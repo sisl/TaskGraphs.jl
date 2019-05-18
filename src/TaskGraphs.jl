@@ -2,7 +2,9 @@ module TaskGraphs
 
 using Parameters
 using LightGraphs, MetaGraphs
-# using DecisionMaking
+using LinearAlgebra
+
+include("utils.jl")
 
 export
     Status,
@@ -11,6 +13,30 @@ export
     EnvTime,
     ObjectID,
     RobotID,
+    StationID,
+
+    PlanningPredicate,
+    OBJECT_AT,
+    ROBOT_AT,
+
+    PlanningAction,
+    MOVE,
+    TAKE,
+    pre_conditions,
+    add_conditions,
+    delete_conditions,
+
+    Operation,
+    construct_operation,
+
+    TaskGraph,
+    get_initial_nodes,
+    get_input_ids,
+    get_output_ids,
+    add_operation!,
+    populate_lower_time_bound!,
+    get_o,get_s,get_r,preconditions,postconditions,
+    get_position,
 
     AgentState,
     ObjectState,
@@ -25,10 +51,6 @@ export
     GO,COLLECT,DEPOSIT,CHARGE,WAIT,COLLECT_AND_DELIVER,GO_AND_CHARGE,
 
     transition
-
-# abstract type AbstractFSM end
-# abstract type AbstractFSMState end
-# abstract type AbstractFSMEvent end
 
 
 const Status            = Symbol
@@ -46,17 +68,6 @@ const RobotID()         = -1
 const StationID         = Int
 const StationID()       = -1
 
-export
-    PlanningPredicate,
-    OBJECT_AT,
-    ROBOT_AT,
-    Operation,
-    TaskGraph,
-    get_initial_nodes,
-    add_operation!,
-    populate_lower_time_bound!,
-    get_o,get_s,get_r,preconditions,postconditions,
-    get_position
 
 abstract type PlanningPredicate end
 struct OBJECT_AT <: PlanningPredicate
@@ -121,6 +132,13 @@ struct Operation
     post::Set{PlanningPredicate}
     Δt::Int
 end
+function construct_operation(station_id, input_ids, output_ids, Δt)
+    Operation(
+        Set{PlanningPredicate}(map(i->OBJECT_AT(i,station_id), input_ids)),
+        Set{PlanningPredicate}(map(i->OBJECT_AT(i,station_id), output_ids)),
+        Δt
+    )
+end
 get_s(op::Operation) = get_s(rand(op.pre))
 Δt(op::Operation) = op.Δt
 preconditions(op::Operation) = op.pre
@@ -168,7 +186,6 @@ function add_operation!(task_graph::TaskGraph, op::Operation)
     end
     task_graph
 end
-
 
 """
     `AgentState`
