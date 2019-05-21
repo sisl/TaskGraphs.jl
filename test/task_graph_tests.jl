@@ -20,7 +20,7 @@ function run_tests()
             r₀,s₀,sₜ = initialize_random_2D_task_graph_env(N,M;d=[20,20])
             D = construct_factory_distance_matrix(r₀,s₀,sₜ)
 
-            project_spec = TaskGraph()
+            project_spec = ProjectSpec()
             add_operation!(project_spec,construct_operation(1, [1,2,3],[4], 0))
             add_operation!(project_spec,construct_operation(2, [5,6]  ,[7], 0))
             add_operation!(project_spec,construct_operation(3, [4,7]  ,[8], 0))
@@ -35,6 +35,9 @@ function run_tests()
             # populate_lower_time_bound!(task_graph,env_state,env_model,t_lower,length(task_graph.operations))
             # @show t_lower
 
+        end
+        @time @testset "RandomInitializationTests" begin
+            construct_random_project_spec(20)
         end
         # @time @testset "SimpleTransitionTests" begin
         #     let

@@ -3,6 +3,7 @@ module TaskGraphs
 using Parameters
 using LightGraphs, MetaGraphs
 using LinearAlgebra
+using DataStructures
 
 include("utils.jl")
 
@@ -29,7 +30,11 @@ export
     Operation,
     construct_operation,
 
-    TaskGraph,
+    DeliveryTask,
+    DeliveryGraph,
+    construct_delivery_graph,
+
+    ProjectSpec,
     get_initial_nodes,
     get_input_ids,
     get_output_ids,
@@ -44,7 +49,7 @@ export
 
     HighLevelEnvModel,
     get_distance,
-    Δt,
+    duration,
     get_charge_distance,
 
     AbstractRobotAction,
@@ -140,29 +145,35 @@ function construct_operation(station_id, input_ids, output_ids, Δt)
     )
 end
 get_s(op::Operation) = get_s(rand(op.pre))
-Δt(op::Operation) = op.Δt
+duration(op::Operation) = op.Δt
 preconditions(op::Operation) = op.pre
 postconditions(op::Operation) = op.post
 
-@with_kw struct TaskGraph{G}
+"""
+    ProjectSpec{G}
+
+    Defines a list of operations that must be performed in order to complete a
+    specific project, in addition to the dependencies between those operations
+"""
+@with_kw struct ProjectSpec{G}
     operations::Vector{Operation} = Vector{Operation}()
     pre_deps::Dict{Int,Set{Int}}  = Dict{Int,Set{Int}}() # id => (pre_conditions)
     post_deps::Dict{Int,Set{Int}} = Dict{Int,Set{Int}}()
     graph::G                      = DiGraph()
 end
-get_initial_nodes(tg::TaskGraph) = setdiff(
+get_initial_nodes(tg::ProjectSpec) = setdiff(
     Set(collect(vertices(tg.graph))),collect(keys(tg.pre_deps)))
 get_input_ids(op::Operation) = Set{Int}([p.o for p in op.pre])
 get_output_ids(op::Operation) = Set{Int}([p.o for p in op.post])
-get_pre_deps(tg::TaskGraph, i::ObjectID) = get(tg.pre_deps, i, Set{Int}())
-get_post_deps(tg::TaskGraph, i::ObjectID) = get(tg.post_deps, i, Set{Int}())
-function add_pre_dep!(tg::TaskGraph, i::ObjectID, op_idx::Int)
+get_pre_deps(tg::ProjectSpec, i::ObjectID) = get(tg.pre_deps, i, Set{Int}())
+get_post_deps(tg::ProjectSpec, i::ObjectID) = get(tg.post_deps, i, Set{Int}())
+function add_pre_dep!(tg::ProjectSpec, i::ObjectID, op_idx::Int)
     push!(get!(tg.pre_deps, i, Set{Int}()),op_idx)
 end
-function add_post_dep!(tg::TaskGraph, i::ObjectID, op_idx::Int)
+function add_post_dep!(tg::ProjectSpec, i::ObjectID, op_idx::Int)
     push!(get!(tg.post_deps, i, Set{Int}()),op_idx)
 end
-function add_operation!(task_graph::TaskGraph, op::Operation)
+function add_operation!(task_graph::ProjectSpec, op::Operation)
     G = task_graph.graph
     ops = task_graph.operations
     add_vertex!(G)
@@ -185,6 +196,39 @@ function add_operation!(task_graph::TaskGraph, op::Operation)
         end
     end
     task_graph
+end
+
+"""
+    DeliveryTask
+"""
+struct DeliveryTask
+    o::ObjectID
+    s1::StationID
+    s2::StationID
+end
+"""
+    DeliveryGraph{G}
+"""
+struct DeliveryGraph{G}
+    tasks::Vector{DeliveryTask}
+    graph::G
+end
+"""
+    construct_delivery_graph(project_spec::ProjectSpec,M::Int)
+
+    Assumes that station ids correspond to object ids.
+"""
+function construct_delivery_graph(project_spec::ProjectSpec,M::Int)
+    delivery_graph = DeliveryGraph(Vector{DeliveryTask}(),MetaDiGraph(M))
+    for op in project_spec.operations
+        for i in get_input_ids(op)
+            for j in get_output_ids(op)
+                add_edge!(delivery_graph.graph, i, j)
+                push!(delivery_graph.tasks,DeliveryTask(i,i,j))
+            end
+        end
+    end
+    delivery_graph
 end
 
 """
@@ -269,7 +313,7 @@ function HighLevelEnvModel(station_ids::Vector{Int},charger_ids::Vector{Int},gra
     HighLevelEnvModel(station_ids,charger_ids,graph,D,DC)
 end
 get_distance(model::HighLevelEnvModel, x1::Location, x2::Location) = model.dist_matrix[x1,x2]
-Δt(model::HighLevelEnvModel, x1::Location, x2::Location) = 1 * get_distance(model,x1,x2)
+duration(model::HighLevelEnvModel, x1::Location, x2::Location) = 1 * get_distance(model,x1,x2)
 get_charge_distance(model::HighLevelEnvModel, x::Location) = minimum(model.dist_to_nearest_charger[x])
 
 function can_carry(env_model::HighLevelEnvModel, r::RobotID, o::ObjectID)
@@ -277,7 +321,7 @@ function can_carry(env_model::HighLevelEnvModel, r::RobotID, o::ObjectID)
     return true
 end
 function populate_lower_time_bound!(
-        task_graph::TaskGraph,
+        task_graph::ProjectSpec,
         env_state::EnvState,
         env_model::HighLevelEnvModel,
         t_lower::Vector{Int},
@@ -297,10 +341,10 @@ function populate_lower_time_bound!(
                 # TODO: if robot r can carry object o
                 if can_carry(env_model, r, o)
                     rx = get_location(robot_state)
-                    t_pred = min(t_pred, Δt(env_model,rx,ox))
+                    t_pred = min(t_pred, duration(env_model,rx,ox))
                 end
             end
-            t_pred += Δt(env_model,ox,sx)
+            t_pred += duration(env_model,ox,sx)
             t = max(t_pred,t)
         end
     else
@@ -308,9 +352,9 @@ function populate_lower_time_bound!(
             parent_op = task_graph.operations[parent_op_idx]
             dt = 0
             for pred in postconditions(parent_op)
-                dt = max(dt, Δt(env_model,get_s(pred),get_s(op)))
+                dt = max(dt, duration(env_model,get_s(pred),get_s(op)))
             end
-            t = max(t, Δt(parent_op) + dt + populate_lower_time_bound!(
+            t = max(t, duration(parent_op) + dt + populate_lower_time_bound!(
                     task_graph,env_state,env_model,t_lower,parent_op_idx))
         end
     end
@@ -320,7 +364,7 @@ end
 
 # robot actions
 abstract type AbstractRobotAction end
-Δt(model, state::AgentState, action::AbstractRobotAction) = 0
+duration(model, state::AgentState, action::AbstractRobotAction) = 0
 struct GO <: AbstractRobotAction # go to position x
     r::RobotID
     x::Location
@@ -353,14 +397,14 @@ struct GO_AND_CHARGE <: AbstractRobotAction
     b   ::BatteryLevel
 end
 
-Δt(model, state::AgentState, action::GO) = Δt(model, state.x, action.x)
-Δt(model, state::AgentState, action::CHARGE) = 0
+duration(model, state::AgentState, action::GO) = duration(model, state.x, action.x)
+duration(model, state::AgentState, action::CHARGE) = 0
 function transition(model, state::AgentState, action::GO)
     next_state = AgentState(
         s = state.s,
         x = action.x,
         b = state.b - get_distance(model, state.x, action.x),
-        t = state.t + Δt(model, state, action),
+        t = state.t + duration(model, state, action),
         o = state.o
     )
 end
@@ -387,7 +431,7 @@ function transition(model, state::AgentState, action::CHARGE)
         s = state.s,
         x = state.x,
         b = action.b,
-        t = state.t + Δt(model, state, action),
+        t = state.t + duration(model, state, action),
         o = state.o
     )
 end
