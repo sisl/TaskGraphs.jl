@@ -129,7 +129,7 @@ function construct_random_project_spec(M::Int;max_parents=1,depth_bias=1.0,Δt_m
 end
 
 """
-    compute_lower_time_bound(G,D,r₀,s₀,sₜ,Δt)
+    compute_lower_time_bound(G,D,Δt)
 
     Given a task graph planning problem, computes a lower bound on completion
     time for each task.
