@@ -55,31 +55,27 @@ function construct_factory_distance_matrix(r₀,s₀,sₜ;dist::Function=(x1,x2)
     N = size(r₀,1)
     M = size(s₀,1)
     # Construct distance matrix
-    D = zeros(N+M,N+M)
+    Drr = zeros(N,N) # distance robot to robot (not relevant)
     for i in 1:N
         for j in 1:N
-            # distance from robot to robot (not relevant)
-            D[i,j] = dist(r₀[i],r₀[j])
-        end
-        for j in 1:M
-            # distance from robot to object + object to station
-            D[i,j+N] = dist(r₀[i],s₀[j]) + dist(s₀[j],sₜ[j])
+            Drr[i,j] = dist(r₀[i],r₀[j])
         end
     end
+    Drs = zeros(N,M) # distance robot to delivery completion
+    for i in 1:N
+        for j in 1:M
+            # distance from robot to object + object to station
+            Drs[i,j] = dist(r₀[i],s₀[j]) + dist(s₀[j],sₜ[j])
+        end
+    end
+    Dss = zeros(M,M) # distance dummy robot to delivery completion
     for i in 1:M
         for j in 1:M
-            # distance from robot to object + object to station
-            D[i+N,j+N] = dist(sₜ[i],s₀[j]) + dist(s₀[j],sₜ[j])
+            # distance from dummy robot to object + object to station
+            Dss[i,j] = dist(sₜ[i],s₀[j]) + dist(s₀[j],sₜ[j])
         end
     end
-    # ensure symmetric matrix
-    for i in 1:size(D,1)
-        for j in 1:size(D,2)
-            D[i,j] = max(D[i,j],D[j,i])
-            D[j,i] = D[i,j]
-        end
-    end
-    D
+    D = [Drr Drs; Drs' Dss]
 end
 
 """
@@ -145,10 +141,10 @@ function compute_lower_time_bound(G,D,Δt)
     N = size(D,1) - M
 
     # split distance matrix into appropriate blocks
-    Drr = D[1:N,1:N]
-    Drs = D[1:N,N+1:N+M]
-    Dsr = Drs'
-    Dss = D[N+1:N+M,N+1:N+M]
+    Drr = D[1:N,1:N]            # distance robot to robot
+    Drs = D[1:N,N+1:N+M]        # distance robot to delivery completion
+    Dsr = Drs'                  # transpose of above
+    Dss = D[N+1:N+M,N+1:N+M]    # distance dummy robot to delivery completion
 
     # compute lower bound
     t_low = zeros(nv(G))
@@ -164,7 +160,6 @@ function compute_lower_time_bound(G,D,Δt)
     end
     t_low
 end
-
 
 """
     TODO: HungarianMethod
