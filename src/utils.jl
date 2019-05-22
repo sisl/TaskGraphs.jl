@@ -1,9 +1,24 @@
 export
+    is_leaf_node,
     initialize_random_2D_task_graph_env,
+    cached_pickup_and_delivery_distances,
+    formulate_optimization_problem,
     construct_factory_distance_matrix,
     construct_random_project_spec,
     compute_lower_time_bound
 
+"""
+    `is_leaf_node(G,v)`
+
+    Inputs:
+        `G` - graph with inverted tree structure that encodes dependencies
+            between tasks
+        `v` - query vertex
+
+    Outputs:
+        returns `true` if vertex v has no prereqs (inneighbors)
+"""
+is_leaf_node(G,v) = degree(G,v) == 1
 
 """
     initialize_random_2D_task_graph_env(G,N;d=[20,20])
@@ -47,6 +62,88 @@ function initialize_random_2D_task_graph_env(N,M;d=[20,20])
         # end
     end
     r₀,s₀,sₜ
+end
+
+"""
+    `cached_pickup_and_delivery_distances(r₀,oₒ,sₒ,dist=(x1,x2)->norm(x2-x1,1))`
+
+    Inputs:
+        `r₀` - vector of initial robot locations.
+        `sₒ` - vector of initial object locations.
+        `sₜ` - vector of station locations (object i must be brough to station i
+            from its initial location)
+
+    Outputs:
+        `Drs` - distance from initial robot locations (including dummies) to
+            object pickup locations
+        `Dss` - distance from pickup stations to delivery stations (only the
+            diagonal) is relevant for our problem
+"""
+function cached_pickup_and_delivery_distances(r₀,s₀,sₜ,dist=(x1,x2)->norm(x2-x1,1))
+    N = size(r₀,1)
+    M = size(s₀,1)
+    # augment r₀ to include "dummy" robots that appear after dropoff
+    r₀ = [r₀;s₀]
+    # Construct distance matrix
+    Drs = zeros(N+M,M) # distance robot to pickup station
+    for i in 1:N+M
+        for j in 1:M
+            Drs[i,j] = dist(r₀[i],s₀[j])
+        end
+    end
+    Dss = zeros(M,M) # distance robot to delivery station
+    for i in 1:M
+        for j in 1:M
+            # distance from dummy robot to object + object to station
+            Dss[i,j] = dist(s₀[j],sₜ[j])
+        end
+    end
+    return Drs, Dss
+end
+
+"""
+    `formulate_optimization_problem(G,Drs,Dss,Δt)`
+
+    *** TODO: This function is still partially pseudocode. ***
+
+    Inputs:
+        `G` - graph with inverted tree structure that encodes dependencies
+            between tasks
+        `Drs` - Drs[i,j] is distance from initial robot position i to pickup
+            station j
+        `Dss` - Drr[j,j] is distance from start station j to final station j (we
+            only care about the diagonal)
+        `to0_` - a `Dict`, where `to0_[j]` gives the start time for task j
+            (applies to leaf task only)
+        `tr0_` - a `Dict`, where `tr0_[i]` gives the start time for robot i
+            (applies to non-dummy robots only)
+
+    Outputs:
+        `model` - an Optimization problem
+"""
+function formulate_optimization_problem(G,Drs,Dss,Δt)
+    #TODO need to provide known start times for leaf tasks and non-dummy robots
+    # Optimization variables
+    x = zeros(Int, M)  # x[j] = i means that agent i is assigned to task j
+    # Helper variables
+    to0 = zeros(M)     # to0[j] = available start time for task j (already known for leaf nodes)
+    tof = zeros(M)     # tof[j] = completion time for task j
+    tr0 = zeros(N+M)   # tr0[i] = available start time for robot i
+    # constraints
+    for j in 1:M
+        # constraint on task start time
+        if !is_leaf_node(G,j)
+            to0[j] = maximum(tof[inneighbors(G,j)]) + Δt[j]
+        end
+        # constraint on dummy robot start time
+        tr0[j+N] == tof[j]
+        for i in 1:N
+            if x[i] == j
+                # constraint on task completion time
+                tof[j] == max(to0[j], tr0[i] + Drs[i,j]) + Dss[j,j]
+            end
+        end
+    end
 end
 
 """
