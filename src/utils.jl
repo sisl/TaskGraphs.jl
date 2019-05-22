@@ -8,10 +8,15 @@ export
 """
     initialize_random_2D_task_graph_env(G,N;d=[20,20])
 
-    d = [20,20] - dimensions of factor floor
-    r₀ - indices of initial robot positions
-    s₀ - indices of initial object locations
-    sₜ - indices of destination object locations
+    Inputs:
+        `N` - number of agents
+        `M` - number of tasks
+        `d` = [20,20] - dimensions of factor floor
+
+    Outputs:
+        `r₀` - indices of initial robot positions
+        `s₀` - indices of initial object locations
+        `sₜ` - indices of destination object locations
 """
 function initialize_random_2D_task_graph_env(N,M;d=[20,20])
     x₀ = Set{Vector{Int}}() # all possible grid locations
@@ -47,9 +52,11 @@ end
 """
     `construct_factory_distance_matrix(r₀,oₒ,sₒ;dist::Function=(x1,x2)->norm(x2-x1,1))`
 
-    r₀ - vector of initial robot locations.
-    sₒ - vector of initial object locations.
-    sₜ - vector of station locations (object i must be brough to station i from its initial location)
+    Inputs:
+        `r₀` - vector of initial robot locations.
+        `sₒ` - vector of initial object locations.
+        `sₜ` - vector of station locations (object i must be brough to station i
+            from its initial location)
 """
 function construct_factory_distance_matrix(r₀,s₀,sₜ;dist::Function=(x1,x2)->norm(x2-x1,1))
     N = size(r₀,1)
@@ -81,11 +88,14 @@ end
 """
     construct_random_project_spec(M::Int;max_children=1)
 
-    max_parents - determines the max number of inputs that an operation may have
-    depth_bias ∈ [0,1] - hyperparameter for tuning depth.
-        If `depth_bias` == 1.0, the project_spec graph will always be depth
-        balanced (all paths through the tree will be of the same length). For
-        depth_bias == 0.0, the graph will be as "strung out" as possible.
+    Inputs:
+        `M` - number of objects involved in the operation
+        `max_parents` - determines the max number of inputs to any operation
+        `depth_bias` ∈ [0,1] - hyperparameter for tuning depth.
+            If `depth_bias` == 1.0, the project_spec graph will always be depth
+            balanced (all paths through the tree will be of the same length).
+            For `depth_bias` == 0.0, the graph will be as "strung out" as
+            possible.
 """
 function construct_random_project_spec(M::Int;max_parents=1,depth_bias=1.0,Δt_min::Int=0,Δt_max::Int=0)
     project_spec = ProjectSpec()
@@ -130,24 +140,50 @@ end
     Given a task graph planning problem, computes a lower bound on completion
     time for each task.
 
-    G - the task graph with that encodes dependencies between the M atomic tasks
-    D - the distance matrix, where D[i,j] specifies the time required for agent i
-        to accomplish task j
-    Δt- the process time vector, where Δt[j] encodes the amount of time required
-        for task j to be available after all prereqs of j are satisfied
+    Inputs:
+        `G` - The task graph. Encodes dependencies between the `M` atomic tasks
+        `D` - The distance matrix. D[i,j] specifies the time required for agent
+            i to accomplish task j
+        `Δt`- The process time vector. Δt[j] encodes the amount of time required
+            for task j to become available after all prereqs of j are satisfied
+
+    Outputs:
+        `t_low` ∈ Rᴹ - lower bound on completion time for each task
 """
 function compute_lower_time_bound(G,D,Δt)
     M = nv(G)
     N = size(D,1) - M
-
     # split distance matrix into appropriate blocks
     Drr = D[1:N,1:N]            # distance robot to robot
     Drs = D[1:N,N+1:N+M]        # distance robot to delivery completion
     Dsr = Drs'                  # transpose of above
     Dss = D[N+1:N+M,N+1:N+M]    # distance dummy robot to delivery completion
-
     # compute lower bound
     t_low = zeros(nv(G))
+    root_node = map(e->e.dst, collect(edges(dfs_tree(G,1))))[end]
+    bfs_traversal = bfs_tree(G,root_node;dir=:in)
+    ids = map(e->e.dst, collect(edges(bfs_traversal)))
+    append!(ids, root_node)
+    for v in ids
+        t_low[v] = Δt[v] + minimum(Drs[:,v])
+        for v2 in inneighbors(G,v)
+            t_low[v] = max(t_low[v], t_low[v2] + Dss[v2,v] + Δt[v]) # + minimum(Dss[inneighbors(G,v),v]))
+        end
+    end
+    t_low
+end
+
+function compute_lower_time_bound_and_slack(G,D,Δt)
+    M = nv(G)
+    N = size(D,1) - M
+    # split distance matrix into appropriate blocks
+    Drr = D[1:N,1:N]            # distance robot to robot
+    Drs = D[1:N,N+1:N+M]        # distance robot to delivery completion
+    Dsr = Drs'                  # transpose of above
+    Dss = D[N+1:N+M,N+1:N+M]    # distance dummy robot to delivery completion
+    # compute lower bound
+    t_low = zeros(nv(G))
+    slack = zeros(nv(G))
     root_node = map(e->e.dst, collect(edges(dfs_tree(G,1))))[end]
     bfs_traversal = bfs_tree(G,root_node;dir=:in)
     ids = map(e->e.dst, collect(edges(bfs_traversal)))
