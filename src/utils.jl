@@ -123,8 +123,10 @@ end
     Outputs:
         `model` - an Optimization problem
 """
-function formulate_optimization_problem(G,Drs,Dss,Δt,to0_,tr0_)
+function TaskGraphs.formulate_optimization_problem(G,Drs,Dss,Δt,to0_,tr0_)
     #TODO need to provide known start times for leaf tasks and non-dummy robots
+    M = size(Dss,1)
+    N = size(Drs,1)-M
     # Optimization variables
     x = zeros(Int, M)  # x[j] = i means that agent i is assigned to task j
     # Helper variables
