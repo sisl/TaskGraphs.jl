@@ -111,17 +111,19 @@ end
             between tasks
         `Drs` - Drs[i,j] is distance from initial robot position i to pickup
             station j
-        `Dss` - Drr[j,j] is distance from start station j to final station j (we
+        `Dss` - Dss[j,j] is distance from start station j to final station j (we
             only care about the diagonal)
+        `Δt` - Δt[j] is the duraction of time that must elapse after all prereqs
+            of task j have been satisfied before task j becomes available
         `to0_` - a `Dict`, where `to0_[j]` gives the start time for task j
-            (applies to leaf task only)
+            (applies to leaf tasks only)
         `tr0_` - a `Dict`, where `tr0_[i]` gives the start time for robot i
             (applies to non-dummy robots only)
 
     Outputs:
         `model` - an Optimization problem
 """
-function formulate_optimization_problem(G,Drs,Dss,Δt)
+function formulate_optimization_problem(G,Drs,Dss,Δt,to0_,tr0_)
     #TODO need to provide known start times for leaf tasks and non-dummy robots
     # Optimization variables
     x = zeros(Int, M)  # x[j] = i means that agent i is assigned to task j
@@ -129,11 +131,20 @@ function formulate_optimization_problem(G,Drs,Dss,Δt)
     to0 = zeros(M)     # to0[j] = available start time for task j (already known for leaf nodes)
     tof = zeros(M)     # tof[j] = completion time for task j
     tr0 = zeros(N+M)   # tr0[i] = available start time for robot i
+    # initial conditions
+    for (i,t) in tr0_
+        # start time for robot i
+        tr0[i] = t
+    end
+    for (j,t) in to0_
+        # start time for task j (applies only to tasks with no prereqs)
+        to0[j] = t
+    end
     # constraints
     for j in 1:M
         # constraint on task start time
         if !is_leaf_node(G,j)
-            to0[j] = maximum(tof[inneighbors(G,j)]) + Δt[j]
+            to0[j] == maximum(tof[inneighbors(G,j)]) + Δt[j]
         end
         # constraint on dummy robot start time
         tr0[j+N] == tof[j]
@@ -145,6 +156,46 @@ function formulate_optimization_problem(G,Drs,Dss,Δt)
         end
     end
 end
+
+# ##### With JuMP #####
+# model = Model()
+# @variable(model, to0[1:M] <= 0.0)
+# @variable(model, tof[1:M] <= 0.0)
+# @variable(model, tr0[1:N+M] <= 0.0)
+# # Assignment matrix x
+# @variable(model, x[1:N+M,1:M], binary = true) # x[i,j] ∈ {0,1}
+# @constraint(model, x * ones(M) .<= 1)         # each robot may have no more than 1 task
+# @constraint(model, x' * ones(N+M) .== 1)      # each task must have exactly 1 assignment
+# for (i,t) in tr0_
+#     # start time for robot i
+#     @constraint(model, tr0[i] == t)
+# end
+# for (j,t) in to0_
+#     # start time for task j (applies only to tasks with no prereqs)
+#     @constraint(model, to0[j] == t)
+# end
+# # constraints
+# for j in 1:M
+#     # constraint on task start time
+#     if !is_leaf_node(G,j)
+#         for v in inneighbors(G,j)
+#             @constraint(model, to0[j] >= tof[v] + Δt[j])
+#         end
+#     end
+#     # constraint on dummy robot start time (corresponds to moment of object delivery)
+#     @constraint(model, tr0[j+N] == tof[j])
+#     # dummy robots can't do downstream jobs
+#     for v in map(e->e.dst,collect(edges(dfs_tree(G,j))))
+#         @constraint(model, x[j+N,v] == 0)
+#     end
+#     # lower bound on task completion time (task can't start until it's available).
+#     @constraint(model, tof[j] >= to0[j] + Dss[j,j])
+#     # bound on task completion time (assigned robot must first complete delivery)
+#     # This is technically a quadratic constraint, because x and tr0 are being
+#     # multiplied by each other. Any way to reformulate?
+#     @constraint(model, tof[j] >= (tr0 + Drs[:,j])'*x[:,j] + Dss[j,j])
+# end
+
 
 """
     `construct_factory_distance_matrix(r₀,oₒ,sₒ;dist::Function=(x1,x2)->norm(x2-x1,1))`
