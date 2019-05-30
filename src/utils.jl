@@ -198,7 +198,6 @@ end
 #     @constraint(model, tof[j] >= (tr0 + Drs[:,j])'*x[:,j] + Dss[j,j])
 # end
 
-
 """
     `construct_factory_distance_matrix(r₀,oₒ,sₒ;dist::Function=(x1,x2)->norm(x2-x1,1))`
 
