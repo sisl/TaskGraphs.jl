@@ -4,6 +4,7 @@ using Parameters
 using LightGraphs, MetaGraphs
 using LinearAlgebra
 using DataStructures
+using JuMP
 
 include("utils.jl")
 

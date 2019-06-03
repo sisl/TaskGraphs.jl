@@ -1,0 +1,34 @@
+\documentclass[tikz]{standalone}
+\usepackage{pgfplots}
+\pgfplotsset{compat=newest}
+\pgfplotsset{every axis legend/.append style={%
+cells={anchor=west}}
+}
+\usepgfplotslibrary{polar}
+\usetikzlibrary{arrows}
+\tikzset{>=stealth'}
+
+\begin{document}
+\begin{tikzpicture}[]
+\begin{axis}\addplot+ coordinates {
+(20.0, 0.034922122955322266)
+(40.0, 0.11672091484069824)
+(80.0, 0.5772669315338135)
+(160.0, 10.523250102996826)
+};
+\addplot+ coordinates {
+(20.0, 0.039205074310302734)
+(40.0, 0.13253092765808105)
+(80.0, 1.457740068435669)
+(160.0, 10.480377912521362)
+};
+\addplot+ coordinates {
+(20.0, 0.03629708290100098)
+(40.0, 0.18575596809387207)
+(80.0, 1.346771001815796)
+(160.0, 10.596359968185425)
+};
+\end{axis}
+
+\end{tikzpicture}
+\end{document}
