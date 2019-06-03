@@ -240,15 +240,12 @@ end
 """
     `construct_factory_distance_matrix(r₀,oₒ,sₒ;dist::Function=(x1,x2)->norm(x2-x1,1))`
 
-    Inputs:
-        `r₀` - vector of initial robot locations.
-        `sₒ` - vector of initial object locations.
-        `sₜ` - vector of station locations (object i must be brough to station i
-            from its initial location)
+    Inputs: `r₀` - vector of initial robot locations. `sₒ` - vector of initial
+    object locations. `sₜ` - vector of station locations (object i must be
+    brough to station i from its initial location)
 """
 function construct_factory_distance_matrix(r₀,s₀,sₜ;dist::Function=(x1,x2)->norm(x2-x1,1))
-    N = size(r₀,1)
-    M = size(s₀,1)
+    N = size(r₀,1); M = size(s₀,1)
     # Construct distance matrix
     Drr = zeros(N,N) # distance robot to robot (not relevant)
     for i in 1:N
