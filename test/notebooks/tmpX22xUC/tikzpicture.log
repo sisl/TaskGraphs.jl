@@ -1,4 +1,4 @@
-This is LuaTeX, Version 1.10.0 (MiKTeX 2.9.7000)  (format=lualatex 2019.5.13)  3 JUN 2019 16:49
+This is LuaTeX, Version 1.10.0 (MiKTeX 2.9.7000)  (format=lualatex 2019.5.13)  3 JUN 2019 17:01
  restricted system commands enabled.
 **tikzpicture.tex
 (./tikzpicture.tex
@@ -27,11 +27,14 @@ uaotfload-init.lua.main'
                                                   \let \f@encoding \encoding...
 l.1 
   \documentclass[tikz]{standalone}
-? 
+? q
+OK, entering \batchmode...
 Babel <3.18> and hyphenation patterns for 1 language(s) loaded.
+
 (/home/kylebrown/.miktex/texmfs/install/tex/latex/standalone/standalone.cls
 Document Class: standalone 2015/07/15 v1.2 Class to compile TeX sub-files standa
 lone
+
 (/home/kylebrown/.miktex/texmfs/install/tex/generic/oberdiek/ifluatex.sty
 Package: ifluatex 2016/05/16 v1.4 Provides the ifluatex switch (HO)
 Package ifluatex Info: LuaTeX detected.
@@ -63,16 +66,21 @@ File: standalone.cfg 2015/07/15 v1.2 Default configuration file for 'standalone'
 )
 (/home/kylebrown/.miktex/texmfs/install/tex/latex/base/article.cls
 Document Class: article 2014/09/29 v1.4h Standard LaTeX document class
+
 (/home/kylebrown/.miktex/texmfs/install/tex/latex/base/size10.clo
 File: size10.clo 2014/09/29 v1.4h Standard LaTeX file (size option)
-
 ! Font \TU/lmr/m/n/10=[lmroman10-regular]:+tlig; at 10pt not loadable: metric da
 ta not found or bad.
 <to be read again> 
 relax 
 l.54 \normalsize
               
-? 
+I wasn't able to read the size data for this font,
+so I will ignore the font specification.
+[Wizards can fix TFM files using TFtoPL/PLtoTF.]
+You might try inserting a different font spec;
+e.g., type `I\font<same font id>=<substitute font name>'.
+
 )
 \c@part=\count82
 \c@section=\count83
@@ -85,7 +93,8 @@ l.54 \normalsize
 \abovecaptionskip=\skip41
 \belowcaptionskip=\skip42
 \bibindent=\dimen102
-) (/home/kylebrown/.miktex/texmfs/install/tex/latex/pgf/frontendlayer/tikz.sty 
+)
+(/home/kylebrown/.miktex/texmfs/install/tex/latex/pgf/frontendlayer/tikz.sty
 (/home/kylebrown/.miktex/texmfs/install/tex/latex/pgf/basiclayer/pgf.sty
 (/home/kylebrown/.miktex/texmfs/install/tex/latex/pgf/utilities/pgfrcs.sty
 (/home/kylebrown/.miktex/texmfs/install/tex/generic/pgf/utilities/pgfutil-commo
@@ -99,7 +108,8 @@ n-lists.tex))
 (/home/kylebrown/.miktex/texmfs/install/tex/generic/pgf/utilities/pgfutil-latex
 .def
 \pgfutil@abb=\box26
- (/home/kylebrown/.miktex/texmfs/install/tex/latex/ms/everyshi.sty
+
+(/home/kylebrown/.miktex/texmfs/install/tex/latex/ms/everyshi.sty
 Package: everyshi 2001/05/15 v3.00 EveryShipout Package (MS)
 ))
 (/home/kylebrown/.miktex/texmfs/install/tex/generic/pgf/utilities/pgfrcs.code.t
@@ -357,7 +367,8 @@ Package: pgfcomp-version-1-18 2007/07/23 v3.0.1a (rcs-revision 1.1)
 (/home/kylebrown/.miktex/texmfs/install/tex/latex/pgf/utilities/pgffor.sty
 (/home/kylebrown/.miktex/texmfs/install/tex/latex/pgf/utilities/pgfkeys.sty
 (/home/kylebrown/.miktex/texmfs/install/tex/generic/pgf/utilities/pgfkeys.code.
-tex)) (/home/kylebrown/.miktex/texmfs/install/tex/latex/pgf/math/pgfmath.sty
+tex))
+(/home/kylebrown/.miktex/texmfs/install/tex/latex/pgf/math/pgfmath.sty
 (/home/kylebrown/.miktex/texmfs/install/tex/generic/pgf/math/pgfmath.code.tex))
 (/home/kylebrown/.miktex/texmfs/install/tex/generic/pgf/utilities/pgffor.code.t
 ex
@@ -556,10 +567,9 @@ File: tikzlibraryarrows.code.tex 2008/01/09 v3.0.1a (rcs-revision 1.1)
 ows.code.tex
 File: pgflibraryarrows.code.tex 2013/09/23 v3.0.1a (rcs-revision 1.16)
 \arrowsize=\dimen165
-))
-No file tikzpicture.aux.
-
+)) (./tikzpicture.aux)
 \openout1 = tikzpicture.aux
+
 LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 11.
 LaTeX Font Info:    ... okay on input line 11.
 LaTeX Font Info:    Checking defaults for T1/cmr/m/n on input line 11.
@@ -574,7 +584,7 @@ LaTeX Font Info:    Checking defaults for OMX/cmex/m/n on input line 11.
 LaTeX Font Info:    ... okay on input line 11.
 LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 11.
 LaTeX Font Info:    ... okay on input line 11.
-ABD: EveryShipout initializing macros
+ ABD: EveryShipout initializing macros
 (/home/kylebrown/.miktex/texmfs/install/tex/context/base/supp-pdf.mkii
 [Loading MPS to PDF converter (version 2006.09.02).]
 \scratchcounter=\count117
@@ -588,7 +598,8 @@ ABD: EveryShipout initializing macros
 \MPnumerator=\count121
 \makeMPintoPDFobject=\count122
 \everyMPtoPDFconversion=\toks33
-) (/home/kylebrown/.miktex/texmfs/install/tex/latex/oberdiek/epstopdf-base.sty
+)
+(/home/kylebrown/.miktex/texmfs/install/tex/latex/oberdiek/epstopdf-base.sty
 Package: epstopdf-base 2016/05/15 v2.6 Base part for package epstopdf
 
 (/home/kylebrown/.miktex/texmfs/install/tex/generic/oberdiek/infwarerr.sty
@@ -639,64 +650,96 @@ LaTeX Font Info:    External font `cmex10' loaded for size
                                               =\wd \sa@box \global \pdfpageh...
 l.33 \end{tikzpicture}
                     
-? 
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
 ! You can't use a prefix with `the character ='.
 <to be read again> 
 =
 l.33 \end{tikzpicture}
                     
-? 
+I'll pretend you didn't say \long or \outer or \global or
+\protected.
+
 ! Missing number, treated as zero.
 <to be read again> 
 \global 
 l.33 \end{tikzpicture}
                     
-? 
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
 ! Illegal unit of measure (pt inserted).
 <to be read again> 
 \global 
 l.33 \end{tikzpicture}
                     
-? 
+Dimensions can be in units of em, ex, in, pt, pc,
+cm, mm, dd, cc, nd, nc, bp, or sp; but yours is a new one!
+I'll assume that you meant to say pt, for printer's points.
+To recover gracefully from this error, it's best to
+delete the erroneous units; e.g., type `2' to delete
+two letters. (See Chapter 27 of The TeXbook.)
+
 ! Undefined control sequence.
 \sa@placebox ...wd \sa@box \global \pdfpageheight 
                                                   =\ht \sa@box \global \pape...
 l.33 \end{tikzpicture}
                     
-? 
+The control sequence at the end of the top line
+of your error message was never \def'ed. If you have
+misspelled it (e.g., `\hobx'), type `I' and the correct
+spelling (e.g., `I\hbox'). Otherwise just continue,
+and I'll forget about whatever was undefined.
+
 ! You can't use a prefix with `the character ='.
 <to be read again> 
 =
 l.33 \end{tikzpicture}
                     
-? 
+I'll pretend you didn't say \long or \outer or \global or
+\protected.
+
 ! Missing number, treated as zero.
 <to be read again> 
 \global 
 l.33 \end{tikzpicture}
                     
-? 
+A number should have been here; I inserted `0'.
+(If you can't figure out why I needed to see a number,
+look up `weird error' in the index to The TeXbook.)
+
 ! Illegal unit of measure (pt inserted).
 <to be read again> 
 \global 
 l.33 \end{tikzpicture}
                     
-? 
+Dimensions can be in units of em, ex, in, pt, pc,
+cm, mm, dd, cc, nd, nc, bp, or sp; but yours is a new one!
+I'll assume that you meant to say pt, for printer's points.
+To recover gracefully from this error, it's best to
+delete the erroneous units; e.g., type `2' to delete
+two letters. (See Chapter 27 of The TeXbook.)
+
 
 Overfull \hbox (15.0pt too wide) in paragraph at lines 33--33
 []==[] 
  []
 
-[1
+ [1
 
 ] [2
 Missing character: There is no = (U+003D) in font nullfont!
 Missing character: There is no = (U+003D) in font nullfont!
-{/home/kylebrown/.miktex/texmfs/data/pdftex/config/pdftex.map}]
-(./tikzpicture.aux))
+{/home/kylebrown/.miktex/texmfs/data/pdftex/config/pdftex.map}] (./tikzpicture.
+aux))
 
 Here is how much of LuaTeX's memory you used:
- 23150 strings out of 494364
+ 23155 strings out of 494364
  100000,794899 words of node,token memory allocated
  351 words of node memory still in use:
    2 hlist, 1 vlist, 1 rule, 2 glue, 3 attribute, 44 glue_spec, 3 attribute_list
