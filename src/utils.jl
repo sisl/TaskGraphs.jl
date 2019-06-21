@@ -186,9 +186,12 @@ end
 """
 function formulate_JuMP_optimization_problem(G,Drs,Dss,Δt,to0_,tr0_,optimizer;
     TimeLimit=50,
+    OutputFlag=0
     )
+
     model = Model(with_optimizer(optimizer,
-        TimeLimit=TimeLimit
+        TimeLimit=TimeLimit,
+        OutputFlag=OutputFlag
         ))
     M = size(Dss,1)
     N = size(Drs,1)-M
