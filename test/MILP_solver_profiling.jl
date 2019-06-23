@@ -1,4 +1,4 @@
-
+#!/usr/local/bin/julia
 using LightGraphs, MetaGraphs
 using Parameters
 using LinearAlgebra
@@ -24,6 +24,7 @@ for filename in file_list
 end
 # filename = joinpath(data_path, string("MILP_profiling_", num_csv_files, ".csv"))
 filename = joinpath(data_path, string("MILP_profiling", ".csv"))
+iteration = isfile("profiling/MILP_profiling.csv") ? -countlines("profiling/MILP_profiling.csv")+1 : 0
 # df = DataFrame(
 #     N = Int[],
 #     M = Int[],
@@ -34,14 +35,18 @@ filename = joinpath(data_path, string("MILP_profiling", ".csv"))
 #     )
 
 TRIALS_PER_SETTING = 3;
-iteration = 1;
+# iteration = 0;
 # run tests and push results into table
 for N in [10,20,40,100,200]
-    for M in Vector{Int}([N/2, N, 2*N, 4*N])
+    for M in Vector{Int}([N/2, N, 2*N, 3*N])
         for max_parents in [3, 5, 10]
             for depth_bias in [0.1, 0.4, 0.8, 1.0]
                 global iteration
-                for trial in 1:TRIALS_PER_SETTING + (iteration == 1)
+                for trial in 1:TRIALS_PER_SETTING + (-TRIALS_PER_SETTING < iteration <= 0)
+                    if iteration < 0
+                        iteration += 1
+                        continue
+                    end
                     df = DataFrame(
                         N = Int[],
                         M = Int[],
@@ -83,7 +88,7 @@ for N in [10,20,40,100,200]
                     solve_time = time() - start_time
 
                     global iteration
-                    if iteration > 1
+                    if iteration > 0
                         row_dict = Dict(
                             :N => N,
                             :M => M,
@@ -94,7 +99,11 @@ for N in [10,20,40,100,200]
                             )
                         push!(df, row_dict)
                         file = open(filename;append=true)
-                        df |> CSV.write(file;append=true)
+                        if countlines(filename) == 0
+                            df |> CSV.write(file;writeheader=true)
+                        else
+                            df |> CSV.write(file;append=true)
+                        end
                         close(file)
                         for k in sort(collect(keys(row_dict)))
                             print(string(k),": ",row_dict[k],", ")

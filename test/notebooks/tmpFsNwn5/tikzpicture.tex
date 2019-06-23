@@ -1,0 +1,352 @@
+\documentclass[tikz]{standalone}
+\usepackage{pgfplots}
+\pgfplotsset{compat=newest}
+\pgfplotsset{every axis legend/.append style={%
+cells={anchor=west}}
+}
+\usepgfplotslibrary{polar}
+\usetikzlibrary{arrows}
+\tikzset{>=stealth'}
+
+\begin{document}
+\begin{tikzpicture}[]
+\begin{axis}[height = {12cm}, ylabel = {Computation Time (s)}, title = {My Title}, xlabel = {Num Tasks}, width = {20cm}]\addplot+ [mark = {x}, solid, mark options={fill=solid}]coordinates {
+(5.0, 0.0033063888549804688)
+(10.0, 0.006885369618733724)
+(20.0, 0.030404329299926758)
+(30.0, 0.2193622589111328)
+};
+\addplot+ [mark = {square}, solid, mark options={fill=solid}]coordinates {
+(10.0, 0.009625673294067383)
+(20.0, 0.025864283243815105)
+(40.0, 0.13139875729878744)
+(60.0, 1.394209623336792)
+};
+\addplot+ [mark = {triangle}, solid, mark options={fill=solid}]coordinates {
+(20.0, 0.0328524112701416)
+(40.0, 0.12759963671366373)
+(80.0, 0.6253017584482828)
+(120.0, 5.936886390050252)
+};
+\addplot+ [mark = {circle}, solid, mark options={fill=solid}]coordinates {
+(50.0, 0.2584523359934489)
+(100.0, 1.4366626739501953)
+(200.0, 11.191797018051147)
+(300.0, 12.30021039644877)
+};
+\addplot+ [mark = {diamond}, solid, mark options={fill=solid}]coordinates {
+(100.0, 1.6746879418690999)
+(200.0, 8.213990688323975)
+};
+\addplot+ [mark = {x}, dashed, mark options={fill=dashed}]coordinates {
+(5.0, 0.003882249196370443)
+(10.0, 0.00867931048075358)
+(20.0, 0.034474690755208336)
+(30.0, 1.69418470064799)
+};
+\addplot+ [mark = {square}, dashed, mark options={fill=dashed}]coordinates {
+(10.0, 0.009380737940470377)
+(20.0, 0.035605669021606445)
+(40.0, 0.14587672551472983)
+(60.0, 0.4496060212453206)
+};
+\addplot+ [mark = {triangle}, dashed, mark options={fill=dashed}]coordinates {
+(20.0, 0.043397982915242515)
+(40.0, 0.1218579610188802)
+(80.0, 0.9520920117696127)
+(120.0, 8.121070305506388)
+};
+\addplot+ [mark = {circle}, dashed, mark options={fill=dashed}]coordinates {
+(50.0, 0.2882903416951497)
+(100.0, 1.2132819493611653)
+(200.0, 11.05697504679362)
+(300.0, 12.242246309916178)
+};
+\addplot+ [mark = {diamond}, dashed, mark options={fill=dashed}]coordinates {
+(100.0, 1.689841349919637)
+(200.0, 8.739770730336508)
+};
+\addplot+ [mark = {x}, dash dot, mark options={fill=dash dot}]coordinates {
+(5.0, 0.003207047780354818)
+(10.0, 0.007171948750813802)
+(20.0, 0.05145637194315592)
+(30.0, 6.698858022689819)
+};
+\addplot+ [mark = {square}, dash dot, mark options={fill=dash dot}]coordinates {
+(10.0, 0.00962535540262858)
+(20.0, 0.028403282165527344)
+(40.0, 0.14393297831217447)
+(60.0, 1.3344662984212239)
+};
+\addplot+ [mark = {triangle}, dash dot, mark options={fill=dash dot}]coordinates {
+(20.0, 0.03492299715677897)
+(40.0, 0.14868903160095215)
+(80.0, 1.0843053658803303)
+(120.0, 5.464240709940593)
+};
+\addplot+ [mark = {circle}, dash dot, mark options={fill=dash dot}]coordinates {
+(50.0, 0.24204325675964355)
+(100.0, 1.3776267369588215)
+(200.0, 11.118860642115274)
+(300.0, 12.146235704421997)
+};
+\addplot+ [mark = {diamond}, dash dot, mark options={fill=dash dot}]coordinates {
+(100.0, 2.000360091527303)
+(200.0, 9.87613574663798)
+};
+\addplot+ [mark = {x}, dotted, mark options={fill=dotted}]coordinates {
+(5.0, 0.0035463174184163413)
+(10.0, 0.008121649424235025)
+(20.0, 0.02474673589070638)
+(30.0, 5.508963664372762)
+};
+\addplot+ [mark = {square}, dotted, mark options={fill=dotted}]coordinates {
+(10.0, 0.010601043701171875)
+(20.0, 0.026416619618733723)
+(40.0, 0.10677361488342285)
+(60.0, 0.6289526621500651)
+};
+\addplot+ [mark = {triangle}, dotted, mark options={fill=dotted}]coordinates {
+(20.0, 0.0328683058420817)
+(40.0, 0.1684706211090088)
+(80.0, 0.6309796969095866)
+(120.0, 3.167370001475016)
+};
+\addplot+ [mark = {circle}, dotted, mark options={fill=dotted}]coordinates {
+(50.0, 0.24903329213460287)
+(100.0, 1.3773630460103352)
+(200.0, 11.161063035329184)
+(300.0, 12.598516941070557)
+};
+\addplot+ [mark = {diamond}, dotted, mark options={fill=dotted}]coordinates {
+(100.0, 1.8237849871317546)
+(200.0, 8.521816651026407)
+};
+\addplot+ [mark = {x}, solid, mark options={fill=solid}]coordinates {
+(5.0, 0.005323648452758789)
+(10.0, 0.008212010065714518)
+(20.0, 0.039550065994262695)
+(30.0, 0.7996020317077637)
+};
+\addplot+ [mark = {square}, solid, mark options={fill=solid}]coordinates {
+(10.0, 0.012203296025594076)
+(20.0, 0.02856000264485677)
+(40.0, 0.21619335810343424)
+(60.0, 1.6801544030507405)
+};
+\addplot+ [mark = {triangle}, solid, mark options={fill=solid}]coordinates {
+(20.0, 0.03621530532836914)
+(40.0, 0.1376513640085856)
+(80.0, 1.0488824049631755)
+(120.0, 5.712249994277954)
+};
+\addplot+ [mark = {circle}, solid, mark options={fill=solid}]coordinates {
+(50.0, 0.28669031461079914)
+(100.0, 1.6680853366851807)
+(200.0, 11.134055614471436)
+(300.0, 12.181144634882608)
+};
+\addplot+ [mark = {diamond}, solid, mark options={fill=solid}]coordinates {
+(100.0, 1.9218180179595947)
+(200.0, 8.707300106684366)
+};
+\addplot+ [mark = {x}, dashed, mark options={fill=dashed}]coordinates {
+(5.0, 0.004144589106241862)
+(10.0, 0.009855270385742188)
+(20.0, 0.23082367579142252)
+(30.0, 10.00865070025126)
+};
+\addplot+ [mark = {square}, dashed, mark options={fill=dashed}]coordinates {
+(10.0, 0.014221986134847006)
+(20.0, 0.04318841298421224)
+(40.0, 0.1415709654490153)
+(60.0, 10.034391085306803)
+};
+\addplot+ [mark = {triangle}, dashed, mark options={fill=dashed}]coordinates {
+(20.0, 0.03416673342386881)
+(40.0, 0.1654814084370931)
+(80.0, 1.7776460647583008)
+(120.0, 4.819865385691325)
+};
+\addplot+ [mark = {circle}, dashed, mark options={fill=dashed}]coordinates {
+(50.0, 0.3664987087249756)
+(100.0, 1.7325065930684407)
+(200.0, 11.106747070948282)
+(300.0, 12.118533372879028)
+};
+\addplot+ [mark = {diamond}, dashed, mark options={fill=dashed}]coordinates {
+(100.0, 1.9452397028605144)
+(200.0, 10.951195319493612)
+};
+\addplot+ [mark = {x}, dash dot, mark options={fill=dash dot}]coordinates {
+(5.0, 0.004279692967732747)
+(10.0, 0.0071976979573567705)
+(20.0, 0.3128790060679118)
+(30.0, 6.698635657628377)
+};
+\addplot+ [mark = {square}, dash dot, mark options={fill=dash dot}]coordinates {
+(10.0, 0.0100553830464681)
+(20.0, 0.03574633598327637)
+(40.0, 0.41138799985249835)
+(60.0, 8.292277733484903)
+};
+\addplot+ [mark = {triangle}, dash dot, mark options={fill=dash dot}]coordinates {
+(20.0, 0.03457776705423991)
+(40.0, 0.14829262097676596)
+(80.0, 0.9616349538167318)
+(120.0, 9.567870616912842)
+};
+\addplot+ [mark = {circle}, dash dot, mark options={fill=dash dot}]coordinates {
+(50.0, 0.2692565123240153)
+(100.0, 1.7519760131835938)
+(200.0, 11.186444918314615)
+(300.0, 12.142472982406616)
+};
+\addplot+ [mark = {diamond}, dash dot, mark options={fill=dash dot}]coordinates {
+(100.0, 1.7921549479166667)
+(200.0, 8.346910317738852)
+};
+\addplot+ [mark = {x}, dotted, mark options={fill=dotted}]coordinates {
+(5.0, 0.00448298454284668)
+(10.0, 0.007564624150594075)
+(20.0, 0.09430432319641113)
+(30.0, 6.695868492126465)
+};
+\addplot+ [mark = {square}, dotted, mark options={fill=dotted}]coordinates {
+(10.0, 0.010201295216878256)
+(20.0, 0.035467306772867836)
+(40.0, 0.5296476682027181)
+(60.0, 10.03506906827291)
+};
+\addplot+ [mark = {triangle}, dotted, mark options={fill=dotted}]coordinates {
+(20.0, 0.03689495722452799)
+(40.0, 0.14803330103556314)
+(80.0, 1.1037828922271729)
+(120.0, 7.969218015670776)
+};
+\addplot+ [mark = {circle}, dotted, mark options={fill=dotted}]coordinates {
+(50.0, 0.3034534454345703)
+(100.0, 1.730711301167806)
+(200.0, 11.206762313842773)
+(300.0, 12.408318360646566)
+};
+\addplot+ [mark = {diamond}, dotted, mark options={fill=dotted}]coordinates {
+(100.0, 2.3020480473836265)
+(200.0, 10.160667260487875)
+};
+\addplot+ [mark = {x}, solid, mark options={fill=solid}]coordinates {
+(5.0, 0.004403114318847656)
+(10.0, 0.008709987004597982)
+(20.0, 0.13182266553243002)
+(30.0, 7.015842755635579)
+};
+\addplot+ [mark = {square}, solid, mark options={fill=solid}]coordinates {
+(10.0, 0.011140982309977213)
+(20.0, 0.03800845146179199)
+(40.0, 0.1502519448598226)
+(60.0, 7.289457400639852)
+};
+\addplot+ [mark = {triangle}, solid, mark options={fill=solid}]coordinates {
+(20.0, 0.03955634435017904)
+(40.0, 0.155047337214152)
+(80.0, 1.342388391494751)
+(120.0, 10.23423663775126)
+};
+\addplot+ [mark = {circle}, solid, mark options={fill=solid}]coordinates {
+(50.0, 0.2916082541147868)
+(100.0, 1.7926747004191081)
+(200.0, 11.053815364837646)
+(300.0, 12.123046716054281)
+};
+\addplot+ [mark = {diamond}, solid, mark options={fill=solid}]coordinates {
+(100.0, 2.4254756768544516)
+(200.0, 8.710426966349283)
+};
+\addplot+ [mark = {x}, dashed, mark options={fill=dashed}]coordinates {
+(5.0, 0.005201975504557292)
+(10.0, 0.008099635442097982)
+(20.0, 5.322571674982707)
+(30.0, 10.00824268658956)
+};
+\addplot+ [mark = {square}, dashed, mark options={fill=dashed}]coordinates {
+(10.0, 0.010619322458902994)
+(20.0, 0.04633323351542155)
+(40.0, 0.6009040673573812)
+(60.0, 10.04144279162089)
+};
+\addplot+ [mark = {triangle}, dashed, mark options={fill=dashed}]coordinates {
+(20.0, 0.038578033447265625)
+(40.0, 0.1403233210245768)
+(80.0, 4.403068621953328)
+(120.0, 8.310081322987875)
+};
+\addplot+ [mark = {circle}, dashed, mark options={fill=dashed}]coordinates {
+(50.0, 0.3144269784291585)
+(100.0, 1.8668099244435628)
+(200.0, 11.117217222849527)
+(300.0, 12.196883042653402)
+};
+\addplot+ [mark = {diamond}, dashed, mark options={fill=dashed}]coordinates {
+(100.0, 1.6551097234090169)
+(200.0, 8.94154461224874)
+};
+\addplot+ [mark = {x}, dash dot, mark options={fill=dash dot}]coordinates {
+(5.0, 0.0048046112060546875)
+(10.0, 0.007902383804321289)
+(20.0, 1.4200396537780762)
+(30.0, 6.720656633377075)
+};
+\addplot+ [mark = {square}, dash dot, mark options={fill=dash dot}]coordinates {
+(10.0, 0.01017141342163086)
+(20.0, 0.03830695152282715)
+(40.0, 1.0564643541971843)
+(60.0, 10.033609708150228)
+};
+\addplot+ [mark = {triangle}, dash dot, mark options={fill=dash dot}]coordinates {
+(20.0, 0.035422722498575844)
+(40.0, 0.16728901863098145)
+(80.0, 2.4936357339223227)
+(120.0, 8.047739664713541)
+};
+\addplot+ [mark = {circle}, dash dot, mark options={fill=dash dot}]coordinates {
+(50.0, 0.35332973798116046)
+(100.0, 2.102731545766195)
+(200.0, 11.081738313039144)
+(300.0, 12.23822514216105)
+};
+\addplot+ [mark = {diamond}, dash dot, mark options={fill=dash dot}]coordinates {
+(100.0, 1.9614032904307048)
+(200.0, 7.199800332387288)
+};
+\addplot+ [mark = {x}, dotted, mark options={fill=dotted}]coordinates {
+(5.0, 0.004086971282958984)
+(10.0, 0.013668060302734375)
+(20.0, 1.1369679768880208)
+(30.0, 10.01371177037557)
+};
+\addplot+ [mark = {square}, dotted, mark options={fill=dotted}]coordinates {
+(10.0, 0.010286966959635416)
+(20.0, 0.030612389246622723)
+(40.0, 1.0272329648335774)
+(60.0, 10.041651407877604)
+};
+\addplot+ [mark = {triangle}, dotted, mark options={fill=dotted}]coordinates {
+(20.0, 0.03833397229512533)
+(40.0, 0.13936090469360352)
+(80.0, 2.2098609606424966)
+(120.0, 10.238147338231405)
+};
+\addplot+ [mark = {circle}, dotted, mark options={fill=dotted}]coordinates {
+(50.0, 0.33972930908203125)
+(100.0, 2.0732489426930747)
+(200.0, 11.099476337432861)
+(300.0, 11.965332667032877)
+};
+\addplot+ [mark = {diamond}, dotted, mark options={fill=dotted}]coordinates {
+(100.0, 1.7868057092030842)
+(200.0, 8.67194128036499)
+};
+\end{axis}
+
+\end{tikzpicture}
+\end{document}
