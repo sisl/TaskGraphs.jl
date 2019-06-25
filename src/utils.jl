@@ -223,7 +223,8 @@ function formulate_JuMP_optimization_problem(G,Drs,Dss,Δt,to0_,tr0_,optimizer;
         # constraint on dummy robot start time (corresponds to moment of object delivery)
         @constraint(model, tr0[j+N] == tof[j])
         # dummy robots can't do upstream jobs
-        for v in map(e->e.dst,collect(edges(bfs_tree(G,j;dir=:in))))
+        upstream_jobs = [j, map(e->e.dst,collect(edges(bfs_tree(G,j;dir=:in))))...]
+        for v in upstream_jobs #map(e->e.dst,collect(edges(bfs_tree(G,j;dir=:in))))
             @constraint(model, x[j+N,v] == 0)
         end
         # lower bound on task completion time (task can't start until it's available).
