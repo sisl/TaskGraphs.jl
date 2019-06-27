@@ -224,16 +224,17 @@ function formulate_JuMP_optimization_problem(G,Drs,Dss,Δt,to0_,tr0_,optimizer;
         @constraint(model, tr0[j+N] == tof[j])
         # dummy robots can't do upstream jobs
         upstream_jobs = [j, map(e->e.dst,collect(edges(bfs_tree(G,j;dir=:in))))...]
-        for v in upstream_jobs #map(e->e.dst,collect(edges(bfs_tree(G,j;dir=:in))))
+        for v in upstream_jobs
             @constraint(model, x[j+N,v] == 0)
         end
         # lower bound on task completion time (task can't start until it's available).
+        # tof[j] = to0[j] + Dss[j,j] + slack[j]
         @constraint(model, tof[j] >= to0[j] + Dss[j,j])
         # bound on task completion time (assigned robot must first complete delivery)
         # Big M constraint (thanks Oriana!): When x[i,j] == 1, this constrains the final time
         # to be no less than the time it takes for the delivery to be completed by robot i.
         # When x[i,j] == 0, this constrains the final time to be greater than a large negative
-        # number (meaning that this is a trivial contraint)
+        # number (meaning that this is a trivial constraint)
         @constraint(model, tof[j] .- (tr0 + Drs[:,j] .+ Dss[j,j]) .>= -Mm*(1 .- x[:,j]))
     end
     @objective(model, Min, tof[M])
