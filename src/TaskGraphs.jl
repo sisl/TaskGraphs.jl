@@ -6,7 +6,6 @@ using LinearAlgebra
 using DataStructures
 using JuMP
 
-include("utils.jl")
 
 export
     Status,
@@ -133,15 +132,15 @@ delete_conditions(a::TAKE) = Set{PlanningPredicate}([
         OBJECT_AT(a.o,a.s1)
         ])
 
-struct Operation
-    pre::Set{PlanningPredicate}
-    post::Set{PlanningPredicate}
-    Δt::Int
+@with_kw struct Operation
+    pre::Set{OBJECT_AT}     = Set{OBJECT_AT}()
+    post::Set{OBJECT_AT}    = Set{OBJECT_AT}()
+    Δt::Float64             = 0
 end
 function construct_operation(station_id, input_ids, output_ids, Δt)
     Operation(
-        Set{PlanningPredicate}(map(i->OBJECT_AT(i,station_id), input_ids)),
-        Set{PlanningPredicate}(map(i->OBJECT_AT(i,station_id), output_ids)),
+        Set{OBJECT_AT}(map(i->OBJECT_AT(i,station_id), input_ids)),
+        Set{OBJECT_AT}(map(i->OBJECT_AT(i,station_id), output_ids)),
         Δt
     )
 end
@@ -161,6 +160,7 @@ postconditions(op::Operation) = op.post
     pre_deps::Dict{Int,Set{Int}}  = Dict{Int,Set{Int}}() # id => (pre_conditions)
     post_deps::Dict{Int,Set{Int}} = Dict{Int,Set{Int}}()
     graph::G                      = DiGraph()
+    M::Int                          = -1
 end
 get_initial_nodes(tg::ProjectSpec) = setdiff(
     Set(collect(vertices(tg.graph))),collect(keys(tg.pre_deps)))
@@ -541,5 +541,7 @@ function transition(model, env_state::EnvState, agent_id::RobotID, action::GO_AN
     end
     next_env_state
 end
+
+include("utils.jl")
 
 end

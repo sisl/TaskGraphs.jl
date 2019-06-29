@@ -1,4 +1,8 @@
 export
+    insert_to_sorted_array!,
+    get_root_node,
+    get_bfs_node_traversal,
+    get_all_root_nodes,
     is_leaf_node,
     initialize_random_2D_task_graph_env,
     cached_pickup_and_delivery_distances,
@@ -6,7 +10,69 @@ export
     formulate_JuMP_optimization_problem,
     construct_factory_distance_matrix,
     construct_random_project_spec,
+    combine_project_specs,
     compute_lower_time_bound
+
+"""
+    insert_to_sorted_array!(array, x)
+
+    Assumes that array is already sorted. Inserts new element x so that
+    array remains sorted
+"""
+function insert_to_sorted_array!(array, x)
+    A = 0
+    C = length(array)+1
+    B = Int(round((A+C) / 2))
+    while C-A > 1
+        if x < array[B]
+            A = A
+            C = B
+            B = Int(ceil((A+C) / 2))
+        else
+            A = B
+            C = C
+            B = Int(ceil((A+C) / 2))
+        end
+    end
+    # @show B
+    insert!(array, B, x)
+    array
+end
+
+"""
+    `get_root_node(G,v=1)`
+"""
+function get_root_node(G,v=1)
+    node_list = map(e->e.dst, collect(edges(dfs_tree(G,v))))
+    root_node = get(node_list, length(node_list), v)
+end
+
+"""
+    `get_bfs_node_traversal(G)`
+"""
+function get_bfs_node_traversal(G,root_node=get_root_node(G))
+    # root_node = map(e->e.dst, collect(edges(dfs_tree(G,1))))[end]
+    bfs_traversal = map(e->e.dst, collect(edges(bfs_tree(G,root_node;dir=:in))))
+    append!(bfs_traversal, root_node)
+    bfs_traversal
+end
+
+"""
+    `get_all_root_nodes(G)`
+"""
+function get_all_root_nodes(G)
+    frontier = Set{Int}(collect(vertices(G)))
+    root_nodes = Set{Int}()
+    while length(frontier) > 0
+        v = pop!(frontier)
+        root_node = get_root_node(G,v)
+        for v2 in get_bfs_node_traversal(G,root_node)
+            setdiff!(frontier, v2)
+        end
+        push!(root_nodes, root_node)
+    end
+    return root_nodes
+end
 
 """
     `is_leaf_node(G,v)`
@@ -212,7 +278,7 @@ function formulate_JuMP_optimization_problem(G,Drs,Dss,Δt,to0_,tr0_,optimizer;
         @constraint(model, to0[j] == t)
     end
     # constraints
-    Mm = Matrix{Float64}(I,N+M,N+M) * (sum(Drs) + sum(Dss))
+    Mm = Matrix{Float64}(I,N+M,N+M) * (sum(Drs) + sum(Dss)) # for big-M constraints
     for j in 1:M
         # constraint on task start time
         if !is_leaf_node(G,j)
@@ -237,8 +303,9 @@ function formulate_JuMP_optimization_problem(G,Drs,Dss,Δt,to0_,tr0_,optimizer;
         # number (meaning that this is a trivial constraint)
         @constraint(model, tof[j] .- (tr0 + Drs[:,j] .+ Dss[j,j]) .>= -Mm*(1 .- x[:,j]))
     end
-    @objective(model, Min, tof[M])
-
+    # cost depends only on root node(s)
+    # @objective(model, Min, tof[M])
+    @objective(model, Min, sum(map(v->tof[v], collect(get_all_root_nodes(G)))))
     model;
 end
 
@@ -288,7 +355,7 @@ end
             possible.
 """
 function construct_random_project_spec(M::Int;max_parents=1,depth_bias=1.0,Δt_min::Int=0,Δt_max::Int=0)
-    project_spec = ProjectSpec()
+    project_spec = ProjectSpec(M=M)
     # fill with random operations going backwards
     i = M-1
     frontier = PriorityQueue{Int,Int}([M=>1])
@@ -322,6 +389,31 @@ function construct_random_project_spec(M::Int;max_parents=1,depth_bias=1.0,Δt_m
         end
     end
     project_spec
+end
+
+"""
+    `combine_project_specs(specs::Vector{ProjectSpec})`
+
+    A helper for combining multiple `ProjectSpec`s into a single
+    ProjectSpec.
+"""
+function combine_project_specs(specs::Vector{P} where P <: ProjectSpec)
+    M = 0
+    new_spec = ProjectSpec(M=sum(map(spec->spec.M, specs)))
+    for spec in specs
+        for op in spec.operations
+            new_op = Operation(Δt = op.Δt)
+            for pred in preconditions(op)
+                push!(new_op.pre, OBJECT_AT(get_o(pred)+M, get_s(pred)+M))
+            end
+            for pred in postconditions(op)
+                push!(new_op.post, OBJECT_AT(get_o(pred)+M, get_s(pred)+M))
+            end
+            add_operation!(new_spec, new_op)
+        end
+        M = M + spec.M
+    end
+    new_spec
 end
 
 """
