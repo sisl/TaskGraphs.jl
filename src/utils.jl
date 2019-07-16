@@ -104,7 +104,7 @@ end
     Outputs:
         returns `true` if vertex v has no prereqs (inneighbors)
 """
-is_leaf_node(G,v) = degree(G,v) == 1
+is_leaf_node(G,v) = length(inneighbors(G,v)) == 0
 
 """
     initialize_random_2D_task_graph_env(G,N;d=[20,20])
@@ -119,14 +119,15 @@ is_leaf_node(G,v) = degree(G,v) == 1
         `s₀` - indices of initial object locations
         `sₜ` - indices of destination object locations
 """
-function initialize_random_2D_task_graph_env(N,M;d=[20,20])
-    x₀ = Set{Vector{Int}}() # all possible grid locations
+function initialize_random_2D_task_graph_env(N,M,G;d=[20,20])
+    x₀ = Vector{Vector{Int}}() # all possible grid locations
     for i in 1:d[1]
         for j in 1:d[2]
             push!(x₀,Vector{Int}([i,j]))
         end
     end
     ##### Random Problem Initialization #####
+    x₀ = x₀[sortperm(rand(length(x₀)))]
     # initial robot locations
     r₀ = Vector{Vector{Int}}(undef, N)
     for i in 1:N
