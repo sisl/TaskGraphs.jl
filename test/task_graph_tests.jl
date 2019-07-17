@@ -8,14 +8,14 @@ using Logging
 global_logger(SimpleLogger(stderr, Logging.Debug))
 # Define package tests
 function run_tests()
-    # test array sorting
-    array = [1.0,2.0,3.0,4.0,5.0]
-    array = insert_to_sorted_array!(array, 3.5)
-    @test(array[4] == 3.5)
-    array = insert_to_sorted_array!(array, 0.5)
-    @test(array[1] == 0.5)
-    array = insert_to_sorted_array!(array, 5.5)
-    @test(array[end] == 5.5)
+    # # test array sorting
+    # array = [1.0,2.0,3.0,4.0,5.0]
+    # array = insert_to_sorted_array!(array, 3.5)
+    # @test(array[4] == 3.5)
+    # array = insert_to_sorted_array!(array, 0.5)
+    # @test(array[1] == 0.5)
+    # array = insert_to_sorted_array!(array, 5.5)
+    # @test(array[end] == 5.5)
 
     G = DiGraph(3)
     add_edge!(G,1,2)

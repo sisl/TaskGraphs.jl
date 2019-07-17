@@ -1,10 +1,8 @@
 export
-    insert_to_sorted_array!,
     get_root_node,
     get_bfs_node_traversal,
     get_all_root_nodes,
     get_bfs_traversal,
-    is_leaf_node,
     initialize_random_2D_task_graph_env,
     cached_pickup_and_delivery_distances,
     formulate_optimization_problem,
@@ -13,32 +11,6 @@ export
     construct_random_project_spec,
     combine_project_specs,
     compute_lower_time_bound
-
-"""
-    insert_to_sorted_array!(array, x)
-
-    Assumes that array is already sorted. Inserts new element x so that
-    array remains sorted
-"""
-function insert_to_sorted_array!(array, x)
-    A = 0
-    C = length(array)+1
-    B = Int(round((A+C) / 2))
-    while C-A > 1
-        if x < array[B]
-            A = A
-            C = B
-            B = Int(ceil((A+C) / 2))
-        else
-            A = B
-            C = C
-            B = Int(ceil((A+C) / 2))
-        end
-    end
-    # @show B
-    insert!(array, B, x)
-    array
-end
 
 """
     `get_root_node(G,v=1)`
@@ -92,19 +64,6 @@ function get_bfs_traversal(G)
     end
     traversal
 end
-
-"""
-    `is_leaf_node(G,v)`
-
-    Inputs:
-        `G` - graph with inverted tree structure that encodes dependencies
-            between tasks
-        `v` - query vertex
-
-    Outputs:
-        returns `true` if vertex v has no prereqs (inneighbors)
-"""
-is_leaf_node(G,v) = length(inneighbors(G,v)) == 0
 
 """
     initialize_random_2D_task_graph_env(G,N;d=[20,20])
@@ -508,6 +467,7 @@ export
     is_feasible,
     TaskGraphProblemSpec,
     process_solution,
+    process_solution_fast,
     solve_task_graph,
     solve_task_graphs_problem
 
@@ -604,43 +564,58 @@ end
 """
 function process_solution(model,cache::SearchCache,spec::TaskGraphProblemSpec)
     Drs, Dss, Δt, N, G = spec.Drs, spec.Dss, spec.Δt, spec.N, spec.graph
-
-    # solution_graph = construct_solution_graph(G,cache.x)
-    # bfs_traversal = Vector{Int}()
-    # for v in get_all_root_nodes(solution_graph)
-    #     if get_prop(solution_graph,v,:vtype) == :task
-    #         bfs_traversal = [bfs_traversal..., get_bfs_node_traversal(solution_graph,v)...]
-    #     end
-    # end
-    # # Compute Lower Bounds Via Forward Dynamic Programming pass
-    # for v in bfs_traversal
-    #     if get_prop(solution_graph,v,:vtype) == :task
-    #         for v2 in inneighbors(G,v)
-    #             cache.to0[v] = max(cache.to0[v], cache.tof[v2] + Δt[v])
-    #         end
-    #         xi = findfirst(cache.x[:,v] .== 1)
-    #         tro0 = cache.tr0[xi] + Drs[xi,v]
-    #         cache.tof[v] = max(cache.to0[v], tro0) + Dss[v,v]
-    #         cache.tr0[v+N] = cache.tof[v]
-    #     elseif get_prop(solution_graph,v,:vtype) == :robot
-    #     end
-    # end
+    solution_graph = construct_solution_graph(G,cache.x)
+    traversal = topological_sort_by_dfs(solution_graph)
+    # Compute Lower Bounds Via Forward Dynamic Programming pass
+    for v in traversal
+        if get_prop(solution_graph,v,:vtype) == :task
+            for v2 in inneighbors(G,v)
+                cache.to0[v] = max(cache.to0[v], cache.tof[v2] + Δt[v])
+            end
+            xi = findfirst(cache.x[:,v] .== 1)
+            tro0 = cache.tr0[xi] + Drs[xi,v]
+            cache.tof[v] = max(cache.to0[v], tro0) + Dss[v,v]
+            cache.tr0[v+N] = cache.tof[v]
+        elseif get_prop(solution_graph,v,:vtype) == :robot
+        end
+    end
     # Compute Slack Via Backward Dynamic Programming pass
-    # for v in reverse(bfs_traversal)
-    #     if get_prop(solution_graph,v,:vtype) == :task
-    #         for v2 in inneighbors(G,v)
-    #             if get_prop(solution_graph,v2,:vtype) == :task
-    #                 cache.local_slack[v2] = cache.to0[v] - cache.tof[v2]
-    #                 cache.slack[v2]       = cache.slack[v] + cache.local_slack[v2]
-    #             end
-    #         end
-    #     end
-    # end
-    # cache
+    for v in reverse(traversal)
+        if get_prop(solution_graph,v,:vtype) == :task
+            for v2 in inneighbors(G,v)
+                if get_prop(solution_graph,v2,:vtype) == :task
+                    cache.local_slack[v2] = cache.to0[v] - cache.tof[v2]
+                    cache.slack[v2]       = cache.slack[v] + cache.local_slack[v2]
+                end
+            end
+        end
+    end
+#     cache.tr0[:] = value.(model[:tr0])
+#     cache.to0[:] = value.(model[:to0])
+#     cache.tof[:] = value.(model[:tof])
+    for v in reverse(topological_sort_by_dfs(G))
+        for v2 in inneighbors(G,v)
+            cache.local_slack[v2] = cache.to0[v] - cache.tof[v2]
+            cache.slack[v2]       = cache.slack[v] + cache.local_slack[v2]
+        end
+    end
+    cache
+end
+
+"""
+    `process_solution_fast(cache::SearchCache,spec::TaskGraphProblemSpec,bfs_traversal)`
+
+    given a cache whose assignment matrix is feasible, compute the start and end times
+    of the robots and tasks, as well as the slack. Identical to `process_solution`,
+    except that `process_solution_fast` pulls `to0`, `tof` and `tr0` directly
+    from the optimization model.
+"""
+function process_solution_fast(model,cache::SearchCache,spec::TaskGraphProblemSpec)
+    Drs, Dss, Δt, N, G = spec.Drs, spec.Dss, spec.Δt, spec.N, spec.graph
     cache.tr0[:] = value.(model[:tr0])
     cache.to0[:] = value.(model[:to0])
     cache.tof[:] = value.(model[:tof])
-    for v in reverse(get_bfs_traversal(G))
+    for v in reverse(topological_sort_by_dfs(G))
         for v2 in inneighbors(G,v)
             cache.local_slack[v2] = cache.to0[v] - cache.tof[v2]
             cache.slack[v2]       = cache.slack[v] + cache.local_slack[v2]

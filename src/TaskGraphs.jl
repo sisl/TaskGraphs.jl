@@ -2,6 +2,7 @@ module TaskGraphs
 
 using Parameters
 using LightGraphs, MetaGraphs
+using GraphUtils
 using LinearAlgebra
 using DataStructures
 using JuMP
