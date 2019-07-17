@@ -119,7 +119,7 @@ is_leaf_node(G,v) = length(inneighbors(G,v)) == 0
         `s₀` - indices of initial object locations
         `sₜ` - indices of destination object locations
 """
-function initialize_random_2D_task_graph_env(N,M,G;d=[20,20])
+function initialize_random_2D_task_graph_env(N,M;d=[20,20])
     x₀ = Vector{Vector{Int}}() # all possible grid locations
     for i in 1:d[1]
         for j in 1:d[2]
@@ -605,38 +605,38 @@ end
 function process_solution(model,cache::SearchCache,spec::TaskGraphProblemSpec)
     Drs, Dss, Δt, N, G = spec.Drs, spec.Dss, spec.Δt, spec.N, spec.graph
 
-#     solution_graph = construct_solution_graph(G,cache.x)
-#     bfs_traversal = Vector{Int}()
-#     for v in get_all_root_nodes(solution_graph)
-#         if get_prop(solution_graph,v,:vtype) == :task
-#             bfs_traversal = [bfs_traversal..., get_bfs_node_traversal(solution_graph,v)...]
-#         end
-#     end
-#     # Compute Lower Bounds Via Forward Dynamic Programming pass
-#     for v in bfs_traversal
-#         if get_prop(solution_graph,v,:vtype) == :task
-#             for v2 in inneighbors(G,v)
-#                 cache.to0[v] = max(cache.to0[v], cache.tof[v2] + Δt[v])
-#             end
-#             xi = findfirst(cache.x[:,v] .== 1)
-#             tro0 = cache.tr0[xi] + Drs[xi,v]
-#             cache.tof[v] = max(cache.to0[v], tro0) + Dss[v,v]
-#             cache.tr0[v+N] = cache.tof[v]
-#         elseif get_prop(solution_graph,v,:vtype) == :robot
-#         end
-#     end
+    # solution_graph = construct_solution_graph(G,cache.x)
+    # bfs_traversal = Vector{Int}()
+    # for v in get_all_root_nodes(solution_graph)
+    #     if get_prop(solution_graph,v,:vtype) == :task
+    #         bfs_traversal = [bfs_traversal..., get_bfs_node_traversal(solution_graph,v)...]
+    #     end
+    # end
+    # # Compute Lower Bounds Via Forward Dynamic Programming pass
+    # for v in bfs_traversal
+    #     if get_prop(solution_graph,v,:vtype) == :task
+    #         for v2 in inneighbors(G,v)
+    #             cache.to0[v] = max(cache.to0[v], cache.tof[v2] + Δt[v])
+    #         end
+    #         xi = findfirst(cache.x[:,v] .== 1)
+    #         tro0 = cache.tr0[xi] + Drs[xi,v]
+    #         cache.tof[v] = max(cache.to0[v], tro0) + Dss[v,v]
+    #         cache.tr0[v+N] = cache.tof[v]
+    #     elseif get_prop(solution_graph,v,:vtype) == :robot
+    #     end
+    # end
     # Compute Slack Via Backward Dynamic Programming pass
-#     for v in reverse(bfs_traversal)
-#         if get_prop(solution_graph,v,:vtype) == :task
-#             for v2 in inneighbors(G,v)
-#                 if get_prop(solution_graph,v2,:vtype) == :task
-#                     cache.local_slack[v2] = cache.to0[v] - cache.tof[v2]
-#                     cache.slack[v2]       = cache.slack[v] + cache.local_slack[v2]
-#                 end
-#             end
-#         end
-#     end
-#     cache
+    # for v in reverse(bfs_traversal)
+    #     if get_prop(solution_graph,v,:vtype) == :task
+    #         for v2 in inneighbors(G,v)
+    #             if get_prop(solution_graph,v2,:vtype) == :task
+    #                 cache.local_slack[v2] = cache.to0[v] - cache.tof[v2]
+    #                 cache.slack[v2]       = cache.slack[v] + cache.local_slack[v2]
+    #             end
+    #         end
+    #     end
+    # end
+    # cache
     cache.tr0[:] = value.(model[:tr0])
     cache.to0[:] = value.(model[:to0])
     cache.tof[:] = value.(model[:tof])
