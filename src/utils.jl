@@ -71,6 +71,7 @@ end
     Inputs:
         `N` - number of agents
         `M` - number of tasks
+        `vtxs` - a list of vertex coordinates
         `d` = [20,20] - dimensions of factor floor
 
     Outputs:
@@ -78,36 +79,45 @@ end
         `s₀` - indices of initial object locations
         `sₜ` - indices of destination object locations
 """
-function initialize_random_2D_task_graph_env(N,M;d=[20,20])
-    x₀ = Vector{Vector{Int}}() # all possible grid locations
-    for i in 1:d[1]
-        for j in 1:d[2]
-            push!(x₀,Vector{Int}([i,j]))
+function initialize_random_2D_task_graph_env(N,M;vtxs=nothing,d=[20,20])
+    if vtxs == nothing
+        k = 1
+        x₀ = Vector{Vector{Int}}() # all possible grid locations
+        for i in 1:d[1]
+            for j in 1:d[2]
+                push!(x₀,Vector{Int}([i,j]))
+            end
         end
+    else
+        x₀ = vtxs
     end
     ##### Random Problem Initialization #####
-    x₀ = x₀[sortperm(rand(length(x₀)))]
+    # x₀ = x₀[sortperm(rand(length(x₀)))]
+    vtxs = sortperm(rand(length(x₀)))
     # initial robot locations
-    r₀ = Vector{Vector{Int}}(undef, N)
+    r₀ = Vector{Int}(undef, N)
     for i in 1:N
-        r₀[i] = pop!(x₀)
+        # r₀[i] = pop!(x₀)
+        r₀[i] = pop!(vtxs)
     end
     # initial object locations - somewhere in factory
-    s₀ = Vector{Vector{Int}}(undef, M)
+    s₀ = Vector{Int}(undef, M)
     for i in 1:M
-        s₀[i] = pop!(x₀)
+        # s₀[i] = pop!(x₀)
+        s₀[i] = pop!(vtxs)
     end
     # final object locations - depends on where the child objects "appear"
-    sₜ = Vector{Vector{Int}}(undef, M)
+    sₜ = Vector{Int}(undef, M)
     for i in 1:M
         # if length(outneighbors(G,v)) > 0
         #     v2 = outneighbors(G,v)[1]
         #     sₜ[v] = s₀[v2]
         # else
-        sₜ[i] = pop!(x₀)
+        # sₜ[i] = pop!(x₀)
+        sₜ[i] = pop!(vtxs)
         # end
     end
-    r₀,s₀,sₜ
+    r₀,s₀,sₜ,x₀
 end
 
 """
@@ -463,9 +473,11 @@ export
     FeasibleAssignmentTable,
     get_feasible_assignments,
     add_constraint!,
-    SearchCache,get_branch_id,
+    SearchCache,
+    get_branch_id,
     is_feasible,
     TaskGraphProblemSpec,
+    construct_solution_graph,
     process_solution,
     process_solution_fast,
     solve_task_graph,
@@ -556,6 +568,37 @@ struct TaskGraphProblemSpec{G}
     to0_::Dict{Int,Float64}
 end
 
+# solution graph encodes dependencies between robots and tasks too
+"""
+    `construct_solution_graph(G,assignment)`
+
+    Constructs a graph wherein all robots and tasks are represented by vertices,
+    and edges go from prereqs to their children.If robot i is responsible
+    for task j, there is an edge from robot i to task j. If task j must be
+    completed before task k, there is an edge from task j to task k)
+"""
+function construct_solution_graph(G,assignment)
+    M = nv(G)
+    N = size(assignment,1) - M
+    solution_graph = deepcopy(G)
+    for j in vertices(solution_graph)
+        set_prop!(solution_graph,j,:vtype,:task)
+    end
+    for i in 1:N+M
+        add_vertex!(solution_graph)
+        set_prop!(solution_graph,nv(solution_graph),:vtype,:robot)
+    end
+    for i in 1:N+M
+        for j in 1:M
+            if assignment[i,j] == 1
+                add_edge!(solution_graph,M+i,j) # robot i -> task j
+                add_edge!(solution_graph,j,M+j+N) # task j -> dummy robot j+N
+            end
+        end
+    end
+    solution_graph
+end
+
 """
     `process_solution(cache::SearchCache,spec::TaskGraphProblemSpec,bfs_traversal)`
 
@@ -590,9 +633,6 @@ function process_solution(model,cache::SearchCache,spec::TaskGraphProblemSpec)
             end
         end
     end
-#     cache.tr0[:] = value.(model[:tr0])
-#     cache.to0[:] = value.(model[:to0])
-#     cache.tof[:] = value.(model[:tof])
     for v in reverse(topological_sort_by_dfs(G))
         for v2 in inneighbors(G,v)
             cache.local_slack[v2] = cache.to0[v] - cache.tof[v2]
