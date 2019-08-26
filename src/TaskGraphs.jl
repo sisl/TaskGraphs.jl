@@ -6,6 +6,7 @@ using GraphUtils
 using LinearAlgebra
 using DataStructures
 using JuMP
+using TOML
 
 
 export
@@ -28,7 +29,8 @@ export
     get_initial_nodes,
     get_input_ids,
     get_output_ids,
-    add_operation!
+    add_operation!,
+    read_project_spec
 
 abstract type PlanningPredicate end
 struct OBJECT_AT <: PlanningPredicate
@@ -105,6 +107,34 @@ function add_operation!(task_graph::ProjectSpec, op::Operation)
     task_graph
 end
 
+# Some tools for writing and reading project specs
+function TOML.parse(op::Operation)
+    toml_dict = Dict()
+    toml_dict["pre"] = map(pred->[get_o(pred),get_s(pred)], collect(op.pre))
+    toml_dict["post"] = map(pred->[get_o(pred),get_s(pred)], collect(op.post))
+    toml_dict["Δt"] = duration(op)
+    return toml_dict
+end
+function TOML.parse(project_spec::ProjectSpec)
+    toml_dict = Dict()
+    toml_dict["title"]      = "ProjectSpec"
+    toml_dict["operations"] = map(op->TOML.parse(op),project_spec.operations)
+    toml_dict
+end
+function read_project_spec(io)
+    toml_dict = TOML.parsefile(io)
+    project_spec = ProjectSpec()
+    for op_dict in toml_dict["operations"]
+        op = Operation(
+            pre     = Set{OBJECT_AT}(map(arr->OBJECT_AT(arr[1],arr[2]),op_dict["pre"])),
+            post    = Set{OBJECT_AT}(map(arr->OBJECT_AT(arr[1],arr[2]),op_dict["post"])),
+            Δt      = op_dict["Δt"]
+            )
+        add_operation!(project_spec, op)
+    end
+    return project_spec
+end
+
 """
     DeliveryTask
 """
@@ -113,6 +143,7 @@ struct DeliveryTask
     s1::Int
     s2::Int
 end
+
 """
     DeliveryGraph{G}
 """
@@ -120,6 +151,7 @@ struct DeliveryGraph{G}
     tasks::Vector{DeliveryTask}
     graph::G
 end
+
 """
     construct_delivery_graph(project_spec::ProjectSpec,M::Int)
 

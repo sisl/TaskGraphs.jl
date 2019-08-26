@@ -5,6 +5,7 @@ using TaskGraphs
 using Test
 using Logging
 using Gurobi
+using TOML
 
 # Set logging level
 global_logger(SimpleLogger(stderr, Logging.Debug))
@@ -22,6 +23,12 @@ function run_tests()
             project_spec1 = construct_random_project_spec(Int(M/2);max_parents=3,depth_bias=0.25,Δt_min=0,Δt_max=0)
             project_spec2 = construct_random_project_spec(Int(M/2);max_parents=3,depth_bias=0.25,Δt_min=0,Δt_max=0)
             project_spec = combine_project_specs([project_spec1, project_spec2])
+
+            filename = "project_spec.toml"
+            open(filename, "w") do io
+                TOML.print(io, TOML.parse(project_spec))
+            end
+            project_spec = read_project_spec(filename)
 
             delivery_graph = construct_delivery_graph(project_spec,M)
             r₀,s₀,sₜ,pts = initialize_random_2D_task_graph_env(N,M;d=[400,400])
