@@ -44,21 +44,23 @@ get_s(pred::OBJECT_AT) = pred.s
     pre::Set{OBJECT_AT}     = Set{OBJECT_AT}()
     post::Set{OBJECT_AT}    = Set{OBJECT_AT}()
     Δt::Float64             = 0
+    station_id::Int         = -1
 end
 function construct_operation(station_id, input_ids, output_ids, Δt)
     Operation(
         Set{OBJECT_AT}(map(i->OBJECT_AT(i,station_id), input_ids)),
         Set{OBJECT_AT}(map(i->OBJECT_AT(i,station_id), output_ids)),
-        Δt
+        Δt,
+        station_id
     )
 end
-get_s(op::Operation) = get_s(rand(op.pre))
+get_s(op::Operation) = op.station_id
 duration(op::Operation) = op.Δt
 preconditions(op::Operation) = op.pre
 postconditions(op::Operation) = op.post
 
 """
-    ProjectSpec{G}
+    `ProjectSpec{G}`
 
     Defines a list of operations that must be performed in order to complete a
     specific project, in addition to the dependencies between those operations
@@ -136,7 +138,7 @@ function read_project_spec(io)
 end
 
 """
-    DeliveryTask
+    `DeliveryTask`
 """
 struct DeliveryTask
     o::Int
@@ -145,7 +147,7 @@ struct DeliveryTask
 end
 
 """
-    DeliveryGraph{G}
+    `DeliveryGraph{G}`
 """
 struct DeliveryGraph{G}
     tasks::Vector{DeliveryTask}
@@ -153,7 +155,7 @@ struct DeliveryGraph{G}
 end
 
 """
-    construct_delivery_graph(project_spec::ProjectSpec,M::Int)
+    `construct_delivery_graph(project_spec::ProjectSpec,M::Int)`
 
     Assumes that station ids correspond to object ids.
 """

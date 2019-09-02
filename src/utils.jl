@@ -151,7 +151,7 @@ function cached_pickup_and_delivery_distances(r₀,s₀,sₜ,dist=(x1,x2)->norm(
     for i in 1:M
         for j in 1:M
             # distance from dummy robot to object + object to station
-            Dss[i,j] = dist(s₀[j],sₜ[j])
+            Dss[i,j] = dist(s₀[i],sₜ[j])
         end
     end
     return Drs, Dss
@@ -378,6 +378,27 @@ function construct_random_project_spec(M::Int;max_parents=1,depth_bias=1.0,Δt_m
         end
     end
     project_spec
+end
+
+"""
+    `randomize_project_spec_stations(spec::P, n_stations::Int)  where P <: ProjectSpec`
+
+    Change the object and station ids
+"""
+function randomize_project_spec_stations(spec::P, n_stations::Int)  where P <: ProjectSpec
+    new_spec = ProjectSpec()
+    station_idxs = sortperm(rand(n_pickup_zones))
+    for op in spec.operations
+        new_op = Operation(Δt = op.Δt)
+        for pred in preconditions(op)
+            push!(new_op.pre, OBJECT_AT(get_o(pred), station_idxs[get_s(pred)]))
+        end
+        for pred in postconditions(op)
+            push!(new_op.post, OBJECT_AT(get_o(pred), station_idxs[get_s(pred)]))
+        end
+        add_operation!(new_spec, new_op)
+    end
+    new_spec
 end
 
 """
@@ -788,7 +809,6 @@ function solve_task_graphs_problem(G,Drs,Dss,Δt,to0_,tr0_;mode=1,MAX_ITERS=1000
 end
 
 # Greedy Search with Correction
-
 # for task in critical_path
 #     dummy_robots_queue = []
 #     for robot in sort(robots, by = lower_bound_on_task_completion_time)
@@ -802,7 +822,6 @@ end
 #             end
 #         end
 #     end
-
 # end
 
 # """
