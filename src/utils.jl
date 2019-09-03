@@ -412,7 +412,7 @@ function combine_project_specs(specs::Vector{P} where P <: ProjectSpec)
     new_spec = ProjectSpec(M=sum(map(spec->spec.M, specs)))
     for spec in specs
         for op in spec.operations
-            new_op = Operation(Δt = op.Δt)
+            new_op = Operation(station_id=op.station_id, Δt = op.Δt)
             for pred in preconditions(op)
                 push!(new_op.pre, OBJECT_AT(get_o(pred)+M, get_s(pred)+M))
             end
@@ -604,10 +604,14 @@ function construct_solution_graph(G,assignment)
     solution_graph = deepcopy(G)
     for j in vertices(solution_graph)
         set_prop!(solution_graph,j,:vtype,:task)
+        set_prop!(solution_graph,j,:text,string("T",j))
+        set_prop!(solution_graph,j,:color,"cyan")
     end
     for i in 1:N+M
         add_vertex!(solution_graph)
         set_prop!(solution_graph,nv(solution_graph),:vtype,:robot)
+        set_prop!(solution_graph,nv(solution_graph),:text,string("R",i))
+        set_prop!(solution_graph,nv(solution_graph),:color,"orange")
     end
     for i in 1:N+M
         for j in 1:M
