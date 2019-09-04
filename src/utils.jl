@@ -343,8 +343,12 @@ end
             For `depth_bias` == 0.0, the graph will be as "strung out" as
             possible.
 """
-function construct_random_project_spec(M::Int;max_parents=1,depth_bias=1.0,Δt_min::Int=0,Δt_max::Int=0)
-    project_spec = ProjectSpec(M=M)
+function construct_random_project_spec(M::Int,object_ICs::Dict{Int,OBJECT_AT}=Dict{Int,OBJECT_AT}();
+    max_parents=1,depth_bias=1.0,Δt_min::Int=0,Δt_max::Int=0)
+    project_spec = ProjectSpec(
+        M=M,
+        initial_conditions=object_ICs
+        )
     # fill with random operations going backwards
     i = M-1
     frontier = PriorityQueue{Int,Int}([M=>1])
@@ -358,7 +362,7 @@ function construct_random_project_spec(M::Int;max_parents=1,depth_bias=1.0,Δt_m
             end
         end
         pairs = Vector{Pair{Int,Int}}()
-        pair = Pair{Int,Int}(0,0)
+        # pair = Pair{Int,Int}(0,0)
         for d in 1:depth
             push!(pairs, peek(frontier))
             dequeue!(frontier)
@@ -372,12 +376,19 @@ function construct_random_project_spec(M::Int;max_parents=1,depth_bias=1.0,Δt_m
         i = i - length(input_ids)
         # Δt = Δt_min + (Δt_max-Δt_min)*rand()
         Δt=rand(Δt_min:Δt_max)
-        add_operation!(project_spec,construct_operation(station_id, input_ids, [output_id], Δt))
+        # add_operation!(project_spec,construct_operation(station_id, input_ids, [output_id], Δt))
+        add_operation!(project_spec,construct_operation(project_spec, station_id, input_ids, [output_id], Δt))
         for id in input_ids
             enqueue!(frontier, id=>M-i)
         end
     end
     project_spec
+end
+function construct_random_project_spec(M::Int,object_ICs::Vector{OBJECT_AT};
+    max_parents=1,depth_bias=1.0,Δt_min::Int=0,Δt_max::Int=0)
+    object_IC_dict = Dict{Int,OBJECT_AT}(get_id(get_o(pred))=>pred for pred in object_ICs)
+    construct_random_project_spec(M,object_IC_dict;
+        max_parents=max_parents,depth_bias=depth_bias,Δt_min=Δt_min,Δt_max=Δt_max)
 end
 
 """
@@ -409,7 +420,10 @@ end
 """
 function combine_project_specs(specs::Vector{P} where P <: ProjectSpec)
     M = 0
-    new_spec = ProjectSpec(M=sum(map(spec->spec.M, specs)))
+    new_spec = ProjectSpec(
+        M=sum(map(spec->spec.M, specs)),
+        initial_conditions=merge(map(spec->spec.initial_conditions, specs)...)
+        )
     for spec in specs
         for op in spec.operations
             new_op = Operation(station_id=op.station_id, Δt = op.Δt)
@@ -487,6 +501,52 @@ function compute_lower_time_bound_and_slack(G,D,Δt)
         end
     end
     t_low
+end
+
+################################################################################
+################################### Rendering ##################################
+################################################################################
+
+export
+    get_display_metagraph
+
+title_string(a::GO)        = "go"
+title_string(a::COLLECT)   = "collect"
+title_string(a::CARRY)     = "carry"
+title_string(a::DEPOSIT)   = "deposit"
+
+function get_display_metagraph(project_schedule::ProjectSchedule;
+    object_color="orange",
+    robot_color="lime",
+    action_color="cyan",
+    operation_color="red"
+    )
+    graph = MetaDiGraph(project_schedule.graph)
+    for (id,pred) in get_object_ICs(project_schedule)
+        v = get_vtx(project_schedule, get_o(pred))
+        set_prop!(graph, v, :vtype, :object_ic)
+        set_prop!(graph, v, :text, string("O",id))
+        set_prop!(graph, v, :color, object_color)
+    end
+    for (id,pred) in get_robot_ICs(project_schedule)
+        v = get_vtx(project_schedule, get_r(pred))
+        set_prop!(graph, v, :vtype, :robot_ic)
+        set_prop!(graph, v, :text, string("R",id))
+        set_prop!(graph, v, :color, robot_color)
+    end
+    for (id,op) in get_operations(project_schedule)
+        v = get_vtx(project_schedule, OperationID(id))
+        set_prop!(graph, v, :vtype, :operation)
+        set_prop!(graph, v, :text, string("M",id))
+        set_prop!(graph, v, :color, operation_color)
+    end
+    for (id,a) in get_actions(project_schedule)
+        v = get_vtx(project_schedule, ActionID(id))
+        set_prop!(graph, v, :vtype, :action)
+        set_prop!(graph, v, :text, string(title_string(a),"-",get_id(get_r(a))))
+        set_prop!(graph, v, :color, action_color)
+    end
+    graph
 end
 
 ###### Custom Solver Tools

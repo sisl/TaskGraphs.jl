@@ -57,10 +57,11 @@ postconditions(op::Operation) = op.post
     specific project, in addition to the dependencies between those operations
 """
 @with_kw struct ProjectSpec{G}
+    initial_conditions::Dict{Int,OBJECT_AT} = Dict{Int,OBJECT_AT}()
     operations::Vector{Operation} = Vector{Operation}()
     pre_deps::Dict{Int,Set{Int}}  = Dict{Int,Set{Int}}() # id => (pre_conditions)
     post_deps::Dict{Int,Set{Int}} = Dict{Int,Set{Int}}()
-    graph::G                      = DiGraph()
+    graph::G                      = MetaDiGraph()
     M::Int                        = -1
 end
 get_initial_nodes(tg::ProjectSpec) = setdiff(
@@ -69,6 +70,7 @@ get_input_ids(op::Operation) = Set{Int}([get_id(get_o(p)) for p in op.pre])
 get_output_ids(op::Operation) = Set{Int}([get_id(get_o(p)) for p in op.post])
 get_pre_deps(tg::ProjectSpec, i::Int) = get(tg.pre_deps, i, Set{Int}())
 get_post_deps(tg::ProjectSpec, i::Int) = get(tg.post_deps, i, Set{Int}())
+get_num_delivery_tasks(spec::ProjectSpec) = length(collect(union(map(op->union(get_input_ids(op),get_output_ids(op)),spec.operations)...)))
 function add_pre_dep!(tg::ProjectSpec, i::Int, op_idx::Int)
     push!(get!(tg.pre_deps, i, Set{Int}()),op_idx)
 end
@@ -99,8 +101,19 @@ function add_operation!(task_graph::ProjectSpec, op::Operation)
     end
     task_graph
 end
+function construct_operation(spec::ProjectSpec, station_id, input_ids, output_ids, Δt)
+    Operation(
+        Set{OBJECT_AT}(map(o->get(spec.initial_conditions, o, OBJECT_AT(o,station_id)), input_ids)),
+        Set{OBJECT_AT}(map(o->get(spec.initial_conditions, o, OBJECT_AT(o,station_id)), output_ids)),
+        Δt,
+        StationID(station_id)
+    )
+end
 
 # Some tools for writing and reading project specs
+function TOML.parse(pred::OBJECT_AT)
+    [get_id(get_o(pred)),get_id(get_s(pred))]
+end
 function TOML.parse(op::Operation)
     toml_dict = Dict()
     toml_dict["pre"] = map(pred->[get_id(get_o(pred)),get_id(get_s(pred))], collect(op.pre))
@@ -112,11 +125,17 @@ function TOML.parse(project_spec::ProjectSpec)
     toml_dict = Dict()
     toml_dict["title"]      = "ProjectSpec"
     toml_dict["operations"] = map(op->TOML.parse(op),project_spec.operations)
+    toml_dict["initial_conditions"] = Dict(string(k)=>TOML.parse(pred) for (k,pred) in project_spec.initial_conditions)
     toml_dict
 end
 function read_project_spec(io)
     toml_dict = TOML.parsefile(io)
     project_spec = ProjectSpec()
+    for (k,arr) in toml_dict["initial_conditions"]
+        object_id = arr[1]
+        station_id = arr[2]
+        project_spec.initial_conditions[object_id] = OBJECT_AT(object_id, station_id)
+    end
     for op_dict in toml_dict["operations"]
         op = Operation(
             pre     = Set{OBJECT_AT}(map(arr->OBJECT_AT(arr[1],arr[2]),op_dict["pre"])),
@@ -153,10 +172,14 @@ end
 function construct_delivery_graph(project_spec::ProjectSpec,M::Int)
     delivery_graph = DeliveryGraph(Vector{DeliveryTask}(),MetaDiGraph(M))
     for op in project_spec.operations
-        for i in get_input_ids(op)
+        # for i in get_input_ids(op)
+        for pred in preconditions(op)
+            i = get_id(get_o(pred))
+            pre = project_spec.initial_conditions[i]
+            push!(delivery_graph.tasks,DeliveryTask(i,get_id(get_s(pre)),get_id(get_s(pre))))
             for j in get_output_ids(op)
                 add_edge!(delivery_graph.graph, i, j)
-                push!(delivery_graph.tasks,DeliveryTask(i,i,j))
+                # push!(delivery_graph.tasks,DeliveryTask(i,i,j))
             end
         end
     end
@@ -241,7 +264,8 @@ function add_to_schedule!(schedule::P,a::A,id::ActionID) where {P<:ProjectSchedu
     schedule
 end
 function LightGraphs.add_edge!(schedule::P,id1::A,id2::B) where {P<:ProjectSchedule,A<:AbstractID,B<:AbstractID}
-    add_edge!(get_graph(schedule), get_vtx(schedule,id1), get_vtx(schedule,id2))
+    success = add_edge!(get_graph(schedule), get_vtx(schedule,id1), get_vtx(schedule,id2))
+    # @show success, get_vtx(schedule,id1), get_vtx(schedule,id2)
     schedule
 end
 """
@@ -255,20 +279,23 @@ end
     that robot `i` is assigned to transport object `j`
 """
 function construct_project_schedule(spec::P,
-    object_ICs::Vector{OBJECT_AT},
-    robot_ICs::Vector{ROBOT_AT},
+    object_ICs::Dict{Int,OBJECT_AT},
+    robot_ICs::Dict{Int,ROBOT_AT},
     assignments::V=Dict{Int,Int}()
     ) where {P<:ProjectSpec,V<:Union{Dict{Int,Int},Vector{Int}}}
     schedule = ProjectSchedule()
+    M = get_num_delivery_tasks(spec)
     graph = get_graph(schedule)
     # add object ICs to graph
-    for pred in object_ICs
+    for (id, pred) in object_ICs
         add_to_schedule!(schedule, pred, get_o(pred))
     end
     # add robot ICs to graph
-    for pred in robot_ICs
+    for (id, pred) in robot_ICs
         add_to_schedule!(schedule, pred, get_r(pred))
     end
+    M = length(object_ICs) # number of objects
+    N = length(robot_ICs) - M # number of robots
     # add operations to graph
     for op_vtx in topological_sort(spec.graph)
         op = spec.operations[op_vtx]
@@ -282,33 +309,34 @@ function construct_project_schedule(spec::P,
 
             pickup_station_id = get_id(get_s(object_pred))
             dropoff_station_id = get_id(get_s(op))
-            action_id = ActionID(get_num_actions(schedule))
+            action_id = ActionID(get_num_actions(schedule) + 1)
             add_to_schedule!(schedule, GO(robot_id, pickup_station_id), action_id)
-            action_id += 1
-            add_edge!(schedule, ObjectID(object_id), action_id)
-            # add_edge!(schedule, RobotID(object_id), ActionID(get_num_actions(schedule)))
+            add_edge!(schedule, RobotID(robot_id), action_id)
 
+            action_id += 1
             add_to_schedule!(schedule, COLLECT(robot_id, object_id, pickup_station_id), action_id)
-            add_edge!(schedule, action_id, action_id+1)
-            action_id += 1
+            add_edge!(schedule, action_id-1, action_id)
+            add_edge!(schedule, ObjectID(object_id), action_id)
 
+            action_id += 1
             add_to_schedule!(schedule, CARRY(robot_id, object_id, dropoff_station_id), action_id)
-            add_edge!(schedule, action_id, action_id+1)
-            action_id += 1
+            add_edge!(schedule, action_id-1, action_id)
 
-            add_to_schedule!(schedule, DEPOSIT(robot_id, object_id, dropoff_station_id), action_id)
-            add_edge!(schedule, action_id, action_id + 1)
             action_id += 1
+            add_to_schedule!(schedule, DEPOSIT(robot_id, object_id, dropoff_station_id), action_id)
+            add_edge!(schedule, action_id-1, action_id)
+
+            new_robot_id = robot_id + N
+            add_edge!(schedule, action_id, RobotID(new_robot_id))
             add_edge!(schedule, action_id, operation_id)
         end
-        for j in get_output_ids(op)
-            robot_pred = ROBOT_AT(-1,-1)
-            robot_id = get_id(get_r(robot_pred))
-            object_pred = OBJECT_AT(j, get_id(get_s(op)))
-            object_id = ObjectID(j)
+        for object_id in get_output_ids(op)
+            # robot_id = assignments[object_id]
+            # robot_pred = get_robot_ICs(schedule)[object_id]
+            # object_pred = get_object_ICs(schedule)[object_id]
 
-            add_to_schedule!(schedule, object_pred, object_id)
-            add_edge!(schedule, operation_id, object_id)
+            # add_to_schedule!(schedule, object_pred, object_id)
+            add_edge!(schedule, operation_id, ObjectID(object_id))
         end
     end
     return schedule

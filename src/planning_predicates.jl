@@ -28,6 +28,7 @@ abstract type AbstractID end
 get_id(id::AbstractID) = id.id
 get_id(id::Int) = id
 Base.:+(id::A,i::Int) where {A<:AbstractID} = A(get_id(id)+i)
+Base.:-(id::A,i::Int) where {A<:AbstractID} = A(get_id(id)-i)
 @with_kw struct LocationID <: AbstractID
 	id::Int = 0
 end
@@ -73,6 +74,7 @@ get_s(pred::ROBOT_AT) = pred.s
 
 # robot actions
 abstract type AbstractRobotAction end
+get_r(a::A) where {A<:AbstractRobotAction} = a.r
 # duration(model, state::AgentState, action::AbstractRobotAction) = 0
 struct GO <: AbstractRobotAction # go to position x
     r::RobotID
