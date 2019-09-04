@@ -4,6 +4,7 @@ export
     get_all_root_nodes,
     get_bfs_traversal,
     initialize_random_2D_task_graph_env,
+    get_random_problem_instantiation,
     cached_pickup_and_delivery_distances,
     formulate_optimization_problem,
     formulate_JuMP_optimization_problem,
@@ -118,6 +119,24 @@ function initialize_random_2D_task_graph_env(N,M;vtxs=nothing,d=[20,20])
         # end
     end
     r₀,s₀,sₜ,x₀
+end
+
+"""
+    `get_random_problem_instantiation`
+
+    Args:
+    - `N`: number of robots
+    - `M`: number of delivery tasks
+    - `robot_zones`: list of possible start locations for robots
+    - `pickup_zones`: list of possible start locations for objects
+    - `dropoff_zones`: list of possible destinations for objects
+"""
+function get_random_problem_instantiation(N::Int,M::Int,pickup_zones,dropoff_zones,robot_zones)
+    ##### Random Problem Initialization #####
+    r0 = robot_zones[sortperm(rand(length(robot_zones)))][1:N]
+    s0 = pickup_zones[sortperm(rand(length(pickup_zones)))][1:M]
+    sF = dropoff_zones[sortperm(rand(length(dropoff_zones)))][1:M]
+    return r0,s0,sF
 end
 
 """
@@ -386,10 +405,18 @@ function construct_random_project_spec(M::Int,object_ICs::Dict{Int,OBJECT_AT},ob
     add_operation!(project_spec,construct_operation(project_spec, -1, [M], [], Δt))
     project_spec
 end
-function construct_random_project_spec(M::Int,object_ICs::Vector{OBJECT_AT};
+function construct_random_project_spec(M::Int,object_ICs::Vector{OBJECT_AT},object_FCs::Vector{OBJECT_AT};
     max_parents=1,depth_bias=1.0,Δt_min::Int=0,Δt_max::Int=0)
     object_IC_dict = Dict{Int,OBJECT_AT}(get_id(get_o(pred))=>pred for pred in object_ICs)
-    construct_random_project_spec(M,object_IC_dict;
+    object_FC_dict = Dict{Int,OBJECT_AT}(get_id(get_o(pred))=>pred for pred in object_FCs)
+    construct_random_project_spec(M,object_IC_dict,object_FC_dict;
+        max_parents=max_parents,depth_bias=depth_bias,Δt_min=Δt_min,Δt_max=Δt_max)
+end
+function construct_random_project_spec(M::Int,s0::Vector{Int},sF::Vector{Int};
+    max_parents=1,depth_bias=1.0,Δt_min::Int=0,Δt_max::Int=0)
+    object_ICs = Dict{Int,OBJECT_AT}(o=>OBJECT_AT(o,s) for (o,s) in enumerate(s0))
+    object_FCs = Dict{Int,OBJECT_AT}(o=>OBJECT_AT(o,s) for (o,s) in enumerate(sF))
+    construct_random_project_spec(M,object_ICs,object_FCs;
         max_parents=max_parents,depth_bias=depth_bias,Δt_min=Δt_min,Δt_max=Δt_max)
 end
 

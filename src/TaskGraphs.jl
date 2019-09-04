@@ -17,14 +17,7 @@ export
     get_s,
     preconditions,
     postconditions,
-    duration,
-
-    ProjectSpec,
-    get_initial_nodes,
-    get_input_ids,
-    get_output_ids,
-    add_operation!,
-    read_project_spec
+    duration
 
 
 @with_kw struct Operation
@@ -46,6 +39,15 @@ duration(op::Operation) = op.Δt
 preconditions(op::Operation) = op.pre
 postconditions(op::Operation) = op.post
 
+export
+    ProjectSpec,
+    get_initial_nodes,
+    get_input_ids,
+    get_output_ids,
+    add_operation!,
+    get_duration_vector,
+    read_project_spec
+    
 """
     `ProjectSpec{G}`
 
@@ -68,6 +70,15 @@ get_output_ids(op::Operation) = Set{Int}([get_id(get_o(p)) for p in op.post])
 get_pre_deps(tg::ProjectSpec, i::Int) = get(tg.pre_deps, i, Set{Int}())
 get_post_deps(tg::ProjectSpec, i::Int) = get(tg.post_deps, i, Set{Int}())
 get_num_delivery_tasks(spec::ProjectSpec) = length(collect(union(map(op->union(get_input_ids(op),get_output_ids(op)),spec.operations)...)))
+function get_duration_vector(spec::P) where {P<:ProjectSpec}
+    Δt = zeros(get_num_delivery_tasks(spec))
+    for op in spec.operations
+        for id in get_output_ids(op)
+            Δt[id] = duration(op)
+        end
+    end
+    Δt
+end
 function add_pre_dep!(tg::ProjectSpec, i::Int, op_idx::Int)
     push!(get!(tg.pre_deps, i, Set{Int}()),op_idx)
 end
@@ -332,13 +343,13 @@ function construct_project_schedule(spec::P,
             # add action sequence
             robot_id = assignments[object_id]
             robot_pred = get_robot_ICs(schedule)[object_id]
-            
+
             object_ic = get_object_ICs(schedule)[object_id]
             pickup_station_id = get_id(get_s(object_ic))
-            
+
             object_fc = object_FCs[object_id]
             dropoff_station_id = get_id(get_s(object_fc))
-            
+
             action_id = ActionID(get_num_actions(schedule) + 1)
             add_to_schedule!(schedule, GO(robot_id, pickup_station_id), action_id)
             add_edge!(schedule, RobotID(robot_id), action_id)
