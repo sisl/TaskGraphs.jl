@@ -58,6 +58,7 @@ postconditions(op::Operation) = op.post
 """
 @with_kw struct ProjectSpec{G}
     initial_conditions::Dict{Int,OBJECT_AT} = Dict{Int,OBJECT_AT}()
+    final_conditions::Dict{Int,OBJECT_AT} = Dict{Int,OBJECT_AT}()
     operations::Vector{Operation} = Vector{Operation}()
     pre_deps::Dict{Int,Set{Int}}  = Dict{Int,Set{Int}}() # id => (pre_conditions)
     post_deps::Dict{Int,Set{Int}} = Dict{Int,Set{Int}}()
@@ -104,7 +105,7 @@ end
 function construct_operation(spec::ProjectSpec, station_id, input_ids, output_ids, Δt)
     Operation(
         Set{OBJECT_AT}(map(o->get(spec.initial_conditions, o, OBJECT_AT(o,station_id)), input_ids)),
-        Set{OBJECT_AT}(map(o->get(spec.initial_conditions, o, OBJECT_AT(o,station_id)), output_ids)),
+        Set{OBJECT_AT}(map(o->get(spec.final_conditions, o, OBJECT_AT(o,station_id)), output_ids)),
         Δt,
         StationID(station_id)
     )
@@ -176,7 +177,8 @@ function construct_delivery_graph(project_spec::ProjectSpec,M::Int)
         for pred in preconditions(op)
             i = get_id(get_o(pred))
             pre = project_spec.initial_conditions[i]
-            push!(delivery_graph.tasks,DeliveryTask(i,get_id(get_s(pre)),get_id(get_s(pre))))
+            post = project_spec.final_conditions[i]
+            push!(delivery_graph.tasks,DeliveryTask(i,get_id(get_s(pre)),get_id(get_s(post))))
             for j in get_output_ids(op)
                 add_edge!(delivery_graph.graph, i, j)
                 # push!(delivery_graph.tasks,DeliveryTask(i,i,j))
@@ -280,6 +282,7 @@ end
 """
 function construct_project_schedule(spec::P,
     object_ICs::Dict{Int,OBJECT_AT},
+    object_FCs::Dict{Int,OBJECT_AT},
     robot_ICs::Dict{Int,ROBOT_AT},
     assignments::V=Dict{Int,Int}()
     ) where {P<:ProjectSpec,V<:Union{Dict{Int,Int},Vector{Int}}}

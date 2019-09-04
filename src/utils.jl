@@ -343,11 +343,12 @@ end
             For `depth_bias` == 0.0, the graph will be as "strung out" as
             possible.
 """
-function construct_random_project_spec(M::Int,object_ICs::Dict{Int,OBJECT_AT}=Dict{Int,OBJECT_AT}();
+function construct_random_project_spec(M::Int,object_ICs::Dict{Int,OBJECT_AT},object_FCs::Dict{Int,OBJECT_AT};
     max_parents=1,depth_bias=1.0,Δt_min::Int=0,Δt_max::Int=0)
     project_spec = ProjectSpec(
         M=M,
-        initial_conditions=object_ICs
+        initial_conditions=object_ICs,
+        final_conditions=object_FCs
         )
     # fill with random operations going backwards
     i = M-1
@@ -381,6 +382,10 @@ function construct_random_project_spec(M::Int,object_ICs::Dict{Int,OBJECT_AT}=Di
         for id in input_ids
             enqueue!(frontier, id=>M-i)
         end
+        # if i == 0
+        #     Δt=0.0
+        #     add_operation!(project_spec,construct_operation(project_spec, station_id, [output_id], [], Δt))
+        # end
     end
     project_spec
 end
@@ -422,7 +427,8 @@ function combine_project_specs(specs::Vector{P} where P <: ProjectSpec)
     M = 0
     new_spec = ProjectSpec(
         M=sum(map(spec->spec.M, specs)),
-        initial_conditions=merge(map(spec->spec.initial_conditions, specs)...)
+        initial_conditions=merge(map(spec->spec.initial_conditions, specs)...),
+        final_conditions=merge(map(spec->spec.final_conditions, specs)...)
         )
     for spec in specs
         for op in spec.operations
