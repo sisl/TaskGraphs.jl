@@ -1,6 +1,7 @@
 using LightGraphs, MetaGraphs, GraphUtils
 using TaskGraphs
 using Gurobi
+using JuMP, MathOptInterface
 using TOML
 
 using Test

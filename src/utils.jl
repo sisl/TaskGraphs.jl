@@ -180,7 +180,6 @@ end
         `model` - an Optimization problem
 """
 function formulate_optimization_problem(G,Drs,Dss,Δt,to0_,tr0_)
-    #TODO need to provide known start times for leaf tasks and non-dummy robots
     M = size(Dss,1)
     N = size(Drs,1)-M
     # Optimization variables
@@ -376,17 +375,15 @@ function construct_random_project_spec(M::Int,object_ICs::Dict{Int,OBJECT_AT},ob
         input_ids = collect(max(1,1+i-rand(1:max_parents)):i)
         i = i - length(input_ids)
         # Δt = Δt_min + (Δt_max-Δt_min)*rand()
-        Δt=rand(Δt_min:Δt_max)
+        Δt=rand(Δt_min:0.01:Δt_max)
         # add_operation!(project_spec,construct_operation(station_id, input_ids, [output_id], Δt))
         add_operation!(project_spec,construct_operation(project_spec, station_id, input_ids, [output_id], Δt))
         for id in input_ids
             enqueue!(frontier, id=>M-i)
         end
-        # if i == 0
-        #     Δt=0.0
-        #     add_operation!(project_spec,construct_operation(project_spec, station_id, [output_id], [], Δt))
-        # end
     end
+    Δt=0.0
+    add_operation!(project_spec,construct_operation(project_spec, -1, [M], [], Δt))
     project_spec
 end
 function construct_random_project_spec(M::Int,object_ICs::Vector{OBJECT_AT};
@@ -514,14 +511,25 @@ end
 ################################################################################
 
 export
+    title_string,
     get_display_metagraph
 
-title_string(a::GO)        = "go"
-title_string(a::COLLECT)   = "collect"
-title_string(a::CARRY)     = "carry"
-title_string(a::DEPOSIT)   = "deposit"
+# title_string(pred::OBJECT_AT,verbose=true) = string("O",get_id(get_o(pred)),"-",get_id(get_s(pred)))
+# title_string(pred::ROBOT_AT,verbose=true)  = string("R",get_id(get_r(pred)),"-",get_id(get_s(pred)))
+# title_string(a::GO,verbose=true)        = string("go-",get_id(get_r(a)),"-",get_id(get_s(a)))
+# title_string(a::COLLECT,verbose=true)   = string("collect-",get_id(get_r(a)),"-",get_id(get_o(a)),"-",get_id(get_s(a)))
+# title_string(a::CARRY,verbose=true)     = string("carry-",get_id(get_r(a)),"-",get_id(get_o(a)),"-",get_id(get_s(a)))
+# title_string(a::DEPOSIT,verbose=true)   = string("deposit-",get_id(get_r(a)),"-",get_id(get_o(a)),"-",get_id(get_s(a)))
+
+title_string(pred::OBJECT_AT,verbose=true) = verbose ? string("O",get_id(get_o(pred)),"-",get_id(get_s(pred))) : string("O",get_id(get_o(pred)));
+title_string(pred::ROBOT_AT,verbose=true)  = verbose ? string("R",get_id(get_r(pred)),"-",get_id(get_s(pred))) : string("R",get_id(get_r(pred)));
+title_string(a::GO,verbose=true)        = verbose ? string("go-",get_id(get_r(a)),"-",get_id(get_s(a))) : "go";
+title_string(a::COLLECT,verbose=true)   = verbose ? string("collect-",get_id(get_r(a)),"-",get_id(get_o(a)),"-",get_id(get_s(a))) : "collect";
+title_string(a::CARRY,verbose=true)     = verbose ? string("carry-",get_id(get_r(a)),"-",get_id(get_o(a)),"-",get_id(get_s(a))) : "carry";
+title_string(a::DEPOSIT,verbose=true)   = verbose ? string("deposit-",get_id(get_r(a)),"-",get_id(get_o(a)),"-",get_id(get_s(a))) : "deposit";
 
 function get_display_metagraph(project_schedule::ProjectSchedule;
+    verbose=true,
     object_color="orange",
     robot_color="lime",
     action_color="cyan",
@@ -531,25 +539,25 @@ function get_display_metagraph(project_schedule::ProjectSchedule;
     for (id,pred) in get_object_ICs(project_schedule)
         v = get_vtx(project_schedule, get_o(pred))
         set_prop!(graph, v, :vtype, :object_ic)
-        set_prop!(graph, v, :text, string("O",id))
+        set_prop!(graph, v, :text, title_string(pred,verbose))
         set_prop!(graph, v, :color, object_color)
     end
     for (id,pred) in get_robot_ICs(project_schedule)
         v = get_vtx(project_schedule, get_r(pred))
         set_prop!(graph, v, :vtype, :robot_ic)
-        set_prop!(graph, v, :text, string("R",id))
+        set_prop!(graph, v, :text, title_string(pred,verbose))
         set_prop!(graph, v, :color, robot_color)
     end
     for (id,op) in get_operations(project_schedule)
         v = get_vtx(project_schedule, OperationID(id))
         set_prop!(graph, v, :vtype, :operation)
-        set_prop!(graph, v, :text, string("M",id))
+        set_prop!(graph, v, :text, string("OP",id))
         set_prop!(graph, v, :color, operation_color)
     end
     for (id,a) in get_actions(project_schedule)
         v = get_vtx(project_schedule, ActionID(id))
         set_prop!(graph, v, :vtype, :action)
-        set_prop!(graph, v, :text, string(title_string(a),"-",get_id(get_r(a))))
+        set_prop!(graph, v, :text, title_string(a,verbose))
         set_prop!(graph, v, :color, action_color)
     end
     graph

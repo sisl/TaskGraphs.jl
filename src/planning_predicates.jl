@@ -1,4 +1,6 @@
 export
+    AbstractID,
+    get_id,
     LocationID,
     ObjectID,
     RobotID,
@@ -19,7 +21,7 @@ export
     delete_conditions,
 
     AbstractRobotAction,
-    GO,COLLECT,DEPOSIT,CHARGE,WAIT,COLLECT_AND_DELIVER,GO_AND_CHARGE,
+    GO,COLLECT,CARRY,DEPOSIT,CHARGE,WAIT,COLLECT_AND_DELIVER,GO_AND_CHARGE,
 
     transition
 
@@ -57,13 +59,6 @@ OBJECT_AT(o::Int,s::Int) = OBJECT_AT(ObjectID(o),StationID(s))
 get_o(pred::OBJECT_AT) = pred.o
 get_s(pred::OBJECT_AT) = pred.s
 
-# struct CAN_CARRY <: AbstractPlanningPredicate
-#     r::RobotID
-#     o::ObjectID
-# end
-# get_r(pred::CAN_CARRY) = pred.r
-# get_o(pred::CAN_CARRY) = pred.o
-
 struct ROBOT_AT <: AbstractPlanningPredicate
     r::RobotID
     s::StationID
@@ -72,9 +67,18 @@ ROBOT_AT(r::Int,s::Int) = ROBOT_AT(RobotID(r),StationID(s))
 get_r(pred::ROBOT_AT) = pred.r
 get_s(pred::ROBOT_AT) = pred.s
 
+# struct CAN_CARRY <: AbstractPlanningPredicate
+#     r::RobotID
+#     o::ObjectID
+# end
+# get_r(pred::CAN_CARRY) = pred.r
+# get_o(pred::CAN_CARRY) = pred.o
+
 # robot actions
 abstract type AbstractRobotAction end
 get_r(a::A) where {A<:AbstractRobotAction} = a.r
+get_s(a::A) where {A<:AbstractRobotAction} = a.x
+get_o(a::A) where {A<:AbstractRobotAction} = a.o
 # duration(model, state::AgentState, action::AbstractRobotAction) = 0
 struct GO <: AbstractRobotAction # go to position x
     r::RobotID

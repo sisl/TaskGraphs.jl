@@ -19,10 +19,6 @@ export
     postconditions,
     duration,
 
-    DeliveryTask,
-    DeliveryGraph,
-    construct_delivery_graph,
-
     ProjectSpec,
     get_initial_nodes,
     get_input_ids,
@@ -127,6 +123,7 @@ function TOML.parse(project_spec::ProjectSpec)
     toml_dict["title"]      = "ProjectSpec"
     toml_dict["operations"] = map(op->TOML.parse(op),project_spec.operations)
     toml_dict["initial_conditions"] = Dict(string(k)=>TOML.parse(pred) for (k,pred) in project_spec.initial_conditions)
+    toml_dict["final_conditions"] = Dict(string(k)=>TOML.parse(pred) for (k,pred) in project_spec.final_conditions)
     toml_dict
 end
 function read_project_spec(io)
@@ -136,6 +133,11 @@ function read_project_spec(io)
         object_id = arr[1]
         station_id = arr[2]
         project_spec.initial_conditions[object_id] = OBJECT_AT(object_id, station_id)
+    end
+    for (k,arr) in toml_dict["final_conditions"]
+        object_id = arr[1]
+        station_id = arr[2]
+        project_spec.final_conditions[object_id] = OBJECT_AT(object_id, station_id)
     end
     for op_dict in toml_dict["operations"]
         op = Operation(
@@ -147,6 +149,11 @@ function read_project_spec(io)
     end
     return project_spec
 end
+
+export
+    DeliveryTask,
+    DeliveryGraph,
+    construct_delivery_graph
 
 """
     `DeliveryTask`
@@ -190,6 +197,20 @@ end
 
 export
     ProjectSchedule,
+    get_graph,
+    get_object_ICs,
+    get_object_FCs,
+    get_robot_ICs,
+    get_actions,
+    get_operations,
+    get_num_actions,
+    get_num_operations,
+    get_num_object_ICs,
+    get_num_robot_ICs,
+    get_completion_time,
+    get_duration,
+    get_vtx,
+    add_to_schedule!,
     construct_project_schedule
 
 """
@@ -198,9 +219,11 @@ export
 @with_kw struct ProjectSchedule{G<:AbstractGraph}
     graph               ::G                 = MetaDiGraph()
     object_ICs          ::Dict{Int,OBJECT_AT} = Dict{Int,OBJECT_AT}()
+    # object_FCs          ::Dict{Int,OBJECT_AT} = Dict{Int,OBJECT_AT}()
     robot_ICs           ::Dict{Int,ROBOT_AT}  = Dict{Int,ROBOT_AT}()
+    # robot_FCs           ::Dict{Int,ROBOT_AT}  = Dict{Int,ROBOT_AT}()
     actions             ::Dict{Int,AbstractRobotAction} = Dict{Int,AbstractRobotAction}()
-    operations          ::Dict{Int,Operation} = Dict{Int,Operation}() # first num_operations vtxs all belong to operations
+    operations          ::Dict{Int,Operation} = Dict{Int,Operation}()
     #
     completion_times    ::Vector{Float64} = Vector{Float64}()
     durations           ::Vector{Float64} = Vector{Float64}()
@@ -212,7 +235,9 @@ export
 end
 get_graph(schedule::P) where {P<:ProjectSchedule} = schedule.graph
 get_object_ICs(schedule::P) where {P<:ProjectSchedule} = schedule.object_ICs
+# get_object_FCs(schedule::P) where {P<:ProjectSchedule} = schedule.object_FCs
 get_robot_ICs(schedule::P) where {P<:ProjectSchedule} = schedule.robot_ICs
+# get_robot_FCs(schedule::P) where {P<:ProjectSchedule} = schedule.robot_FCs
 get_actions(schedule::P) where {P<:ProjectSchedule} = schedule.actions
 get_operations(schedule::P) where {P<:ProjectSchedule} = schedule.operations
 get_num_actions(schedule::P) where {P<:ProjectSchedule} = length(get_actions(schedule))
@@ -287,7 +312,6 @@ function construct_project_schedule(spec::P,
     assignments::V=Dict{Int,Int}()
     ) where {P<:ProjectSpec,V<:Union{Dict{Int,Int},Vector{Int}}}
     schedule = ProjectSchedule()
-    M = get_num_delivery_tasks(spec)
     graph = get_graph(schedule)
     # add object ICs to graph
     for (id, pred) in object_ICs
@@ -308,10 +332,13 @@ function construct_project_schedule(spec::P,
             # add action sequence
             robot_id = assignments[object_id]
             robot_pred = get_robot_ICs(schedule)[object_id]
-            object_pred = get_object_ICs(schedule)[object_id]
-
-            pickup_station_id = get_id(get_s(object_pred))
-            dropoff_station_id = get_id(get_s(op))
+            
+            object_ic = get_object_ICs(schedule)[object_id]
+            pickup_station_id = get_id(get_s(object_ic))
+            
+            object_fc = object_FCs[object_id]
+            dropoff_station_id = get_id(get_s(object_fc))
+            
             action_id = ActionID(get_num_actions(schedule) + 1)
             add_to_schedule!(schedule, GO(robot_id, pickup_station_id), action_id)
             add_edge!(schedule, RobotID(robot_id), action_id)
@@ -329,7 +356,7 @@ function construct_project_schedule(spec::P,
             add_to_schedule!(schedule, DEPOSIT(robot_id, object_id, dropoff_station_id), action_id)
             add_edge!(schedule, action_id-1, action_id)
 
-            new_robot_id = robot_id + N
+            new_robot_id = object_id + N
             add_edge!(schedule, action_id, RobotID(new_robot_id))
             add_edge!(schedule, action_id, operation_id)
         end
