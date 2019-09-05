@@ -19,7 +19,6 @@ export
     postconditions,
     duration
 
-
 @with_kw struct Operation
     pre::Set{OBJECT_AT}     = Set{OBJECT_AT}()
     post::Set{OBJECT_AT}    = Set{OBJECT_AT}()
@@ -40,6 +39,34 @@ preconditions(op::Operation) = op.pre
 postconditions(op::Operation) = op.post
 
 export
+    TaskGraphProblemSpec
+
+"""
+    `TaskGraphProblemSpec{G}`
+
+    Elements:
+    - N::Int - num robots
+    - M::Int - num tasks
+    - graph::G - delivery graph
+    - Drs::Matrix{Float64} - distance matrix robot initial locations -> pickup stations
+    - Dss::Matrix{Float64} - distance matrix piickup stations -> dropoff stations
+    - Δt::Vector{Float64}  - durations of operations
+    - tr0_::Dict{Int,Float64} - robot start times
+    - to0_::Dict{Int,Float64} - object start times
+"""
+@with_kw struct TaskGraphProblemSpec{G}
+    N::Int                  = 0 # num robots
+    M::Int                  = 0 # num tasks
+    graph::G                = DiGraph() # delivery graph
+    D::Matrix{Float64}      = zeros(0,0)
+    Drs::Matrix{Float64}    = zeros(N+M,M) # distance matrix robot initial locations -> pickup stations
+    Dss::Matrix{Float64}    = zeros(M,M) # distance matrix piickup stations -> dropoff stations
+    Δt::Vector{Float64}     = Vector{Float64}() # durations of operations
+    tr0_::Dict{Int,Float64} = Dict{Int,Float64}() # robot start times
+    to0_::Dict{Int,Float64} = Dict{Int,Float64}() # object start times
+end
+
+export
     ProjectSpec,
     get_initial_nodes,
     get_input_ids,
@@ -47,7 +74,7 @@ export
     add_operation!,
     get_duration_vector,
     read_project_spec
-    
+
 """
     `ProjectSpec{G}`
 
@@ -207,6 +234,7 @@ function construct_delivery_graph(project_spec::ProjectSpec,M::Int)
 end
 
 export
+    PathSpec,
     ProjectSchedule,
     get_graph,
     get_object_ICs,
@@ -224,6 +252,20 @@ export
     add_to_schedule!,
     construct_project_schedule
 
+
+@with_kw struct PathSpec
+    # element             ::T             = nothing
+    op_duration         ::Float64       = 0.0
+    # agent_id            ::Int           = -1
+    # path_id             ::Int           = -1
+    # object_id           ::Int           = -1
+    start_vtx           ::Int           = -1
+    final_vtx           ::Int           = -1
+    min_path_duration   ::Int           = 0.0
+    # slack               ::Int           = 0.0
+    # deadline            ::Int           = 0.0
+end
+
 """
     `ProjectSchedule`
 """
@@ -238,6 +280,8 @@ export
     #
     completion_times    ::Vector{Float64} = Vector{Float64}()
     durations           ::Vector{Float64} = Vector{Float64}()
+    completed           ::Vector{Bool}    = Vector{Bool}()
+    path_specs          ::Vector{PathSpec}= Vector{PathSpec}()
     #
     object_vtx_map      ::Dict{Int,Int}   = Dict{Int,Int}()
     robot_vtx_map       ::Dict{Int,Int}   = Dict{Int,Int}()
@@ -265,38 +309,115 @@ get_vtx(schedule::ProjectSchedule,i::ObjectID)      = get(schedule.object_vtx_ma
 get_vtx(schedule::ProjectSchedule,i::RobotID)       = get(schedule.robot_vtx_map,       get_id(i), -1)
 get_vtx(schedule::ProjectSchedule,i::ActionID)      = get(schedule.action_vtx_map,      get_id(i), -1)
 get_vtx(schedule::ProjectSchedule,i::OperationID)   = get(schedule.operation_vtx_map,   get_id(i), -1)
-function add_to_schedule!(schedule::P,pred::OBJECT_AT,id::ObjectID) where {P<:ProjectSchedule}
+
+function get_path_spec(schedule::P,spec::T,a::GO) where {P<:ProjectSchedule,T<:TaskGraphProblemSpec,A<:AbstractRobotAction}
+    r = get_id(get_r(a))
+    s = get_id(get_s(a))
+    robot_pred = get_robot_ICs(schedule)[r]
+    s0 = get_id(get_s(robot_pred))
+    PathSpec(
+        op_duration=0.0,
+        start_vtx=s0,
+        final_vtx=s,
+        min_path_duration=spec.D[s0,s] # TaskGraphProblemSpec distance matrix
+        )
+end
+function get_path_spec(schedule::P,spec::T,a::CARRY) where {P<:ProjectSchedule,T<:TaskGraphProblemSpec,A<:AbstractRobotAction}
+    r = get_id(get_r(a))
+    o = get_id(get_o(a))
+    s = get_id(get_s(a))
+    object_pred = get_object_ICs(schedule)[o]
+    s0 = get_id(get_s(object_pred))
+    PathSpec(
+        op_duration=0.0,
+        start_vtx=s0,
+        final_vtx=s,
+        min_path_duration=spec.D[s0,s] # TaskGraphProblemSpec distance matrix
+        )
+end
+function get_path_spec(schedule::P,spec::T,a::COLLECT) where {P<:ProjectSchedule,T<:TaskGraphProblemSpec,A<:AbstractRobotAction}
+    r = get_id(get_r(a))
+    o = get_id(get_o(a))
+    s = get_id(get_s(a))
+    PathSpec(
+        op_duration=0.0,
+        start_vtx=s,
+        final_vtx=s,
+        min_path_duration=0.0
+        )
+end
+function get_path_spec(schedule::P,spec::T,a::DEPOSIT) where {P<:ProjectSchedule,T<:TaskGraphProblemSpec,A<:AbstractRobotAction}
+    r = get_id(get_r(a))
+    o = get_id(get_o(a))
+    s = get_id(get_s(a))
+    object_pred = get_object_ICs(schedule)[o]
+    s0 = get_id(get_s(object_pred))
+    PathSpec(
+        op_duration=0.0,
+        start_vtx=s,
+        final_vtx=s,
+        min_path_duration=0.0
+        )
+end
+function add_to_schedule!(schedule::P,spec::T,pred::OBJECT_AT,id::ObjectID) where {P<:ProjectSchedule,T<:TaskGraphProblemSpec}
     @assert get_vtx(schedule, id) == -1
     graph = get_graph(schedule)
     add_vertex!(graph)
-    set_prop!(graph,nv(graph),:vtype,:object_ic)
+    push!(schedule.path_specs, PathSpec(
+        op_duration=0.0,
+        start_vtx=get_id(get_s(pred)),
+        final_vtx=get_id(get_s(pred)),
+        min_path_duration=0.0
+        ))
+    push!(schedule.completion_times, 0.0)
+    push!(schedule.durations, 0.0)
+    set_props!(graph,nv(graph),Dict(:vtype=>:object_ic,:id=>id,:pred=>pred))
     get_object_ICs(schedule)[get_id(id)] = pred
     schedule.object_vtx_map[get_id(id)] = nv(graph)
     schedule
 end
-function add_to_schedule!(schedule::P,pred::ROBOT_AT,id::RobotID) where {P<:ProjectSchedule}
+function add_to_schedule!(schedule::P,spec::T,pred::ROBOT_AT,id::RobotID) where {P<:ProjectSchedule,T<:TaskGraphProblemSpec}
     @assert get_vtx(schedule, id) == -1
     graph = get_graph(schedule)
     add_vertex!(graph)
-    set_prop!(graph,nv(graph),:vtype,:robot_ic)
+    push!(schedule.path_specs, PathSpec(
+        op_duration=0.0,
+        start_vtx=get_id(get_s(pred)),
+        final_vtx=get_id(get_s(pred)),
+        min_path_duration=0.0
+        ))
+    push!(schedule.completion_times, 0.0)
+    push!(schedule.durations, 0.0)
+    set_props!(graph,nv(graph),Dict(:vtype=>:robot_ic,:id=>id,:pred=>pred))
     get_robot_ICs(schedule)[get_id(id)] = pred
     schedule.robot_vtx_map[get_id(id)] = nv(graph)
     schedule
 end
-function add_to_schedule!(schedule::P,op::Operation,id::OperationID) where {P<:ProjectSchedule}
+function add_to_schedule!(schedule::P,spec::T,op::Operation,id::OperationID) where {P<:ProjectSchedule,T<:TaskGraphProblemSpec}
     @assert get_vtx(schedule, id) == -1
     graph = get_graph(schedule)
     add_vertex!(graph)
-    set_prop!(graph,nv(graph),:vtype,:operation)
+    push!(schedule.path_specs, PathSpec(
+        op_duration=duration(op),
+        start_vtx=-1,
+        final_vtx=-1,
+        min_path_duration=0.0
+        ))
+    push!(schedule.completion_times, 0.0)
+    push!(schedule.durations, 0.0)
+    set_props!(graph,nv(graph),Dict(:vtype=>:operation,:id=>id,:op=>op))
     schedule.operations[get_id(id)] = op
     schedule.operation_vtx_map[get_id(id)] = nv(graph)
     schedule
 end
-function add_to_schedule!(schedule::P,a::A,id::ActionID) where {P<:ProjectSchedule,A<:AbstractRobotAction}
+function add_to_schedule!(schedule::P,spec::T,a::A,id::ActionID) where {P<:ProjectSchedule,T<:TaskGraphProblemSpec,A<:AbstractRobotAction}
     @assert get_vtx(schedule, id) == -1
     graph = get_graph(schedule)
     add_vertex!(graph)
-    set_prop!(graph,nv(graph),:vtype,:action)
+    push!(schedule.completion_times, 0.0)
+    push!(schedule.durations, 0.0)
+    push!(schedule.path_specs, get_path_spec(schedule,spec,a))
+    set_props!(graph,nv(graph),Dict(:vtype=>:action,:id=>id,:a=>a))
     schedule.actions[get_id(id)] = a
     schedule.action_vtx_map[get_id(id)] = nv(graph)
     schedule
@@ -306,6 +427,8 @@ function LightGraphs.add_edge!(schedule::P,id1::A,id2::B) where {P<:ProjectSched
     # @show success, get_vtx(schedule,id1), get_vtx(schedule,id2)
     schedule
 end
+
+
 """
     `construct_project_schedule`
 
@@ -316,33 +439,36 @@ end
     - `assignments` - a list of robot assignments. `assignments[i] == j` means
     that robot `i` is assigned to transport object `j`
 """
-function construct_project_schedule(spec::P,
+function construct_project_schedule(
+    project_spec::P,
+    problem_spec::T,
     object_ICs::Dict{Int,OBJECT_AT},
     object_FCs::Dict{Int,OBJECT_AT},
     robot_ICs::Dict{Int,ROBOT_AT},
     assignments::V=Dict{Int,Int}()
-    ) where {P<:ProjectSpec,V<:Union{Dict{Int,Int},Vector{Int}}}
+    ) where {P<:ProjectSpec,T<:TaskGraphProblemSpec,V<:Union{Dict{Int,Int},Vector{Int}}}
     schedule = ProjectSchedule()
     graph = get_graph(schedule)
     # add object ICs to graph
     for (id, pred) in object_ICs
-        add_to_schedule!(schedule, pred, get_o(pred))
+        add_to_schedule!(schedule, problem_spec, pred, get_o(pred))
     end
     # add robot ICs to graph
     for (id, pred) in robot_ICs
-        add_to_schedule!(schedule, pred, get_r(pred))
+        add_to_schedule!(schedule, problem_spec, pred, get_r(pred))
     end
     M = length(object_ICs) # number of objects
     N = length(robot_ICs) - M # number of robots
     # add operations to graph
-    for op_vtx in topological_sort(spec.graph)
-        op = spec.operations[op_vtx]
+    for op_vtx in topological_sort(project_spec.graph)
+        op = project_spec.operations[op_vtx]
         operation_id = OperationID(get_num_operations(schedule) + 1)
-        add_to_schedule!(schedule, op, operation_id)
+        add_to_schedule!(schedule, problem_spec, op, operation_id)
         for object_id in get_input_ids(op)
             # add action sequence
             robot_id = assignments[object_id]
-            robot_pred = get_robot_ICs(schedule)[object_id]
+            robot_pred = get_robot_ICs(schedule)[robot_id]
+            robot_start_station = get_id(get_s(robot_pred))
 
             object_ic = get_object_ICs(schedule)[object_id]
             pickup_station_id = get_id(get_s(object_ic))
@@ -351,20 +477,20 @@ function construct_project_schedule(spec::P,
             dropoff_station_id = get_id(get_s(object_fc))
 
             action_id = ActionID(get_num_actions(schedule) + 1)
-            add_to_schedule!(schedule, GO(robot_id, pickup_station_id), action_id)
+            add_to_schedule!(schedule, problem_spec, GO(robot_id, pickup_station_id), action_id)
             add_edge!(schedule, RobotID(robot_id), action_id)
 
             action_id += 1
-            add_to_schedule!(schedule, COLLECT(robot_id, object_id, pickup_station_id), action_id)
+            add_to_schedule!(schedule, problem_spec, COLLECT(robot_id, object_id, pickup_station_id), action_id)
             add_edge!(schedule, action_id-1, action_id)
             add_edge!(schedule, ObjectID(object_id), action_id)
 
             action_id += 1
-            add_to_schedule!(schedule, CARRY(robot_id, object_id, dropoff_station_id), action_id)
+            add_to_schedule!(schedule, problem_spec, CARRY(robot_id, object_id, dropoff_station_id), action_id)
             add_edge!(schedule, action_id-1, action_id)
 
             action_id += 1
-            add_to_schedule!(schedule, DEPOSIT(robot_id, object_id, dropoff_station_id), action_id)
+            add_to_schedule!(schedule, problem_spec, DEPOSIT(robot_id, object_id, dropoff_station_id), action_id)
             add_edge!(schedule, action_id-1, action_id)
 
             new_robot_id = object_id + N

@@ -315,6 +315,16 @@ function formulate_JuMP_optimization_problem(G,Drs,Dss,Δt,to0_,tr0_,optimizer;
     @objective(model, Min, sum(map(v->tof[v], collect(get_all_root_nodes(G)))))
     model;
 end
+function formulate_JuMP_optimization_problem(spec::TaskGraphProblemSpec,optimizer;
+    TimeLimit=50,
+    OutputFlag=0
+    )
+    formulate_JuMP_optimization_problem(
+        spec.graph,spec.Drs,spec.Dss,spec.Δt,spec.to0_,spec.tr0_,optimizer;
+        TimeLimit=TimeLimit,
+        OutputFlag=OutputFlag
+        )
+end
 
 """
     `construct_factory_distance_matrix(r₀,oₒ,sₒ;dist::Function=(x1,x2)->norm(x2-x1,1))`
@@ -598,7 +608,6 @@ export
     SearchCache,
     get_branch_id,
     is_feasible,
-    TaskGraphProblemSpec,
     construct_solution_graph,
     process_solution,
     process_solution_fast,
@@ -677,17 +686,6 @@ end
 function is_feasible(cache::SearchCache)
     M = length(cache.to0)
     rank(cache.x) == M
-end
-
-struct TaskGraphProblemSpec{G}
-    N::Int
-    M::Int
-    graph::G
-    Drs::Matrix{Float64}
-    Dss::Matrix{Float64}
-    Δt::Vector{Float64}
-    tr0_::Dict{Int,Float64}
-    to0_::Dict{Int,Float64}
 end
 
 # solution graph encodes dependencies between robots and tasks too

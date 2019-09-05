@@ -23,14 +23,15 @@ let
     add_operation!(project_spec,construct_operation(project_spec, 3, [1,2], [3], 1.0))
     add_operation!(project_spec,construct_operation(project_spec, 6, [3], [], 0.0))
     delivery_graph = construct_delivery_graph(project_spec,M)
-    @show delivery_graph.tasks
-    assignments = [1,2,3]
-    project_schedule = construct_project_schedule(project_spec, object_ICs, object_FCs, robot_ICs, assignments)
-    o_keys = Set(collect(keys(get_object_ICs(project_schedule))))
-    input_ids = union([get_input_ids(op) for (k,op) in get_operations(project_schedule)]...)
-    @test o_keys == input_ids
-    output_ids = union([get_output_ids(op) for (k,op) in get_operations(project_schedule)]...)
-    rg = get_display_metagraph(project_schedule)
+    problem_spec = TaskGraphProblemSpec()
+    # # @show delivery_graph.tasks
+    # assignments = [1,2,3]
+    # project_schedule = construct_project_schedule(project_spec, problem_spec, object_ICs, object_FCs, robot_ICs, assignments)
+    # o_keys = Set(collect(keys(get_object_ICs(project_schedule))))
+    # input_ids = union([get_input_ids(op) for (k,op) in get_operations(project_schedule)]...)
+    # @test o_keys == input_ids
+    # output_ids = union([get_output_ids(op) for (k,op) in get_operations(project_schedule)]...)
+    # rg = get_display_metagraph(project_schedule)
 end
 let
     G = DiGraph(3)
@@ -40,16 +41,26 @@ end
 let
     N = 4                  # num robots
     M = 6                  # num delivery tasks
-    r0,s0,sF,pts = initialize_random_2D_task_graph_env(N,M;d=[10,10])
-
+    env_graph, vtx_grid = initialize_grid_graph_with_obstacles([10,10]);
     # N = 40                  # num robots
     # M = 60                  # num delivery tasks
-    # r0,s0,sF,pts = initialize_random_2D_task_graph_env(N,M;d=[100,100])
+    # env_graph, vtx_grid = initialize_grid_graph_with_obstacles([50,50]);
+    pickup_zones = collect(1:2*N)
+    dropoff_zones = collect(2*N+1:2*(M+N))
+    free_zones = collect(2*(M+N):nv(env_graph))
+    dist_matrix = get_dist_matrix(env_graph)
+
+    r0 = free_zones[1:N]
+    s0 = pickup_zones[1:M]
+    sF = dropoff_zones[1:M]
+    # r0,s0,sF = get_random_problem_instantiation(
+    #     N,M,pickup_zones,dropoff_zones,free_zones)
 
     object_ICs = Dict{Int,OBJECT_AT}(o => OBJECT_AT(o,s0[o]) for o in 1:M) # initial_conditions
     object_FCs = Dict{Int,OBJECT_AT}(o => OBJECT_AT(o,sF[o]) for o in 1:M) # final conditions
     robot_ICs = Dict{Int,ROBOT_AT}(r => ROBOT_AT(r,r0[r]) for r in 1:N)
-    Drs, Dss = cached_pickup_and_delivery_distances(pts[r0],pts[s0],pts[sF])
+    # Drs, Dss = cached_pickup_and_delivery_distances(pts[r0],pts[s0],pts[sF])
+    Drs, Dss = cached_pickup_and_delivery_distances(r0,s0,sF,(v1,v2)->dist_matrix[v1,v2])
     project_spec = construct_random_project_spec(M,object_ICs,object_FCs;max_parents=3,depth_bias=1.0,Δt_min=0,Δt_max=0)
     project_spec = construct_random_project_spec(M,object_ICs,object_FCs;max_parents=3,depth_bias=1.0,Δt_min=0,Δt_max=0)
     project_spec = construct_random_project_spec(M,object_ICs,object_FCs;max_parents=3,depth_bias=1.0,Δt_min=0,Δt_max=0)
@@ -91,33 +102,33 @@ let
     for i in 1:N
         tr0_[i] = 0.0
     end
-
-    model = formulate_JuMP_optimization_problem(G,Drs,Dss,Δt,to0_,tr0_,Gurobi.Optimizer;OutputFlag=0);
-    spec = TaskGraphProblemSpec(N,M,G,Drs,Dss,Δt,tr0_,to0_)
+    problem_spec = TaskGraphProblemSpec(N,M,G,dist_matrix,Drs,Dss,Δt,tr0_,to0_)
+    # model = formulate_JuMP_optimization_problem(G,Drs,Dss,Δt,to0_,tr0_,Gurobi.Optimizer;OutputFlag=0);
+    model = formulate_JuMP_optimization_problem(problem_spec,Gurobi.Optimizer;OutputFlag=0);
 
     optimize!(model)
     optimal = (termination_status(model) == MathOptInterface.TerminationStatusCode(1))
     @show optimal;
     assignment = Matrix{Int}(value.(model[:x]));
 
-    spec = TaskGraphProblemSpec(N,M,G,Drs,Dss,Δt,tr0_,to0_)
     cache = SearchCache(N,M,to0_,tr0_)
     for j in 1:M
         i = findfirst(assignment[:,j] .== 1)
         cache.x[i,j] = 1
     end
     solution_graph = construct_solution_graph(delivery_graph.graph,assignment)
-    cache = process_solution(model,cache,spec);
+    cache = process_solution(model,cache,problem_spec);
 
     assignments = map(j->findfirst(cache.x[:,j] .== 1),1:M)
 
     for r in N+1:N+M
         robot_ICs[r] = ROBOT_AT(r,sF[r-N])
     end
-    project_schedule = construct_project_schedule(project_spec, object_ICs, object_FCs, robot_ICs, assignments);
+    project_schedule = construct_project_schedule(project_spec, problem_spec, object_ICs, object_FCs, robot_ICs, assignments);
 
     o_keys = Set(collect(keys(get_object_ICs(project_schedule))))
     input_ids = union([get_input_ids(op) for (k,op) in get_operations(project_schedule)]...)
     @test o_keys == input_ids
 
+    rg = get_display_metagraph(project_schedule)
 end
