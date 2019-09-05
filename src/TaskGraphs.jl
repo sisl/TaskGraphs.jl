@@ -455,7 +455,9 @@ function construct_project_schedule(
     end
     # add robot ICs to graph
     for (id, pred) in robot_ICs
+        # if (id in assignments)
         add_to_schedule!(schedule, problem_spec, pred, get_r(pred))
+        # end
     end
     M = length(object_ICs) # number of objects
     N = length(robot_ICs) - M # number of robots
@@ -468,13 +470,13 @@ function construct_project_schedule(
             # add action sequence
             robot_id = assignments[object_id]
             robot_pred = get_robot_ICs(schedule)[robot_id]
-            robot_start_station = get_id(get_s(robot_pred))
+            robot_start_station = get_id(TaskGraphs.get_s(robot_pred))
 
             object_ic = get_object_ICs(schedule)[object_id]
-            pickup_station_id = get_id(get_s(object_ic))
+            pickup_station_id = get_id(TaskGraphs.get_s(object_ic))
 
             object_fc = object_FCs[object_id]
-            dropoff_station_id = get_id(get_s(object_fc))
+            dropoff_station_id = get_id(TaskGraphs.get_s(object_fc))
 
             action_id = ActionID(get_num_actions(schedule) + 1)
             add_to_schedule!(schedule, problem_spec, GO(robot_id, pickup_station_id), action_id)
@@ -493,9 +495,12 @@ function construct_project_schedule(
             add_to_schedule!(schedule, problem_spec, DEPOSIT(robot_id, object_id, dropoff_station_id), action_id)
             add_edge!(schedule, action_id-1, action_id)
 
-            new_robot_id = object_id + N
-            add_edge!(schedule, action_id, RobotID(new_robot_id))
             add_edge!(schedule, action_id, operation_id)
+            new_robot_id = object_id + N
+            # if (new_robot_id in assignments)
+            #     @show new_robot_id
+            add_edge!(schedule, action_id, RobotID(new_robot_id))
+            # end
         end
         for object_id in get_output_ids(op)
             # robot_id = assignments[object_id]
@@ -520,9 +525,24 @@ function process_schedule(schedule::P) where {P<:ProjectSchedule}
     traversal = topological_sort_by_dfs(solution_graph)
     t0 = zeros(nv(solution_graph))
     tF = zeros(nv(solution_graph))
-    slack = zeros(nv(solution_graph))
-    local_slack = zeros(nv(solution_graph))
-    # Compute Lower Bounds Via Forward Dynamic Programming pass
+    slack = Inf*ones(nv(solution_graph))
+    local_slack = Inf*ones(nv(solution_graph))
+    # Take care of all terminal nodes that are not part of the objective (infinite slack)
+    false_terminal_nodes = Set{Int}()
+    for (idx,pred) in get_robot_ICs(schedule)
+        v = get_vtx(schedule, RobotID(idx))
+        if length(outneighbors(solution_graph,v)) == 0
+            push!(false_terminal_nodes, v)
+        end
+    end
+    # True terminal nodes
+    for (idx,op) in get_operations(schedule)
+        if length(get_output_ids(op)) == 0
+            v = get_vtx(schedule, OperationID(idx))
+            slack[v] = 0.0
+        end
+    end
+    ########## Compute Lower Bounds Via Forward Dynamic Programming pass
     for v in traversal
         path_spec = schedule.path_specs[v]
         Δt = path_spec.op_duration
@@ -531,11 +551,17 @@ function process_schedule(schedule::P) where {P<:ProjectSchedule}
         end
         tF[v] = t0[v] + path_spec.min_path_duration
     end
-    # Compute Slack Via Backward Dynamic Programming pass
+    ########### Compute Slack Via Backward Dynamic Programming pass
     for v in reverse(traversal)
-        for v2 in inneighbors(solution_graph,v)
-            local_slack[v2] = t0[v] - tF[v2]
-            slack[v2]       = slack[v] + local_slack[v2]
+        for v2 in outneighbors(solution_graph,v)
+            if !(v2 in false_terminal_nodes)
+                path_spec = schedule.path_specs[v2]
+                Δt = path_spec.op_duration
+                local_slack[v] = min(local_slack[v], t0[v2] - (tF[v] + Δt))
+            end
+        end
+        for v2 in outneighbors(solution_graph,v)
+            slack[v] = min(slack[v], slack[v2] + local_slack[v])
         end
     end
     t0,tF,slack,local_slack
