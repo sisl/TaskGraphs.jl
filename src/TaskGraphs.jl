@@ -428,7 +428,6 @@ function LightGraphs.add_edge!(schedule::P,id1::A,id2::B) where {P<:ProjectSched
     schedule
 end
 
-
 """
     `construct_project_schedule`
 
