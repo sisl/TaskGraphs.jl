@@ -1,3 +1,15 @@
+module TaskGraphsUtils
+
+using Parameters
+using LightGraphs, MetaGraphs
+using GraphUtils
+using LinearAlgebra
+using DataStructures
+using JuMP
+
+using ..PlanningPredicates
+using ..TaskGraphsCore
+
 export
     get_root_node,
     get_bfs_node_traversal,
@@ -417,8 +429,8 @@ function construct_random_project_spec(M::Int,object_ICs::Dict{Int,OBJECT_AT},ob
 end
 function construct_random_project_spec(M::Int,object_ICs::Vector{OBJECT_AT},object_FCs::Vector{OBJECT_AT};
     max_parents=1,depth_bias=1.0,Δt_min=0,Δt_max=0)
-    object_IC_dict = Dict{Int,OBJECT_AT}(get_id(get_o(pred))=>pred for pred in object_ICs)
-    object_FC_dict = Dict{Int,OBJECT_AT}(get_id(get_o(pred))=>pred for pred in object_FCs)
+    object_IC_dict = Dict{Int,OBJECT_AT}(get_id(get_object_id(pred))=>pred for pred in object_ICs)
+    object_FC_dict = Dict{Int,OBJECT_AT}(get_id(get_object_id(pred))=>pred for pred in object_FCs)
     construct_random_project_spec(M,object_IC_dict,object_FC_dict;
         max_parents=max_parents,depth_bias=depth_bias,Δt_min=Δt_min,Δt_max=Δt_max)
 end
@@ -441,10 +453,10 @@ function randomize_project_spec_stations(spec::P, n_stations::Int)  where P <: P
     for op in spec.operations
         new_op = Operation(Δt = op.Δt)
         for pred in preconditions(op)
-            push!(new_op.pre, OBJECT_AT(get_o(pred), station_idxs[get_s(pred)]))
+            push!(new_op.pre, OBJECT_AT(get_object_id(pred), station_idxs[get_location_id(pred)]))
         end
         for pred in postconditions(op)
-            push!(new_op.post, OBJECT_AT(get_o(pred), station_idxs[get_s(pred)]))
+            push!(new_op.post, OBJECT_AT(get_object_id(pred), station_idxs[get_location_id(pred)]))
         end
         add_operation!(new_spec, new_op)
     end
@@ -468,10 +480,10 @@ function combine_project_specs(specs::Vector{P} where P <: ProjectSpec)
         for op in spec.operations
             new_op = Operation(station_id=op.station_id, Δt = op.Δt)
             for pred in preconditions(op)
-                push!(new_op.pre, OBJECT_AT(get_o(pred)+M, get_s(pred)+M))
+                push!(new_op.pre, OBJECT_AT(get_object_id(pred)+M, get_location_id(pred)+M))
             end
             for pred in postconditions(op)
-                push!(new_op.post, OBJECT_AT(get_o(pred)+M, get_s(pred)+M))
+                push!(new_op.post, OBJECT_AT(get_object_id(pred)+M, get_location_id(pred)+M))
             end
             add_operation!(new_spec, new_op)
         end
@@ -551,12 +563,12 @@ export
     title_string,
     get_display_metagraph
 
-title_string(pred::OBJECT_AT,verbose=true) = verbose ? string("O",get_id(get_o(pred)),"-",get_id(get_s(pred))) : string("O",get_id(get_o(pred)));
-title_string(pred::ROBOT_AT,verbose=true)  = verbose ? string("R",get_id(get_r(pred)),"-",get_id(get_s(pred))) : string("R",get_id(get_r(pred)));
-title_string(a::GO,verbose=true)        = verbose ? string("go-",get_id(get_r(a)),"-",get_id(get_s(a))) : "go";
-title_string(a::COLLECT,verbose=true)   = verbose ? string("collect-",get_id(get_r(a)),"-",get_id(get_o(a)),"-",get_id(get_s(a))) : "collect";
-title_string(a::CARRY,verbose=true)     = verbose ? string("carry-",get_id(get_r(a)),"-",get_id(get_o(a)),"-",get_id(get_s(a))) : "carry";
-title_string(a::DEPOSIT,verbose=true)   = verbose ? string("deposit-",get_id(get_r(a)),"-",get_id(get_o(a)),"-",get_id(get_s(a))) : "deposit";
+title_string(pred::OBJECT_AT,verbose=true) = verbose ? string("O",get_id(get_object_id(pred)),"-",get_id(get_location_id(pred))) : string("O",get_id(get_object_id(pred)));
+title_string(pred::ROBOT_AT,verbose=true)  = verbose ? string("R",get_id(get_robot_id(pred)),"-",get_id(get_location_id(pred))) : string("R",get_id(get_robot_id(pred)));
+title_string(a::GO,verbose=true)        = verbose ? string("go-",get_id(get_robot_id(a)),"-",get_id(get_destination_location_id(a))) : "go";
+title_string(a::COLLECT,verbose=true)   = verbose ? string("collect-",get_id(get_robot_id(a)),"-",get_id(get_object_id(a)),"-",get_id(get_location_id(a))) : "collect";
+title_string(a::CARRY,verbose=true)     = verbose ? string("carry-",get_id(get_robot_id(a)),"-",get_id(get_object_id(a)),"-",get_id(get_destination_location_id(a))) : "carry";
+title_string(a::DEPOSIT,verbose=true)   = verbose ? string("deposit-",get_id(get_robot_id(a)),"-",get_id(get_object_id(a)),"-",get_id(get_location_id(a))) : "deposit";
 
 function get_display_metagraph(project_schedule::ProjectSchedule;
     verbose=true,
@@ -567,13 +579,13 @@ function get_display_metagraph(project_schedule::ProjectSchedule;
     )
     graph = MetaDiGraph(project_schedule.graph)
     for (id,pred) in get_object_ICs(project_schedule)
-        v = get_vtx(project_schedule, get_o(pred))
+        v = get_vtx(project_schedule, get_object_id(pred))
         set_prop!(graph, v, :vtype, :object_ic)
         set_prop!(graph, v, :text, title_string(pred,verbose))
         set_prop!(graph, v, :color, object_color)
     end
     for (id,pred) in get_robot_ICs(project_schedule)
-        v = get_vtx(project_schedule, get_r(pred))
+        v = get_vtx(project_schedule, get_robot_id(pred))
         set_prop!(graph, v, :vtype, :robot_ic)
         set_prop!(graph, v, :text, title_string(pred,verbose))
         set_prop!(graph, v, :color, robot_color)
@@ -660,6 +672,9 @@ function SearchCache(N::Int,M::Int,to0_::Dict{Int,Float64},tr0_::Dict{Int,Float6
         cache.to0[j] = t # start time for task j (leaf tasks only)
     end
     cache
+end
+function SearchCache(spec::TaskGraphProblemSpec)
+    SearchCache(spec.N,spec.M,spec.to0_,spec.tr0_)
 end
 function get_branch_id(cache::SearchCache,mode=1)
     if mode == 1
@@ -959,3 +974,5 @@ end
 #     end
 #     return assignment, solved
 # end
+
+end # module TaskGraphsUtils

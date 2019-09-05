@@ -1,3 +1,7 @@
+module PlanningPredicates
+
+using Parameters
+
 export
     AbstractID,
     get_id,
@@ -11,7 +15,7 @@ export
     AbstractPlanningPredicate,
     OBJECT_AT,
     ROBOT_AT,
-    get_o, get_s, get_r,
+    get_object_id, get_location_id, get_robot_id,
 
     AbstractPlanningAction,
     MOVE,
@@ -19,9 +23,6 @@ export
     pre_conditions,
     add_conditions,
     delete_conditions,
-
-    AbstractRobotAction,
-    GO,COLLECT,CARRY,DEPOSIT,CHARGE,WAIT,COLLECT_AND_DELIVER,GO_AND_CHARGE,
 
     transition
 
@@ -56,53 +57,64 @@ struct OBJECT_AT <: AbstractPlanningPredicate
     s::StationID
 end
 OBJECT_AT(o::Int,s::Int) = OBJECT_AT(ObjectID(o),StationID(s))
-get_o(pred::OBJECT_AT) = pred.o
-get_s(pred::OBJECT_AT) = pred.s
+get_object_id(pred::OBJECT_AT) = pred.o
+get_location_id(pred::OBJECT_AT) = pred.s
 
 struct ROBOT_AT <: AbstractPlanningPredicate
     r::RobotID
     s::StationID
 end
 ROBOT_AT(r::Int,s::Int) = ROBOT_AT(RobotID(r),StationID(s))
-get_r(pred::ROBOT_AT) = pred.r
-get_s(pred::ROBOT_AT) = pred.s
+get_robot_id(pred::ROBOT_AT) = pred.r
+get_location_id(pred::ROBOT_AT) = pred.s
 
 # struct CAN_CARRY <: AbstractPlanningPredicate
 #     r::RobotID
 #     o::ObjectID
 # end
-# get_r(pred::CAN_CARRY) = pred.r
-# get_o(pred::CAN_CARRY) = pred.o
+# get_robot_id(pred::CAN_CARRY) = pred.r
+# get_object_id(pred::CAN_CARRY) = pred.o
+
+export
+    AbstractRobotAction,
+    GO,COLLECT,CARRY,DEPOSIT,
+	get_initial_location_id, get_destination_location_id
 
 # robot actions
 abstract type AbstractRobotAction end
-get_r(a::A) where {A<:AbstractRobotAction} = a.r
-get_s(a::A) where {A<:AbstractRobotAction} = a.x
-get_o(a::A) where {A<:AbstractRobotAction} = a.o
-# duration(model, state::AgentState, action::AbstractRobotAction) = 0
+get_robot_id(a::A) where {A<:AbstractRobotAction} = a.r
 struct GO <: AbstractRobotAction # go to position x
     r::RobotID
-    x::StationID
+    x1::StationID
+    x2::StationID
 end
-GO(r::Int,x::Int) = GO(RobotID(r),StationID(x))
+GO(r::Int,x1::Int,x2::Int) = GO(RobotID(r),StationID(x1),StationID(x2))
+struct CARRY <: AbstractRobotAction # carry object o to position x
+    r::RobotID
+    o::ObjectID
+    # x::StationID
+    x1::StationID
+    x2::StationID
+end
+CARRY(r::Int,o::Int,x1::Int,x2::Int) = CARRY(RobotID(r),ObjectID(o),StationID(x1),StationID(x2))
+get_initial_location_id(a::A) where {A<:Union{GO,CARRY}}        = a.x1
+get_destination_location_id(a::A) where {A<:Union{GO,CARRY}}    = a.x2
 struct COLLECT <: AbstractRobotAction # collect object o
     r::RobotID
     o::ObjectID
     x::StationID
 end
 COLLECT(r::Int,o::Int,x::Int) = COLLECT(RobotID(r),ObjectID(o),StationID(x))
-struct CARRY <: AbstractRobotAction # carry object o to position x
-    r::RobotID
-    o::ObjectID
-    x::StationID
-end
-CARRY(r::Int,o::Int,x::Int) = CARRY(RobotID(r),ObjectID(o),StationID(x))
 struct DEPOSIT <: AbstractRobotAction # deposit object o
     r::RobotID
     o::ObjectID
     x::StationID
 end
 DEPOSIT(r::Int,o::Int,x::Int) = DEPOSIT(RobotID(r),ObjectID(o),StationID(x))
+get_location_id(a::A) where {A<:Union{COLLECT,DEPOSIT}}             = a.x
+get_initial_location_id(a::A) where {A<:Union{COLLECT,DEPOSIT}}     = a.x
+get_destination_location_id(a::A) where {A<:Union{COLLECT,DEPOSIT}} = a.x
+get_object_id(a::A) where {A<:Union{CARRY,COLLECT,DEPOSIT}}         = a.o
 
 abstract type AbstractPlanningAction end
 struct MOVE <: AbstractPlanningAction
@@ -139,6 +151,27 @@ delete_conditions(a::TAKE) = Set{AbstractPlanningPredicate}([
         ROBOT_AT(a.r,a.s1),
         OBJECT_AT(a.o,a.s1)
         ])
+
+
+export
+    Operation,
+    get_object_id,
+    get_location_id,
+    preconditions,
+    postconditions,
+    duration
+
+@with_kw struct Operation
+    pre::Set{OBJECT_AT}     = Set{OBJECT_AT}()
+    post::Set{OBJECT_AT}    = Set{OBJECT_AT}()
+    Δt::Float64             = 0
+    station_id::StationID   = StationID(-1)
+end
+get_location_id(op::Operation) = op.station_id
+duration(op::Operation) = op.Δt
+preconditions(op::Operation) = op.pre
+postconditions(op::Operation) = op.post
+
 
 
 # const Status            = Symbol
@@ -390,3 +423,5 @@ delete_conditions(a::TAKE) = Set{AbstractPlanningPredicate}([
 #     end
 #     next_env_state
 # end
+
+end # module PlanningPredicates

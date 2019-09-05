@@ -24,14 +24,6 @@ let
     add_operation!(project_spec,construct_operation(project_spec, 6, [3], [], 0.0))
     delivery_graph = construct_delivery_graph(project_spec,M)
     problem_spec = TaskGraphProblemSpec()
-    # # @show delivery_graph.tasks
-    # assignments = [1,2,3]
-    # project_schedule = construct_project_schedule(project_spec, problem_spec, object_ICs, object_FCs, robot_ICs, assignments)
-    # o_keys = Set(collect(keys(get_object_ICs(project_schedule))))
-    # input_ids = union([get_input_ids(op) for (k,op) in get_operations(project_schedule)]...)
-    # @test o_keys == input_ids
-    # output_ids = union([get_output_ids(op) for (k,op) in get_operations(project_schedule)]...)
-    # rg = get_display_metagraph(project_schedule)
 end
 let
     G = DiGraph(3)
@@ -40,62 +32,62 @@ let
 end
 # Simple Hand Crafted Problem
 let
-    N = 2                  # num robots
-    M = 3                  # num delivery tasks
-    env_graph = initialize_grid_graph_from_vtx_grid(initialize_dense_vtx_grid(4,4))
-    # display(initialize_dense_vtx_grid(4,4))
-    # print("\n\n")
-    dist_matrix = get_dist_matrix(env_graph)
-    r0 = [1,4]
-    s0 = [5,8,14]
-    sF = [13,12,15]
-    # @show r0
-    # @show s0
-    # @show sF
+    # N = 2                  # num robots
+    # M = 3                  # num delivery tasks
+    # env_graph = initialize_grid_graph_from_vtx_grid(initialize_dense_vtx_grid(4,4))
+    # # display(initialize_dense_vtx_grid(4,4))
+    # # print("\n\n")
+    # dist_matrix = get_dist_matrix(env_graph)
+    # r0 = [1,4]
+    # s0 = [5,8,14]
+    # sF = [13,12,15]
+    # # @show r0
+    # # @show s0
+    # # @show sF
+    #
+    # object_ICs = Dict{Int,OBJECT_AT}(o => OBJECT_AT(o,s0[o]) for o in 1:M) # initial_conditions
+    # object_FCs = Dict{Int,OBJECT_AT}(o => OBJECT_AT(o,sF[o]) for o in 1:M) # final conditions
+    # robot_ICs = Dict{Int,ROBOT_AT}(r => ROBOT_AT(r,r0[r]) for r in 1:N)
+    # for r in N+1:N+M
+    #     robot_ICs[r] = ROBOT_AT(r,sF[r-N])
+    # end
+    # Drs, Dss = cached_pickup_and_delivery_distances(r0,s0,sF,(v1,v2)->dist_matrix[v1,v2])
+    # project_spec = ProjectSpec( M=M, initial_conditions=object_ICs, final_conditions=object_FCs )
+    # add_operation!(project_spec,construct_operation(project_spec,-1,[1,2],[3],0.0))
+    # add_operation!(project_spec,construct_operation(project_spec,-1,[3],  [], 0.0))
+    # # display(project_spec.operations)
+    # # print("\n\n")
+    #
+    # delivery_graph = construct_delivery_graph(project_spec,M)
+    # # display(delivery_graph.tasks)
+    # G = delivery_graph.graph
+    # Δt = get_duration_vector(project_spec) # initialize vector of operation times
+    # # set initial conditions
+    # to0_ = Dict{Int,Float64}()
+    # for v in vertices(G)
+    #     if is_leaf_node(G,v)
+    #         to0_[v] = 0.0
+    #     end
+    # end
+    # tr0_ = Dict{Int,Float64}()
+    # for i in 1:N
+    #     tr0_[i] = 0.0
+    # end
+    # problem_spec = TaskGraphProblemSpec(N,M,G,dist_matrix,Drs,Dss,Δt,tr0_,to0_)
 
-    object_ICs = Dict{Int,OBJECT_AT}(o => OBJECT_AT(o,s0[o]) for o in 1:M) # initial_conditions
-    object_FCs = Dict{Int,OBJECT_AT}(o => OBJECT_AT(o,sF[o]) for o in 1:M) # final conditions
-    robot_ICs = Dict{Int,ROBOT_AT}(r => ROBOT_AT(r,r0[r]) for r in 1:N)
-    for r in N+1:N+M
-        robot_ICs[r] = ROBOT_AT(r,sF[r-N])
-    end
-    Drs, Dss = cached_pickup_and_delivery_distances(r0,s0,sF,(v1,v2)->dist_matrix[v1,v2])
-    project_spec = ProjectSpec( M=M, initial_conditions=object_ICs, final_conditions=object_FCs )
-    add_operation!(project_spec,construct_operation(project_spec,-1,[1,2],[3],0.0))
-    add_operation!(project_spec,construct_operation(project_spec,-1,[3],  [], 0.0))
-    # display(project_spec.operations)
-    # print("\n\n")
+    project_spec, problem_spec, robot_ICs, optimal_assignments = initialize_toy_problem_1()
+    N = problem_spec.N
+    M = problem_spec.M
 
-    delivery_graph = construct_delivery_graph(project_spec,M)
-    # display(delivery_graph.tasks)
-    G = delivery_graph.graph
-    Δt = get_duration_vector(project_spec) # initialize vector of operation times
-    # set initial conditions
-    to0_ = Dict{Int,Float64}()
-    for v in vertices(G)
-        if is_leaf_node(G,v)
-            to0_[v] = 0.0
-        end
-    end
-    tr0_ = Dict{Int,Float64}()
-    for i in 1:N
-        tr0_[i] = 0.0
-    end
-    problem_spec = TaskGraphProblemSpec(N,M,G,dist_matrix,Drs,Dss,Δt,tr0_,to0_)
     model = formulate_JuMP_optimization_problem(problem_spec,Gurobi.Optimizer;OutputFlag=0);
     optimize!(model)
-
     optimal = (termination_status(model) == MathOptInterface.TerminationStatusCode(1))
     @show optimal;
-    assignment = Matrix{Int}(value.(model[:x]));
-    cache = SearchCache(N,M,to0_,tr0_)
-    for j in 1:M
-        i = findfirst(assignment[:,j] .== 1)
-        cache.x[i,j] = 1
-    end
+    cache = SearchCache(problem_spec)
+    cache.x .= Matrix{Int}(value.(model[:x]))
     cache = process_solution(model,cache,problem_spec)
     assignments = map(j->findfirst(cache.x[:,j] .== 1),1:M)
-    @test assignments == [1,2,3]
+    @test assignments == optimal_assignments
     @test cache.to0 == [0.0,0.0,3.0]
     @test cache.tof == [3.0,2.0,5.0]
     @test cache.slack == [0.0,1.0,0.0]
@@ -105,7 +97,19 @@ let
     # @show cache.tr0
     # @show cache.slack
     # @show cache.local_slack
-    project_schedule = construct_project_schedule(project_spec, problem_spec, object_ICs, object_FCs, robot_ICs, assignments);
+    project_schedule = construct_project_schedule(project_spec, problem_spec, robot_ICs, assignments);
+    t0,tF,slack,local_slack = process_schedule(project_schedule)
+    @test t0[get_vtx(project_schedule,RobotID(1))] == 0.0
+    @test t0[get_vtx(project_schedule,RobotID(2))] == 0.0
+    @test t0[get_vtx(project_schedule,RobotID(3))] == 3.0
+    # @test tF[get_vtx(project_schedule,RobotID(1))] == 3.0
+    # @test tF[get_vtx(project_schedule,RobotID(2))] == 2.0
+    # @test tF[get_vtx(project_schedule,RobotID(3))] == 5.0
+
+    @test length(get_vtx_ids(project_schedule)) == nv(get_graph(project_schedule))
+    for (v,id) in enumerate(project_schedule.vtx_ids)
+        @test get_vtx(project_schedule, id) == v
+    end
 end
 
 let
