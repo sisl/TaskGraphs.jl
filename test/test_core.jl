@@ -39,15 +39,79 @@ let
     @test get_all_root_nodes(G) == Set([2,3])
 end
 let
+    N = 2                  # num robots
+    M = 3                  # num delivery tasks
+    env_graph = initialize_grid_graph_from_vtx_grid(initialize_dense_vtx_grid(4,4))
+    display(initialize_dense_vtx_grid(4,4))
+    print("\n\n")
+    dist_matrix = get_dist_matrix(env_graph)
+    @show r0 = [1,4]
+    @show s0 = [9,12,14]
+    @show sF = [13,16,15]
+
+    object_ICs = Dict{Int,OBJECT_AT}(o => OBJECT_AT(o,s0[o]) for o in 1:M) # initial_conditions
+    object_FCs = Dict{Int,OBJECT_AT}(o => OBJECT_AT(o,sF[o]) for o in 1:M) # final conditions
+    robot_ICs = Dict{Int,ROBOT_AT}(r => ROBOT_AT(r,r0[r]) for r in 1:N)
+    Drs, Dss = cached_pickup_and_delivery_distances(r0,s0,sF,(v1,v2)->dist_matrix[v1,v2])
+    project_spec = ProjectSpec( M=M, initial_conditions=object_ICs, final_conditions=object_FCs )
+    add_operation!(project_spec,construct_operation(project_spec,-1,[1,2],[3],0.0))
+    add_operation!(project_spec,construct_operation(project_spec,-1,[3],  [], 0.0))
+    display(project_spec.operations)
+    print("\n\n")
+
+    delivery_graph = construct_delivery_graph(project_spec,M)
+    display(delivery_graph.tasks)
+    G = delivery_graph.graph
+    Δt = get_duration_vector(project_spec) # initialize vector of operation times
+    # set initial conditions
+    to0_ = Dict{Int,Float64}()
+    for v in vertices(G)
+        if is_leaf_node(G,v)
+            to0_[v] = 0.0
+        end
+    end
+    tr0_ = Dict{Int,Float64}()
+    for i in 1:N
+        tr0_[i] = 0.0
+    end
+    problem_spec = TaskGraphProblemSpec(N,M,G,dist_matrix,Drs,Dss,Δt,tr0_,to0_)
+    model = formulate_JuMP_optimization_problem(problem_spec,Gurobi.Optimizer;OutputFlag=0);
+    optimize!(model)
+
+    optimal = (termination_status(model) == MathOptInterface.TerminationStatusCode(1))
+    @show optimal;
+    assignment = Matrix{Int}(value.(model[:x]));
+    cache = SearchCache(N,M,to0_,tr0_)
+    for j in 1:M
+        i = findfirst(assignment[:,j] .== 1)
+        cache.x[i,j] = 1
+    end
+    cache = process_solution(model,cache,problem_spec)
+    assignments = map(j->findfirst(cache.x[:,j] .== 1),1:M)
+    @show assignments
+    @show cache.to0
+    @show cache.tof
+    @show cache.tr0
+    @show cache.slack
+    @show cache.local_slack
+
+    for r in N+1:N+M
+        robot_ICs[r] = ROBOT_AT(r,sF[r-N])
+    end
+    project_schedule = construct_project_schedule(project_spec, problem_spec, object_ICs, object_FCs, robot_ICs, assignments);
+end
+
+let
     N = 4                  # num robots
     M = 6                  # num delivery tasks
-    env_graph, vtx_grid = initialize_grid_graph_with_obstacles([10,10]);
+    # env_graph, vtx_grid = initialize_grid_graph_with_obstacles([10,10]);
+    env_graph = initialize_grid_graph_from_vtx_grid(initialize_dense_vtx_grid(4,4))
     # N = 40                  # num robots
     # M = 60                  # num delivery tasks
     # env_graph, vtx_grid = initialize_grid_graph_with_obstacles([50,50]);
-    pickup_zones = collect(1:2*N)
-    dropoff_zones = collect(2*N+1:2*(M+N))
-    free_zones = collect(2*(M+N):nv(env_graph))
+    pickup_zones = collect(1:M)
+    dropoff_zones = collect(M+1:2*M)
+    free_zones = collect(2*M+1:nv(env_graph))
     dist_matrix = get_dist_matrix(env_graph)
 
     r0 = free_zones[1:N]

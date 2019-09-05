@@ -158,7 +158,7 @@ function cached_pickup_and_delivery_distances(r₀,s₀,sₜ,dist=(x1,x2)->norm(
     N = size(r₀,1)
     M = size(s₀,1)
     # augment r₀ to include "dummy" robots that appear after dropoff
-    r₀ = [r₀;s₀]
+    r₀ = [r₀;sₜ]
     # Construct distance matrix
     Drs = zeros(N+M,M) # distance robot to pickup station
     for i in 1:N+M
@@ -372,7 +372,7 @@ end
             possible.
 """
 function construct_random_project_spec(M::Int,object_ICs::Dict{Int,OBJECT_AT},object_FCs::Dict{Int,OBJECT_AT};
-    max_parents=1,depth_bias=1.0,Δt_min::Int=0,Δt_max::Int=0)
+    max_parents=1,depth_bias=1.0,Δt_min=0,Δt_max=0)
     project_spec = ProjectSpec(
         M=M,
         initial_conditions=object_ICs,
@@ -416,14 +416,14 @@ function construct_random_project_spec(M::Int,object_ICs::Dict{Int,OBJECT_AT},ob
     project_spec
 end
 function construct_random_project_spec(M::Int,object_ICs::Vector{OBJECT_AT},object_FCs::Vector{OBJECT_AT};
-    max_parents=1,depth_bias=1.0,Δt_min::Int=0,Δt_max::Int=0)
+    max_parents=1,depth_bias=1.0,Δt_min=0,Δt_max=0)
     object_IC_dict = Dict{Int,OBJECT_AT}(get_id(get_o(pred))=>pred for pred in object_ICs)
     object_FC_dict = Dict{Int,OBJECT_AT}(get_id(get_o(pred))=>pred for pred in object_FCs)
     construct_random_project_spec(M,object_IC_dict,object_FC_dict;
         max_parents=max_parents,depth_bias=depth_bias,Δt_min=Δt_min,Δt_max=Δt_max)
 end
 function construct_random_project_spec(M::Int,s0::Vector{Int},sF::Vector{Int};
-    max_parents=1,depth_bias=1.0,Δt_min::Int=0,Δt_max::Int=0)
+    max_parents=1,depth_bias=1.0,Δt_min=0,Δt_max=0)
     object_ICs = Dict{Int,OBJECT_AT}(o=>OBJECT_AT(o,s) for (o,s) in enumerate(s0))
     object_FCs = Dict{Int,OBJECT_AT}(o=>OBJECT_AT(o,s) for (o,s) in enumerate(sF))
     construct_random_project_spec(M,object_ICs,object_FCs;
@@ -550,13 +550,6 @@ end
 export
     title_string,
     get_display_metagraph
-
-# title_string(pred::OBJECT_AT,verbose=true) = string("O",get_id(get_o(pred)),"-",get_id(get_s(pred)))
-# title_string(pred::ROBOT_AT,verbose=true)  = string("R",get_id(get_r(pred)),"-",get_id(get_s(pred)))
-# title_string(a::GO,verbose=true)        = string("go-",get_id(get_r(a)),"-",get_id(get_s(a)))
-# title_string(a::COLLECT,verbose=true)   = string("collect-",get_id(get_r(a)),"-",get_id(get_o(a)),"-",get_id(get_s(a)))
-# title_string(a::CARRY,verbose=true)     = string("carry-",get_id(get_r(a)),"-",get_id(get_o(a)),"-",get_id(get_s(a)))
-# title_string(a::DEPOSIT,verbose=true)   = string("deposit-",get_id(get_r(a)),"-",get_id(get_o(a)),"-",get_id(get_s(a)))
 
 title_string(pred::OBJECT_AT,verbose=true) = verbose ? string("O",get_id(get_o(pred)),"-",get_id(get_s(pred))) : string("O",get_id(get_o(pred)));
 title_string(pred::ROBOT_AT,verbose=true)  = verbose ? string("R",get_id(get_r(pred)),"-",get_id(get_s(pred))) : string("R",get_id(get_r(pred)));

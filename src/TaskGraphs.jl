@@ -138,8 +138,8 @@ function add_operation!(task_graph::ProjectSpec, op::Operation)
 end
 function construct_operation(spec::ProjectSpec, station_id, input_ids, output_ids, Δt)
     Operation(
-        Set{OBJECT_AT}(map(o->get(spec.initial_conditions, o, OBJECT_AT(o,station_id)), input_ids)),
-        Set{OBJECT_AT}(map(o->get(spec.final_conditions, o, OBJECT_AT(o,station_id)), output_ids)),
+        Set{OBJECT_AT}(map(o->get(spec.final_conditions, o, OBJECT_AT(o,station_id)), input_ids)),
+        Set{OBJECT_AT}(map(o->get(spec.initial_conditions, o, OBJECT_AT(o,station_id)), output_ids)),
         Δt,
         StationID(station_id)
     )
@@ -250,7 +250,8 @@ export
     get_duration,
     get_vtx,
     add_to_schedule!,
-    construct_project_schedule
+    construct_project_schedule,
+    process_schedule
 
 
 @with_kw struct PathSpec
@@ -508,6 +509,37 @@ function construct_project_schedule(
     return schedule
 end
 
+"""
+    `process_schedule(schedule::P) where {P<:ProjectSchedule}`
+
+    Compute the optimistic start and end times, along with the slack associated
+    with each vertex in the `schedule`.
+"""
+function process_schedule(schedule::P) where {P<:ProjectSchedule}
+    solution_graph = schedule.graph
+    traversal = topological_sort_by_dfs(solution_graph)
+    t0 = zeros(nv(solution_graph))
+    tF = zeros(nv(solution_graph))
+    slack = zeros(nv(solution_graph))
+    local_slack = zeros(nv(solution_graph))
+    # Compute Lower Bounds Via Forward Dynamic Programming pass
+    for v in traversal
+        path_spec = schedule.path_specs[v]
+        Δt = path_spec.op_duration
+        for v2 in inneighbors(solution_graph,v)
+            t0[v] = max(t0[v], tF[v2] + Δt)
+        end
+        tF[v] = t0[v] + path_spec.min_path_duration
+    end
+    # Compute Slack Via Backward Dynamic Programming pass
+    for v in reverse(traversal)
+        for v2 in inneighbors(solution_graph,v)
+            local_slack[v2] = t0[v] - tF[v2]
+            slack[v2]       = slack[v] + local_slack[v2]
+        end
+    end
+    t0,tF,slack,local_slack
+end
 
 include("utils.jl")
 

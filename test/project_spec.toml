@@ -1,33 +1,29 @@
 title = "ProjectSpec"
 
 [[operations]]
-pre = [[2, 2], [1, 1]]
-post = [[3, 11]]
+pre = [[1, 7], [2, 8]]
+post = [[3, 3]]
 "Δt" = 0.0
 [[operations]]
-pre = [[3, 3]]
+pre = [[3, 9]]
 post = []
 "Δt" = 0.0
 [[operations]]
-pre = [[5, 6]]
-post = [[6, 14]]
+pre = [[4, 6], [5, 6]]
+post = [[6, 6]]
 "Δt" = 0.0
 [[operations]]
-pre = [[4, 5]]
-post = [[5, 5]]
-"Δt" = 0.0
-[[operations]]
-pre = [[6, 6]]
+pre = [[6, 12]]
 post = []
 "Δt" = 0.0
 
 [final_conditions]
-4 = [4, 12]
-1 = [1, 9]
-5 = [5, 13]
-2 = [2, 10]
-6 = [6, 14]
-3 = [3, 11]
+4 = [4, 10]
+1 = [1, 7]
+5 = [5, 11]
+2 = [2, 8]
+6 = [6, 12]
+3 = [3, 9]
 
 [initial_conditions]
 4 = [4, 4]
