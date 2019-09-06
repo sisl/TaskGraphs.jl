@@ -569,9 +569,11 @@ title_string(a::GO,verbose=true)        = verbose ? string("go-",get_id(get_robo
 title_string(a::COLLECT,verbose=true)   = verbose ? string("collect-",get_id(get_robot_id(a)),"-",get_id(get_object_id(a)),"-",get_id(get_location_id(a))) : "collect";
 title_string(a::CARRY,verbose=true)     = verbose ? string("carry-",get_id(get_robot_id(a)),"-",get_id(get_object_id(a)),"-",get_id(get_destination_location_id(a))) : "carry";
 title_string(a::DEPOSIT,verbose=true)   = verbose ? string("deposit-",get_id(get_robot_id(a)),"-",get_id(get_object_id(a)),"-",get_id(get_location_id(a))) : "deposit";
+title_string(op::Operation,verbose=true)= verbose ? "op" : "op";
 
 function get_display_metagraph(project_schedule::ProjectSchedule;
     verbose=true,
+    f=(v,p)->title_string(p,verbose),
     object_color="orange",
     robot_color="lime",
     action_color="cyan",
@@ -581,25 +583,25 @@ function get_display_metagraph(project_schedule::ProjectSchedule;
     for (id,pred) in get_object_ICs(project_schedule)
         v = get_vtx(project_schedule, get_object_id(pred))
         set_prop!(graph, v, :vtype, :object_ic)
-        set_prop!(graph, v, :text, title_string(pred,verbose))
+        set_prop!(graph, v, :text, f(v,pred))
         set_prop!(graph, v, :color, object_color)
     end
     for (id,pred) in get_robot_ICs(project_schedule)
         v = get_vtx(project_schedule, get_robot_id(pred))
         set_prop!(graph, v, :vtype, :robot_ic)
-        set_prop!(graph, v, :text, title_string(pred,verbose))
+        set_prop!(graph, v, :text, f(v,pred))
         set_prop!(graph, v, :color, robot_color)
     end
     for (id,op) in get_operations(project_schedule)
         v = get_vtx(project_schedule, OperationID(id))
         set_prop!(graph, v, :vtype, :operation)
-        set_prop!(graph, v, :text, string("OP",id))
+        set_prop!(graph, v, :text, f(v,op))
         set_prop!(graph, v, :color, operation_color)
     end
     for (id,a) in get_actions(project_schedule)
         v = get_vtx(project_schedule, ActionID(id))
         set_prop!(graph, v, :vtype, :action)
-        set_prop!(graph, v, :text, title_string(a,verbose))
+        set_prop!(graph, v, :text, f(v,a))
         set_prop!(graph, v, :color, action_color)
     end
     graph

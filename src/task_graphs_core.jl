@@ -215,47 +215,13 @@ export
     final_vtx           ::Int           = -1
     min_path_duration   ::Int           = 0.0
 
-    # agent_id            ::Int           = -1
-    # path_id             ::Int           = -1
+    agent_id            ::Int           = -1
+    path_id             ::Int           = -1
     # object_id           ::Int           = -1
     # slack               ::Int           = 0.0
     # deadline            ::Int           = 0.0
 end
 
-function generate_path_spec(spec::T,a::A) where {T<:TaskGraphProblemSpec,A<:AbstractRobotAction}
-    s0 = get_id(get_initial_location_id(a))
-    s = get_id(get_destination_location_id(a))
-    path_spec = PathSpec(
-        # op_duration=0.0,
-        start_vtx=s0,
-        final_vtx=s,
-        min_path_duration=spec.D[s0,s] # TaskGraphProblemSpec distance matrix
-        )
-end
-function generate_path_spec(spec::T,pred::OBJECT_AT) where {T<:TaskGraphProblemSpec}
-    path_spec = PathSpec(
-        # op_duration=0.0,
-        start_vtx=get_id(get_location_id(pred)),
-        final_vtx=get_id(get_location_id(pred)),
-        min_path_duration=0.0
-        )
-end
-function generate_path_spec(spec::T,pred::ROBOT_AT) where {T<:TaskGraphProblemSpec}
-    path_spec = PathSpec(
-        # op_duration=0.0,
-        start_vtx=get_id(get_location_id(pred)),
-        final_vtx=get_id(get_location_id(pred)),
-        min_path_duration=0.0
-        )
-end
-function generate_path_spec(spec::T,op::Operation) where {T<:TaskGraphProblemSpec}
-    path_spec = PathSpec(
-        # op_duration=duration(op),
-        start_vtx = -1,
-        final_vtx = -1,
-        min_path_duration=duration(op)
-        )
-end
 
 export
     ProjectSchedule,
@@ -276,6 +242,8 @@ export
     get_duration,
     get_vtx,
     get_vtx_id,
+    get_path_spec,
+    set_path_spec!,
     add_to_schedule!,
     construct_project_schedule,
     process_schedule
@@ -295,6 +263,7 @@ export
     completion_status   ::Vector{Bool}    = Vector{Bool}() # INACTIVE, ACTIVE, COMPLETE
     path_specs          ::Vector{PathSpec}= Vector{PathSpec}()
     #
+    robot_id_map        ::Dict{Int,Int}   = Dict{Int,Int}()
     vtx_ids             ::Vector{AbstractID} = Vector{AbstractID}()
     object_vtx_map      ::Dict{Int,Int}   = Dict{Int,Int}()
     robot_vtx_map       ::Dict{Int,Int}   = Dict{Int,Int}()
@@ -369,11 +338,56 @@ function insert_to_vtx_map!(schedule::P,a::A,id::ActionID,idx::Int) where {P<:Pr
 end
 
 
+function generate_path_spec(schedule::P,spec::T,a::A) where {P<:ProjectSchedule,T<:TaskGraphProblemSpec,A<:AbstractRobotAction}
+    s0 = get_id(get_initial_location_id(a))
+    s = get_id(get_destination_location_id(a))
+    r = get_id(get_robot_id(a))
+    path_spec = PathSpec(
+        # op_duration=0.0,
+        start_vtx=s0,
+        final_vtx=s,
+        min_path_duration=spec.D[s0,s], # TaskGraphProblemSpec distance matrix
+        agent_id=r,
+        path_id=schedule.robot_id_map[r]
+        )
+end
+function generate_path_spec(schedule::P,spec::T,pred::OBJECT_AT) where {P<:ProjectSchedule,T<:TaskGraphProblemSpec}
+    path_spec = PathSpec(
+        # op_duration=0.0,
+        start_vtx=get_id(get_location_id(pred)),
+        final_vtx=get_id(get_location_id(pred)),
+        min_path_duration=0.0
+        )
+end
+function generate_path_spec(schedule::P,spec::T,pred::ROBOT_AT) where {P<:ProjectSchedule,T<:TaskGraphProblemSpec}
+    r = get_id(get_robot_id(pred))
+    if !(r in collect(keys(schedule.robot_id_map)))
+        @show r
+        @show schedule.robot_id_map
+    end
+    path_spec = PathSpec(
+        # op_duration=0.0,
+        start_vtx=get_id(get_location_id(pred)),
+        final_vtx=get_id(get_location_id(pred)),
+        min_path_duration=0.0,
+        agent_id=r,
+        path_id=get(schedule.robot_id_map,r,r)
+        )
+end
+function generate_path_spec(schedule::P,spec::T,op::Operation) where {P<:ProjectSchedule,T<:TaskGraphProblemSpec}
+    path_spec = PathSpec(
+        # op_duration=duration(op),
+        start_vtx = -1,
+        final_vtx = -1,
+        min_path_duration=duration(op)
+        )
+end
+
 function add_to_schedule!(schedule::P,spec::T,pred,id::ID) where {P<:ProjectSchedule,T<:TaskGraphProblemSpec,ID<:AbstractID}
     @assert get_vtx(schedule, id) == -1
     add_vertex!(get_graph(schedule))
     insert_to_vtx_map!(schedule,pred,id,nv(get_graph(schedule)))
-    path_spec = generate_path_spec(spec,pred)
+    path_spec = generate_path_spec(schedule,spec,pred)
     add_path_spec!(schedule,path_spec)
     schedule
 end
@@ -383,6 +397,46 @@ function LightGraphs.add_edge!(schedule::P,id1::A,id2::B) where {P<:ProjectSched
     # @show success, get_vtx(schedule,id1), get_vtx(schedule,id2)
     schedule
 end
+
+"""
+    `get_task_sequences`
+
+    Returns a dict mapping robot i => task sequence. The Vector `assignments`
+    must map task j -> robot i (including dummy robots).
+
+"""
+function get_task_sequences(N::Int,M::Int,assignments::Vector{Int})
+    task_sequences = Dict{Int,Vector{Int}}()
+    for i in 1:N
+        robot_id = i
+        seq = Vector{Int}()
+        for j in 1:M
+            if assignments[j] == robot_id
+                push!(seq, j)
+                robot_id = j + N
+            end
+        end
+        task_sequences[i] = seq
+    end
+    task_sequences
+end
+function populate_path_ids!(schedule::P,spec::T,assignments::Vector{Int}) where {P<:ProjectSchedule,T<:TaskGraphProblemSpec}
+    N, M = spec.N, spec.M
+    for i in 1:N
+        robot_id = i
+        schedule.robot_id_map[robot_id] = i
+        seq = Vector{Int}()
+        for j in 1:M
+            if assignments[j] == robot_id
+                push!(seq, j)
+                robot_id = j + N
+                schedule.robot_id_map[robot_id] = i
+            end
+        end
+    end
+    schedule
+end
+
 
 """
     `construct_project_schedule`
@@ -403,6 +457,7 @@ function construct_project_schedule(
     assignments::V=Dict{Int,Int}()
     ) where {P<:ProjectSpec,T<:TaskGraphProblemSpec,V<:Union{Dict{Int,Int},Vector{Int}}}
     schedule = ProjectSchedule()
+    populate_path_ids!(schedule,problem_spec,assignments)
     graph = get_graph(schedule)
     # add object ICs to graph
     for (id, pred) in object_ICs
@@ -534,120 +589,5 @@ function process_schedule(schedule::P) where {P<:ProjectSchedule}
     t0,tF,slack,local_slack
 end
 
-# export
-#     PlanningCache,
-#     initialize_planning_cache,
-#     plan_next_path!,
-#     invalidate_node!,
-#     plan_paths!
-#
-# @with_kw struct PlanningCache
-#     closed_set::Set{Int}    = Set{Int}()                # nodes that are completed
-#     active_set::Set{Int}    = Set{Int}()    # active nodes
-#     node_queue::PriorityQueue{Int,Float64} = PriorityQueue{Int,Float64}() # active nodes prioritized by slack
-#     t0::Vector{Float64}     = Vector{Float64}()
-#     tF::Vector{Float64}     = Vector{Float64}()
-#     slack::Vector{Float64}       = Vector{Float64}()
-#     local_slack::Vector{Float64} = Vector{Float64}()
-# end
-# function initialize_planning_cache(schedule::ProjectSchedule)
-#     t0,tF,slack,local_slack = process_schedule(schedule);
-#     cache = PlanningCache(t0=t0,tF=tF,slack=slack,local_slack=local_slack)
-#     for v in vertices(get_graph(schedule))
-#         if is_leaf_node(get_graph(schedule),v)
-#             push!(cache.active_set,v)
-#             enqueue!(cache.node_queue,v=>cache.slack[v]) # need to store slack
-#         end
-#     end
-#     cache
-# end
-# execute_node(op::Operation) = println("Operation, nothing to do...")
-# execute_node(pred::P) where {P<:AbstractPlanningPredicate} = println(string("predicate ",typeof(pred),", nothing to do..."))
-# execute_node(a::A) where {A<:Union{COLLECT,DEPOSIT}} = println(string("action ",typeof(a),", nothing to do..."))
-# execute_node(a::A) where {A<:Union{GO,CARRY}} = println(string("action ",typeof(a),", planning path..."))
-# function plan_next_path!(cache::PlanningCache,schedule::ProjectSchedule;verbose=true)
-#     active_set = cache.active_set
-#     closed_set = cache.closed_set
-#     node_queue = cache.node_queue
-#     graph = get_graph(schedule)
-#
-#     v = dequeue!(node_queue)
-#     if verbose
-#         print("processing node:    v = ",v,"    -    ")
-#         execute_node(get_node_from_id(schedule,get_vtx_id(schedule,v)))
-#     end
-#     push!(closed_set,v)
-#     setdiff!(active_set, v)
-#     for v2 in outneighbors(graph,v)
-#         active = true
-#         for v1 in inneighbors(graph,v2)
-#             if !(v1 in closed_set)
-#                 active = false
-#                 break
-#             end
-#         end
-#         if active
-#             enqueue!(node_queue, v2=>cache.slack[v2]) # add to priority queue
-#             push!(active_set, v2)               # add to active set
-#         end
-#     end
-#     return cache
-# end
-# function invalidate_node!(cache::PlanningCache,schedule::ProjectSchedule,vi::Int;verbose=true)
-#     active_set = cache.active_set
-#     closed_set = cache.closed_set
-#     node_queue = cache.node_queue
-#     graph = get_graph(schedule)
-#
-#     if verbose
-#         print("\tNode",vi," invalidated. Removing nodes ")
-#     end
-#     # remove invalidated nodes from closed_set and active_set
-#     invalidated_set = Set{Int}(vi)
-#     while length(invalidated_set) > 0
-#         vx = pop!(invalidated_set)
-#         if verbose
-#             print(vx,",")
-#         end
-#         if (vx in active_set)
-#             delete!(node_queue, vx) # no need to add to invalidated set - stops here
-#             setdiff!(active_set,vx)
-#         elseif (vx in closed_set)
-#             for vo in outneighbors(graph,vx)
-#                 push!(invalidated_set, vo)
-#             end
-#             setdiff!(closed_set,vx)
-#         end
-#     end
-#     if verbose
-#         println("...adding node ",vi," back into active set")
-#     end
-#     enqueue!(node_queue, vi=>cache.slack[vi])
-#     push!(active_set, vi)
-#     return cache
-# end
-# function plan_paths!(schedule::ProjectSchedule,cache::PlanningCache;verbose=true)
-#     while length(cache.node_queue) > 0
-#         ###########################################
-#         plan_next_path!(cache,schedule;verbose=verbose)
-#         ###########################################
-#         # update_cache!()
-#         ## update t0, tF, slack, local_slack
-#         ###########################################
-#         # deal with invalidated nodes
-#         # artificial substitute for actual planning
-#         if rand() < 0.05
-#             vi = rand(cache.closed_set)
-#             invalidate_node!(cache,schedule,vi;verbose=verbose)
-#         end
-#         ###########################################
-#     end
-#     if verbose
-#         println("Done!")
-#     end
-# end
-# function plan_paths!(schedule::ProjectSchedule;verbose=true)
-#     plan_paths!(schedule,initialize_planning_cache(schedule);verbose=verbose)
-# end
 
 end # module TaskGraphCore
