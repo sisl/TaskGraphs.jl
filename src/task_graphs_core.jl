@@ -210,12 +210,13 @@ export
 
 @with_kw struct PathSpec
     # element             ::T             = nothing
-    op_duration         ::Float64       = 0.0
+    op_duration         ::Int           = 0
     start_vtx           ::Int           = -1
     final_vtx           ::Int           = -1
-    min_path_duration   ::Int           = 0.0
+    min_path_duration   ::Int           =  0
 
     agent_id            ::Int           = -1
+    dummy_id            ::Int           = -1
     path_id             ::Int           = -1
     # object_id           ::Int           = -1
     # slack               ::Int           = 0.0
@@ -238,6 +239,8 @@ export
     get_num_object_ICs,
     get_num_robot_ICs,
     get_num_vtxs,
+    get_num_paths,
+    get_next_path_id,
     get_completion_time,
     get_duration,
     get_vtx,
@@ -263,8 +266,9 @@ export
     completion_status   ::Vector{Bool}    = Vector{Bool}() # INACTIVE, ACTIVE, COMPLETE
     path_specs          ::Vector{PathSpec}= Vector{PathSpec}()
     #
-    robot_id_map        ::Dict{Int,Int}   = Dict{Int,Int}()
-    vtx_ids             ::Vector{AbstractID} = Vector{AbstractID}()
+    robot_id_map        ::Dict{Int,Int}   = Dict{Int,Int}() # maps dummy id to true id
+    path_id_to_vtx_map  ::Dict{Int,Int}   = Dict{Int,Int}() # maps path_id to vertex
+    vtx_ids             ::Vector{AbstractID} = Vector{AbstractID}() # maps vertex to actual graph node
     object_vtx_map      ::Dict{Int,Int}   = Dict{Int,Int}()
     robot_vtx_map       ::Dict{Int,Int}   = Dict{Int,Int}()
     operation_vtx_map   ::Dict{Int,Int}   = Dict{Int,Int}()
@@ -293,6 +297,9 @@ get_num_operations(schedule::P) where {P<:ProjectSchedule}  = length(get_operati
 get_num_object_ICs(schedule::P) where {P<:ProjectSchedule}  = length(get_object_ICs(schedule))
 get_num_robot_ICs(schedule::P) where {P<:ProjectSchedule}   = length(get_robot_ICs(schedule))
 get_num_vtxs(schedule::P) where {P<:ProjectSchedule}        = nv(get_graph(schedule))
+get_num_paths(schedule::P) where {P<:ProjectSchedule}       = get_num_actions(schedule) + get_num_robot_ICs(schedule)
+
+get_next_path_id(schedule::P) where {P<:ProjectSchedule}    = length(schedule.path_id_to_vtx_map) + 1
 
 get_completion_time(schedule::ProjectSchedule,i::Int) = schedule.completion_times[i]
 function set_completion_time!(schedule::ProjectSchedule,i::Int,t)
@@ -309,11 +316,15 @@ end
 get_path_spec(schedule::P,i::Int) where {P<:ProjectSchedule} = schedule.path_specs[i]
 function set_path_spec!(schedule::P,i::Int,spec::S) where {P<:ProjectSchedule,S<:PathSpec}
     schedule.path_specs[i] = spec
+    schedule.path_id_to_vtx_map[spec.path_id] = i
 end
 function add_path_spec!(schedule::P,spec::S) where {P<:ProjectSchedule,S<:PathSpec}
     push!(schedule.path_specs, spec)
-    push!(schedule.completion_times, 0.0)
-    push!(schedule.durations, 0.0)
+    if spec.path_id != -1
+        schedule.path_id_to_vtx_map[spec.path_id] = nv(get_graph(schedule))
+    end
+    # push!(schedule.completion_times, 0.0)
+    # push!(schedule.durations, 0.0)
 end
 
 function insert_to_vtx_map!(schedule::P,pred::OBJECT_AT,id::ObjectID,idx::Int) where {P<:ProjectSchedule}
@@ -337,26 +348,28 @@ function insert_to_vtx_map!(schedule::P,a::A,id::ActionID,idx::Int) where {P<:Pr
     schedule.action_vtx_map[get_id(id)] = idx
 end
 
-
+"""
+    PathSpec provides details about the path that corresponds to this node in
+    the schedule
+"""
 function generate_path_spec(schedule::P,spec::T,a::A) where {P<:ProjectSchedule,T<:TaskGraphProblemSpec,A<:AbstractRobotAction}
     s0 = get_id(get_initial_location_id(a))
     s = get_id(get_destination_location_id(a))
     r = get_id(get_robot_id(a))
     path_spec = PathSpec(
-        # op_duration=0.0,
         start_vtx=s0,
         final_vtx=s,
         min_path_duration=spec.D[s0,s], # TaskGraphProblemSpec distance matrix
-        agent_id=r,
-        path_id=schedule.robot_id_map[r]
+        path_id=get_next_path_id(schedule),
+        dummy_id=r,
+        agent_id=schedule.robot_id_map[r]
         )
 end
 function generate_path_spec(schedule::P,spec::T,pred::OBJECT_AT) where {P<:ProjectSchedule,T<:TaskGraphProblemSpec}
     path_spec = PathSpec(
-        # op_duration=0.0,
         start_vtx=get_id(get_location_id(pred)),
         final_vtx=get_id(get_location_id(pred)),
-        min_path_duration=0.0
+        min_path_duration=0
         )
 end
 function generate_path_spec(schedule::P,spec::T,pred::ROBOT_AT) where {P<:ProjectSchedule,T<:TaskGraphProblemSpec}
@@ -366,17 +379,16 @@ function generate_path_spec(schedule::P,spec::T,pred::ROBOT_AT) where {P<:Projec
         @show schedule.robot_id_map
     end
     path_spec = PathSpec(
-        # op_duration=0.0,
         start_vtx=get_id(get_location_id(pred)),
         final_vtx=get_id(get_location_id(pred)),
-        min_path_duration=0.0,
-        agent_id=r,
-        path_id=get(schedule.robot_id_map,r,r)
+        min_path_duration=0,
+        path_id=get_next_path_id(schedule),
+        dummy_id=r,
+        agent_id=get(schedule.robot_id_map,r,r)
         )
 end
 function generate_path_spec(schedule::P,spec::T,op::Operation) where {P<:ProjectSchedule,T<:TaskGraphProblemSpec}
     path_spec = PathSpec(
-        # op_duration=duration(op),
         start_vtx = -1,
         final_vtx = -1,
         min_path_duration=duration(op)
@@ -403,7 +415,6 @@ end
 
     Returns a dict mapping robot i => task sequence. The Vector `assignments`
     must map task j -> robot i (including dummy robots).
-
 """
 function get_task_sequences(N::Int,M::Int,assignments::Vector{Int})
     task_sequences = Dict{Int,Vector{Int}}()
@@ -420,7 +431,13 @@ function get_task_sequences(N::Int,M::Int,assignments::Vector{Int})
     end
     task_sequences
 end
-function populate_path_ids!(schedule::P,spec::T,assignments::Vector{Int}) where {P<:ProjectSchedule,T<:TaskGraphProblemSpec}
+"""
+    `populate_agent_ids!`
+
+    Fills the schedule's dictionary mapping path_id (including dummy robots) to
+    real agent id.
+"""
+function populate_agent_ids!(schedule::P,spec::T,assignments::Vector{Int}) where {P<:ProjectSchedule,T<:TaskGraphProblemSpec}
     N, M = spec.N, spec.M
     for i in 1:N
         robot_id = i
@@ -436,7 +453,6 @@ function populate_path_ids!(schedule::P,spec::T,assignments::Vector{Int}) where 
     end
     schedule
 end
-
 
 """
     `construct_project_schedule`
@@ -457,7 +473,7 @@ function construct_project_schedule(
     assignments::V=Dict{Int,Int}()
     ) where {P<:ProjectSpec,T<:TaskGraphProblemSpec,V<:Union{Dict{Int,Int},Vector{Int}}}
     schedule = ProjectSchedule()
-    populate_path_ids!(schedule,problem_spec,assignments)
+    populate_agent_ids!(schedule,problem_spec,assignments)
     graph = get_graph(schedule)
     # add object ICs to graph
     for (id, pred) in object_ICs
@@ -541,11 +557,13 @@ end
     Compute the optimistic start and end times, along with the slack associated
     with each vertex in the `schedule`.
 """
-function process_schedule(schedule::P) where {P<:ProjectSchedule}
+function process_schedule(schedule::P,
+        t0=zeros(Int,get_num_vtxs(schedule)),
+        tF=zeros(Int,get_num_vtxs(schedule))
+    ) where {P<:ProjectSchedule}
+
     solution_graph = schedule.graph
     traversal = topological_sort_by_dfs(solution_graph)
-    t0 = zeros(nv(solution_graph))
-    tF = zeros(nv(solution_graph))
     slack = Inf*ones(nv(solution_graph))
     local_slack = Inf*ones(nv(solution_graph))
     # Take care of all terminal nodes that are not part of the objective (infinite slack)
@@ -560,18 +578,16 @@ function process_schedule(schedule::P) where {P<:ProjectSchedule}
     for (idx,op) in get_operations(schedule)
         if length(get_output_ids(op)) == 0
             v = get_vtx(schedule, OperationID(idx))
-            slack[v] = 0.0
+            slack[v] = 0
         end
     end
     ########## Compute Lower Bounds Via Forward Dynamic Programming pass
     for v in traversal
         path_spec = schedule.path_specs[v]
-        # Δt = path_spec.op_duration
         for v2 in inneighbors(solution_graph,v)
-            # t0[v] = max(t0[v], tF[v2] + Δt)
             t0[v] = max(t0[v], tF[v2])
         end
-        tF[v] = t0[v] + path_spec.min_path_duration
+        tF[v] = max(tF[v], t0[v] + path_spec.min_path_duration)
     end
     ########### Compute Slack Via Backward Dynamic Programming pass
     for v in reverse(traversal)
@@ -580,10 +596,8 @@ function process_schedule(schedule::P) where {P<:ProjectSchedule}
                 path_spec = schedule.path_specs[v2]
                 Δt = path_spec.op_duration
                 local_slack[v] = min(local_slack[v], t0[v2] - (tF[v] + Δt))
+                slack[v] = min(slack[v], slack[v2] + t0[v2] - (tF[v] + Δt))
             end
-        end
-        for v2 in outneighbors(solution_graph,v)
-            slack[v] = min(slack[v], slack[v2] + local_slack[v])
         end
     end
     t0,tF,slack,local_slack

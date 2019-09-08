@@ -416,14 +416,14 @@ function construct_random_project_spec(M::Int,object_ICs::Dict{Int,OBJECT_AT},ob
         input_ids = collect(max(1,1+i-rand(1:max_parents)):i)
         i = i - length(input_ids)
         # Δt = Δt_min + (Δt_max-Δt_min)*rand()
-        Δt=rand(Δt_min:0.01:Δt_max)
+        Δt=rand(Δt_min:Δt_max)
         # add_operation!(project_spec,construct_operation(station_id, input_ids, [output_id], Δt))
         add_operation!(project_spec,construct_operation(project_spec, station_id, input_ids, [output_id], Δt))
         for id in input_ids
             enqueue!(frontier, id=>M-i)
         end
     end
-    Δt=0.0
+    Δt=0
     add_operation!(project_spec,construct_operation(project_spec, -1, [M], [], Δt))
     project_spec
 end
