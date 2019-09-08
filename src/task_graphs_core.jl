@@ -557,8 +557,7 @@ end
     Compute the optimistic start and end times, along with the slack associated
     with each vertex in the `schedule`.
 """
-function process_schedule(schedule::P,
-        t0=zeros(Int,get_num_vtxs(schedule)),
+function process_schedule(schedule::P; t0=zeros(Int,get_num_vtxs(schedule)),
         tF=zeros(Int,get_num_vtxs(schedule))
     ) where {P<:ProjectSchedule}
 

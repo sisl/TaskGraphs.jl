@@ -63,7 +63,7 @@ let
 
     # try with perturbed start times
     t0[get_vtx(project_schedule,RobotID(2))] = 1
-    t0,tF,slack,local_slack = process_schedule(project_schedule,t0)
+    t0,tF,slack,local_slack = process_schedule(project_schedule;t0=t0)
     @test t0[get_vtx(project_schedule,RobotID(1))] == 0
     @test t0[get_vtx(project_schedule,RobotID(2))] == 1
     @test t0[get_vtx(project_schedule,RobotID(3))] == 3
