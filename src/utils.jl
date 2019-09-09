@@ -22,6 +22,7 @@ export
     formulate_JuMP_optimization_problem,
     construct_factory_distance_matrix,
     construct_random_project_spec,
+    construct_random_task_graphs_problem,
     combine_project_specs,
     compute_lower_time_bound
 
@@ -76,79 +77,6 @@ function get_bfs_traversal(G)
         traversal = [traversal..., get_bfs_node_traversal(G,v)...]
     end
     traversal
-end
-
-"""
-    initialize_random_2D_task_graph_env(G,N;d=[20,20])
-
-    Inputs:
-        `N` - number of agents
-        `M` - number of tasks
-        `vtxs` - a list of vertex coordinates
-        `d` = [20,20] - dimensions of factor floor
-
-    Outputs:
-        `r₀` - indices of initial robot positions
-        `s₀` - indices of initial object locations
-        `sₜ` - indices of destination object locations
-"""
-function initialize_random_2D_task_graph_env(N,M;vtxs=nothing,d=[20,20])
-    if vtxs == nothing
-        k = 1
-        x₀ = Vector{Vector{Int}}() # all possible grid locations
-        for i in 1:d[1]
-            for j in 1:d[2]
-                push!(x₀,Vector{Int}([i,j]))
-            end
-        end
-    else
-        x₀ = vtxs
-    end
-    ##### Random Problem Initialization #####
-    # x₀ = x₀[sortperm(rand(length(x₀)))]
-    vtxs = sortperm(rand(length(x₀)))
-    # initial robot locations
-    r₀ = Vector{Int}(undef, N)
-    for i in 1:N
-        # r₀[i] = pop!(x₀)
-        r₀[i] = pop!(vtxs)
-    end
-    # initial object locations - somewhere in factory
-    s₀ = Vector{Int}(undef, M)
-    for i in 1:M
-        # s₀[i] = pop!(x₀)
-        s₀[i] = pop!(vtxs)
-    end
-    # final object locations - depends on where the child objects "appear"
-    sₜ = Vector{Int}(undef, M)
-    for i in 1:M
-        # if length(outneighbors(G,v)) > 0
-        #     v2 = outneighbors(G,v)[1]
-        #     sₜ[v] = s₀[v2]
-        # else
-        # sₜ[i] = pop!(x₀)
-        sₜ[i] = pop!(vtxs)
-        # end
-    end
-    r₀,s₀,sₜ,x₀
-end
-
-"""
-    `get_random_problem_instantiation`
-
-    Args:
-    - `N`: number of robots
-    - `M`: number of delivery tasks
-    - `robot_zones`: list of possible start locations for robots
-    - `pickup_zones`: list of possible start locations for objects
-    - `dropoff_zones`: list of possible destinations for objects
-"""
-function get_random_problem_instantiation(N::Int,M::Int,pickup_zones,dropoff_zones,robot_zones)
-    ##### Random Problem Initialization #####
-    r0 = robot_zones[sortperm(rand(length(robot_zones)))][1:N]
-    s0 = pickup_zones[sortperm(rand(length(pickup_zones)))][1:M]
-    sF = dropoff_zones[sortperm(rand(length(dropoff_zones)))][1:M]
-    return r0,s0,sF
 end
 
 """
@@ -443,24 +371,113 @@ function construct_random_project_spec(M::Int,s0::Vector{Int},sF::Vector{Int};
 end
 
 """
-    `randomize_project_spec_stations(spec::P, n_stations::Int)  where P <: ProjectSpec`
+    initialize_random_2D_task_graph_env(G,N;d=[20,20])
 
-    Change the object and station ids
+    Inputs:
+        `N` - number of agents
+        `M` - number of tasks
+        `vtxs` - a list of vertex coordinates
+        `d` = [20,20] - dimensions of factor floor
+
+    Outputs:
+        `r₀` - indices of initial robot positions
+        `s₀` - indices of initial object locations
+        `sₜ` - indices of destination object locations
 """
-function randomize_project_spec_stations(spec::P, n_stations::Int)  where P <: ProjectSpec
-    new_spec = ProjectSpec()
-    station_idxs = sortperm(rand(n_pickup_zones))
-    for op in spec.operations
-        new_op = Operation(Δt = op.Δt)
-        for pred in preconditions(op)
-            push!(new_op.pre, OBJECT_AT(get_object_id(pred), station_idxs[get_location_id(pred)]))
+function initialize_random_2D_task_graph_env(N,M;vtxs=nothing,d=[20,20])
+    if vtxs == nothing
+        k = 1
+        x₀ = Vector{Vector{Int}}() # all possible grid locations
+        for i in 1:d[1]
+            for j in 1:d[2]
+                push!(x₀,Vector{Int}([i,j]))
+            end
         end
-        for pred in postconditions(op)
-            push!(new_op.post, OBJECT_AT(get_object_id(pred), station_idxs[get_location_id(pred)]))
-        end
-        add_operation!(new_spec, new_op)
+    else
+        x₀ = vtxs
     end
-    new_spec
+    ##### Random Problem Initialization #####
+    # x₀ = x₀[sortperm(rand(length(x₀)))]
+    vtxs = sortperm(rand(length(x₀)))
+    # initial robot locations
+    r₀ = Vector{Int}(undef, N)
+    for i in 1:N
+        # r₀[i] = pop!(x₀)
+        r₀[i] = pop!(vtxs)
+    end
+    # initial object locations - somewhere in factory
+    s₀ = Vector{Int}(undef, M)
+    for i in 1:M
+        # s₀[i] = pop!(x₀)
+        s₀[i] = pop!(vtxs)
+    end
+    # final object locations - depends on where the child objects "appear"
+    sₜ = Vector{Int}(undef, M)
+    for i in 1:M
+        # if length(outneighbors(G,v)) > 0
+        #     v2 = outneighbors(G,v)[1]
+        #     sₜ[v] = s₀[v2]
+        # else
+        # sₜ[i] = pop!(x₀)
+        sₜ[i] = pop!(vtxs)
+        # end
+    end
+    r₀,s₀,sₜ,x₀
+end
+
+"""
+    `get_random_problem_instantiation`
+
+    Args:
+    - `N`: number of robots
+    - `M`: number of delivery tasks
+    - `robot_zones`: list of possible start locations for robots
+    - `pickup_zones`: list of possible start locations for objects
+    - `dropoff_zones`: list of possible destinations for objects
+"""
+function get_random_problem_instantiation(N::Int,M::Int,pickup_zones,dropoff_zones,robot_zones)
+    ##### Random Problem Initialization #####
+    r0 = robot_zones[sortperm(rand(length(robot_zones)))][1:N]
+    s0 = pickup_zones[sortperm(rand(length(pickup_zones)))][1:M]
+    sF = dropoff_zones[sortperm(rand(length(dropoff_zones)))][1:M]
+    return r0,s0,sF
+end
+
+"""
+    `construct_randomd_task_graphs_problem`
+"""
+function construct_random_task_graphs_problem(N::Int,M::Int,
+    pickup_vtxs::Vector{Int},dropoff_vtxs::Vector{Int},free_vtxs::Vector{Int},dist_matrix)
+    # select subset of pickup, dropoff and free locations to instantiate objects and robots
+    r0,s0,sF = get_random_problem_instantiation(N,M,pickup_vtxs,dropoff_vtxs,free_vtxs)
+
+    object_ICs = Dict{Int,OBJECT_AT}(o => OBJECT_AT(o,s0[o]) for o in 1:M) # initial object conditions
+    object_FCs = Dict{Int,OBJECT_AT}(o => OBJECT_AT(o,sF[o]) for o in 1:M) # final object conditions
+    robot_ICs = Dict{Int,ROBOT_AT}(r => ROBOT_AT(r,r0[r]) for r in 1:N) # initial robot conditions
+    for r in 1:M # dummy robots
+        robot_ICs[r+N] = ROBOT_AT(r+N,sF[r])
+    end
+
+    Drs, Dss = cached_pickup_and_delivery_distances(r0,s0,sF,(v1,v2)->dist_matrix[v1,v2])
+    project_spec = construct_random_project_spec(M,s0,sF;max_parents=3,depth_bias=1.0,Δt_min=0,Δt_max=0)
+
+    delivery_graph = construct_delivery_graph(project_spec,M)
+    # display(delivery_graph.tasks)
+    G = delivery_graph.graph
+    Δt = get_duration_vector(project_spec) # initialize vector of operation times
+    # set initial conditions
+    to0_ = Dict{Int,Float64}()
+    for v in vertices(G)
+        if is_leaf_node(G,v)
+            to0_[v] = 0.0
+        end
+    end
+    tr0_ = Dict{Int,Float64}()
+    for i in 1:N
+        tr0_[i] = 0.0
+    end
+    problem_spec = TaskGraphProblemSpec(N,M,G,dist_matrix,Drs,Dss,Δt,tr0_,to0_)
+    return project_spec, problem_spec, object_ICs, object_FCs, robot_ICs
 end
 
 """

@@ -1,8 +1,12 @@
 title = "ProjectSpec"
 
 [[operations]]
-pre = [[1, 7], [2, 8]]
+pre = [[2, 8]]
 post = [[3, 3]]
+"Δt" = 0.0
+[[operations]]
+pre = [[1, 7]]
+post = [[2, 2]]
 "Δt" = 0.0
 [[operations]]
 pre = [[3, 9]]

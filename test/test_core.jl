@@ -164,3 +164,29 @@ let
 
     rg = get_display_metagraph(project_schedule)
 end
+
+let
+    N = 4                  # num robots
+    M = 6                  # num delivery tasks
+    env_graph = initialize_grid_graph_from_vtx_grid(initialize_dense_vtx_grid(4,4))
+    dist_matrix = get_dist_matrix(env_graph)
+    pickup_zones = collect(1:M)
+    dropoff_zones = collect(M+1:2*M)
+    free_zones = collect(2*M+1:nv(env_graph))
+
+    project_spec, problem_spec, object_ICs, object_FCs, robot_ICs = construct_random_task_graphs_problem(
+        N,M,pickup_zones,dropoff_zones,free_zones,dist_matrix)
+
+    model = formulate_JuMP_optimization_problem(problem_spec,Gurobi.Optimizer;OutputFlag=0);
+
+    optimize!(model)
+    optimal = (termination_status(model) == MathOptInterface.TerminationStatusCode(1))
+    @show optimal;
+    assignment_matrix = Matrix{Int}(value.(model[:x]));
+    assignments = map(j->findfirst(assignment_matrix[:,j] .== 1),1:M)
+    project_schedule = construct_project_schedule(project_spec, problem_spec, object_ICs, object_FCs, robot_ICs, assignments);
+
+    o_keys = Set(collect(keys(get_object_ICs(project_schedule))))
+    input_ids = union([get_input_ids(op) for (k,op) in get_operations(project_schedule)]...)
+    @test o_keys == input_ids
+end

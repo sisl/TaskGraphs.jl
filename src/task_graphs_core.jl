@@ -437,21 +437,25 @@ end
     Fills the schedule's dictionary mapping path_id (including dummy robots) to
     real agent id.
 """
-function populate_agent_ids!(schedule::P,spec::T,assignments::Vector{Int}) where {P<:ProjectSchedule,T<:TaskGraphProblemSpec}
+function populate_agent_ids!(robot_id_map::Dict{Int,Int},spec::T,assignments::Vector{Int}) where {T<:TaskGraphProblemSpec}
     N, M = spec.N, spec.M
-    for i in 1:N
-        robot_id = i
-        schedule.robot_id_map[robot_id] = i
-        seq = Vector{Int}()
-        for j in 1:M
-            if assignments[j] == robot_id
-                push!(seq, j)
-                robot_id = j + N
-                schedule.robot_id_map[robot_id] = i
+    for agent_id in 1:N
+        path_id = agent_id
+        robot_id_map[path_id] = agent_id
+        j = 1
+        while j <= M
+            if assignments[j] == path_id
+                path_id = j + N
+                robot_id_map[path_id] = agent_id
+                j = 0
             end
+            j += 1
         end
     end
     schedule
+end
+function populate_agent_ids!(schedule::P,spec::T,assignments::Vector{Int}) where {P<:ProjectSchedule,T<:TaskGraphProblemSpec}
+    populate_agent_ids!(schedule.robot_id_map,spec,assignments)
 end
 
 """
