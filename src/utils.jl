@@ -266,6 +266,21 @@ function formulate_JuMP_optimization_problem(spec::TaskGraphProblemSpec,optimize
         )
 end
 
+export
+    exclude_solutions!
+
+"""
+    `exclude_solutions!(model::JuMP.Model,forbidden_solutions::Vector{Matrix{Int}})`
+
+    This is the key utility for finding the next best solution to the MILP
+    problem. It simply excludes every specific solution passed to it.
+"""
+function exclude_solutions!(model::JuMP.Model,M::Int,forbidden_solutions::Vector{Matrix{Int}})
+    for xf in forbidden_solutions
+        @constraint(model, sum(model[:x] .* xf) <= M-1)
+    end
+end
+
 """
     `construct_factory_distance_matrix(r₀,oₒ,sₒ;dist::Function=(x1,x2)->norm(x2-x1,1))`
 
@@ -444,12 +459,20 @@ function get_random_problem_instantiation(N::Int,M::Int,pickup_zones,dropoff_zon
 end
 
 """
-    `construct_randomd_task_graphs_problem`
+    `construct_task_graphs_problem`
 """
-function construct_random_task_graphs_problem(N::Int,M::Int,
-    pickup_vtxs::Vector{Int},dropoff_vtxs::Vector{Int},free_vtxs::Vector{Int},dist_matrix)
+function construct_task_graphs_problem(
+        project_spec::ProjectSpec,
+        r0::Vector{Int},
+        s0::Vector{Int},
+        sF::Vector{Int},
+        dist_matrix
+        )
     # select subset of pickup, dropoff and free locations to instantiate objects and robots
-    r0,s0,sF = get_random_problem_instantiation(N,M,pickup_vtxs,dropoff_vtxs,free_vtxs)
+    # r0,s0,sF        = get_random_problem_instantiation(N,M,pickup_vtxs,dropoff_vtxs,free_vtxs)
+    # project_spec    = construct_random_project_spec(M,s0,sF;max_parents=3,depth_bias=1.0,Δt_min=0,Δt_max=0)
+    N = length(r0)
+    M = length(s0)
 
     object_ICs = Dict{Int,OBJECT_AT}(o => OBJECT_AT(o,s0[o]) for o in 1:M) # initial object conditions
     object_FCs = Dict{Int,OBJECT_AT}(o => OBJECT_AT(o,sF[o]) for o in 1:M) # final object conditions
@@ -459,7 +482,6 @@ function construct_random_task_graphs_problem(N::Int,M::Int,
     end
 
     Drs, Dss = cached_pickup_and_delivery_distances(r0,s0,sF,(v1,v2)->dist_matrix[v1,v2])
-    project_spec = construct_random_project_spec(M,s0,sF;max_parents=3,depth_bias=1.0,Δt_min=0,Δt_max=0)
 
     delivery_graph = construct_delivery_graph(project_spec,M)
     # display(delivery_graph.tasks)
@@ -478,6 +500,18 @@ function construct_random_task_graphs_problem(N::Int,M::Int,
     end
     problem_spec = TaskGraphProblemSpec(N,M,G,dist_matrix,Drs,Dss,Δt,tr0_,to0_)
     return project_spec, problem_spec, object_ICs, object_FCs, robot_ICs
+end
+
+"""
+    `construct_randomd_task_graphs_problem`
+"""
+function construct_random_task_graphs_problem(N::Int,M::Int,
+    pickup_vtxs::Vector{Int},dropoff_vtxs::Vector{Int},free_vtxs::Vector{Int},dist_matrix)
+    # select subset of pickup, dropoff and free locations to instantiate objects and robots
+    r0,s0,sF        = get_random_problem_instantiation(N,M,pickup_vtxs,dropoff_vtxs,free_vtxs)
+    project_spec    = construct_random_project_spec(M,s0,sF;max_parents=3,depth_bias=1.0,Δt_min=0,Δt_max=0)
+
+    construct_task_graphs_problem( project_spec, r0, s0, sF, dist_matrix )
 end
 
 """

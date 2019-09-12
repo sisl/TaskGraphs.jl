@@ -119,6 +119,14 @@ let
     end
     project_spec = read_project_spec(filename)
 
+    problem_def = SimpleProblemDef(project_spec,r0,s0,sF)
+    filename = "problem_def.toml"
+    open(filename, "w") do io
+        TOML.print(io, TOML.parse(problem_def))
+    end
+    problem_def = read_problem_def(filename)
+
+
     delivery_graph = construct_delivery_graph(project_spec,M)
     G = delivery_graph.graph
     # initialize vector of operation times

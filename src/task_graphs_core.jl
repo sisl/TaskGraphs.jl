@@ -28,7 +28,7 @@ export
     N::Int                  = 0 # num robots
     M::Int                  = 0 # num tasks
     graph::G                = DiGraph() # delivery graph
-    D::Matrix{Float64}      = zeros(0,0)
+    D::Matrix{Float64}      = zeros(0,0) # full distance matrix
     Drs::Matrix{Float64}    = zeros(N+M,M) # distance matrix robot initial locations -> pickup stations
     Dss::Matrix{Float64}    = zeros(M,M) # distance matrix piickup stations -> dropoff stations
     Δt::Vector{Float64}     = Vector{Float64}() # durations of operations
@@ -135,8 +135,7 @@ function TOML.parse(project_spec::ProjectSpec)
     toml_dict["final_conditions"] = Dict(string(k)=>TOML.parse(pred) for (k,pred) in project_spec.final_conditions)
     toml_dict
 end
-function read_project_spec(io)
-    toml_dict = TOML.parsefile(io)
+function read_project_spec(toml_dict::Dict)
     project_spec = ProjectSpec()
     for (k,arr) in toml_dict["initial_conditions"]
         object_id = arr[1]
@@ -157,6 +156,39 @@ function read_project_spec(io)
         add_operation!(project_spec, op)
     end
     return project_spec
+end
+function read_project_spec(io)
+    read_project_spec(TOML.parsefile(io))
+end
+
+export
+    SimpleProblemDef,
+    read_problem_def
+
+struct SimpleProblemDef
+    project_spec::ProjectSpec
+    r0::Vector{Int}
+    s0::Vector{Int}
+    sF::Vector{Int}
+end
+
+function TOML.parse(def::SimpleProblemDef)
+    toml_dict = TOML.parse(def.project_spec)
+    toml_dict["r0"] = def.r0
+    toml_dict["s0"] = def.s0
+    toml_dict["sF"] = def.sF
+    toml_dict
+end
+function read_problem_def(toml_dict::Dict)
+    SimpleProblemDef(
+        read_project_spec(toml_dict),
+        toml_dict["r0"],
+        toml_dict["s0"],
+        toml_dict["sF"]
+    )
+end
+function read_problem_def(io)
+    read_problem_def(TOML.parsefile(io))
 end
 
 export
