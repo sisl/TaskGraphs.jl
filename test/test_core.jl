@@ -38,7 +38,7 @@ let
 
     model = formulate_JuMP_optimization_problem(problem_spec,Gurobi.Optimizer;OutputFlag=0);
     optimize!(model)
-    optimal = (termination_status(model) == MathOptInterface.TerminationStatusCode(1))
+    optimal = (termination_status(model) == MathOptInterface.OPTIMAL)
     @show optimal;
     cache = SearchCache(problem_spec)
     cache.x .= Matrix{Int}(value.(model[:x]))
@@ -147,7 +147,7 @@ let
     model = formulate_JuMP_optimization_problem(problem_spec,Gurobi.Optimizer;OutputFlag=0);
 
     optimize!(model)
-    optimal = (termination_status(model) == MathOptInterface.TerminationStatusCode(1))
+    optimal = (termination_status(model) == MathOptInterface.OPTIMAL)
     @show optimal;
     assignment = Matrix{Int}(value.(model[:x]));
 
@@ -188,7 +188,7 @@ let
     model = formulate_JuMP_optimization_problem(problem_spec,Gurobi.Optimizer;OutputFlag=0);
 
     optimize!(model)
-    optimal = (termination_status(model) == MathOptInterface.TerminationStatusCode(1))
+    optimal = (termination_status(model) == MathOptInterface.OPTIMAL)
     @show optimal;
     assignment_matrix = Matrix{Int}(value.(model[:x]));
     assignments = map(j->findfirst(assignment_matrix[:,j] .== 1),1:M)

@@ -129,7 +129,6 @@ function TOML.parse(op::Operation)
 end
 function TOML.parse(project_spec::ProjectSpec)
     toml_dict = Dict()
-    toml_dict["title"]      = "ProjectSpec"
     toml_dict["operations"] = map(op->TOML.parse(op),project_spec.operations)
     toml_dict["initial_conditions"] = Dict(string(k)=>TOML.parse(pred) for (k,pred) in project_spec.initial_conditions)
     toml_dict["final_conditions"] = Dict(string(k)=>TOML.parse(pred) for (k,pred) in project_spec.final_conditions)

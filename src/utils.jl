@@ -198,7 +198,7 @@ end
         `model` - the optimization model
 """
 function formulate_JuMP_optimization_problem(G,Drs,Dss,Δt,to0_,tr0_,optimizer;
-    TimeLimit=50,
+    TimeLimit=100,
     OutputFlag=0
     )
 
@@ -458,6 +458,8 @@ function get_random_problem_instantiation(N::Int,M::Int,pickup_zones,dropoff_zon
     return r0,s0,sF
 end
 
+export
+    construct_task_graphs_problem
 """
     `construct_task_graphs_problem`
 """
@@ -628,7 +630,8 @@ function get_display_metagraph(project_schedule::ProjectSchedule;
     object_color="orange",
     robot_color="lime",
     action_color="cyan",
-    operation_color="red"
+    operation_color="red",
+    remove_leaf_robots=false
     )
     graph = MetaDiGraph(project_schedule.graph)
     for (id,pred) in get_object_ICs(project_schedule)
@@ -636,12 +639,6 @@ function get_display_metagraph(project_schedule::ProjectSchedule;
         set_prop!(graph, v, :vtype, :object_ic)
         set_prop!(graph, v, :text, f(v,pred))
         set_prop!(graph, v, :color, object_color)
-    end
-    for (id,pred) in get_robot_ICs(project_schedule)
-        v = get_vtx(project_schedule, get_robot_id(pred))
-        set_prop!(graph, v, :vtype, :robot_ic)
-        set_prop!(graph, v, :text, f(v,pred))
-        set_prop!(graph, v, :color, robot_color)
     end
     for (id,op) in get_operations(project_schedule)
         v = get_vtx(project_schedule, OperationID(id))
@@ -654,6 +651,21 @@ function get_display_metagraph(project_schedule::ProjectSchedule;
         set_prop!(graph, v, :vtype, :action)
         set_prop!(graph, v, :text, f(v,a))
         set_prop!(graph, v, :color, action_color)
+    end
+    for (id,pred) in get_robot_ICs(project_schedule)
+        v = get_vtx(project_schedule, get_robot_id(pred))
+        set_prop!(graph, v, :vtype, :robot_ic)
+        set_prop!(graph, v, :text, f(v,pred))
+        set_prop!(graph, v, :color, robot_color)
+    end
+    if remove_leaf_robots
+        for v in reverse(vertices(graph))
+            if get_prop(graph,v,:vtype) ==:robot_ic
+                if length(outneighbors(graph,v)) == 0
+                    rem_vertex!(graph,v)
+                end
+            end
+        end
     end
     graph
 end
