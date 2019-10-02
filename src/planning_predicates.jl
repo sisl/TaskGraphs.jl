@@ -164,7 +164,8 @@ export
 @with_kw struct Operation
     pre::Set{OBJECT_AT}     = Set{OBJECT_AT}()
     post::Set{OBJECT_AT}    = Set{OBJECT_AT}()
-    Δt::Float64             = 0
+    Δt::Int 				= 0
+    # Δt::Float64             = 0
     station_id::StationID   = StationID(-1)
 end
 get_location_id(op::Operation) = op.station_id
