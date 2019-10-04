@@ -83,12 +83,14 @@ export
 # robot actions
 abstract type AbstractRobotAction end
 get_robot_id(a::A) where {A<:AbstractRobotAction} = a.r
+
 struct GO <: AbstractRobotAction # go to position x
     r::RobotID
     x1::StationID
     x2::StationID
 end
 GO(r::Int,x1::Int,x2::Int) = GO(RobotID(r),StationID(x1),StationID(x2))
+
 struct CARRY <: AbstractRobotAction # carry object o to position x
     r::RobotID
     o::ObjectID
@@ -97,20 +99,24 @@ struct CARRY <: AbstractRobotAction # carry object o to position x
     x2::StationID
 end
 CARRY(r::Int,o::Int,x1::Int,x2::Int) = CARRY(RobotID(r),ObjectID(o),StationID(x1),StationID(x2))
+
 get_initial_location_id(a::A) where {A<:Union{GO,CARRY}}        = a.x1
 get_destination_location_id(a::A) where {A<:Union{GO,CARRY}}    = a.x2
+
 struct COLLECT <: AbstractRobotAction # collect object o
     r::RobotID
     o::ObjectID
     x::StationID
 end
 COLLECT(r::Int,o::Int,x::Int) = COLLECT(RobotID(r),ObjectID(o),StationID(x))
+
 struct DEPOSIT <: AbstractRobotAction # deposit object o
     r::RobotID
     o::ObjectID
     x::StationID
 end
 DEPOSIT(r::Int,o::Int,x::Int) = DEPOSIT(RobotID(r),ObjectID(o),StationID(x))
+
 get_location_id(a::A) where {A<:Union{COLLECT,DEPOSIT}}             = a.x
 get_initial_location_id(a::A) where {A<:Union{COLLECT,DEPOSIT}}     = a.x
 get_destination_location_id(a::A) where {A<:Union{COLLECT,DEPOSIT}} = a.x

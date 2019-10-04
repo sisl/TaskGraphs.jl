@@ -197,7 +197,7 @@ end
     Outputs:
         `model` - the optimization model
 """
-function formulate_JuMP_optimization_problem(G,Drs,Dss,Δt,to0_,tr0_,optimizer;
+function formulate_JuMP_optimization_problem(G,Drs,Dss,Δt,Δt_collect,Δt_deliver,to0_,tr0_,optimizer;
     TimeLimit=100,
     OutputFlag=0
     )
@@ -242,13 +242,13 @@ function formulate_JuMP_optimization_problem(G,Drs,Dss,Δt,to0_,tr0_,optimizer;
         end
         # lower bound on task completion time (task can't start until it's available).
         # tof[j] = to0[j] + Dss[j,j] + slack[j]
-        @constraint(model, tof[j] >= to0[j] + Dss[j,j])
+        @constraint(model, tof[j] >= to0[j] + Dss[j,j] + Δt_collect[j] + Δt_deliver[j])
         # bound on task completion time (assigned robot must first complete delivery)
         # Big M constraint (thanks Oriana!): When x[i,j] == 1, this constrains the final time
         # to be no less than the time it takes for the delivery to be completed by robot i.
         # When x[i,j] == 0, this constrains the final time to be greater than a large negative
         # number (meaning that this is a trivial constraint)
-        @constraint(model, tof[j] .- (tr0 + Drs[:,j] .+ Dss[j,j]) .>= -Mm*(1 .- x[:,j]))
+        @constraint(model, tof[j] .- (tr0 + Drs[:,j] .+ Dss[j,j] .+ Δt_collect[j] .+ Δt_deliver[j]) .>= -Mm*(1 .- x[:,j]))
     end
     # cost depends only on root node(s)
     # @objective(model, Min, tof[M])
@@ -260,7 +260,15 @@ function formulate_JuMP_optimization_problem(spec::TaskGraphProblemSpec,optimize
     OutputFlag=0
     )
     formulate_JuMP_optimization_problem(
-        spec.graph,spec.Drs,spec.Dss,spec.Δt,spec.to0_,spec.tr0_,optimizer;
+        spec.graph,
+        spec.Drs,
+        spec.Dss,
+        spec.Δt,
+        spec.Δt_collect,
+        spec.Δt_deliver,
+        spec.to0_,
+        spec.tr0_,
+        optimizer;
         TimeLimit=TimeLimit,
         OutputFlag=OutputFlag
         )
@@ -468,7 +476,9 @@ function construct_task_graphs_problem(
         r0::Vector{Int},
         s0::Vector{Int},
         sF::Vector{Int},
-        dist_matrix
+        dist_matrix,
+        Δt_collect::Vector{Float64}=zeros(length(s0)),
+        Δt_deliver::Vector{Float64}=zeros(length(sF))
         )
     # select subset of pickup, dropoff and free locations to instantiate objects and robots
     # r0,s0,sF        = get_random_problem_instantiation(N,M,pickup_vtxs,dropoff_vtxs,free_vtxs)
@@ -500,7 +510,9 @@ function construct_task_graphs_problem(
     for i in 1:N
         tr0_[i] = 0.0
     end
-    problem_spec = TaskGraphProblemSpec(N,M,G,dist_matrix,Drs,Dss,Δt,tr0_,to0_)
+    problem_spec = TaskGraphProblemSpec(N=N,M=M,graph=G,D=dist_matrix,Drs=Drs,
+        Dss=Dss,Δt=Δt,tr0_=tr0_,to0_=to0_,
+        Δt_collect=Δt_collect,Δt_deliver=Δt_deliver)
     return project_spec, problem_spec, object_ICs, object_FCs, robot_ICs
 end
 
@@ -508,12 +520,15 @@ end
     `construct_randomd_task_graphs_problem`
 """
 function construct_random_task_graphs_problem(N::Int,M::Int,
-    pickup_vtxs::Vector{Int},dropoff_vtxs::Vector{Int},free_vtxs::Vector{Int},dist_matrix)
+    pickup_vtxs::Vector{Int},dropoff_vtxs::Vector{Int},free_vtxs::Vector{Int},dist_matrix,
+    Δt_collect::Vector{Float64}=zeros(M),
+    Δt_deliver::Vector{Float64}=zeros(M)
+    )
     # select subset of pickup, dropoff and free locations to instantiate objects and robots
     r0,s0,sF        = get_random_problem_instantiation(N,M,pickup_vtxs,dropoff_vtxs,free_vtxs)
     project_spec    = construct_random_project_spec(M,s0,sF;max_parents=3,depth_bias=1.0,Δt_min=0,Δt_max=0)
 
-    construct_task_graphs_problem( project_spec, r0, s0, sF, dist_matrix )
+    construct_task_graphs_problem(project_spec,r0,s0,sF,dist_matrix,Δt_collect,Δt_deliver)
 end
 
 """
@@ -522,7 +537,7 @@ end
     A helper for combining multiple `ProjectSpec`s into a single
     ProjectSpec.
 """
-function combine_project_specs(specs::Vector{P} where P <: ProjectSpec)
+function combine_project_specs(specs::Vector{P}) where {P<:ProjectSpec}
     M = 0
     new_spec = ProjectSpec(
         M=sum(map(spec->spec.M, specs)),
@@ -633,34 +648,39 @@ function get_display_metagraph(project_schedule::ProjectSchedule;
     operation_color="red",
     remove_leaf_robots=false
     )
-    graph = MetaDiGraph(project_schedule.graph)
+    graph = MetaDiGraph(deepcopy(project_schedule.graph))
     for (id,pred) in get_object_ICs(project_schedule)
         v = get_vtx(project_schedule, get_object_id(pred))
         set_prop!(graph, v, :vtype, :object_ic)
         set_prop!(graph, v, :text, f(v,pred))
         set_prop!(graph, v, :color, object_color)
+        set_prop!(graph, v, :vtx_id, v)
     end
     for (id,op) in get_operations(project_schedule)
         v = get_vtx(project_schedule, OperationID(id))
         set_prop!(graph, v, :vtype, :operation)
         set_prop!(graph, v, :text, f(v,op))
         set_prop!(graph, v, :color, operation_color)
+        set_prop!(graph, v, :vtx_id, v)
     end
     for (id,a) in get_actions(project_schedule)
         v = get_vtx(project_schedule, ActionID(id))
         set_prop!(graph, v, :vtype, :action)
         set_prop!(graph, v, :text, f(v,a))
         set_prop!(graph, v, :color, action_color)
+        set_prop!(graph, v, :vtx_id, v)
     end
     for (id,pred) in get_robot_ICs(project_schedule)
         v = get_vtx(project_schedule, get_robot_id(pred))
         set_prop!(graph, v, :vtype, :robot_ic)
         set_prop!(graph, v, :text, f(v,pred))
         set_prop!(graph, v, :color, robot_color)
+        set_prop!(graph, v, :vtx_id, v)
     end
-    if remove_leaf_robots
+    if remove_leaf_robots == true
         for v in reverse(vertices(graph))
-            if get_prop(graph,v,:vtype) ==:robot_ic
+            # if get_prop(graph,v,:vtype) ==:robot_ic
+            if typeof(get_vtx_id(project_schedule,v)) <: RobotID
                 if length(outneighbors(graph,v)) == 0
                     rem_vertex!(graph,v)
                 end
@@ -892,97 +912,98 @@ function solve_task_graph(cache::SearchCache,spec::TaskGraphProblemSpec,bfs_trav
     cache
 end
 
-"""
-    `solve_task_graphs_problem(G,Drs,Dss,Δt)`
-
-    Inputs:
-        `G` - graph with inverted tree structure that encodes dependencies
-            between tasks
-        `Drs` - Drs[i,j] is distance from initial robot position i to pickup
-            station j
-        `Dss` - Dss[j,j] is distance from start station j to final station j (we
-            only care about the diagonal)
-        `Δt` - Δt[j] is the duration of time that must elapse after all prereqs
-            of task j have been satisfied before task j becomes available
-        `to0_` - a `Dict`, where `to0_[j]` gives the start time for task j
-            (applies to leaf tasks only)
-        `tr0_` - a `Dict`, where `tr0_[i]` gives the start time for robot i
-            (applies to non-dummy robots only)
-
-    Outputs:
-        `x` - the optimal assignment vector
-"""
-function solve_task_graphs_problem(G,Drs,Dss,Δt,to0_,tr0_;mode=1,MAX_ITERS=10000)
-    M = size(Dss,1)
-    N = size(Drs,1) - M
-    bfs_traversal = Vector{Int}()
-    for root_node in get_all_root_nodes(G)
-        bfs_traversal = [bfs_traversal, get_bfs_node_traversal(G,root_node)]
-    end
-    bfs_traversal = get_bfs_node_traversal(G);
-    cache0 = SearchCache(N,M,to0_,tr0_)
-    for j in 1:M
-        upstream_jobs = [j, map(e->e.dst,collect(edges(bfs_tree(G,j;dir=:in))))...]
-        for v in upstream_jobs
-            add_constraint!(cache0.FT, j+N, v)
-        end
-    end
-    spec = TaskGraphProblemSpec(N,M,G,Drs,Dss,Δt,tr0_,to0_)
-
-    cache0 = solve_task_graph(cache0,spec,bfs_traversal)
-    @show cache0.tof
-    @show cache0.slack
-    @show cache0.local_slack;
-
-    P = PriorityQueue{SearchCache,Float64}()
-    enqueue!(P, cache0, cache0.tof[end])
-    FEASIBLE = false
-    iteration = 1
-    while length(P) > 0
-        cache, tf = dequeue_pair!(P)
-        # check if solution is feasible
-        if is_feasible(cache)
-            FEASIBLE = true
-            @show iteration
-            @show FEASIBLE
-            return cache, FEASIBLE
-        end
-
-        # BRANCH
-        cache1 = deepcopy(cache); cache2 = deepcopy(cache)
-        # select robot id to branch on ... HOW TO DECIDE?
-        i = get_branch_id(cache,mode)
-        # Which assignment to try keeping?
-        idxs = findall(cache.x[i,:] .== 1)
-        ordering = (cache.slack .* cache.x[i,:])[idxs]
-        sort!(idxs, by=j->(cache.slack .* cache.x[i,:])[j])
-        # add constraints
-        # assignment must be maintained in child 1
-        for j in bfs_traversal
-            if j != idxs[1]
-                add_constraint!(cache1.FT, i, j)
-            end
-        end
-        # assignment must be swapped in child 2
-        add_constraint!(cache2.FT, i, idxs[1])
-
-        # for j in idxs[1:end-1]
-        #     add_constraint!(cache1.FT, i, j)
-        # end
-        # add_constraint!(cache2.FT, i, idxs[end])
-
-        cache1 = solve_task_graph(cache1,spec,bfs_traversal)
-        enqueue!(P, cache1, cache1.tof[end])
-        cache2 = solve_task_graph(cache2,spec,bfs_traversal)
-        enqueue!(P, cache2, cache2.tof[end])
-        iteration += 1
-        if iteration > MAX_ITERS
-            @show iteration
-            @show FEASIBLE
-            return cache, FEASIBLE
-        end
-    end
-end
+# """
+#     `solve_task_graphs_problem(G,Drs,Dss,Δt)`
+#
+#     Inputs:
+#         `G` - graph with inverted tree structure that encodes dependencies
+#             between tasks
+#         `Drs` - Drs[i,j] is distance from initial robot position i to pickup
+#             station j
+#         `Dss` - Dss[j,j] is distance from start station j to final station j (we
+#             only care about the diagonal)
+#         `Δt` - Δt[j] is the duration of time that must elapse after all prereqs
+#             of task j have been satisfied before task j becomes available
+#         `to0_` - a `Dict`, where `to0_[j]` gives the start time for task j
+#             (applies to leaf tasks only)
+#         `tr0_` - a `Dict`, where `tr0_[i]` gives the start time for robot i
+#             (applies to non-dummy robots only)
+#
+#     Outputs:
+#         `x` - the optimal assignment vector
+# """
+# function solve_task_graphs_problem(G,Drs,Dss,Δt,to0_,tr0_;mode=1,MAX_ITERS=10000)
+#     M = size(Dss,1)
+#     N = size(Drs,1) - M
+#     bfs_traversal = Vector{Int}()
+#     for root_node in get_all_root_nodes(G)
+#         bfs_traversal = [bfs_traversal, get_bfs_node_traversal(G,root_node)]
+#     end
+#     bfs_traversal = get_bfs_node_traversal(G);
+#     cache0 = SearchCache(N,M,to0_,tr0_)
+#     for j in 1:M
+#         upstream_jobs = [j, map(e->e.dst,collect(edges(bfs_tree(G,j;dir=:in))))...]
+#         for v in upstream_jobs
+#             add_constraint!(cache0.FT, j+N, v)
+#         end
+#     end
+#     spec = TaskGraphProblemSpec(N=N,M=M,graph=G,Drs=Drs,
+#         Dss=Dss,Δt=Δt,tr0_=tr0_,to0_=to0_)
+#
+#     cache0 = solve_task_graph(cache0,spec,bfs_traversal)
+#     @show cache0.tof
+#     @show cache0.slack
+#     @show cache0.local_slack;
+#
+#     P = PriorityQueue{SearchCache,Float64}()
+#     enqueue!(P, cache0, cache0.tof[end])
+#     FEASIBLE = false
+#     iteration = 1
+#     while length(P) > 0
+#         cache, tf = dequeue_pair!(P)
+#         # check if solution is feasible
+#         if is_feasible(cache)
+#             FEASIBLE = true
+#             @show iteration
+#             @show FEASIBLE
+#             return cache, FEASIBLE
+#         end
+#
+#         # BRANCH
+#         cache1 = deepcopy(cache); cache2 = deepcopy(cache)
+#         # select robot id to branch on ... HOW TO DECIDE?
+#         i = get_branch_id(cache,mode)
+#         # Which assignment to try keeping?
+#         idxs = findall(cache.x[i,:] .== 1)
+#         ordering = (cache.slack .* cache.x[i,:])[idxs]
+#         sort!(idxs, by=j->(cache.slack .* cache.x[i,:])[j])
+#         # add constraints
+#         # assignment must be maintained in child 1
+#         for j in bfs_traversal
+#             if j != idxs[1]
+#                 add_constraint!(cache1.FT, i, j)
+#             end
+#         end
+#         # assignment must be swapped in child 2
+#         add_constraint!(cache2.FT, i, idxs[1])
+#
+#         # for j in idxs[1:end-1]
+#         #     add_constraint!(cache1.FT, i, j)
+#         # end
+#         # add_constraint!(cache2.FT, i, idxs[end])
+#
+#         cache1 = solve_task_graph(cache1,spec,bfs_traversal)
+#         enqueue!(P, cache1, cache1.tof[end])
+#         cache2 = solve_task_graph(cache2,spec,bfs_traversal)
+#         enqueue!(P, cache2, cache2.tof[end])
+#         iteration += 1
+#         if iteration > MAX_ITERS
+#             @show iteration
+#             @show FEASIBLE
+#             return cache, FEASIBLE
+#         end
+#     end
+# end
 
 # Greedy Search with Correction
 # for task in critical_path

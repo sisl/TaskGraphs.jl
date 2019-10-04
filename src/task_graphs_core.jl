@@ -32,6 +32,8 @@ export
     Drs::Matrix{Float64}    = zeros(N+M,M) # distance matrix robot initial locations -> pickup stations
     Dss::Matrix{Float64}    = zeros(M,M) # distance matrix piickup stations -> dropoff stations
     Δt::Vector{Float64}     = Vector{Float64}() # durations of operations
+    Δt_collect::Vector{Float64} = zeros(M) # duration of COLLECT operations
+    Δt_deliver::Vector{Float64} = zeros(M) # duration of DELIVER operations
     tr0_::Dict{Int,Float64} = Dict{Int,Float64}() # robot start times
     to0_::Dict{Int,Float64} = Dict{Int,Float64}() # object start times
 end
@@ -241,10 +243,10 @@ export
 
 @with_kw struct PathSpec
     # element             ::T             = nothing
-    op_duration         ::Int           = 0
+    # op_duration         ::Int           = 0 # time between end of predecessor and start of current
     start_vtx           ::Int           = -1
     final_vtx           ::Int           = -1
-    min_path_duration   ::Int           =  0
+    min_path_duration   ::Int           =  0 # duration
 
     agent_id            ::Int           = -1
     dummy_id            ::Int           = -1
@@ -391,6 +393,34 @@ function generate_path_spec(schedule::P,spec::T,a::A) where {P<:ProjectSchedule,
         start_vtx=s0,
         final_vtx=s,
         min_path_duration=spec.D[s0,s], # TaskGraphProblemSpec distance matrix
+        path_id=get_next_path_id(schedule),
+        dummy_id=r,
+        agent_id=schedule.robot_id_map[r]
+        )
+end
+function generate_path_spec(schedule::P,spec::T,a::COLLECT) where {P<:ProjectSchedule,T<:TaskGraphProblemSpec}
+    s0 = get_id(get_initial_location_id(a))
+    s = get_id(get_destination_location_id(a))
+    r = get_id(get_robot_id(a))
+    o = get_id(get_object_id(a))
+    path_spec = PathSpec(
+        start_vtx=s0,
+        final_vtx=s,
+        min_path_duration=spec.Δt_collect[o],
+        path_id=get_next_path_id(schedule),
+        dummy_id=r,
+        agent_id=schedule.robot_id_map[r]
+        )
+end
+function generate_path_spec(schedule::P,spec::T,a::DEPOSIT) where {P<:ProjectSchedule,T<:TaskGraphProblemSpec}
+    s0 = get_id(get_initial_location_id(a))
+    s = get_id(get_destination_location_id(a))
+    r = get_id(get_robot_id(a))
+    o = get_id(get_object_id(a))
+    path_spec = PathSpec(
+        start_vtx=s0,
+        final_vtx=s,
+        min_path_duration=spec.Δt_deliver[o],
         path_id=get_next_path_id(schedule),
         dummy_id=r,
         agent_id=schedule.robot_id_map[r]
@@ -612,12 +642,13 @@ function process_schedule(schedule::P; t0=zeros(Int,get_num_vtxs(schedule)),
     for (idx,op) in get_operations(schedule)
         if length(get_output_ids(op)) == 0
             v = get_vtx(schedule, OperationID(idx))
-            slack[v] = 0
+            slack[v] = 0 # I think this handles multi-headed projects out of the box!
         end
     end
     ########## Compute Lower Bounds Via Forward Dynamic Programming pass
     for v in traversal
         path_spec = schedule.path_specs[v]
+        # Δt = path_spec.op_duration
         for v2 in inneighbors(solution_graph,v)
             t0[v] = max(t0[v], tF[v2])
         end
@@ -628,9 +659,9 @@ function process_schedule(schedule::P; t0=zeros(Int,get_num_vtxs(schedule)),
         for v2 in outneighbors(solution_graph,v)
             if !(v2 in false_terminal_nodes)
                 path_spec = schedule.path_specs[v2]
-                Δt = path_spec.op_duration
-                local_slack[v] = min(local_slack[v], t0[v2] - (tF[v] + Δt))
-                slack[v] = min(slack[v], slack[v2] + t0[v2] - (tF[v] + Δt))
+                # Δt = path_spec.op_duration
+                local_slack[v] = min(local_slack[v], t0[v2] - tF[v]) # (tF[v] + Δt))
+                slack[v] = min(slack[v], slack[v2] + t0[v2] - tF[v]) # (tF[v] + Δt))
             end
         end
     end

@@ -142,8 +142,7 @@ let
     for i in 1:N
         tr0_[i] = 0.0
     end
-    problem_spec = TaskGraphProblemSpec(N,M,G,dist_matrix,Drs,Dss,Δt,tr0_,to0_)
-    # model = formulate_JuMP_optimization_problem(G,Drs,Dss,Δt,to0_,tr0_,Gurobi.Optimizer;OutputFlag=0);
+    problem_spec = TaskGraphProblemSpec(N=N,M=M,graph=G,D=dist_matrix,Drs=Drs,Dss=Dss,Δt=Δt,tr0_=tr0_,to0_=to0_)
     model = formulate_JuMP_optimization_problem(problem_spec,Gurobi.Optimizer;OutputFlag=0);
 
     optimize!(model)
