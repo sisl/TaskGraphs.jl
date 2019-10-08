@@ -185,6 +185,10 @@ end
             only care about the diagonal)
         `Δt` - Δt[j] is the duraction of time that must elapse after all prereqs
             of task j have been satisfied before task j becomes available
+        `Δt_collect` - Δt_collect[j] is the time required for a robot to pick up
+            object j
+        `Δt_deliver` - Δt_deliver[j] is the time required for a robot to set
+            down object j
         `to0_` - a `Dict`, where `to0_[j]` gives the start time for task j
             (applies to leaf tasks only)
         `tr0_` - a `Dict`, where `tr0_[i]` gives the start time for robot i
@@ -200,7 +204,8 @@ end
 """
 function formulate_JuMP_optimization_problem(G,Drs,Dss,Δt,Δt_collect,Δt_deliver,to0_,tr0_,root_nodes,weights,optimizer;
     TimeLimit=100,
-    OutputFlag=0
+    OutputFlag=0,
+    cost_model=:MakeSpan
     )
 
     model = Model(with_optimizer(optimizer,
@@ -253,12 +258,17 @@ function formulate_JuMP_optimization_problem(G,Drs,Dss,Δt,Δt_collect,Δt_deliv
     end
     # cost depends only on root node(s)
     # @objective(model, Min, tof[M])
-    @objective(model, Min, sum(map(v->tof[v]*get(weights,v,0.0), root_nodes)))
+    if cost_model == :SumOfMakeSpans
+        @objective(model, Min, sum(map(v->tof[v]*get(weights,v,0.0), root_nodes)))
+    elseif cost_model == :MakeSpan
+        @variable(model, T)
+        @constraint(model, T .>= tof)
+        @objective(model, Min, T)
+    end
     model;
 end
 function formulate_JuMP_optimization_problem(spec::TaskGraphProblemSpec,optimizer;
-    TimeLimit=50,
-    OutputFlag=0
+    kwargs...
     )
     formulate_JuMP_optimization_problem(
         spec.graph,
@@ -272,8 +282,7 @@ function formulate_JuMP_optimization_problem(spec::TaskGraphProblemSpec,optimize
         spec.root_nodes,
         spec.weights,
         optimizer;
-        TimeLimit=TimeLimit,
-        OutputFlag=OutputFlag
+        kwargs...
         )
 end
 

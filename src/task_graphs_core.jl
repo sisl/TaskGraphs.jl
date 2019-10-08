@@ -309,6 +309,7 @@ export
     #
     robot_id_map        ::Dict{Int,Int}   = Dict{Int,Int}() # maps dummy id to true id
     root_nodes          ::Vector{Int}     = Vector{Int}() # list of "project heads"
+    weights             ::Dict{Int,Float64} = Dict{Int,Float64}() # weights corresponding to project heads
     path_id_to_vtx_map  ::Dict{Int,Int}   = Dict{Int,Int}() # maps path_id to vertex
     vtx_ids             ::Vector{AbstractID} = Vector{AbstractID}() # maps vertex to actual graph node
     object_vtx_map      ::Dict{Int,Int}   = Dict{Int,Int}()
@@ -322,6 +323,8 @@ get_robot_ICs(schedule::P) where {P<:ProjectSchedule}   = schedule.robot_ICs
 get_actions(schedule::P) where {P<:ProjectSchedule}     = schedule.actions
 get_operations(schedule::P) where {P<:ProjectSchedule}  = schedule.operations
 get_vtx_ids(schedule::P) where {P<:ProjectSchedule}     = schedule.vtx_ids
+get_root_nodes(schedule::P) where {P<:ProjectSchedule}  = schedule.root_nodes
+get_root_node_weights(schedule::P) where {P<:ProjectSchedule}  = schedule.weights
 
 get_node_from_id(schedule::P,id::ActionID) where {P<:ProjectSchedule}       = get_actions(schedule)[get_id(id)]
 get_node_from_id(schedule::P,id::OperationID) where {P<:ProjectSchedule}    = get_operations(schedule)[get_id(id)]
@@ -562,10 +565,18 @@ function construct_project_schedule(
     M = length(object_ICs) # number of objects
     N = length(robot_ICs) - M # number of robots
     # add operations to graph
+    # root_nodes = Set{Int}()
     for op_vtx in topological_sort(project_spec.graph)
         op = project_spec.operations[op_vtx]
         operation_id = OperationID(get_num_operations(schedule) + 1)
         add_to_schedule!(schedule, problem_spec, op, operation_id)
+        v = nv(get_graph(schedule))
+        for object_id in get_input_ids(op)
+            if object_id in problem_spec.root_nodes
+                push!(schedule.root_nodes, v)
+                schedule.weights[v] = problem_spec.weights[object_id]
+            end
+        end
         for object_id in get_input_ids(op)
             # add action sequence
             robot_id = assignments[object_id]
@@ -607,14 +618,15 @@ function construct_project_schedule(
             add_edge!(schedule, operation_id, ObjectID(object_id))
         end
     end
+    sort!(schedule.root_nodes)
     # identify root nodes and store their indices in the schedule (important for multi-headed projects)
-    root_nodes = get_all_root_nodes(get_graph(schedule))
-    for (idx,pred) in get_robot_ICs(schedule)
-        setdiff!(root_nodes,get_vtx(schedule, RobotID(idx)))
-    end
-    for v in sort(collect(root_nodes))
-        push!(schedule.root_nodes, v)
-    end
+    # root_nodes = get_all_root_nodes(get_graph(schedule))
+    # for (idx,pred) in get_robot_ICs(schedule)
+    #     setdiff!(root_nodes,get_vtx(schedule, RobotID(idx)))
+    # end
+    # for v in sort(collect(root_nodes))
+    #     push!(schedule.root_nodes, v)
+    # end
     return schedule
 end
 function construct_project_schedule(
