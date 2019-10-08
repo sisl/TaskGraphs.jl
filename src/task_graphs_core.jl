@@ -36,6 +36,8 @@ export
     Δt_deliver::Vector{Float64} = zeros(M) # duration of DELIVER operations
     tr0_::Dict{Int,Float64} = Dict{Int,Float64}() # robot start times
     to0_::Dict{Int,Float64} = Dict{Int,Float64}() # object start times
+    root_nodes::Vector{Int} = sort(collect(get_all_root_nodes(graph)))
+    weights::Dict{Int,Float64} = Dict{Int,Float64}(v=>1.0 for v in root_nodes)
 end
 
 export
@@ -61,7 +63,8 @@ export
     pre_deps::Dict{Int,Set{Int}}  = Dict{Int,Set{Int}}() # id => (pre_conditions)
     post_deps::Dict{Int,Set{Int}} = Dict{Int,Set{Int}}()
     graph::G                      = MetaDiGraph()
-    M::Int                        = -1
+    M::Int                        = length(initial_conditions)
+    weight::Float64               = 1.0
 end
 get_initial_nodes(tg::ProjectSpec) = setdiff(
     Set(collect(vertices(tg.graph))),collect(keys(tg.pre_deps)))
@@ -284,10 +287,15 @@ export
     construct_project_schedule,
     process_schedule
 
+# abstract type AbstractProjectSchedule end
+# struct CompositeProjectSchedule <: AbstractProjectSchedule
+#     schedules::Vector{ProjectSchedule}
+#     weights::Vector{Float64}
+# end
 """
     `ProjectSchedule`
 """
-@with_kw struct ProjectSchedule{G<:AbstractGraph}
+@with_kw struct ProjectSchedule{G<:AbstractGraph}# <: AbstractProjectSchedule
     graph               ::G                 = MetaDiGraph()
     object_ICs          ::Dict{Int,OBJECT_AT} = Dict{Int,OBJECT_AT}()
     robot_ICs           ::Dict{Int,ROBOT_AT}  = Dict{Int,ROBOT_AT}()
@@ -300,6 +308,7 @@ export
     path_specs          ::Vector{PathSpec}= Vector{PathSpec}()
     #
     robot_id_map        ::Dict{Int,Int}   = Dict{Int,Int}() # maps dummy id to true id
+    root_nodes          ::Vector{Int}     = Vector{Int}() # list of "project heads"
     path_id_to_vtx_map  ::Dict{Int,Int}   = Dict{Int,Int}() # maps path_id to vertex
     vtx_ids             ::Vector{AbstractID} = Vector{AbstractID}() # maps vertex to actual graph node
     object_vtx_map      ::Dict{Int,Int}   = Dict{Int,Int}()
@@ -598,6 +607,14 @@ function construct_project_schedule(
             add_edge!(schedule, operation_id, ObjectID(object_id))
         end
     end
+    # identify root nodes and store their indices in the schedule (important for multi-headed projects)
+    root_nodes = get_all_root_nodes(get_graph(schedule))
+    for (idx,pred) in get_robot_ICs(schedule)
+        setdiff!(root_nodes,get_vtx(schedule, RobotID(idx)))
+    end
+    for v in sort(collect(root_nodes))
+        push!(schedule.root_nodes, v)
+    end
     return schedule
 end
 function construct_project_schedule(
@@ -620,7 +637,8 @@ end
     `process_schedule(schedule::P) where {P<:ProjectSchedule}`
 
     Compute the optimistic start and end times, along with the slack associated
-    with each vertex in the `schedule`.
+    with each vertex in the `schedule`. Slack for each vertex is represented as
+    a vector in order to handle multi-headed projects.
 """
 function process_schedule(schedule::P; t0=zeros(Int,get_num_vtxs(schedule)),
         tF=zeros(Int,get_num_vtxs(schedule))
@@ -628,27 +646,17 @@ function process_schedule(schedule::P; t0=zeros(Int,get_num_vtxs(schedule)),
 
     solution_graph = schedule.graph
     traversal = topological_sort_by_dfs(solution_graph)
-    slack = Inf*ones(nv(solution_graph))
-    local_slack = Inf*ones(nv(solution_graph))
-    # Take care of all terminal nodes that are not part of the objective (infinite slack)
-    false_terminal_nodes = Set{Int}()
-    for (idx,pred) in get_robot_ICs(schedule)
-        v = get_vtx(schedule, RobotID(idx))
-        if length(outneighbors(solution_graph,v)) == 0
-            push!(false_terminal_nodes, v)
-        end
-    end
+    n_roots = length(schedule.root_nodes)
+    slack = map(i->Inf*ones(n_roots), vertices(solution_graph))
+    local_slack = map(i->Inf*ones(n_roots), vertices(solution_graph))
     # True terminal nodes
-    for (idx,op) in get_operations(schedule)
-        if length(get_output_ids(op)) == 0
-            v = get_vtx(schedule, OperationID(idx))
-            slack[v] = 0 # I think this handles multi-headed projects out of the box!
-        end
+    for (i,v) in enumerate(schedule.root_nodes)
+        slack[v] = Inf*ones(n_roots)
+        slack[v][i] = 0 # only slack for corresponing head is set to 0
     end
     ########## Compute Lower Bounds Via Forward Dynamic Programming pass
     for v in traversal
         path_spec = schedule.path_specs[v]
-        # Δt = path_spec.op_duration
         for v2 in inneighbors(solution_graph,v)
             t0[v] = max(t0[v], tF[v2])
         end
@@ -657,12 +665,8 @@ function process_schedule(schedule::P; t0=zeros(Int,get_num_vtxs(schedule)),
     ########### Compute Slack Via Backward Dynamic Programming pass
     for v in reverse(traversal)
         for v2 in outneighbors(solution_graph,v)
-            if !(v2 in false_terminal_nodes)
-                path_spec = schedule.path_specs[v2]
-                # Δt = path_spec.op_duration
-                local_slack[v] = min(local_slack[v], t0[v2] - tF[v]) # (tF[v] + Δt))
-                slack[v] = min(slack[v], slack[v2] + t0[v2] - tF[v]) # (tF[v] + Δt))
-            end
+            local_slack[v] = min.(local_slack[v], (t0[v2] - tF[v]) )
+            slack[v] = min.(slack[v], slack[v2] .+ (t0[v2] - tF[v]) )
         end
     end
     t0,tF,slack,local_slack

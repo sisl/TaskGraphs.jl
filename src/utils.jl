@@ -11,10 +11,10 @@ using ..PlanningPredicates
 using ..TaskGraphsCore
 
 export
-    get_root_node,
-    get_bfs_node_traversal,
-    get_all_root_nodes,
-    get_bfs_traversal,
+    # get_root_node,
+    # get_bfs_node_traversal,
+    # get_all_root_nodes,
+    # get_bfs_traversal,
     initialize_random_2D_task_graph_env,
     get_random_problem_instantiation,
     cached_pickup_and_delivery_distances,
@@ -26,58 +26,55 @@ export
     combine_project_specs,
     compute_lower_time_bound
 
-"""
-    `get_root_node(G,v=1)`
-"""
-function get_root_node(G,v=1)
-    node_list = map(e->e.dst, collect(edges(dfs_tree(G,v))))
-    root_node = get(node_list, length(node_list), v)
-end
-
-"""
-    `get_bfs_node_traversal(G,root_node=-1)`
-
-    Gets a BFS traversal beginning from a particular root node.
-"""
-function get_bfs_node_traversal(G,root_node=-1)
-    # root_node = map(e->e.dst, collect(edges(dfs_tree(G,1))))[end]
-    if root_node < 0
-        root_node = get_root_node(G)
-    end
-    bfs_traversal = map(e->e.dst, collect(edges(bfs_tree(G,root_node;dir=:in))))
-    append!(bfs_traversal, root_node)
-    bfs_traversal
-end
-
-"""
-    `get_all_root_nodes(G)`
-"""
-function get_all_root_nodes(G)
-    frontier = Set{Int}(collect(vertices(G)))
-    root_nodes = Set{Int}()
-    while length(frontier) > 0
-        v = pop!(frontier)
-        root_node = get_root_node(G,v)
-        for v2 in get_bfs_node_traversal(G,root_node)
-            setdiff!(frontier, v2)
-        end
-        push!(root_nodes, root_node)
-    end
-    return root_nodes
-end
-
-"""
-    `get_bfs_traversal(G)`
-
-    Returns a full bfs traversal, even if the graph is disjoint
-"""
-function get_bfs_traversal(G)
-    traversal = Vector{Int}()
-    for v in get_all_root_nodes(G)
-        traversal = [traversal..., get_bfs_node_traversal(G,v)...]
-    end
-    traversal
-end
+# """
+#     `get_root_node(G,v=1)`
+# """
+# function get_root_node(G,v=1)
+#     node_list = map(e->e.dst, collect(edges(dfs_tree(G,v))))
+#     root_node = get(node_list, length(node_list), v)
+# end
+# """
+#     `get_bfs_node_traversal(G,root_node=-1)`
+#
+#     Gets a BFS traversal beginning from a particular root node.
+# """
+# function get_bfs_node_traversal(G,root_node=-1)
+#     # root_node = map(e->e.dst, collect(edges(dfs_tree(G,1))))[end]
+#     if root_node < 0
+#         root_node = get_root_node(G)
+#     end
+#     bfs_traversal = map(e->e.dst, collect(edges(bfs_tree(G,root_node;dir=:in))))
+#     append!(bfs_traversal, root_node)
+#     bfs_traversal
+# end
+# """
+#     `get_all_root_nodes(G)`
+# """
+# function get_all_root_nodes(G)
+#     frontier = Set{Int}(collect(vertices(G)))
+#     root_nodes = Set{Int}()
+#     while length(frontier) > 0
+#         v = pop!(frontier)
+#         root_node = get_root_node(G,v)
+#         for v2 in get_bfs_node_traversal(G,root_node)
+#             setdiff!(frontier, v2)
+#         end
+#         push!(root_nodes, root_node)
+#     end
+#     return root_nodes
+# end
+# """
+#     `get_bfs_traversal(G)`
+#
+#     Returns a full bfs traversal, even if the graph is disjoint
+# """
+# function get_bfs_traversal(G)
+#     traversal = Vector{Int}()
+#     for v in get_all_root_nodes(G)
+#         traversal = [traversal..., get_bfs_node_traversal(G,v)...]
+#     end
+#     traversal
+# end
 
 """
     `cached_pickup_and_delivery_distances(r₀,oₒ,sₒ,dist=(x1,x2)->norm(x2-x1,1))`
@@ -192,12 +189,16 @@ end
             (applies to leaf tasks only)
         `tr0_` - a `Dict`, where `tr0_[i]` gives the start time for robot i
             (applies to non-dummy robots only)
+        `root_nodes` - a vector of integers specfying the graph vertices that
+            are roots of the project
+        `weights` - a vector of weights that determines the contribution of each
+            root_node to the objective
         `optimizer` - a JuMP optimizer (e.g., Gurobi.optimizer)
 
     Outputs:
         `model` - the optimization model
 """
-function formulate_JuMP_optimization_problem(G,Drs,Dss,Δt,Δt_collect,Δt_deliver,to0_,tr0_,optimizer;
+function formulate_JuMP_optimization_problem(G,Drs,Dss,Δt,Δt_collect,Δt_deliver,to0_,tr0_,root_nodes,weights,optimizer;
     TimeLimit=100,
     OutputFlag=0
     )
@@ -252,7 +253,7 @@ function formulate_JuMP_optimization_problem(G,Drs,Dss,Δt,Δt_collect,Δt_deliv
     end
     # cost depends only on root node(s)
     # @objective(model, Min, tof[M])
-    @objective(model, Min, sum(map(v->tof[v], collect(get_all_root_nodes(G)))))
+    @objective(model, Min, sum(map(v->tof[v]*get(weights,v,0.0), root_nodes)))
     model;
 end
 function formulate_JuMP_optimization_problem(spec::TaskGraphProblemSpec,optimizer;
@@ -268,6 +269,8 @@ function formulate_JuMP_optimization_problem(spec::TaskGraphProblemSpec,optimize
         spec.Δt_deliver,
         spec.to0_,
         spec.tr0_,
+        spec.root_nodes,
+        spec.weights,
         optimizer;
         TimeLimit=TimeLimit,
         OutputFlag=OutputFlag
@@ -540,11 +543,12 @@ end
 function combine_project_specs(specs::Vector{P}) where {P<:ProjectSpec}
     M = 0
     new_spec = ProjectSpec(
-        M=sum(map(spec->spec.M, specs)),
+        # M=sum(map(spec->length(spec.initial_conditions), specs)),
         initial_conditions=merge(map(spec->spec.initial_conditions, specs)...),
         final_conditions=merge(map(spec->spec.final_conditions, specs)...)
         )
     for spec in specs
+        spec_M = length(spec.initial_conditions)
         for op in spec.operations
             new_op = Operation(station_id=op.station_id, Δt = op.Δt)
             for pred in preconditions(op)
@@ -555,7 +559,7 @@ function combine_project_specs(specs::Vector{P}) where {P<:ProjectSpec}
             end
             add_operation!(new_spec, new_op)
         end
-        M = M + spec.M
+        M = M + spec_M
     end
     new_spec
 end

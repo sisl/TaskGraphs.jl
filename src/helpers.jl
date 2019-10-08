@@ -15,7 +15,8 @@ export
     initialize_toy_problem_4,
     initialize_toy_problem_5,
     initialize_toy_problem_6,
-    initialize_toy_problem_7
+    initialize_toy_problem_7,
+    initialize_toy_problem_8
 
 # This is a place to put reusable problem initializers for testing
 function initialize_toy_problem_1(;verbose=false)
@@ -454,7 +455,7 @@ end
 
 
 """
-    Robot 2 will have to sit and wait at the pickup station, meaning that robot 1 will have to go around 
+    Robot 2 will have to sit and wait at the pickup station, meaning that robot 1 will have to go around
     if robot 2 is on the critical path
 """
 function initialize_toy_problem_7(;verbose=false,Δt_op=0,Δt_collect=[0,4,0],Δt_deliver=[0,0,0])
@@ -520,11 +521,12 @@ function initialize_toy_problem_7(;verbose=false,Δt_op=0,Δt_collect=[0,4,0],Δ
 end
 
 """
-    Combines two separate projects. NOT YET IMPLEMENTED
+    two-headed project. Robot 1 does the first half of the first head, and
+    robot 2 handles the first half of the second head, and then they swap.
 """
-function initialize_toy_problem_8(;verbose=false,Δt_op=1,Δt_collect=[0,0,0],Δt_deliver=[0,0,0])
+function initialize_toy_problem_8(;verbose=false,Δt_op=0,Δt_collect=[0,0,0,0],Δt_deliver=[0,0,0,0])
     N = 2                  # num robots
-    M = 3                  # num delivery tasks
+    M = 4                  # num delivery tasks
     vtx_grid = initialize_dense_vtx_grid(4,8)
     # 1  5   9  13  17  21  25  29
     # 2  6  10  14  18  22  26  30
@@ -532,9 +534,9 @@ function initialize_toy_problem_8(;verbose=false,Δt_op=1,Δt_collect=[0,0,0],Δ
     # 4  8  12  16  20  24  28  32
     env_graph = initialize_grid_graph_from_vtx_grid(vtx_grid)
     dist_matrix = get_dist_matrix(env_graph)
-    r0 = [1,4]
-    s0 = [5,8,13]
-    sF = [9,32,17]
+    r0 = [1,29]
+    s0 = [5,25,12,24]
+    sF = [8,28,9,21]
 
     object_ICs = Dict{Int,OBJECT_AT}(o => OBJECT_AT(o,s0[o]) for o in 1:M) # initial_conditions
     object_FCs = Dict{Int,OBJECT_AT}(o => OBJECT_AT(o,sF[o]) for o in 1:M) # final conditions
@@ -544,9 +546,10 @@ function initialize_toy_problem_8(;verbose=false,Δt_op=1,Δt_collect=[0,0,0],Δ
     end
     Drs, Dss = cached_pickup_and_delivery_distances(r0,s0,sF,(v1,v2)->dist_matrix[v1,v2])
     project_spec = ProjectSpec( M=M, initial_conditions=object_ICs, final_conditions=object_FCs )
-    add_operation!(project_spec,construct_operation(project_spec,-1,[1,2],[3],Δt_op))
-    add_operation!(project_spec,construct_operation(project_spec,-1,[3],  [], Δt_op))
-
+    add_operation!(project_spec,construct_operation(project_spec,-1,[1],[4],Δt_op))
+    add_operation!(project_spec,construct_operation(project_spec,-1,[2],[3],Δt_op))
+    add_operation!(project_spec,construct_operation(project_spec,-1,[4],[],Δt_op))
+    add_operation!(project_spec,construct_operation(project_spec,-1,[3],[],Δt_op))
 
     delivery_graph = construct_delivery_graph(project_spec,M)
     G = delivery_graph.graph
@@ -568,7 +571,7 @@ function initialize_toy_problem_8(;verbose=false,Δt_op=1,Δt_collect=[0,0,0],Δ
     if verbose
         print(
         """
-            TOY PROBLEM 6
+            TOY PROBLEM 8
         """)
         display(vtx_grid)
         print("\n\n")
@@ -580,7 +583,7 @@ function initialize_toy_problem_8(;verbose=false,Δt_op=1,Δt_collect=[0,0,0],Δ
         display(delivery_graph.tasks)
         print("\n\n")
     end
-    assignments = [1,2,3]
+    assignments = [1,2,3,4]
     return project_spec, problem_spec, robot_ICs, assignments, env_graph
 end
 
