@@ -122,21 +122,7 @@ let
 
 
     delivery_graph = construct_delivery_graph(project_spec,M)
-    G = delivery_graph.graph
-    # initialize vector of operation times
-    Δt = get_duration_vector(project_spec)
-    # set initial conditions
-    to0_ = Dict{Int,Float64}()
-    for v in vertices(G)
-        if is_leaf_node(G,v)
-            to0_[v] = 0.0
-        end
-    end
-    tr0_ = Dict{Int,Float64}()
-    for i in 1:N
-        tr0_[i] = 0.0
-    end
-    problem_spec = TaskGraphProblemSpec(N=N,M=M,graph=G,D=dist_matrix,Drs=Drs,Dss=Dss,Δt=Δt,tr0_=tr0_,to0_=to0_)
+    project_spec, problem_spec, object_ICs, object_FCs, robot_ICs = construct_task_graphs_problem(project_spec,r0,s0,sF,dist_matrix)
     model = formulate_JuMP_optimization_problem(problem_spec,Gurobi.Optimizer;OutputFlag=0);
 
     optimize!(model)
@@ -144,15 +130,7 @@ let
     @show optimal;
     assignment = Matrix{Int}(value.(model[:x]));
 
-    cache = SearchCache(N,M,to0_,tr0_)
-    for j in 1:M
-        i = findfirst(assignment[:,j] .== 1)
-        cache.x[i,j] = 1
-    end
-    solution_graph = construct_solution_graph(delivery_graph.graph,assignment)
-    cache = process_solution(model,cache,problem_spec);
-
-    assignments = map(j->findfirst(cache.x[:,j] .== 1),1:M)
+    assignments = map(j->findfirst(assignment[:,j] .== 1),1:M)
 
     for r in N+1:N+M
         robot_ICs[r] = ROBOT_AT(r,sF[r-N])

@@ -214,9 +214,12 @@ function formulate_JuMP_optimization_problem(G,Drs,Dss,Δt,Δt_collect,Δt_deliv
         ))
     M = size(Dss,1)
     N = size(Drs,1)-M
-    @variable(model, to0[1:M] >= 0.0)
-    @variable(model, tof[1:M] >= 0.0)
-    @variable(model, tr0[1:N+M] >= 0.0)
+    @variable(model, to0[1:M] >= 0.0) # object availability time
+    @variable(model, tor[1:M] >= 0.0) # object robot arrival time
+    @variable(model, toc[1:M] >= 0.0) # object collection complete time
+    @variable(model, tod[1:M] >= 0.0) # object deliver begin time
+    @variable(model, tof[1:M] >= 0.0) # object termination time
+    @variable(model, tr0[1:N+M] >= 0.0) # robot availability time
 
     # Assignment matrix x
     @variable(model, x[1:N+M,1:M], binary = true) # x[i,j] ∈ {0,1}
@@ -249,13 +252,18 @@ function formulate_JuMP_optimization_problem(G,Drs,Dss,Δt,Δt_collect,Δt_deliv
         end
         # lower bound on task completion time (task can't start until it's available).
         # tof[j] = to0[j] + Dss[j,j] + slack[j]
-        @constraint(model, tof[j] >= to0[j] + Dss[j,j] + Δt_collect[j] + Δt_deliver[j])
+        @constraint(model, tor[j] >= to0[j])
+        # @constraint(model, tof[j] >= tor[j] + Dss[j,j] + Δt_collect[j] + Δt_deliver[j])
         # bound on task completion time (assigned robot must first complete delivery)
         # Big M constraint (thanks Oriana!): When x[i,j] == 1, this constrains the final time
         # to be no less than the time it takes for the delivery to be completed by robot i.
         # When x[i,j] == 0, this constrains the final time to be greater than a large negative
-        # number (meaning that this is a trivial constraint)
-        @constraint(model, tof[j] .- (tr0 + Drs[:,j] .+ Dss[j,j] .+ Δt_collect[j] .+ Δt_deliver[j]) .>= -Mm*(1 .- x[:,j]))
+        # number (meaning that this is a trivial constraint)        
+        @constraint(model, tor[j] .- (tr0 + Drs[:,j]) .>= -Mm*(1 .- x[:,j]))
+        @constraint(model, toc[j] == tor[j] + Δt_collect[j])
+        @constraint(model, tod[j] == toc[j] + Dss[j,j])
+        @constraint(model, tof[j] == tod[j] + Δt_deliver[j])
+        # @constraint(model, tof[j] >= tor[j] + Dss[j,j] + Δt_collect[j] + Δt_deliver[j])
         # "Job-shop" constraints specifying that no station may be double-booked. A station
         # can only support a single COLLECT or DEPOSIT operation at a time, meaning that all
         # the windows for these operations cannot overlap. In the constraints below, t1 and t2
@@ -266,38 +274,37 @@ function formulate_JuMP_optimization_problem(G,Drs,Dss,Δt,Δt_collect,Δt_deliv
         # We use the big M method here as well to tightly enforce the binary constraints.
         for j2 in j+1:M
             if (s0[j] == s0[j2]) || (s0[j] == sF[j2]) || (sF[j] == s0[j2]) || (sF[j] == sF[j2])
+                # @show j, j2
                 if s0[j] == s0[j2]
-                    t1 = [s0[j], s0[j] + Δt_collect[j]]
-                    t2 = [s0[j2], s0[j2] + Δt_collect[j2]]
+                    t1 = [tor[j], toc[j]]
+                    t2 = [tor[j2], toc[j2]]
                 elseif s0[j] == sF[j2]
-                    t1 = [s0[j], s0[j] + Δt_collect[j]]
-                    t2 = [sF[j2], sF[j2] + Δt_deliver[j2]]
+                    t1 = [tor[j], toc[j]]
+                    t2 = [tod[j2], tof[j2]]
                 elseif sF[j] == s0[j2]
-                    t1 = [sF[j], sF[j] + Δt_deliver[j]]
-                    t2 = [s0[j2], s0[j2] + Δt_collect[j2]]
+                    t1 = [tod[j], tof[j]]
+                    t2 = [tor[j2], toc[j2]]
                 elseif sF[j] == sF[j2]
-                    t1 = [sF[j], sF[j] + Δt_deliver[j]]
-                    t2 = [sF[j2], sF[j2] + Δt_deliver[j2]]
+                    t1 = [tod, tof[j]]
+                    t2 = [tod, tof[j2]]
                 end
                 tmax = @variable(model)
                 tmin = @variable(model)
-                y = @variable(model, [1:2], binary=true)
-                @constraint(model, y[1]+y[2] == 1)
+                y = @variable(model, binary=true)
                 @constraint(model, tmax >= t1[1])
                 @constraint(model, tmax >= t2[1])
                 @constraint(model, tmin <= t1[2])
                 @constraint(model, tmin <= t2[2])
                 
-                @constraint(model, tmax - t2[1] <= (1 - y[1])*MMm)
-                @constraint(model, tmax - t1[1] <= (1 - y[2])*MMm)
-#                 @constraint(model, t1[2] - tmin <= (1 - y[1])*MMm)
-#                 @constraint(model, t2[2] - tmin <= (1 - y[2])*MMm)
+                @constraint(model, tmax - t2[1] <= (1 - y)*MMm)
+                @constraint(model, tmax - t1[1] <= y*MMm)
+                @constraint(model, tmin - t1[2] >= (1 - y)*-MMm)
+                @constraint(model, tmin - t2[2] >= y*-MMm)
                 @constraint(model, tmin + 1 <= tmax)
             end
         end
     end
     # cost depends only on root node(s)
-    # @objective(model, Min, tof[M])
     if cost_model == :SumOfMakeSpans
         @objective(model, Min, sum(map(v->tof[v]*get(weights,v,0.0), root_nodes)))
     elseif cost_model == :MakeSpan
