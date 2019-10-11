@@ -38,6 +38,8 @@ export
     to0_::Dict{Int,Float64} = Dict{Int,Float64}() # object start times
     root_nodes::Vector{Int} = sort(collect(get_all_root_nodes(graph)))
     weights::Dict{Int,Float64} = Dict{Int,Float64}(v=>1.0 for v in root_nodes)
+    s0::Vector{Int} = zeros(M) # pickup stations for each task
+    sF::Vector{Int} = zeros(M) # delivery station for each task
 end
 
 export

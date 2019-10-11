@@ -202,7 +202,7 @@ end
     Outputs:
         `model` - the optimization model
 """
-function formulate_JuMP_optimization_problem(G,Drs,Dss,Δt,Δt_collect,Δt_deliver,to0_,tr0_,root_nodes,weights,optimizer;
+function formulate_JuMP_optimization_problem(G,Drs,Dss,Δt,Δt_collect,Δt_deliver,to0_,tr0_,root_nodes,weights,s0,sF,optimizer;
     TimeLimit=100,
     OutputFlag=0,
     cost_model=:MakeSpan
@@ -232,6 +232,7 @@ function formulate_JuMP_optimization_problem(G,Drs,Dss,Δt,Δt_collect,Δt_deliv
     end
     # constraints
     Mm = Matrix{Float64}(I,N+M,N+M) * (sum(Drs) + sum(Dss)) # for big-M constraints
+    MMm = typemax(Int) # sum(Drs) + sum(Dss) # for scalar big-M constraints in station ordering
     for j in 1:M
         # constraint on task start time
         if !is_leaf_node(G,j)
@@ -255,6 +256,45 @@ function formulate_JuMP_optimization_problem(G,Drs,Dss,Δt,Δt_collect,Δt_deliv
         # When x[i,j] == 0, this constrains the final time to be greater than a large negative
         # number (meaning that this is a trivial constraint)
         @constraint(model, tof[j] .- (tr0 + Drs[:,j] .+ Dss[j,j] .+ Δt_collect[j] .+ Δt_deliver[j]) .>= -Mm*(1 .- x[:,j]))
+        # "Job-shop" constraints specifying that no station may be double-booked. A station
+        # can only support a single COLLECT or DEPOSIT operation at a time, meaning that all
+        # the windows for these operations cannot overlap. In the constraints below, t1 and t2
+        # represent the intervals for the COLLECT or DEPOSIT operations of tasks j and j2, 
+        # respectively. If eny of the operations for these two tasks require use of the same 
+        # station, we introduce a 2D binary variable y. if y = [1,0], the operation for task 
+        # j must occur before the operation for task j2. The opposite is true for y == [0,1]. 
+        # We use the big M method here as well to tightly enforce the binary constraints.
+        for j2 in j+1:M
+            if (s0[j] == s0[j2]) || (s0[j] == sF[j2]) || (sF[j] == s0[j2]) || (sF[j] == sF[j2])
+                if s0[j] == s0[j2]
+                    t1 = [s0[j], s0[j] + Δt_collect[j]]
+                    t2 = [s0[j2], s0[j2] + Δt_collect[j2]]
+                elseif s0[j] == sF[j2]
+                    t1 = [s0[j], s0[j] + Δt_collect[j]]
+                    t2 = [sF[j2], sF[j2] + Δt_deliver[j2]]
+                elseif sF[j] == s0[j2]
+                    t1 = [sF[j], sF[j] + Δt_deliver[j]]
+                    t2 = [s0[j2], s0[j2] + Δt_collect[j2]]
+                elseif sF[j] == sF[j2]
+                    t1 = [sF[j], sF[j] + Δt_deliver[j]]
+                    t2 = [sF[j2], sF[j2] + Δt_deliver[j2]]
+                end
+                tmax = @variable(model)
+                tmin = @variable(model)
+                y = @variable(model, [1:2], binary=true)
+                @constraint(model, y[1]+y[2] == 1)
+                @constraint(model, tmax >= t1[1])
+                @constraint(model, tmax >= t2[1])
+                @constraint(model, tmin <= t1[2])
+                @constraint(model, tmin <= t2[2])
+                
+                @constraint(model, tmax - t2[1] <= (1 - y[1])*MMm)
+                @constraint(model, tmax - t1[1] <= (1 - y[2])*MMm)
+#                 @constraint(model, t1[2] - tmin <= (1 - y[1])*MMm)
+#                 @constraint(model, t2[2] - tmin <= (1 - y[2])*MMm)
+                @constraint(model, tmin + 1 <= tmax)
+            end
+        end
     end
     # cost depends only on root node(s)
     # @objective(model, Min, tof[M])
@@ -281,6 +321,8 @@ function formulate_JuMP_optimization_problem(spec::TaskGraphProblemSpec,optimize
         spec.tr0_,
         spec.root_nodes,
         spec.weights,
+        spec.s0,
+        spec.sF,
         optimizer;
         kwargs...
         )
@@ -484,14 +526,14 @@ export
     `construct_task_graphs_problem`
 """
 function construct_task_graphs_problem(
-        project_spec::ProjectSpec,
+        project_spec::P,
         r0::Vector{Int},
         s0::Vector{Int},
         sF::Vector{Int},
         dist_matrix,
-        Δt_collect::Vector{Float64}=zeros(length(s0)),
-        Δt_deliver::Vector{Float64}=zeros(length(sF))
-        )
+        Δt_collect=zeros(length(s0)),
+        Δt_deliver=zeros(length(sF))
+        ) where {P<:ProjectSpec}
     # select subset of pickup, dropoff and free locations to instantiate objects and robots
     # r0,s0,sF        = get_random_problem_instantiation(N,M,pickup_vtxs,dropoff_vtxs,free_vtxs)
     # project_spec    = construct_random_project_spec(M,s0,sF;max_parents=3,depth_bias=1.0,Δt_min=0,Δt_max=0)
@@ -523,8 +565,7 @@ function construct_task_graphs_problem(
         tr0_[i] = 0.0
     end
     problem_spec = TaskGraphProblemSpec(N=N,M=M,graph=G,D=dist_matrix,Drs=Drs,
-        Dss=Dss,Δt=Δt,tr0_=tr0_,to0_=to0_,
-        Δt_collect=Δt_collect,Δt_deliver=Δt_deliver)
+        Dss=Dss,Δt=Δt,tr0_=tr0_,to0_=to0_,Δt_collect=Δt_collect,Δt_deliver=Δt_deliver,s0=s0,sF=sF)
     return project_spec, problem_spec, object_ICs, object_FCs, robot_ICs
 end
 
