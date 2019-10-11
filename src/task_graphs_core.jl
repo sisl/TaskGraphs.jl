@@ -620,6 +620,38 @@ function construct_project_schedule(
             add_edge!(schedule, operation_id, ObjectID(object_id))
         end
     end
+    # # process schedule
+    # t0 = zeros(Int,get_num_vtxs(schedule))
+    # for v in vertices(get_graph(schedule))
+    #     node = get_node_from_id(schedule, get_vtx_id(schedule, v))
+    #     if typeof(node) <: ROBOT_AT
+    #         r = get_id(robot_id(node))
+    #         t0[v] = get(project_spec.tr0_, r, 0)
+    #     end
+    #     if typeof(node) <: OBJECT_AT
+    #         r = get_id(object_id(node))
+    #         t0[v] = get(project_spec.to0_, r, 0)
+    #     end
+    # end
+    # t0,tF,slack,local_slack = process_schedule(schedule)
+    # # Add dependencies between nodes that use the same station
+    # for v in vertices(get_graph(schedule))
+    #     node = get_node_from_id(schedule, get_vtx_id(schedule, v))
+    #     if typeof(node) <: Union{COLLECT,DEPOSIT}
+    #         for v2 in v:get_num_vtxs(schedule)
+    #             node2 = get_node_from_id(schedule, get_vtx_id(schedule, v2))
+    #             if typeof(node2) <: Union{COLLECT,DEPOSIT}
+    #                 if station_id(node) == station_id(node2)
+    #                     if t0[v] < t0[v2]
+    #                         add_edge!(get_graph(schedule),v,v2)
+    #                     else
+    #                         add_edge!(get_graph(schedule),v2,v)
+    #                     end
+    #                 end
+    #             end
+    #         end
+    #     end
+    # end
     sort!(schedule.root_nodes)
     # identify root nodes and store their indices in the schedule (important for multi-headed projects)
     # root_nodes = get_all_root_nodes(get_graph(schedule))

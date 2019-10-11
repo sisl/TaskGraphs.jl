@@ -38,8 +38,8 @@ let
 
     model = formulate_JuMP_optimization_problem(problem_spec,Gurobi.Optimizer;OutputFlag=0);
     optimize!(model)
-    optimal = (termination_status(model) == MathOptInterface.OPTIMAL)
-    @show optimal;
+    @test termination_status(model) == MathOptInterface.OPTIMAL
+
     cache = SearchCache(problem_spec)
     cache.x .= Matrix{Int}(value.(model[:x]))
     cache = process_solution(model,cache,problem_spec)
@@ -126,8 +126,8 @@ let
     model = formulate_JuMP_optimization_problem(problem_spec,Gurobi.Optimizer;OutputFlag=0);
 
     optimize!(model)
-    optimal = (termination_status(model) == MathOptInterface.OPTIMAL)
-    @show optimal;
+    @test termination_status(model) == MathOptInterface.OPTIMAL
+
     assignment = Matrix{Int}(value.(model[:x]));
 
     assignments = map(j->findfirst(assignment[:,j] .== 1),1:M)
@@ -159,8 +159,8 @@ let
     model = formulate_JuMP_optimization_problem(problem_spec,Gurobi.Optimizer;OutputFlag=0);
 
     optimize!(model)
-    optimal = (termination_status(model) == MathOptInterface.OPTIMAL)
-    @show optimal;
+    @test termination_status(model) == MathOptInterface.OPTIMAL
+    
     assignment_matrix = Matrix{Int}(value.(model[:x]));
     assignments = map(j->findfirst(assignment_matrix[:,j] .== 1),1:M)
     project_schedule = construct_project_schedule(project_spec, problem_spec, object_ICs, object_FCs, robot_ICs, assignments);

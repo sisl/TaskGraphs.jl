@@ -236,6 +236,7 @@ function formulate_JuMP_optimization_problem(G,Drs,Dss,Δt,Δt_collect,Δt_deliv
     # constraints
     Mm = Matrix{Float64}(I,N+M,N+M) * (sum(Drs) + sum(Dss)) # for big-M constraints
     MMm = typemax(Int) # sum(Drs) + sum(Dss) # for scalar big-M constraints in station ordering
+    Y = Dict{Tuple{Int,Int},VariableRef}()
     for j in 1:M
         # constraint on task start time
         if !is_leaf_node(G,j)
@@ -258,7 +259,7 @@ function formulate_JuMP_optimization_problem(G,Drs,Dss,Δt,Δt_collect,Δt_deliv
         # Big M constraint (thanks Oriana!): When x[i,j] == 1, this constrains the final time
         # to be no less than the time it takes for the delivery to be completed by robot i.
         # When x[i,j] == 0, this constrains the final time to be greater than a large negative
-        # number (meaning that this is a trivial constraint)        
+        # number (meaning that this is a trivial constraint)
         @constraint(model, tor[j] .- (tr0 + Drs[:,j]) .>= -Mm*(1 .- x[:,j]))
         @constraint(model, toc[j] == tor[j] + Δt_collect[j])
         @constraint(model, tod[j] == toc[j] + Dss[j,j])
@@ -267,10 +268,10 @@ function formulate_JuMP_optimization_problem(G,Drs,Dss,Δt,Δt_collect,Δt_deliv
         # "Job-shop" constraints specifying that no station may be double-booked. A station
         # can only support a single COLLECT or DEPOSIT operation at a time, meaning that all
         # the windows for these operations cannot overlap. In the constraints below, t1 and t2
-        # represent the intervals for the COLLECT or DEPOSIT operations of tasks j and j2, 
-        # respectively. If eny of the operations for these two tasks require use of the same 
-        # station, we introduce a 2D binary variable y. if y = [1,0], the operation for task 
-        # j must occur before the operation for task j2. The opposite is true for y == [0,1]. 
+        # represent the intervals for the COLLECT or DEPOSIT operations of tasks j and j2,
+        # respectively. If eny of the operations for these two tasks require use of the same
+        # station, we introduce a 2D binary variable y. if y = [1,0], the operation for task
+        # j must occur before the operation for task j2. The opposite is true for y == [0,1].
         # We use the big M method here as well to tightly enforce the binary constraints.
         for j2 in j+1:M
             if (s0[j] == s0[j2]) || (s0[j] == sF[j2]) || (sF[j] == s0[j2]) || (sF[j] == sF[j2])
@@ -290,12 +291,12 @@ function formulate_JuMP_optimization_problem(G,Drs,Dss,Δt,Δt_collect,Δt_deliv
                 end
                 tmax = @variable(model)
                 tmin = @variable(model)
-                y = @variable(model, binary=true)
+                y = Y[(j,j2)] = @variable(model, binary=true)
                 @constraint(model, tmax >= t1[1])
                 @constraint(model, tmax >= t2[1])
                 @constraint(model, tmin <= t1[2])
                 @constraint(model, tmin <= t2[2])
-                
+
                 @constraint(model, tmax - t2[1] <= (1 - y)*MMm)
                 @constraint(model, tmax - t1[1] <= y*MMm)
                 @constraint(model, tmin - t1[2] >= (1 - y)*-MMm)
