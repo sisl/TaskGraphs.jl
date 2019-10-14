@@ -20,6 +20,7 @@ export
     cached_pickup_and_delivery_distances,
     formulate_optimization_problem,
     formulate_JuMP_optimization_problem,
+    get_assignment_matrix,
     construct_factory_distance_matrix,
     construct_random_project_spec,
     construct_random_task_graphs_problem,
@@ -234,9 +235,7 @@ function formulate_JuMP_optimization_problem(G,Drs,Dss,Δt,Δt_collect,Δt_deliv
         @constraint(model, to0[j] == t)
     end
     # constraints
-    Mm = Matrix{Float64}(I,N+M,N+M) * (sum(Drs) + sum(Dss)) # for big-M constraints
-    MMm = typemax(Int) # sum(Drs) + sum(Dss) # for scalar big-M constraints in station ordering
-    Y = Dict{Tuple{Int,Int},VariableRef}()
+    Mm = sum(Drs) + sum(Dss) # for big-M constraints
     for j in 1:M
         # constraint on task start time
         if !is_leaf_node(G,j)
@@ -260,11 +259,12 @@ function formulate_JuMP_optimization_problem(G,Drs,Dss,Δt,Δt_collect,Δt_deliv
         # to be no less than the time it takes for the delivery to be completed by robot i.
         # When x[i,j] == 0, this constrains the final time to be greater than a large negative
         # number (meaning that this is a trivial constraint)
-        @constraint(model, tor[j] .- (tr0 + Drs[:,j]) .>= -Mm*(1 .- x[:,j]))
+        for i in 1:N+M
+            @constraint(model, tor[j] - (tr0[i] + Drs[i,j]) >= -Mm*(1 - x[i,j]))
+        end
         @constraint(model, toc[j] == tor[j] + Δt_collect[j])
         @constraint(model, tod[j] == toc[j] + Dss[j,j])
         @constraint(model, tof[j] == tod[j] + Δt_deliver[j])
-        # @constraint(model, tof[j] >= tor[j] + Dss[j,j] + Δt_collect[j] + Δt_deliver[j])
         # "Job-shop" constraints specifying that no station may be double-booked. A station
         # can only support a single COLLECT or DEPOSIT operation at a time, meaning that all
         # the windows for these operations cannot overlap. In the constraints below, t1 and t2
@@ -291,16 +291,16 @@ function formulate_JuMP_optimization_problem(G,Drs,Dss,Δt,Δt_collect,Δt_deliv
                 end
                 tmax = @variable(model)
                 tmin = @variable(model)
-                y = Y[(j,j2)] = @variable(model, binary=true)
+                y = @variable(model, binary=true)
                 @constraint(model, tmax >= t1[1])
                 @constraint(model, tmax >= t2[1])
                 @constraint(model, tmin <= t1[2])
                 @constraint(model, tmin <= t2[2])
 
-                @constraint(model, tmax - t2[1] <= (1 - y)*MMm)
-                @constraint(model, tmax - t1[1] <= y*MMm)
-                @constraint(model, tmin - t1[2] >= (1 - y)*-MMm)
-                @constraint(model, tmin - t2[2] >= y*-MMm)
+                @constraint(model, tmax - t2[1] <= (1 - y)*Mm)
+                @constraint(model, tmax - t1[1] <= y*Mm)
+                @constraint(model, tmin - t1[2] >= (1 - y)*-Mm)
+                @constraint(model, tmin - t2[2] >= y*-Mm)
                 @constraint(model, tmin + 1 <= tmax)
             end
         end
@@ -335,6 +335,10 @@ function formulate_JuMP_optimization_problem(spec::TaskGraphProblemSpec,optimize
         kwargs...
         )
 end
+function get_assignment_matrix(model::M) where {M<:JuMP.Model}
+    Matrix{Int}(value.(model[:x]))
+end
+# function get_station_precedence_dict(model::M) where {M<:JuMP.Model} end
 
 export
     exclude_solutions!

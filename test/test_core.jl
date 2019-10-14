@@ -41,7 +41,7 @@ let
     @test termination_status(model) == MathOptInterface.OPTIMAL
 
     cache = SearchCache(problem_spec)
-    cache.x .= Matrix{Int}(value.(model[:x]))
+    cache.x .= get_assignment_matrix(model)
     cache = process_solution(model,cache,problem_spec)
     assignments = map(j->findfirst(cache.x[:,j] .== 1),1:M)
     @test assignments == optimal_assignments
@@ -128,7 +128,7 @@ let
     optimize!(model)
     @test termination_status(model) == MathOptInterface.OPTIMAL
 
-    assignment = Matrix{Int}(value.(model[:x]));
+    assignment = get_assignment_matrix(model);
 
     assignments = map(j->findfirst(assignment[:,j] .== 1),1:M)
 
@@ -160,8 +160,8 @@ let
 
     optimize!(model)
     @test termination_status(model) == MathOptInterface.OPTIMAL
-    
-    assignment_matrix = Matrix{Int}(value.(model[:x]));
+
+    assignment_matrix = get_assignment_matrix(model);
     assignments = map(j->findfirst(assignment_matrix[:,j] .== 1),1:M)
     project_schedule = construct_project_schedule(project_spec, problem_spec, object_ICs, object_FCs, robot_ICs, assignments);
 

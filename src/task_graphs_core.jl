@@ -4,6 +4,7 @@ using Parameters
 using LightGraphs, MetaGraphs
 using GraphUtils
 using DataStructures
+using JuMP
 using TOML
 
 using ..PlanningPredicates
@@ -716,6 +717,75 @@ function process_schedule(schedule::P; t0=zeros(Int,get_num_vtxs(schedule)),
         end
     end
     t0,tF,slack,local_slack
+end
+
+export
+    get_collect_node,
+    get_deposit_node,
+    add_job_shop_constraints!
+
+function get_collect_node(schedule::P,id::ObjectID) where {P<:ProjectSchedule}
+    current_id = id
+    node = get_node_from_id(schedule,current_id)
+    while typeof(node) != COLLECT
+        current_id = get_vtx_id(schedule, outneighbors(get_graph(schedule),get_vtx(schedule,current_id))[1])
+        node = get_node_from_id(schedule, current_id)
+    end
+    return current_id, node
+end
+function get_deposit_node(schedule::P,id::ObjectID) where {P<:ProjectSchedule}
+    current_id = id
+    node = get_node_from_id(schedule,current_id)
+    while typeof(node) != DEPOSIT
+        current_id = get_vtx_id(schedule, outneighbors(get_graph(schedule),get_vtx(schedule,current_id))[1])
+        node = get_node_from_id(schedule, current_id)
+    end
+    return current_id, node
+end
+
+function add_job_shop_constraints!(schedule::P,spec::T,model::JuMP.Model) where {P<:ProjectSchedule,T<:TaskGraphProblemSpec}
+    M = spec.M
+    s0 = spec.s0
+    sF = spec.sF
+    tor = Int.(round.(value.(model[:tor]))) # collect begin time
+    toc = Int.(round.(value.(model[:toc]))) # collect end time
+    tod = Int.(round.(value.(model[:tod]))) # deposit begin time
+    tof = Int.(round.(value.(model[:tof]))) # deposit end time
+    for j in 1:M
+        for j2 in j+1:M
+            if (s0[j] == s0[j2]) || (s0[j] == sF[j2]) || (sF[j] == s0[j2]) || (sF[j] == sF[j2])
+                # @show j, j2
+                if s0[j] == s0[j2]
+                    id1, n1 = get_collect_node(schedule, ObjectID(j))
+                    id2, n2 = get_collect_node(schedule, ObjectID(j2))
+                    t1 = [tor[j], toc[j]]
+                    t2 = [tor[j2], toc[j2]]
+                elseif s0[j] == sF[j2]
+                    id1, n1 = get_collect_node(schedule, ObjectID(j))
+                    id2, n2 = get_deposit_node(schedule, ObjectID(j2))
+                    t1 = [tor[j], toc[j]]
+                    t2 = [tod[j2], tof[j2]]
+                elseif sF[j] == s0[j2]
+                    id1, n1 = get_deposit_node(schedule, ObjectID(j))
+                    id2, n2 = get_collect_node(schedule, ObjectID(j2))
+                    t1 = [tod[j], tof[j]]
+                    t2 = [tor[j2], toc[j2]]
+                elseif sF[j] == sF[j2]
+                    id1, n1 = get_deposit_node(schedule, ObjectID(j))
+                    id2, n2 = get_deposit_node(schedule, ObjectID(j2))
+                    t1 = [tod, tof[j]]
+                    t2 = [tod, tof[j2]]
+                end
+                if t1[2] < t2[1]
+                    add_edge!(schedule, id1, id2)
+                elseif t2[2] < t1[1]
+                    add_edge!(schedule, id2, id1)
+                else
+                    throw(ErrorException("JOB SHOP CONSTRAINT VIOLATED"))
+                end
+            end
+        end
+    end
 end
 
 
