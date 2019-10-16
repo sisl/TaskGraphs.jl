@@ -7,7 +7,7 @@ let
     project_spec, problem_spec, robot_ICs, assignments, env_graph = initialize_toy_problem_4(;
         verbose=false);
     let
-        model = formulate_JuMP_optimization_problem(problem_spec,Gurobi.Optimizer;cost_model=:MakeSpan)
+        model = formulate_optimization_problem(problem_spec,Gurobi.Optimizer;cost_model=:MakeSpan)
         optimize!(model)
         optimal = (termination_status(model) == MathOptInterface.OPTIMAL)
         optimal_TA_cost = Int(round(value(objective_function(model))));
@@ -15,7 +15,7 @@ let
         @test optimal_TA_cost == 2
     end
     let
-        model = formulate_JuMP_optimization_problem(problem_spec,Gurobi.Optimizer;cost_model=:SumOfMakeSpans)
+        model = formulate_optimization_problem(problem_spec,Gurobi.Optimizer;cost_model=:SumOfMakeSpans)
         optimize!(model)
         optimal = (termination_status(model) == MathOptInterface.OPTIMAL)
         optimal_TA_cost = Int(round(value(objective_function(model))));
@@ -28,7 +28,7 @@ let
     project_spec, problem_spec, robot_ICs, assignments, env_graph = initialize_toy_problem_8(;
         verbose=false);
     let
-        model = formulate_JuMP_optimization_problem(problem_spec,Gurobi.Optimizer;cost_model=:MakeSpan)
+        model = formulate_optimization_problem(problem_spec,Gurobi.Optimizer;cost_model=:MakeSpan)
         optimize!(model)
         optimal = (termination_status(model) == MathOptInterface.OPTIMAL)
         optimal_TA_cost = Int(round(value(objective_function(model))));
@@ -36,7 +36,7 @@ let
         @test optimal_TA_cost == 8
     end
     let
-        model = formulate_JuMP_optimization_problem(problem_spec,Gurobi.Optimizer;cost_model=:SumOfMakeSpans)
+        model = formulate_optimization_problem(problem_spec,Gurobi.Optimizer;cost_model=:SumOfMakeSpans)
         optimize!(model)
         optimal = (termination_status(model) == MathOptInterface.OPTIMAL)
         optimal_TA_cost = Int(round(value(objective_function(model))));
@@ -51,7 +51,7 @@ let
             project_spec, problem_spec, robot_ICs, assignments, env_graph = initialize_toy_problem_9(;
                 verbose=false,Δt_op=0,Δt_collect=[i,0],Δt_deliver=[0,0]
                 );
-            model = formulate_JuMP_optimization_problem(problem_spec,Gurobi.Optimizer;cost_model=:SumOfMakeSpans)
+            model = formulate_optimization_problem(problem_spec,Gurobi.Optimizer;cost_model=:SumOfMakeSpans)
             optimize!(model)
             optimal = (termination_status(model) == MathOptInterface.OPTIMAL)
             optimal_TA_cost = Int(round(value(objective_function(model))));
@@ -64,7 +64,7 @@ let
             project_spec, problem_spec, robot_ICs, assignments, env_graph = initialize_toy_problem_9(;
                 verbose=false,Δt_op=0,Δt_collect=[i,0],Δt_deliver=[0,0]
                 );
-            model = formulate_JuMP_optimization_problem(problem_spec,Gurobi.Optimizer;cost_model=:SumOfMakeSpans)
+            model = formulate_optimization_problem(problem_spec,Gurobi.Optimizer;cost_model=:SumOfMakeSpans)
             optimize!(model)
             optimal = (termination_status(model) == MathOptInterface.OPTIMAL)
             optimal_TA_cost = Int(round(value(objective_function(model))));
@@ -78,7 +78,7 @@ let
     project_spec, problem_spec, robot_ICs, assignments, env_graph = initialize_toy_problem_9(;
         verbose=false,Δt_op=0,Δt_collect=[0,0],Δt_deliver=[0,0]
         );
-    model = formulate_JuMP_optimization_problem(problem_spec,Gurobi.Optimizer;cost_model=:SumOfMakeSpans)
+    model = formulate_optimization_problem(problem_spec,Gurobi.Optimizer;cost_model=:SumOfMakeSpans)
     optimize!(model)
     @test termination_status(model) == MathOptInterface.OPTIMAL
     assignment_matrix = get_assignment_matrix(model);

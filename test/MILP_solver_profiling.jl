@@ -79,7 +79,7 @@ for N in [10,20,40,100]
                         tr0_[i] = 0.0
                     end
                     # formulate MILP
-                    model = formulate_JuMP_optimization_problem(
+                    model = formulate_optimization_problem(
                         G,Drs,Dss,Δt,to0_,tr0_,
                         Gurobi.Optimizer;TimeLimit=10);
                     # Solve!

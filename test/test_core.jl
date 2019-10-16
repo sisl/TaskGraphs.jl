@@ -51,7 +51,7 @@ let
     N = problem_spec.N
     M = problem_spec.M
 
-    model = formulate_JuMP_optimization_problem(problem_spec,Gurobi.Optimizer;OutputFlag=0);
+    model = formulate_optimization_problem(problem_spec,Gurobi.Optimizer;OutputFlag=0);
     optimize!(model)
     @test termination_status(model) == MathOptInterface.OPTIMAL
 
@@ -128,7 +128,7 @@ let
 
     delivery_graph = construct_delivery_graph(project_spec,M)
     project_spec, problem_spec, object_ICs, object_FCs, robot_ICs = construct_task_graphs_problem(project_spec,r0,s0,sF,dist_matrix)
-    model = formulate_JuMP_optimization_problem(problem_spec,Gurobi.Optimizer;OutputFlag=0);
+    model = formulate_optimization_problem(problem_spec,Gurobi.Optimizer;OutputFlag=0);
 
     optimize!(model)
     @test termination_status(model) == MathOptInterface.OPTIMAL
@@ -161,7 +161,7 @@ let
     project_spec, problem_spec, object_ICs, object_FCs, robot_ICs = construct_random_task_graphs_problem(
         N,M,pickup_zones,dropoff_zones,free_zones,dist_matrix)
 
-    model = formulate_JuMP_optimization_problem(problem_spec,Gurobi.Optimizer;OutputFlag=0);
+    model = formulate_optimization_problem(problem_spec,Gurobi.Optimizer;OutputFlag=0);
 
     optimize!(model)
     @test termination_status(model) == MathOptInterface.OPTIMAL
