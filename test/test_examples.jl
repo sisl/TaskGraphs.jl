@@ -1,3 +1,9 @@
+# Root nodes
+let
+    project_spec, problem_spec, robot_ICs, assignments, env_graph = initialize_toy_problem_4(;
+        verbose=false);
+end
+# Cost models
 let
     project_spec, problem_spec, robot_ICs, assignments, env_graph = initialize_toy_problem_8(;
         verbose=false);

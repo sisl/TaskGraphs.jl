@@ -19,6 +19,21 @@ let
         2=>ROBOT_AT(2,8),
         3=>ROBOT_AT(3,9)
         )
+    # Testing root nodes
+    let
+        project_spec = ProjectSpec(initial_conditions=object_ICs,final_conditions=object_FCs)
+        add_operation!(project_spec,construct_operation(project_spec, 3, [1,2], [3], 1.0))
+        @test project_spec.root_nodes == Set{Int}([1])
+        add_operation!(project_spec,construct_operation(project_spec, 6, [3], [], 0.0))
+        @test project_spec.root_nodes == Set{Int}([2])
+    end
+    let
+        project_spec = ProjectSpec(initial_conditions=object_ICs,final_conditions=object_FCs)
+        add_operation!(project_spec,construct_operation(project_spec, 3, [1,2], [], 1.0))
+        @test project_spec.root_nodes == Set{Int}([1])
+        add_operation!(project_spec,construct_operation(project_spec, 6, [3], [], 0.0))
+        @test project_spec.root_nodes == Set{Int}([1,2])
+    end
     project_spec = ProjectSpec(initial_conditions=object_ICs,final_conditions=object_FCs)
     add_operation!(project_spec,construct_operation(project_spec, 3, [1,2], [3], 1.0))
     add_operation!(project_spec,construct_operation(project_spec, 6, [3], [], 0.0))
@@ -40,22 +55,12 @@ let
     optimize!(model)
     @test termination_status(model) == MathOptInterface.OPTIMAL
 
-    cache = SearchCache(problem_spec)
-    cache.x .= get_assignment_matrix(model)
-    cache = process_solution(model,cache,problem_spec)
-    assignments = map(j->findfirst(cache.x[:,j] .== 1),1:M)
+    assignment_matrix = get_assignment_matrix(model)
+    assignments = map(j->findfirst(assignment_matrix[:,j] .== 1),1:M)
     @test assignments == optimal_assignments
-    @test cache.to0 == [0,0,3]
-    @test cache.tof == [3,2,5]
-    @test cache.slack == [0,1,0]
-    # @show assignments
-    # @show cache.to0
-    # @show cache.tof
-    # @show cache.tr0
-    # @show cache.slack
-    # @show cache.local_slack
+
     project_schedule = construct_project_schedule(project_spec, problem_spec, robot_ICs, assignments);
-    # @show project_schedule.path_id_to_vtx_map
+
     t0,tF,slack,local_slack = process_schedule(project_schedule)
     @test t0[get_vtx(project_schedule,RobotID(1))] == 0
     @test t0[get_vtx(project_schedule,RobotID(2))] == 0

@@ -69,7 +69,8 @@ function initialize_toy_problem_1(;verbose=false)
     add_operation!(project_spec,construct_operation(project_spec,-1,[3],  [], 0))
     assignments = [1,2,3]
 
-    project_spec, problem_spec, object_ICs, object_FCs, robot_ICs = construct_task_graphs_problem(project_spec,r0,s0,sF,dist_matrix)
+    project_spec, problem_spec, object_ICs, object_FCs, robot_ICs = construct_task_graphs_problem(
+        project_spec,r0,s0,sF,dist_matrix)
     if verbose
         problem_description = """
         #### TOY PROBLEM 1 ####
@@ -110,7 +111,8 @@ function initialize_toy_problem_2(;verbose=false)
     add_operation!(project_spec,construct_operation(project_spec,-1,[3],  [], 0))
     assignments = [1,2,3]
 
-    project_spec, problem_spec, object_ICs, object_FCs, robot_ICs = construct_task_graphs_problem(project_spec,r0,s0,sF,dist_matrix)
+    project_spec, problem_spec, object_ICs, object_FCs, robot_ICs = construct_task_graphs_problem(
+        project_spec,r0,s0,sF,dist_matrix)
     if verbose
         problem_description = """
             TOY PROBLEM 2
@@ -138,7 +140,7 @@ end
     Second operation:
         robot 1 does [8-12-16]
 """
-function initialize_toy_problem_3(;verbose=false)
+function initialize_toy_problem_3(;verbose=false,Δt_op=0,Δt_collect=[0,0,0],Δt_deliver=[0,0,0])
     N = 2                  # num robots
     M = 3                  # num delivery tasks
     vtx_grid = initialize_dense_vtx_grid(4,8)
@@ -164,7 +166,8 @@ function initialize_toy_problem_3(;verbose=false)
     add_operation!(project_spec,construct_operation(project_spec,-1,[3],  [], 0.0))
     assignments = [1,2,3]
 
-    project_spec, problem_spec, object_ICs, object_FCs, robot_ICs = construct_task_graphs_problem(project_spec,r0,s0,sF,dist_matrix,Δt_collect,Δt_deliver)
+    project_spec, problem_spec, object_ICs, object_FCs, robot_ICs = construct_task_graphs_problem(
+        project_spec,r0,s0,sF,dist_matrix,Δt_collect,Δt_deliver)
     if verbose
         problem_description = """
 
@@ -275,7 +278,7 @@ function initialize_toy_problem_5(;verbose=false)
 
     project_spec, problem_spec, object_ICs, object_FCs, robot_ICs = construct_task_graphs_problem(project_spec,r0,s0,sF,dist_matrix)
     if verbose
-        problem_description = 
+        problem_description =
         """
 
         #### TOY PROBLEM 5 ####
@@ -310,7 +313,7 @@ function initialize_toy_problem_6(;verbose=false,Δt_op=1,Δt_collect=[0,0,0],Δ
     env_graph = initialize_grid_graph_from_vtx_grid(vtx_grid)
     dist_matrix = get_dist_matrix(env_graph)
     r0 = [1,4]
-    s0 = [5,8,13]
+    s0 = [5,12,13]
     sF = [9,32,17]
 
     object_ICs = Dict{Int,OBJECT_AT}(o => OBJECT_AT(o,s0[o]) for o in 1:M) # initial_conditions
@@ -401,7 +404,7 @@ function initialize_toy_problem_8(;verbose=false,Δt_op=0,Δt_collect=[0,0,0,0],
     add_operation!(project_spec,construct_operation(project_spec,-1,[4],[],Δt_op))
     add_operation!(project_spec,construct_operation(project_spec,-1,[3],[],Δt_op))
     assignments = [1,2,3,4]
-    
+
     project_spec, problem_spec, object_ICs, object_FCs, robot_ICs = construct_task_graphs_problem(project_spec,r0,s0,sF,dist_matrix,Δt_collect,Δt_deliver)
 
     if verbose
@@ -445,7 +448,7 @@ function initialize_toy_problem_9(;verbose=false,Δt_op=0,Δt_collect=[0,0],Δt_
     if verbose
         print_toy_problem_specs("""
             TOY PROBLEM 9
-            
+
             Project with station-sharing. Station 5 needs to accessed by both robots for picking up their objects.
             """,vtx_grid,r0,s0,sF,project_spec,problem_spec.graph)
     end

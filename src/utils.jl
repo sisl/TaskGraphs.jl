@@ -199,6 +199,13 @@ end
         `weights` - a vector of weights that determines the contribution of each
             root_node to the objective
         `optimizer` - a JuMP optimizer (e.g., Gurobi.optimizer)
+    Keyword Args:
+        `TimeLimit=100`
+        `OutputFlag=0`
+        `assignments=Dict{Int64,Int64}()` - maps robot id to assignment that must be
+            enforced
+        `cost_model=:MakeSpan` - optimization objective, either `:MakeSpan` or
+            `:SumOfMakeSpans`
 
     Outputs:
         `model` - the optimization model
@@ -206,6 +213,7 @@ end
 function formulate_JuMP_optimization_problem(G,Drs,Dss,Δt,Δt_collect,Δt_deliver,to0_,tr0_,root_nodes,weights,s0,sF,optimizer;
     TimeLimit=100,
     OutputFlag=0,
+    assignments=Dict{Int64,Int64}(),
     cost_model=:MakeSpan
     )
 
@@ -233,6 +241,10 @@ function formulate_JuMP_optimization_problem(G,Drs,Dss,Δt,Δt_collect,Δt_deliv
     for (j,t) in to0_
         # start time for task j (applies only to tasks with no prereqs)
         @constraint(model, to0[j] == t)
+    end
+    for (i,j) in assignments
+        # start time for task j (applies only to tasks with no prereqs)
+        @constraint(model, x[i,j] == 1)
     end
     # constraints
     Mm = sum(Drs) + sum(Dss) # for big-M constraints
@@ -576,8 +588,10 @@ function construct_task_graphs_problem(
     for i in 1:N
         tr0_[i] = 0.0
     end
+    @show root_node_groups = map(v->get_input_ids(project_spec.operations[v]),collect(project_spec.root_nodes))
     problem_spec = TaskGraphProblemSpec(N=N,M=M,graph=G,D=dist_matrix,Drs=Drs,
         Dss=Dss,Δt=Δt,tr0_=tr0_,to0_=to0_,Δt_collect=Δt_collect,Δt_deliver=Δt_deliver,s0=s0,sF=sF)
+    @show problem_spec.root_nodes
     return project_spec, problem_spec, object_ICs, object_FCs, robot_ICs
 end
 
@@ -757,226 +771,226 @@ function get_display_metagraph(project_schedule::ProjectSchedule;
 end
 
 ###### Custom Solver Tools
-export
-    FeasibleAssignmentTable,
-    get_feasible_assignments,
-    add_constraint!,
-    SearchCache,
-    get_branch_id,
-    is_feasible,
-    construct_solution_graph,
-    process_solution,
-    process_solution_fast,
-    solve_task_graph,
-    solve_task_graphs_problem
-
-"""
-    `FeasibleAssignmentTable`
-
-    Maps task id to the ids of LEGAL robot assignments
-"""
-struct FeasibleAssignmentTable
-    arr::Matrix{Bool}
-end
-function FeasibleAssignmentTable(M::Int,N::Int)
-    FeasibleAssignmentTable(
-        fill!(Matrix{Bool}(undef,N+M,M),true)
-    )
-end
-function get_feasible_assignments(table::FeasibleAssignmentTable, v::Int)
-    [i for (i, flag) in enumerate(table.arr[:,v]) if flag==true]
-end
-
-"""
-    `add_constraint!(table::FeasibleAssignmentTable, i::Int, j::Int)`
-
-    specify that robot `i` is not allowed to perform task `j`
-"""
-function add_constraint!(table::FeasibleAssignmentTable, i::Int, j::Int)
-    table.arr[i,j] = false
-end
-
-struct SearchCache
-    x           ::Matrix{Int}
-    to0         ::Vector{Float64}
-    tof         ::Vector{Float64}
-    tr0         ::Vector{Float64}
-    slack       ::Vector{Float64}
-    local_slack ::Vector{Float64}
-    FT          ::FeasibleAssignmentTable
-end
-function SearchCache(N::Int,M::Int,to0_::Dict{Int,Float64},tr0_::Dict{Int,Float64})
-    cache = SearchCache(
-        zeros(Int,N+M,M),
-        zeros(M),
-        zeros(M),
-        Inf*ones(N+M),
-        zeros(M),
-        zeros(M),
-        FeasibleAssignmentTable(M,N)
-    )
-    # initial conditions
-    for (i,t) in tr0_
-        cache.tr0[i] = t # start time for robot i
-    end
-    for (j,t) in to0_
-        cache.to0[j] = t # start time for task j (leaf tasks only)
-    end
-    cache
-end
-function SearchCache(spec::TaskGraphProblemSpec)
-    SearchCache(spec.N,spec.M,spec.to0_,spec.tr0_)
-end
-function get_branch_id(cache::SearchCache,mode=1)
-    if mode == 1
-        M = length(cache.to0)
-        i = argmax(cache.x * ones(M))
-    elseif mode == 2
-        M = length(cache.to0)
-        for j in 1:M
-            if sum(cache.x[j,:]) > 1
-                i = argmin(cache.x[j,:] .* cache.slack)
-                return i
-            end
-        end
-    end
-    i
-end
-function is_feasible(cache::SearchCache)
-    M = length(cache.to0)
-    rank(cache.x) == M
-end
-
-# solution graph encodes dependencies between robots and tasks too
-"""
-    `construct_solution_graph(G,assignment)`
-
-    Constructs a graph wherein all robots and tasks are represented by vertices,
-    and edges go from prereqs to their children.If robot i is responsible
-    for task j, there is an edge from robot i to task j. If task j must be
-    completed before task k, there is an edge from task j to task k)
-"""
-function construct_solution_graph(G,assignment)
-    M = nv(G)
-    N = size(assignment,1) - M
-    solution_graph = deepcopy(G)
-    for j in vertices(solution_graph)
-        set_prop!(solution_graph,j,:vtype,:task)
-        set_prop!(solution_graph,j,:text,string("T",j))
-        set_prop!(solution_graph,j,:color,"cyan")
-    end
-    for i in 1:N+M
-        add_vertex!(solution_graph)
-        set_prop!(solution_graph,nv(solution_graph),:vtype,:robot)
-        set_prop!(solution_graph,nv(solution_graph),:text,string("R",i))
-        set_prop!(solution_graph,nv(solution_graph),:color,"orange")
-    end
-    for i in 1:N+M
-        for j in 1:M
-            if assignment[i,j] == 1
-                add_edge!(solution_graph,M+i,j) # robot i -> task j
-                add_edge!(solution_graph,j,M+j+N) # task j -> dummy robot j+N
-            end
-        end
-    end
-    solution_graph
-end
-
-"""
-    `process_solution(cache::SearchCache,spec::TaskGraphProblemSpec,bfs_traversal)`
-
-    given a cache whose assignment matrix is feasible, compute the start and end times
-    of the robots and tasks, as well as the slack.
-"""
-function process_solution(model,cache::SearchCache,spec::TaskGraphProblemSpec)
-    Drs, Dss, Δt, N, G = spec.Drs, spec.Dss, spec.Δt, spec.N, spec.graph
-    solution_graph = construct_solution_graph(G,cache.x)
-    traversal = topological_sort_by_dfs(solution_graph)
-    # Compute Lower Bounds Via Forward Dynamic Programming pass
-    for v in traversal
-        if get_prop(solution_graph,v,:vtype) == :task
-            for v2 in inneighbors(G,v)
-                cache.to0[v] = max(cache.to0[v], cache.tof[v2] + Δt[v])
-            end
-            xi = findfirst(cache.x[:,v] .== 1)
-            tro0 = cache.tr0[xi] + Drs[xi,v]
-            cache.tof[v] = max(cache.to0[v], tro0) + Dss[v,v]
-            cache.tr0[v+N] = cache.tof[v]
-        elseif get_prop(solution_graph,v,:vtype) == :robot
-        end
-    end
-    # Compute Slack Via Backward Dynamic Programming pass
-    for v in reverse(traversal)
-        if get_prop(solution_graph,v,:vtype) == :task
-            for v2 in inneighbors(G,v)
-                if get_prop(solution_graph,v2,:vtype) == :task
-                    cache.local_slack[v2] = cache.to0[v] - cache.tof[v2]
-                    cache.slack[v2]       = cache.slack[v] + cache.local_slack[v2]
-                end
-            end
-        end
-    end
-    for v in reverse(topological_sort_by_dfs(G))
-        for v2 in inneighbors(G,v)
-            cache.local_slack[v2] = cache.to0[v] - cache.tof[v2]
-            cache.slack[v2]       = cache.slack[v] + cache.local_slack[v2]
-        end
-    end
-    cache
-end
-
-"""
-    `process_solution_fast(cache::SearchCache,spec::TaskGraphProblemSpec,bfs_traversal)`
-
-    given a cache whose assignment matrix is feasible, compute the start and end times
-    of the robots and tasks, as well as the slack. Identical to `process_solution`,
-    except that `process_solution_fast` pulls `to0`, `tof` and `tr0` directly
-    from the optimization model.
-"""
-function process_solution_fast(model,cache::SearchCache,spec::TaskGraphProblemSpec)
-    Drs, Dss, Δt, N, G = spec.Drs, spec.Dss, spec.Δt, spec.N, spec.graph
-    cache.tr0[:] = value.(model[:tr0])
-    cache.to0[:] = value.(model[:to0])
-    cache.tof[:] = value.(model[:tof])
-    for v in reverse(topological_sort_by_dfs(G))
-        for v2 in inneighbors(G,v)
-            cache.local_slack[v2] = cache.to0[v] - cache.tof[v2]
-            cache.slack[v2]       = cache.slack[v] + cache.local_slack[v2]
-        end
-    end
-    cache
-end
-
-function solve_task_graph(cache::SearchCache,spec::TaskGraphProblemSpec,bfs_traversal)
-    Drs, Dss, Δt, N, G = spec.Drs, spec.Dss, spec.Δt, spec.N, spec.graph
-    # Compute Lower Bounds Via Forward Dynamic Programming pass
-    for v in bfs_traversal
-        cache.x[:,v] .= 0
-        for v2 in inneighbors(G,v)
-            cache.to0[v] = max(cache.to0[v], cache.tof[v2] + Δt[v])
-        end
-        r_idxs = get_feasible_assignments(cache.FT,v) # valid robot indices for this task
-        tro0 = Inf
-        xi = 0
-        for i in r_idxs
-            if cache.tr0[i] + Drs[i,v] < tro0
-                xi = i
-                tro0 = cache.tr0[i] + Drs[i,v]
-            end
-        end
-        cache.x[xi,v] = 1
-        cache.tof[v] = max(cache.to0[v], tro0) + Dss[v,v]
-        cache.tr0[v+N] = cache.tof[v]
-    end
-    # Compute Slack Via Backward Dynamic Programming pass
-    for v in reverse(bfs_traversal)
-        for v2 in inneighbors(G,v)
-            cache.local_slack[v2] = cache.to0[v] - cache.tof[v2]
-            cache.slack[v2]       = cache.slack[v] + cache.local_slack[v2]
-        end
-    end
-    cache
-end
+# export
+#     FeasibleAssignmentTable,
+#     get_feasible_assignments,
+#     add_constraint!,
+#     SearchCache,
+#     get_branch_id,
+#     is_feasible,
+#     construct_solution_graph,
+#     process_solution,
+#     process_solution_fast,
+#     solve_task_graph,
+#     solve_task_graphs_problem
+#
+# """
+#     `FeasibleAssignmentTable`
+#
+#     Maps task id to the ids of LEGAL robot assignments
+# """
+# struct FeasibleAssignmentTable
+#     arr::Matrix{Bool}
+# end
+# function FeasibleAssignmentTable(M::Int,N::Int)
+#     FeasibleAssignmentTable(
+#         fill!(Matrix{Bool}(undef,N+M,M),true)
+#     )
+# end
+# function get_feasible_assignments(table::FeasibleAssignmentTable, v::Int)
+#     [i for (i, flag) in enumerate(table.arr[:,v]) if flag==true]
+# end
+#
+# """
+#     `add_constraint!(table::FeasibleAssignmentTable, i::Int, j::Int)`
+#
+#     specify that robot `i` is not allowed to perform task `j`
+# """
+# function add_constraint!(table::FeasibleAssignmentTable, i::Int, j::Int)
+#     table.arr[i,j] = false
+# end
+#
+# struct SearchCache
+#     x           ::Matrix{Int}
+#     to0         ::Vector{Float64}
+#     tof         ::Vector{Float64}
+#     tr0         ::Vector{Float64}
+#     slack       ::Vector{Float64}
+#     local_slack ::Vector{Float64}
+#     FT          ::FeasibleAssignmentTable
+# end
+# function SearchCache(N::Int,M::Int,to0_::Dict{Int,Float64},tr0_::Dict{Int,Float64})
+#     cache = SearchCache(
+#         zeros(Int,N+M,M),
+#         zeros(M),
+#         zeros(M),
+#         Inf*ones(N+M),
+#         zeros(M),
+#         zeros(M),
+#         FeasibleAssignmentTable(M,N)
+#     )
+#     # initial conditions
+#     for (i,t) in tr0_
+#         cache.tr0[i] = t # start time for robot i
+#     end
+#     for (j,t) in to0_
+#         cache.to0[j] = t # start time for task j (leaf tasks only)
+#     end
+#     cache
+# end
+# function SearchCache(spec::TaskGraphProblemSpec)
+#     SearchCache(spec.N,spec.M,spec.to0_,spec.tr0_)
+# end
+# function get_branch_id(cache::SearchCache,mode=1)
+#     if mode == 1
+#         M = length(cache.to0)
+#         i = argmax(cache.x * ones(M))
+#     elseif mode == 2
+#         M = length(cache.to0)
+#         for j in 1:M
+#             if sum(cache.x[j,:]) > 1
+#                 i = argmin(cache.x[j,:] .* cache.slack)
+#                 return i
+#             end
+#         end
+#     end
+#     i
+# end
+# function is_feasible(cache::SearchCache)
+#     M = length(cache.to0)
+#     rank(cache.x) == M
+# end
+#
+# # solution graph encodes dependencies between robots and tasks too
+# """
+#     `construct_solution_graph(G,assignment)`
+#
+#     Constructs a graph wherein all robots and tasks are represented by vertices,
+#     and edges go from prereqs to their children.If robot i is responsible
+#     for task j, there is an edge from robot i to task j. If task j must be
+#     completed before task k, there is an edge from task j to task k)
+# """
+# function construct_solution_graph(G,assignment)
+#     M = nv(G)
+#     N = size(assignment,1) - M
+#     solution_graph = deepcopy(G)
+#     for j in vertices(solution_graph)
+#         set_prop!(solution_graph,j,:vtype,:task)
+#         set_prop!(solution_graph,j,:text,string("T",j))
+#         set_prop!(solution_graph,j,:color,"cyan")
+#     end
+#     for i in 1:N+M
+#         add_vertex!(solution_graph)
+#         set_prop!(solution_graph,nv(solution_graph),:vtype,:robot)
+#         set_prop!(solution_graph,nv(solution_graph),:text,string("R",i))
+#         set_prop!(solution_graph,nv(solution_graph),:color,"orange")
+#     end
+#     for i in 1:N+M
+#         for j in 1:M
+#             if assignment[i,j] == 1
+#                 add_edge!(solution_graph,M+i,j) # robot i -> task j
+#                 add_edge!(solution_graph,j,M+j+N) # task j -> dummy robot j+N
+#             end
+#         end
+#     end
+#     solution_graph
+# end
+#
+# """
+#     `process_solution(cache::SearchCache,spec::TaskGraphProblemSpec,bfs_traversal)`
+#
+#     given a cache whose assignment matrix is feasible, compute the start and end times
+#     of the robots and tasks, as well as the slack.
+# """
+# function process_solution(model,cache::SearchCache,spec::TaskGraphProblemSpec)
+#     Drs, Dss, Δt, N, G = spec.Drs, spec.Dss, spec.Δt, spec.N, spec.graph
+#     solution_graph = construct_solution_graph(G,cache.x)
+#     traversal = topological_sort_by_dfs(solution_graph)
+#     # Compute Lower Bounds Via Forward Dynamic Programming pass
+#     for v in traversal
+#         if get_prop(solution_graph,v,:vtype) == :task
+#             for v2 in inneighbors(G,v)
+#                 cache.to0[v] = max(cache.to0[v], cache.tof[v2] + Δt[v])
+#             end
+#             xi = findfirst(cache.x[:,v] .== 1)
+#             tro0 = cache.tr0[xi] + Drs[xi,v]
+#             cache.tof[v] = max(cache.to0[v], tro0) + Dss[v,v]
+#             cache.tr0[v+N] = cache.tof[v]
+#         elseif get_prop(solution_graph,v,:vtype) == :robot
+#         end
+#     end
+#     # Compute Slack Via Backward Dynamic Programming pass
+#     for v in reverse(traversal)
+#         if get_prop(solution_graph,v,:vtype) == :task
+#             for v2 in inneighbors(G,v)
+#                 if get_prop(solution_graph,v2,:vtype) == :task
+#                     cache.local_slack[v2] = cache.to0[v] - cache.tof[v2]
+#                     cache.slack[v2]       = cache.slack[v] + cache.local_slack[v2]
+#                 end
+#             end
+#         end
+#     end
+#     for v in reverse(topological_sort_by_dfs(G))
+#         for v2 in inneighbors(G,v)
+#             cache.local_slack[v2] = cache.to0[v] - cache.tof[v2]
+#             cache.slack[v2]       = cache.slack[v] + cache.local_slack[v2]
+#         end
+#     end
+#     cache
+# end
+#
+# """
+#     `process_solution_fast(cache::SearchCache,spec::TaskGraphProblemSpec,bfs_traversal)`
+#
+#     given a cache whose assignment matrix is feasible, compute the start and end times
+#     of the robots and tasks, as well as the slack. Identical to `process_solution`,
+#     except that `process_solution_fast` pulls `to0`, `tof` and `tr0` directly
+#     from the optimization model.
+# """
+# function process_solution_fast(model,cache::SearchCache,spec::TaskGraphProblemSpec)
+#     Drs, Dss, Δt, N, G = spec.Drs, spec.Dss, spec.Δt, spec.N, spec.graph
+#     cache.tr0[:] = value.(model[:tr0])
+#     cache.to0[:] = value.(model[:to0])
+#     cache.tof[:] = value.(model[:tof])
+#     for v in reverse(topological_sort_by_dfs(G))
+#         for v2 in inneighbors(G,v)
+#             cache.local_slack[v2] = cache.to0[v] - cache.tof[v2]
+#             cache.slack[v2]       = cache.slack[v] + cache.local_slack[v2]
+#         end
+#     end
+#     cache
+# end
+#
+# function solve_task_graph(cache::SearchCache,spec::TaskGraphProblemSpec,bfs_traversal)
+#     Drs, Dss, Δt, N, G = spec.Drs, spec.Dss, spec.Δt, spec.N, spec.graph
+#     # Compute Lower Bounds Via Forward Dynamic Programming pass
+#     for v in bfs_traversal
+#         cache.x[:,v] .= 0
+#         for v2 in inneighbors(G,v)
+#             cache.to0[v] = max(cache.to0[v], cache.tof[v2] + Δt[v])
+#         end
+#         r_idxs = get_feasible_assignments(cache.FT,v) # valid robot indices for this task
+#         tro0 = Inf
+#         xi = 0
+#         for i in r_idxs
+#             if cache.tr0[i] + Drs[i,v] < tro0
+#                 xi = i
+#                 tro0 = cache.tr0[i] + Drs[i,v]
+#             end
+#         end
+#         cache.x[xi,v] = 1
+#         cache.tof[v] = max(cache.to0[v], tro0) + Dss[v,v]
+#         cache.tr0[v+N] = cache.tof[v]
+#     end
+#     # Compute Slack Via Backward Dynamic Programming pass
+#     for v in reverse(bfs_traversal)
+#         for v2 in inneighbors(G,v)
+#             cache.local_slack[v2] = cache.to0[v] - cache.tof[v2]
+#             cache.slack[v2]       = cache.slack[v] + cache.local_slack[v2]
+#         end
+#     end
+#     cache
+# end
 
 # """
 #     `solve_task_graphs_problem(G,Drs,Dss,Δt)`

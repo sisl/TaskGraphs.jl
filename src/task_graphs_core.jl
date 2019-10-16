@@ -66,6 +66,7 @@ export
     pre_deps::Dict{Int,Set{Int}}  = Dict{Int,Set{Int}}() # id => (pre_conditions)
     post_deps::Dict{Int,Set{Int}} = Dict{Int,Set{Int}}()
     graph::G                      = MetaDiGraph()
+    root_nodes::Set{Int}          = Set{Int}()
     M::Int                        = length(initial_conditions)
     weight::Float64               = 1.0
 end
@@ -113,6 +114,8 @@ function add_operation!(task_graph::ProjectSpec, op::Operation)
             add_edge!(G, op0_id, op_id)
         end
     end
+    union!(task_graph.root_nodes, get_all_root_nodes(task_graph.graph))
+    intersect!(task_graph.root_nodes, get_all_root_nodes(task_graph.graph))
     task_graph
 end
 function construct_operation(spec::ProjectSpec, station_id, input_ids, output_ids, Δt)
@@ -574,12 +577,16 @@ function construct_project_schedule(
         operation_id = OperationID(get_num_operations(schedule) + 1)
         add_to_schedule!(schedule, problem_spec, op, operation_id)
         v = nv(get_graph(schedule))
-        for object_id in get_input_ids(op)
-            if object_id in problem_spec.root_nodes
-                push!(schedule.root_nodes, v)
-                schedule.weights[v] = problem_spec.weights[object_id]
-            end
+        if op_vtx in project_spec.root_nodes
+            push!(schedule.root_nodes, v)
+            schedule.weights[v] = 1.0 # project_spec.weights[object_id]
         end
+        # for object_id in get_input_ids(op)
+        #     if object_id in problem_spec.root_nodes
+        #         push!(schedule.root_nodes, v)
+        #         schedule.weights[v] = problem_spec.weights[object_id]
+        #     end
+        # end
         for object_id in get_input_ids(op)
             # add action sequence
             robot_id = assignments[object_id]
@@ -691,7 +698,7 @@ function process_schedule(schedule::P; t0=zeros(Int,get_num_vtxs(schedule)),
         tF=zeros(Int,get_num_vtxs(schedule))
     ) where {P<:ProjectSchedule}
 
-    solution_graph = schedule.graph
+    solution_graph = get_graph(schedule)
     traversal = topological_sort_by_dfs(solution_graph)
     n_roots = length(schedule.root_nodes)
     slack = map(i->Inf*ones(n_roots), vertices(solution_graph))
