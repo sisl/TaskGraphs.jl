@@ -11,10 +11,6 @@ using ..PlanningPredicates
 using ..TaskGraphsCore
 
 export
-    # get_root_node,
-    # get_bfs_node_traversal,
-    # get_all_root_nodes,
-    # get_bfs_traversal,
     initialize_random_2D_task_graph_env,
     get_random_problem_instantiation,
     cached_pickup_and_delivery_distances,
@@ -26,56 +22,6 @@ export
     construct_random_task_graphs_problem,
     combine_project_specs,
     compute_lower_time_bound
-
-# """
-#     `get_root_node(G,v=1)`
-# """
-# function get_root_node(G,v=1)
-#     node_list = map(e->e.dst, collect(edges(dfs_tree(G,v))))
-#     root_node = get(node_list, length(node_list), v)
-# end
-# """
-#     `get_bfs_node_traversal(G,root_node=-1)`
-#
-#     Gets a BFS traversal beginning from a particular root node.
-# """
-# function get_bfs_node_traversal(G,root_node=-1)
-#     # root_node = map(e->e.dst, collect(edges(dfs_tree(G,1))))[end]
-#     if root_node < 0
-#         root_node = get_root_node(G)
-#     end
-#     bfs_traversal = map(e->e.dst, collect(edges(bfs_tree(G,root_node;dir=:in))))
-#     append!(bfs_traversal, root_node)
-#     bfs_traversal
-# end
-# """
-#     `get_all_root_nodes(G)`
-# """
-# function get_all_root_nodes(G)
-#     frontier = Set{Int}(collect(vertices(G)))
-#     root_nodes = Set{Int}()
-#     while length(frontier) > 0
-#         v = pop!(frontier)
-#         root_node = get_root_node(G,v)
-#         for v2 in get_bfs_node_traversal(G,root_node)
-#             setdiff!(frontier, v2)
-#         end
-#         push!(root_nodes, root_node)
-#     end
-#     return root_nodes
-# end
-# """
-#     `get_bfs_traversal(G)`
-#
-#     Returns a full bfs traversal, even if the graph is disjoint
-# """
-# function get_bfs_traversal(G)
-#     traversal = Vector{Int}()
-#     for v in get_all_root_nodes(G)
-#         traversal = [traversal..., get_bfs_node_traversal(G,v)...]
-#     end
-#     traversal
-# end
 
 """
     `cached_pickup_and_delivery_distances(r₀,oₒ,sₒ,dist=(x1,x2)->norm(x2-x1,1))`
@@ -319,7 +265,14 @@ function formulate_JuMP_optimization_problem(G,Drs,Dss,Δt,Δt_collect,Δt_deliv
     end
     # cost depends only on root node(s)
     if cost_model == :SumOfMakeSpans
-        @objective(model, Min, sum(map(v->tof[v]*get(weights,v,0.0), root_nodes)))
+        @variable(model, T[1:length(root_nodes)])
+        for (i,project_head) in enumerate(root_nodes)
+            for v in project_head
+                @constraint(model, T[i] >= tof[v])
+            end
+        end
+        @objective(model, Min, sum(map(i->T[i]*get(weights,i,0.0), 1:length(root_nodes))))
+        # @objective(model, Min, sum(map(v->tof[v]*get(weights,v,0.0), root_nodes)))
     elseif cost_model == :MakeSpan
         @variable(model, T)
         @constraint(model, T .>= tof)
@@ -588,10 +541,11 @@ function construct_task_graphs_problem(
     for i in 1:N
         tr0_[i] = 0.0
     end
-    @show root_node_groups = map(v->get_input_ids(project_spec.operations[v]),collect(project_spec.root_nodes))
+    root_node_groups = map(v->get_input_ids(project_spec.operations[v]),collect(project_spec.root_nodes))
     problem_spec = TaskGraphProblemSpec(N=N,M=M,graph=G,D=dist_matrix,Drs=Drs,
-        Dss=Dss,Δt=Δt,tr0_=tr0_,to0_=to0_,Δt_collect=Δt_collect,Δt_deliver=Δt_deliver,s0=s0,sF=sF)
-    @show problem_spec.root_nodes
+        Dss=Dss,Δt=Δt,tr0_=tr0_,to0_=to0_,root_nodes=root_node_groups,
+        Δt_collect=Δt_collect,Δt_deliver=Δt_deliver,s0=s0,sF=sF)
+    # @show problem_spec.root_nodes
     return project_spec, problem_spec, object_ICs, object_FCs, robot_ICs
 end
 

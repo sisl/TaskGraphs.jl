@@ -1,7 +1,27 @@
 # Root nodes
 let
+    # This project has only two delivery tasks, both of which converge into a
+    # single final project. Here we test that the cost models function correctly,
+    # treating the tasks as part of the same project head rather than as two
+    # separate project heads.
     project_spec, problem_spec, robot_ICs, assignments, env_graph = initialize_toy_problem_4(;
         verbose=false);
+    let
+        model = formulate_JuMP_optimization_problem(problem_spec,Gurobi.Optimizer;cost_model=:MakeSpan)
+        optimize!(model)
+        optimal = (termination_status(model) == MathOptInterface.OPTIMAL)
+        optimal_TA_cost = Int(round(value(objective_function(model))));
+        @test optimal == true
+        @test optimal_TA_cost == 2
+    end
+    let
+        model = formulate_JuMP_optimization_problem(problem_spec,Gurobi.Optimizer;cost_model=:SumOfMakeSpans)
+        optimize!(model)
+        optimal = (termination_status(model) == MathOptInterface.OPTIMAL)
+        optimal_TA_cost = Int(round(value(objective_function(model))));
+        @test optimal == true
+        @test optimal_TA_cost == 2
+    end
 end
 # Cost models
 let

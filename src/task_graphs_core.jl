@@ -37,8 +37,8 @@ export
     Δt_deliver::Vector{Float64} = zeros(M) # duration of DELIVER operations
     tr0_::Dict{Int,Float64} = Dict{Int,Float64}() # robot start times
     to0_::Dict{Int,Float64} = Dict{Int,Float64}() # object start times
-    root_nodes::Vector{Int} = sort(collect(get_all_root_nodes(graph)))
-    weights::Dict{Int,Float64} = Dict{Int,Float64}(v=>1.0 for v in root_nodes)
+    root_nodes::Vector{Set{Int}} = [get_all_root_nodes(graph)]
+    weights::Dict{Int,Float64} = Dict{Int,Float64}(v=>1.0 for v in 1:length(root_nodes))
     s0::Vector{Int} = zeros(M) # pickup stations for each task
     sF::Vector{Int} = zeros(M) # delivery station for each task
 end
@@ -67,6 +67,7 @@ export
     post_deps::Dict{Int,Set{Int}} = Dict{Int,Set{Int}}()
     graph::G                      = MetaDiGraph()
     root_nodes::Set{Int}          = Set{Int}()
+    weights::Dict{Int,Float64}    = Dict{Int,Float64}(v->1.0 for v in root_nodes)
     M::Int                        = length(initial_conditions)
     weight::Float64               = 1.0
 end
@@ -579,7 +580,7 @@ function construct_project_schedule(
         v = nv(get_graph(schedule))
         if op_vtx in project_spec.root_nodes
             push!(schedule.root_nodes, v)
-            schedule.weights[v] = 1.0 # project_spec.weights[object_id]
+            schedule.weights[v] = get(project_spec.weights, op_vtx, 1.0)
         end
         # for object_id in get_input_ids(op)
         #     if object_id in problem_spec.root_nodes
