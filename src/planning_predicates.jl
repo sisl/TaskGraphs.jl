@@ -68,19 +68,18 @@ ROBOT_AT(r::Int,s::Int) = ROBOT_AT(RobotID(r),StationID(s))
 get_robot_id(pred::ROBOT_AT) = pred.r
 get_location_id(pred::ROBOT_AT) = pred.s
 
-# struct CAN_CARRY <: AbstractPlanningPredicate
-#     r::RobotID
-#     o::ObjectID
-# end
-# get_robot_id(pred::CAN_CARRY) = pred.r
-# get_object_id(pred::CAN_CARRY) = pred.o
+struct CAN_CARRY <: AbstractPlanningPredicate
+    r::RobotID
+    o::ObjectID
+end
+get_robot_id(pred::CAN_CARRY) = pred.r
+get_object_id(pred::CAN_CARRY) = pred.o
 
 export
     AbstractRobotAction,
     GO,COLLECT,CARRY,DEPOSIT,
 	get_initial_location_id, get_destination_location_id
 
-# robot actions
 abstract type AbstractRobotAction end
 get_robot_id(a::A) where {A<:AbstractRobotAction} = a.r
 
@@ -94,29 +93,27 @@ GO(r::Int,x1::Int,x2::Int) = GO(RobotID(r),StationID(x1),StationID(x2))
 struct CARRY <: AbstractRobotAction # carry object o to position x
     r::RobotID
     o::ObjectID
-    # x::StationID
     x1::StationID
     x2::StationID
 end
 CARRY(r::Int,o::Int,x1::Int,x2::Int) = CARRY(RobotID(r),ObjectID(o),StationID(x1),StationID(x2))
 
-get_initial_location_id(a::A) where {A<:Union{GO,CARRY}}        = a.x1
-get_destination_location_id(a::A) where {A<:Union{GO,CARRY}}    = a.x2
-
-struct COLLECT <: AbstractRobotAction # collect object o
+struct COLLECT <: AbstractRobotAction
     r::RobotID
     o::ObjectID
     x::StationID
 end
 COLLECT(r::Int,o::Int,x::Int) = COLLECT(RobotID(r),ObjectID(o),StationID(x))
 
-struct DEPOSIT <: AbstractRobotAction # deposit object o
+struct DEPOSIT <: AbstractRobotAction
     r::RobotID
     o::ObjectID
     x::StationID
 end
 DEPOSIT(r::Int,o::Int,x::Int) = DEPOSIT(RobotID(r),ObjectID(o),StationID(x))
 
+get_initial_location_id(a::A) where {A<:Union{GO,CARRY}}        	= a.x1
+get_destination_location_id(a::A) where {A<:Union{GO,CARRY}}    	= a.x2
 get_location_id(a::A) where {A<:Union{COLLECT,DEPOSIT}}             = a.x
 get_initial_location_id(a::A) where {A<:Union{COLLECT,DEPOSIT}}     = a.x
 get_destination_location_id(a::A) where {A<:Union{COLLECT,DEPOSIT}} = a.x
@@ -141,8 +138,8 @@ delete_conditions(a::MOVE) = Set{AbstractPlanningPredicate}([
 struct TAKE <: AbstractPlanningAction
     r::RobotID
     o::ObjectID
-    s1::StationID # from
-    s2::StationID # to
+    s1::StationID
+    s2::StationID
 end
 preconditions(a::TAKE) = Set{AbstractPlanningPredicate}([
         CAN_CARRY(a.r,a.o),
@@ -158,7 +155,6 @@ delete_conditions(a::TAKE) = Set{AbstractPlanningPredicate}([
         OBJECT_AT(a.o,a.s1)
         ])
 
-
 export
     Operation,
     get_object_id,
@@ -171,15 +167,14 @@ export
     pre::Set{OBJECT_AT}     = Set{OBJECT_AT}()
     post::Set{OBJECT_AT}    = Set{OBJECT_AT}()
     Δt::Int 				= 0
-    # Δt::Float64             = 0
     station_id::StationID   = StationID(-1)
 end
 get_location_id(op::Operation) = op.station_id
 duration(op::Operation) = op.Δt
 preconditions(op::Operation) = op.pre
 postconditions(op::Operation) = op.post
-
-
+add_conditions(op::Operation) = op.post
+delete_conditions(op::Operation) = op.pre
 
 # const Status            = Symbol
 # const Status()          = :waiting

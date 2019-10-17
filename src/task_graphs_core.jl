@@ -254,6 +254,7 @@ export
 @with_kw struct PathSpec
     # element             ::T             = nothing
     # op_duration         ::Int           = 0 # time between end of predecessor and start of current
+    node_type           ::Symbol        = :EMPTY
     start_vtx           ::Int           = -1
     final_vtx           ::Int           = -1
     min_path_duration   ::Int           =  0 # duration
@@ -261,7 +262,7 @@ export
     agent_id            ::Int           = -1
     dummy_id            ::Int           = -1
     path_id             ::Int           = -1
-    # object_id           ::Int           = -1
+    object_id           ::Int           = -1
     # slack               ::Int           = 0.0
     # deadline            ::Int           = 0.0
 end
@@ -309,9 +310,6 @@ export
     actions             ::Dict{Int,AbstractRobotAction} = Dict{Int,AbstractRobotAction}()
     operations          ::Dict{Int,Operation} = Dict{Int,Operation}()
     #
-    completion_times    ::Vector{Float64} = Vector{Float64}()
-    durations           ::Vector{Float64} = Vector{Float64}()
-    completion_status   ::Vector{Bool}    = Vector{Bool}() # INACTIVE, ACTIVE, COMPLETE
     path_specs          ::Vector{PathSpec}= Vector{PathSpec}()
     #
     robot_id_map        ::Dict{Int,Int}   = Dict{Int,Int}() # maps dummy id to true id
@@ -353,22 +351,10 @@ get_num_paths(schedule::P) where {P<:ProjectSchedule}       = get_num_actions(sc
 
 get_next_path_id(schedule::P) where {P<:ProjectSchedule}    = length(schedule.path_id_to_vtx_map) + 1
 
-get_completion_time(schedule::ProjectSchedule,i::Int) = schedule.completion_times[i]
-function set_completion_time!(schedule::ProjectSchedule,i::Int,t)
-    schedule.completion_times[i] = t
-end
-get_duration(schedule::ProjectSchedule,i::Int) = schedule.durations[i]
-function set_duration!(schedule::ProjectSchedule,i::Int,t)
-    schedule.duration[i] = t
-end
-get_completion_status(schedule::ProjectSchedule,i::Int) = schedule.completion_status[i]
-function set_completion_status!(schedule::ProjectSchedule,i::Int,t)
-    schedule.completion_status[i] = t
-end
-get_path_spec(schedule::P,i::Int) where {P<:ProjectSchedule} = schedule.path_specs[i]
-function set_path_spec!(schedule::P,i::Int,spec::S) where {P<:ProjectSchedule,S<:PathSpec}
-    schedule.path_specs[i] = spec
-    schedule.path_id_to_vtx_map[spec.path_id] = i
+get_path_spec(schedule::P,v::Int) where {P<:ProjectSchedule} = schedule.path_specs[v]
+function set_path_spec!(schedule::P,v::Int,spec::S) where {P<:ProjectSchedule,S<:PathSpec}
+    schedule.path_specs[v] = spec
+    schedule.path_id_to_vtx_map[spec.path_id] = v
 end
 function add_path_spec!(schedule::P,spec::S) where {P<:ProjectSchedule,S<:PathSpec}
     push!(schedule.path_specs, spec)
@@ -404,11 +390,12 @@ end
     PathSpec provides details about the path that corresponds to this node in
     the schedule
 """
-function generate_path_spec(schedule::P,spec::T,a::A) where {P<:ProjectSchedule,T<:TaskGraphProblemSpec,A<:AbstractRobotAction}
+function generate_path_spec(schedule::P,spec::T,a::GO) where {P<:ProjectSchedule,T<:TaskGraphProblemSpec}
     s0 = get_id(get_initial_location_id(a))
     s = get_id(get_destination_location_id(a))
     r = get_id(get_robot_id(a))
     path_spec = PathSpec(
+        node_type=Symbol(typeof(a)),
         start_vtx=s0,
         final_vtx=s,
         min_path_duration=spec.D[s0,s], # TaskGraphProblemSpec distance matrix
@@ -417,18 +404,36 @@ function generate_path_spec(schedule::P,spec::T,a::A) where {P<:ProjectSchedule,
         agent_id=schedule.robot_id_map[r]
         )
 end
+function generate_path_spec(schedule::P,spec::T,a::CARRY) where {P<:ProjectSchedule,T<:TaskGraphProblemSpec}
+    s0 = get_id(get_initial_location_id(a))
+    s = get_id(get_destination_location_id(a))
+    r = get_id(get_robot_id(a))
+    o = get_id(get_object_id(a))
+    path_spec = PathSpec(
+        node_type=Symbol(typeof(a)),
+        start_vtx=s0,
+        final_vtx=s,
+        min_path_duration=spec.D[s0,s], # TaskGraphProblemSpec distance matrix
+        path_id=get_next_path_id(schedule),
+        dummy_id=r,
+        agent_id=schedule.robot_id_map[r],
+        object_id = o
+        )
+end
 function generate_path_spec(schedule::P,spec::T,a::COLLECT) where {P<:ProjectSchedule,T<:TaskGraphProblemSpec}
     s0 = get_id(get_initial_location_id(a))
     s = get_id(get_destination_location_id(a))
     r = get_id(get_robot_id(a))
     o = get_id(get_object_id(a))
     path_spec = PathSpec(
+        node_type=Symbol(typeof(a)),
         start_vtx=s0,
         final_vtx=s,
         min_path_duration=spec.Δt_collect[o],
         path_id=get_next_path_id(schedule),
         dummy_id=r,
-        agent_id=schedule.robot_id_map[r]
+        agent_id=schedule.robot_id_map[r],
+        object_id = o
         )
 end
 function generate_path_spec(schedule::P,spec::T,a::DEPOSIT) where {P<:ProjectSchedule,T<:TaskGraphProblemSpec}
@@ -437,19 +442,23 @@ function generate_path_spec(schedule::P,spec::T,a::DEPOSIT) where {P<:ProjectSch
     r = get_id(get_robot_id(a))
     o = get_id(get_object_id(a))
     path_spec = PathSpec(
+        node_type=Symbol(typeof(a)),
         start_vtx=s0,
         final_vtx=s,
         min_path_duration=spec.Δt_deliver[o],
         path_id=get_next_path_id(schedule),
         dummy_id=r,
-        agent_id=schedule.robot_id_map[r]
+        agent_id=schedule.robot_id_map[r],
+        object_id = o
         )
 end
 function generate_path_spec(schedule::P,spec::T,pred::OBJECT_AT) where {P<:ProjectSchedule,T<:TaskGraphProblemSpec}
     path_spec = PathSpec(
+        node_type=Symbol(typeof(pred)),
         start_vtx=get_id(get_location_id(pred)),
         final_vtx=get_id(get_location_id(pred)),
-        min_path_duration=0
+        min_path_duration=0,
+        object_id = get_id(get_object_id(pred))
         )
 end
 function generate_path_spec(schedule::P,spec::T,pred::ROBOT_AT) where {P<:ProjectSchedule,T<:TaskGraphProblemSpec}
@@ -459,6 +468,7 @@ function generate_path_spec(schedule::P,spec::T,pred::ROBOT_AT) where {P<:Projec
         @show schedule.robot_id_map
     end
     path_spec = PathSpec(
+        node_type=Symbol(typeof(pred)),
         start_vtx=get_id(get_location_id(pred)),
         final_vtx=get_id(get_location_id(pred)),
         min_path_duration=0,
@@ -469,6 +479,7 @@ function generate_path_spec(schedule::P,spec::T,pred::ROBOT_AT) where {P<:Projec
 end
 function generate_path_spec(schedule::P,spec::T,op::Operation) where {P<:ProjectSchedule,T<:TaskGraphProblemSpec}
     path_spec = PathSpec(
+        node_type=Symbol(typeof(op)),
         start_vtx = -1,
         final_vtx = -1,
         min_path_duration=duration(op)
@@ -542,20 +553,22 @@ end
     `construct_project_schedule`
 
     Args:
-    - `spec` - a ProjectSpec
+    - `project_spec` - a ProjectSpec
+    - `problem_spec` - a TaskGraphProblemSpec
     - `object_ICs` - a list of initial object locations
+    - `object_fCs` - a list of final object locations
     - `robot_ICs` - a list of initial robot locations
     - `assignments` - a list of robot assignments. `assignments[i] == j` means
     that robot `i` is assigned to transport object `j`
 """
 function construct_project_schedule(
-    project_spec::P,
-    problem_spec::T,
-    object_ICs::Dict{Int,OBJECT_AT},
-    object_FCs::Dict{Int,OBJECT_AT},
-    robot_ICs::Dict{Int,ROBOT_AT},
-    assignments::V=Dict{Int,Int}()
-    ) where {P<:ProjectSpec,T<:TaskGraphProblemSpec,V<:Union{Dict{Int,Int},Vector{Int}}}
+        project_spec::P,
+        problem_spec::T,
+        object_ICs::Dict{Int,OBJECT_AT},
+        object_FCs::Dict{Int,OBJECT_AT},
+        robot_ICs::Dict{Int,ROBOT_AT},
+        assignments::V=Dict{Int,Int}()
+        ) where {P<:ProjectSpec,T<:TaskGraphProblemSpec,V<:Union{Dict{Int,Int},Vector{Int}}}
     schedule = ProjectSchedule()
     populate_agent_ids!(schedule,problem_spec,assignments)
     graph = get_graph(schedule)
@@ -572,7 +585,6 @@ function construct_project_schedule(
     M = length(object_ICs) # number of objects
     N = length(robot_ICs) - M # number of robots
     # add operations to graph
-    # root_nodes = Set{Int}()
     for op_vtx in topological_sort(project_spec.graph)
         op = project_spec.operations[op_vtx]
         operation_id = OperationID(get_num_operations(schedule) + 1)
@@ -582,27 +594,24 @@ function construct_project_schedule(
             push!(schedule.root_nodes, v)
             schedule.weights[v] = get(project_spec.weights, op_vtx, 1.0)
         end
-        # for object_id in get_input_ids(op)
-        #     if object_id in problem_spec.root_nodes
-        #         push!(schedule.root_nodes, v)
-        #         schedule.weights[v] = problem_spec.weights[object_id]
-        #     end
-        # end
         for object_id in get_input_ids(op)
             # add action sequence
+            object_ic = get_object_ICs(schedule)[object_id]
+            pickup_station_id = get_id(get_location_id(object_ic))
+            object_fc = object_FCs[object_id]
+            dropoff_station_id = get_id(get_location_id(object_fc))
+
             robot_id = assignments[object_id]
             robot_pred = get_robot_ICs(schedule)[robot_id]
             robot_start_station_id = get_id(get_location_id(robot_pred))
 
-            object_ic = get_object_ICs(schedule)[object_id]
-            pickup_station_id = get_id(get_location_id(object_ic))
-
-            object_fc = object_FCs[object_id]
-            dropoff_station_id = get_id(get_location_id(object_fc))
-
+            # THIS NODE IS DETERMINED BY THE TASK ASSIGNMENT.
+            # TODO Enable "leave-it-blank" so that the incomplete project schedule
+            # can be used as an input to the MILP formulation and solver.
             action_id = ActionID(get_num_actions(schedule) + 1)
             add_to_schedule!(schedule, problem_spec, GO(robot_id, robot_start_station_id, pickup_station_id), action_id)
             add_edge!(schedule, RobotID(robot_id), action_id)
+            # END EMPTY GO NODE
 
             action_id += 1
             add_to_schedule!(schedule, problem_spec, COLLECT(robot_id, object_id, pickup_station_id), action_id)
@@ -619,13 +628,9 @@ function construct_project_schedule(
 
             add_edge!(schedule, action_id, operation_id)
             new_robot_id = object_id + N
-            # if (new_robot_id in assignments)
-            #     @show new_robot_id
             add_edge!(schedule, action_id, RobotID(new_robot_id))
-            # end
         end
         for object_id in get_output_ids(op)
-            # add_to_schedule!(schedule, object_pred, object_id)
             add_edge!(schedule, operation_id, ObjectID(object_id))
         end
     end
@@ -762,7 +767,6 @@ function add_job_shop_constraints!(schedule::P,spec::T,model::JuMP.Model) where 
     for j in 1:M
         for j2 in j+1:M
             if (s0[j] == s0[j2]) || (s0[j] == sF[j2]) || (sF[j] == s0[j2]) || (sF[j] == sF[j2])
-                # @show j, j2
                 if s0[j] == s0[j2]
                     id1, n1 = get_collect_node(schedule, ObjectID(j))
                     id2, n2 = get_collect_node(schedule, ObjectID(j2))

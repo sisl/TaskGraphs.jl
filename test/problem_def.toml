@@ -3,15 +3,19 @@ s0 = [1, 2, 3, 4, 5, 6]
 sF = [7, 8, 9, 10, 11, 12]
 
 [[operations]]
-pre = [[1, 7], [2, 8]]
+pre = [[2, 8]]
 post = [[3, 3]]
+"Δt" = 0
+[[operations]]
+pre = [[1, 7]]
+post = [[2, 2]]
 "Δt" = 0
 [[operations]]
 pre = [[3, 9]]
 post = []
 "Δt" = 0
 [[operations]]
-pre = [[5, 6], [4, 6]]
+pre = [[4, 6], [5, 6]]
 post = [[6, 6]]
 "Δt" = 0
 [[operations]]

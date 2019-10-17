@@ -11,6 +11,7 @@ using TOML
 
 include("planning_predicates.jl")
 include("task_graphs_core.jl")
+include("hierarchical_nodes.jl")
 include("utils.jl")
 include("helpers.jl")
 
