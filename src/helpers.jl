@@ -22,7 +22,7 @@ function get_zero_initial_conditions(G,N)
     # set initial conditions
     to0_ = Dict{Int,Float64}()
     for v in vertices(G)
-        if is_leaf_node(G,v)
+        if is_root_node(G,v)
             to0_[v] = 0.0
         end
     end

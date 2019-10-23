@@ -96,7 +96,7 @@ function formulate_optimization_problem(G,Drs,Dss,Δt,Δt_collect,Δt_deliver,to
     Mm = sum(Drs) + sum(Dss) # for big-M constraints
     for j in 1:M
         # constraint on task start time
-        if !is_leaf_node(G,j)
+        if !is_root_node(G,j)
             for v in inneighbors(G,j)
                 @constraint(model, to0[j] >= tof[v] + Δt[j])
             end
@@ -180,9 +180,9 @@ function formulate_optimization_problem(G,Drs,Dss,Δt,Δt_collect,Δt_deliver,to
     end
     model;
 end
-function formulate_optimization_problem(spec::TaskGraphProblemSpec,optimizer;
+function formulate_optimization_problem(spec::T,optimizer;
     kwargs...
-    )
+    ) where {T<:TaskGraphProblemSpec}
     formulate_optimization_problem(
         spec.graph,
         spec.Drs,
@@ -291,7 +291,7 @@ function construct_task_graphs_problem(
     # set initial conditions
     to0_ = Dict{Int,Float64}()
     for v in vertices(G)
-        if is_leaf_node(G,v)
+        if is_root_node(G,v)
             to0_[v] = 0.0
         end
     end

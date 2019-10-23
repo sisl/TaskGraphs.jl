@@ -51,39 +51,39 @@ abstract type AbstractLoadingZoneType end
 struct GenericLoadingZone <: AbstractLoadingZoneType end
 
 @with_kw struct PlanningResource{T} <: AbstractResource
-	id::Int 	= -1
-	rtype::T 	= GenericRobot()
+    id::Int 	= -1
+    rtype::T 	= GenericRobot()
 end
 @with_kw struct RobotResource{T<:AbstractRobotType} <: AbstractResource
-	id::Int 	= -1
-	rtype::T 	= GenericRobot()
+    id::Int 	= -1
+    rtype::T 	= GenericRobot()
 end
 @with_kw struct ObjectResource{T<:AbstractObjectType} <: AbstractResource
-	id::Int		= -1
-	rtype::T	= GenericObject()
+    id::Int		= -1
+    rtype::T	= GenericObject()
 end
 @with_kw struct LoadingZoneResource{T<:AbstractLoadingZoneType} <: AbstractResource
-	id::Int		= -1
-	rtype::T	= GenericLoadingZone()
+    id::Int		= -1
+    rtype::T	= GenericLoadingZone()
 end
 struct StationResource{T<:AbstractStationType} <: AbstractResource
-	id::Int
-	rtype::T
+    id::Int
+    rtype::T
 end
 
 get_id(r::R) where {R<:AbstractResource} = r.id
 get_type(r::R) where {R<:AbstractResource} = r.rtype
 
 function matches_resource_spec(required_type::T,required_id::Int,available::R) where {T<:DataType,R<:AbstractResource}
-	if get_type(available) <: required_type
-		if (get_id(available) == required_id) || (required_id == -1)
-			return true
-		end
-	end
-	return false
+    if get_type(available) <: required_type
+        if (get_id(available) == required_id) || (required_id == -1)
+            return true
+        end
+    end
+    return false
 end
 function matches_resource_spec(required::T,available::R) where {T<:AbstractResource,R<:AbstractResource}
-	matches_resource_spec(get_type(required),get_id(required),available)
+    matches_resource_spec(get_type(required),get_id(required),available)
 end
 
 
@@ -94,20 +94,11 @@ end
 	Defines all available resources
 """
 struct ResourceTable
-	robots::Dict{Int,RobotResource}
-	objects::Dict{Int,ObjectResource}
-	loading_zones::Dict{Int,LoadingZoneResource}
-	stations::Dict{Int,StationResource}
+    robots::Dict{Int,RobotResource}
+    objects::Dict{Int,ObjectResource}
+    loading_zones::Dict{Int,LoadingZoneResource}
+    stations::Dict{Int,StationResource}
 end
-
-
-
-struct TaskSepcification
-	inputs
-	outputs
-end
-
-
 
 
 abstract type AbstractID end
@@ -202,41 +193,61 @@ get_initial_location_id(a::A) where {A<:Union{COLLECT,DEPOSIT}}     = a.x
 get_destination_location_id(a::A) where {A<:Union{COLLECT,DEPOSIT}} = a.x
 get_object_id(a::A) where {A<:Union{CARRY,COLLECT,DEPOSIT}}         = a.o
 
-abstract type AbstractPlanningAction end
-struct MOVE <: AbstractPlanningAction
-    r::RobotID
-    s1::StationID # from
-    s2::StationID # to
-end
-preconditions(a::MOVE) = Set{AbstractPlanningPredicate}([
-        ROBOT_AT(a.r,a.s1)
-        ])
-add_conditions(a::MOVE) = Set{AbstractPlanningPredicate}([
-        ROBOT_AT(a.r,a.s2)
-        ])
-delete_conditions(a::MOVE) = Set{AbstractPlanningPredicate}([
-        ROBOT_AT(a.r,a.s1)
-        ])
+"""
+    COLLABORATE
 
-struct TAKE <: AbstractPlanningAction
-    r::RobotID
-    o::ObjectID
-    s1::StationID
-    s2::StationID
+    Collaborative action (CARRY, COLLECT, or DEPOSIT).
+
+    `robots` specifies the ordered list of robots in the team
+    `configuration` specifies their configuration relative to the object center
+    `a` provides the underlying action (CARRY, COLLECT, DEPOSIT)
+"""
+struct COLLABORATE{A} <: AbstractRobotAction
+    robots::Vector{RobotID}
+    configuration::Vector{Tuple{Int}}
+    a::A
 end
-preconditions(a::TAKE) = Set{AbstractPlanningPredicate}([
-        CAN_CARRY(a.r,a.o),
-        OBJECT_AT(a.o,a.s1),
-        ROBOT_AT(a.r,a.s1)
-        ])
-add_conditions(a::TAKE) = Set{AbstractPlanningPredicate}([
-        ROBOT_AT(a.r,a.s2),
-        OBJECT_AT(a.o,a.s2)
-        ])
-delete_conditions(a::TAKE) = Set{AbstractPlanningPredicate}([
-        ROBOT_AT(a.r,a.s1),
-        OBJECT_AT(a.o,a.s1)
-        ])
+
+get_robot_id(a::A) where {A<:COLLABORATE}                           = a.robots
+get_initial_location_id(a::A) where {A<:COLLABORATE}                = get_initial_location_id(a.a)
+get_destination_location_id(a::A) where {A<:COLLABORATE}            = get_destination_location_id(a.a)
+get_object_id(a::A) where {A<:COLLABORATE}                          = get_object_id(a.a)
+
+# abstract type AbstractPlanningAction end
+# struct MOVE <: AbstractPlanningAction
+#     r::RobotID
+#     s1::StationID # from
+#     s2::StationID # to
+# end
+# preconditions(a::MOVE) = Set{AbstractPlanningPredicate}([
+#         ROBOT_AT(a.r,a.s1)
+#         ])
+# add_conditions(a::MOVE) = Set{AbstractPlanningPredicate}([
+#         ROBOT_AT(a.r,a.s2)
+#         ])
+# delete_conditions(a::MOVE) = Set{AbstractPlanningPredicate}([
+#         ROBOT_AT(a.r,a.s1)
+#         ])
+#
+# struct TAKE <: AbstractPlanningAction
+#     r::RobotID
+#     o::ObjectID
+#     s1::StationID
+#     s2::StationID
+# end
+# preconditions(a::TAKE) = Set{AbstractPlanningPredicate}([
+#         CAN_CARRY(a.r,a.o),
+#         OBJECT_AT(a.o,a.s1),
+#         ROBOT_AT(a.r,a.s1)
+#         ])
+# add_conditions(a::TAKE) = Set{AbstractPlanningPredicate}([
+#         ROBOT_AT(a.r,a.s2),
+#         OBJECT_AT(a.o,a.s2)
+#         ])
+# delete_conditions(a::TAKE) = Set{AbstractPlanningPredicate}([
+#         ROBOT_AT(a.r,a.s1),
+#         OBJECT_AT(a.o,a.s1)
+#         ])
 
 export
     Operation,
