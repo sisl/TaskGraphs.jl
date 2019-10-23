@@ -27,6 +27,89 @@ export
     transition
 
 
+export
+	get_unique_id
+
+ID_COUNTER = 0
+get_unique_id() = Int(global ID_COUNTER += 1)
+
+""" Planning Resources (at the assignment level) """
+abstract type AbstractResource end
+abstract type ActiveResource <: AbstractResource end
+abstract type PassiveResource <: AbstractResource end
+""" Robot Types """
+abstract type AbstractRobotType end
+struct GenericRobot <: AbstractRobotType end
+""" Object Types """
+abstract type AbstractObjectType end
+struct GenericObject <: AbstractObjectType end
+""" Manufacturing Station Types """
+abstract type AbstractStationType end
+struct GenericStation <: AbstractStationType end
+""" Loading Zone Types """
+abstract type AbstractLoadingZoneType end
+struct GenericLoadingZone <: AbstractLoadingZoneType end
+
+@with_kw struct PlanningResource{T} <: AbstractResource
+	id::Int 	= -1
+	rtype::T 	= GenericRobot()
+end
+@with_kw struct RobotResource{T<:AbstractRobotType} <: AbstractResource
+	id::Int 	= -1
+	rtype::T 	= GenericRobot()
+end
+@with_kw struct ObjectResource{T<:AbstractObjectType} <: AbstractResource
+	id::Int		= -1
+	rtype::T	= GenericObject()
+end
+@with_kw struct LoadingZoneResource{T<:AbstractLoadingZoneType} <: AbstractResource
+	id::Int		= -1
+	rtype::T	= GenericLoadingZone()
+end
+struct StationResource{T<:AbstractStationType} <: AbstractResource
+	id::Int
+	rtype::T
+end
+
+get_id(r::R) where {R<:AbstractResource} = r.id
+get_type(r::R) where {R<:AbstractResource} = r.rtype
+
+function matches_resource_spec(required_type::T,required_id::Int,available::R) where {T<:DataType,R<:AbstractResource}
+	if get_type(available) <: required_type
+		if (get_id(available) == required_id) || (required_id == -1)
+			return true
+		end
+	end
+	return false
+end
+function matches_resource_spec(required::T,available::R) where {T<:AbstractResource,R<:AbstractResource}
+	matches_resource_spec(get_type(required),get_id(required),available)
+end
+
+
+
+"""
+	`ResourceTable`
+
+	Defines all available resources
+"""
+struct ResourceTable
+	robots::Dict{Int,RobotResource}
+	objects::Dict{Int,ObjectResource}
+	loading_zones::Dict{Int,LoadingZoneResource}
+	stations::Dict{Int,StationResource}
+end
+
+
+
+struct TaskSepcification
+	inputs
+	outputs
+end
+
+
+
+
 abstract type AbstractID end
 get_id(id::AbstractID) = id.id
 get_id(id::Int) = id

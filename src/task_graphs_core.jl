@@ -9,6 +9,10 @@ using TOML
 
 using ..PlanningPredicates
 
+struct TaskIDCounter
+    count::Int
+end
+
 export
     TaskGraphProblemSpec
 
@@ -67,7 +71,7 @@ export
     post_deps::Dict{Int,Set{Int}} = Dict{Int,Set{Int}}()
     graph::G                      = MetaDiGraph()
     root_nodes::Set{Int}          = Set{Int}()
-    weights::Dict{Int,Float64}    = Dict{Int,Float64}(v->1.0 for v in root_nodes)
+    weights::Dict{Int,Float64}    = Dict{Int,Float64}(v=>1.0 for v in root_nodes)
     M::Int                        = length(initial_conditions)
     weight::Float64               = 1.0
 end
@@ -634,47 +638,7 @@ function construct_project_schedule(
             add_edge!(schedule, operation_id, ObjectID(object_id))
         end
     end
-    # # process schedule
-    # t0 = zeros(Int,get_num_vtxs(schedule))
-    # for v in vertices(get_graph(schedule))
-    #     node = get_node_from_id(schedule, get_vtx_id(schedule, v))
-    #     if typeof(node) <: ROBOT_AT
-    #         r = get_id(robot_id(node))
-    #         t0[v] = get(project_spec.tr0_, r, 0)
-    #     end
-    #     if typeof(node) <: OBJECT_AT
-    #         r = get_id(object_id(node))
-    #         t0[v] = get(project_spec.to0_, r, 0)
-    #     end
-    # end
-    # t0,tF,slack,local_slack = process_schedule(schedule)
-    # # Add dependencies between nodes that use the same station
-    # for v in vertices(get_graph(schedule))
-    #     node = get_node_from_id(schedule, get_vtx_id(schedule, v))
-    #     if typeof(node) <: Union{COLLECT,DEPOSIT}
-    #         for v2 in v:get_num_vtxs(schedule)
-    #             node2 = get_node_from_id(schedule, get_vtx_id(schedule, v2))
-    #             if typeof(node2) <: Union{COLLECT,DEPOSIT}
-    #                 if station_id(node) == station_id(node2)
-    #                     if t0[v] < t0[v2]
-    #                         add_edge!(get_graph(schedule),v,v2)
-    #                     else
-    #                         add_edge!(get_graph(schedule),v2,v)
-    #                     end
-    #                 end
-    #             end
-    #         end
-    #     end
-    # end
     sort!(schedule.root_nodes)
-    # identify root nodes and store their indices in the schedule (important for multi-headed projects)
-    # root_nodes = get_all_root_nodes(get_graph(schedule))
-    # for (idx,pred) in get_robot_ICs(schedule)
-    #     setdiff!(root_nodes,get_vtx(schedule, RobotID(idx)))
-    # end
-    # for v in sort(collect(root_nodes))
-    #     push!(schedule.root_nodes, v)
-    # end
     return schedule
 end
 function construct_project_schedule(
