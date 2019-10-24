@@ -19,6 +19,9 @@ export
 """
     `TaskGraphProblemSpec{G}`
 
+    This containts all information necessary to formulate the Task Assignment
+    problem as a MILP.
+
     Elements:
     - N::Int - num robots
     - M::Int - num tasks
@@ -28,6 +31,11 @@ export
     - Δt::Vector{Float64}  - durations of operations
     - tr0_::Dict{Int,Float64} - robot start times
     - to0_::Dict{Int,Float64} - object start times
+    - root_nodes::Vector{Set{Int}} - identifies "project heads"
+    - weights::Dict{Int,Float64} - stores weights associated with each project head
+    - s0::Vector{Int} - pickup stations for each task
+    - sF::Vector{Int} - delivery station for each task
+    - nR::Vector{Int} - num robots required for each task (>1 => collaborative task)
 """
 @with_kw struct TaskGraphProblemSpec{G}
     N::Int                  = 0 # num robots
@@ -45,6 +53,7 @@ export
     weights::Dict{Int,Float64} = Dict{Int,Float64}(v=>1.0 for v in 1:length(root_nodes))
     s0::Vector{Int} = zeros(M) # pickup stations for each task
     sF::Vector{Int} = zeros(M) # delivery station for each task
+    nR::Vector{Int} = ones(M) # num robots required for each task (>1 => collaborative task)
 end
 
 export
@@ -62,10 +71,23 @@ export
 
     Defines a list of operations that must be performed in order to complete a
     specific project, in addition to the dependencies between those operations
+
+    Elements:
+    - initial_conditions::Vector{OBJECT_AT} - maps object id to initial condition predicate
+    - final_conditions::Vector{OBJECT_AT} - maps object id to final condition predicate
+    - operations::Vector{Operation} - list of manufacturing operations
+    - pre_deps::Dict{Int,Set{Int}} - maps object id to ids of operations that are required to produce that object
+    - post_deps::Dict{Int,Set{Int}} - maps object id to ids of operations that depend on that object
+    - graph::G
+    - root_nodes::Set{Int}
+    - weights::Dict{Int,Float64}
+    - M::Int
+    - weight::Float64
+    - id_to_idx::Dict{Int,Int}
 """
 @with_kw struct ProjectSpec{G}
-    initial_conditions::Dict{Int,OBJECT_AT} = Dict{Int,OBJECT_AT}()
-    final_conditions::Dict{Int,OBJECT_AT} = Dict{Int,OBJECT_AT}()
+    initial_conditions::Vector{OBJECT_AT} = Vector{OBJECT_AT}()
+    final_conditions::Vector{OBJECT_AT} = Vector{OBJECT_AT}()
     operations::Vector{Operation} = Vector{Operation}()
     pre_deps::Dict{Int,Set{Int}}  = Dict{Int,Set{Int}}() # id => (pre_conditions)
     post_deps::Dict{Int,Set{Int}} = Dict{Int,Set{Int}}()
@@ -74,6 +96,7 @@ export
     weights::Dict{Int,Float64}    = Dict{Int,Float64}(v=>1.0 for v in root_nodes)
     M::Int                        = length(initial_conditions)
     weight::Float64               = 1.0
+    id_to_idx::Dict{Int,Int}      = Dict{Int,Int}(get_id(get_object_id(id))=>k for (k,id) in enumerate(initial_conditions))
 end
 get_initial_nodes(tg::ProjectSpec) = setdiff(
     Set(collect(vertices(tg.graph))),collect(keys(tg.pre_deps)))
@@ -125,8 +148,8 @@ function add_operation!(task_graph::ProjectSpec, op::Operation)
 end
 function construct_operation(spec::ProjectSpec, station_id, input_ids, output_ids, Δt)
     Operation(
-        Set{OBJECT_AT}(map(o->get(spec.final_conditions, o, OBJECT_AT(o,station_id)), input_ids)),
-        Set{OBJECT_AT}(map(o->get(spec.initial_conditions, o, OBJECT_AT(o,station_id)), output_ids)),
+        Set{OBJECT_AT}(map(id->get(spec.final_conditions, spec.id_to_idx[id], OBJECT_AT(id,station_id)), input_ids)),
+        Set{OBJECT_AT}(map(id->get(spec.initial_conditions, spec.id_to_idx[id], OBJECT_AT(id,station_id)), output_ids)),
         Δt,
         StationID(station_id)
     )
@@ -146,21 +169,33 @@ end
 function TOML.parse(project_spec::ProjectSpec)
     toml_dict = Dict()
     toml_dict["operations"] = map(op->TOML.parse(op),project_spec.operations)
-    toml_dict["initial_conditions"] = Dict(string(k)=>TOML.parse(pred) for (k,pred) in project_spec.initial_conditions)
-    toml_dict["final_conditions"] = Dict(string(k)=>TOML.parse(pred) for (k,pred) in project_spec.final_conditions)
+    # toml_dict["initial_conditions"] = Dict(string(k)=>TOML.parse(pred) for (k,pred) in project_spec.initial_conditions)
+    # toml_dict["final_conditions"] = Dict(string(k)=>TOML.parse(pred) for (k,pred) in project_spec.final_conditions)
+    toml_dict["initial_conditions"] = map(pred->TOML.parse(pred), project_spec.initial_conditions)
+    toml_dict["final_conditions"] = map(pred->TOML.parse(pred), project_spec.final_conditions)
     toml_dict
 end
 function read_project_spec(toml_dict::Dict)
     project_spec = ProjectSpec()
-    for (k,arr) in toml_dict["initial_conditions"]
+    # for (k,arr) in toml_dict["initial_conditions"]
+    #     object_id = arr[1]
+    #     station_id = arr[2]
+    #     project_spec.initial_conditions[object_id] = OBJECT_AT(object_id, station_id)
+    # end
+    for arr in toml_dict["initial_conditions"]
         object_id = arr[1]
         station_id = arr[2]
-        project_spec.initial_conditions[object_id] = OBJECT_AT(object_id, station_id)
+        push!(project_spec.initial_conditions, OBJECT_AT(object_id, station_id))
     end
-    for (k,arr) in toml_dict["final_conditions"]
+    # for (k,arr) in toml_dict["final_conditions"]
+    #     object_id = arr[1]
+    #     station_id = arr[2]
+    #     project_spec.final_conditions[object_id] = OBJECT_AT(object_id, station_id)
+    # end
+    for arr in toml_dict["final_conditions"]
         object_id = arr[1]
         station_id = arr[2]
-        project_spec.final_conditions[object_id] = OBJECT_AT(object_id, station_id)
+        push!(project_spec.final_conditions, OBJECT_AT(object_id, station_id))
     end
     for op_dict in toml_dict["operations"]
         op = Operation(
@@ -238,12 +273,14 @@ function construct_delivery_graph(project_spec::ProjectSpec,M::Int)
     for op in project_spec.operations
         # for i in get_input_ids(op)
         for pred in preconditions(op)
-            i = get_id(get_object_id(pred))
-            pre = project_spec.initial_conditions[i]
-            post = project_spec.final_conditions[i]
-            push!(delivery_graph.tasks,DeliveryTask(i,get_id(get_location_id(pre)),get_id(get_location_id(post))))
+            id = get_id(get_object_id(pred))
+            idx = project_spec.id_to_idx[id]
+            pre = project_spec.initial_conditions[idx]
+            post = project_spec.final_conditions[idx]
+            push!(delivery_graph.tasks,DeliveryTask(id,get_id(get_location_id(pre)),get_id(get_location_id(post))))
             for j in get_output_ids(op)
-                add_edge!(delivery_graph.graph, i, j)
+                idx2 = project_spec.id_to_idx[j]
+                add_edge!(delivery_graph.graph, idx, idx2)
                 # push!(delivery_graph.tasks,DeliveryTask(i,i,j))
             end
         end
@@ -381,6 +418,7 @@ end
 
 function insert_to_vtx_map!(schedule::P,pred::OBJECT_AT,id::ObjectID,idx::Int) where {P<:ProjectSchedule}
     push!(schedule.vtx_ids, id)
+    # push!(schedule.object_ICs, pred)
     get_object_ICs(schedule)[get_id(id)] = pred
     schedule.object_vtx_map[get_id(id)] = idx
 end
@@ -626,8 +664,8 @@ end
 function construct_project_schedule(
         project_spec::P,
         problem_spec::T,
-        object_ICs::Dict{Int,OBJECT_AT},
-        object_FCs::Dict{Int,OBJECT_AT},
+        object_ICs::Vector{OBJECT_AT},
+        object_FCs::Vector{OBJECT_AT},
         robot_ICs::Dict{Int,ROBOT_AT},
         assignments::V=Dict{Int,Int}()
         ) where {P<:ProjectSpec,T<:TaskGraphProblemSpec,V<:Union{Dict{Int,Int},Vector{Int}}}
@@ -635,11 +673,11 @@ function construct_project_schedule(
     populate_agent_ids!(schedule,problem_spec,assignments)
     graph = get_graph(schedule)
     # add object ICs to graph
-    for (id, pred) in object_ICs
+    for pred in object_ICs
         add_to_schedule!(schedule, problem_spec, pred, get_object_id(pred))
     end
     # add robot ICs to graph
-    for (id, pred) in robot_ICs
+    for (id,pred) in robot_ICs
         # if (id in assignments)
         add_to_schedule!(schedule, problem_spec, pred, get_robot_id(pred))
         # end
@@ -696,8 +734,6 @@ function construct_project_schedule(
         assignments
     )
 end
-
-function formulate_optimization_problem(schedule::S,) where
 
 """
     `process_schedule(schedule::P) where {P<:ProjectSchedule}`

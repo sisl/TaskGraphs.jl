@@ -4,16 +4,16 @@ let
 end
 let
     M = 3
-    object_ICs = Dict{Int,OBJECT_AT}(
-        1=>OBJECT_AT(1,1),
-        2=>OBJECT_AT(2,2),
-        3=>OBJECT_AT(3,3)
-        )
-    object_FCs = Dict{Int,OBJECT_AT}(
-        1=>OBJECT_AT(1,4),
-        2=>OBJECT_AT(2,5),
-        3=>OBJECT_AT(3,6)
-        )
+    object_ICs = Vector{OBJECT_AT}([
+        OBJECT_AT(1,1),
+        OBJECT_AT(2,2),
+        OBJECT_AT(3,3)
+        ])
+    object_FCs = Vector{OBJECT_AT}([
+        OBJECT_AT(1,4),
+        OBJECT_AT(2,5),
+        OBJECT_AT(3,6)
+        ])
     robot_ICs = Dict{Int,ROBOT_AT}(
         1=>ROBOT_AT(1,7),
         2=>ROBOT_AT(2,8),
@@ -98,17 +98,17 @@ let
     # r0,s0,sF = get_random_problem_instantiation(
     #     N,M,pickup_zones,dropoff_zones,free_zones)
 
-    object_ICs = Dict{Int,OBJECT_AT}(o => OBJECT_AT(o,s0[o]) for o in 1:M) # initial_conditions
-    object_FCs = Dict{Int,OBJECT_AT}(o => OBJECT_AT(o,sF[o]) for o in 1:M) # final conditions
+    object_ICs = Vector{OBJECT_AT}([OBJECT_AT(o,s0[o]) for o in 1:M]) # initial_conditions
+    object_FCs = Vector{OBJECT_AT}([OBJECT_AT(o,sF[o]) for o in 1:M]) # final conditions
     robot_ICs = Dict{Int,ROBOT_AT}(r => ROBOT_AT(r,r0[r]) for r in 1:N)
     # Drs, Dss = cached_pickup_and_delivery_distances(pts[r0],pts[s0],pts[sF])
     Drs, Dss = cached_pickup_and_delivery_distances(r0,s0,sF,(v1,v2)->dist_matrix[v1,v2])
     project_spec = construct_random_project_spec(M,object_ICs,object_FCs;max_parents=3,depth_bias=1.0,Δt_min=0,Δt_max=0)
-    object_ICs1 = Dict{Int,OBJECT_AT}(o => object_ICs[o] for o in 1:Int(M/2))
-    object_FCs1 = Dict{Int,OBJECT_AT}(o => object_FCs[o] for o in 1:Int(M/2))
+    object_ICs1 = Vector{OBJECT_AT}([object_ICs[o] for o in 1:Int(M/2)])
+    object_FCs1 = Vector{OBJECT_AT}([object_FCs[o] for o in 1:Int(M/2)])
     project_spec1 = construct_random_project_spec(Int(M/2),object_ICs1,object_FCs1;max_parents=3,depth_bias=0.25,Δt_min=0,Δt_max=0)
-    object_ICs2 = Dict{Int,OBJECT_AT}(o => object_ICs[o] for o in Int(M/2):M)
-    object_FCs2 = Dict{Int,OBJECT_AT}(o => object_FCs[o] for o in Int(M/2):M)
+    object_FCs2 = Vector{OBJECT_AT}([object_FCs[o] for o in Int(M/2)+1:M])
+    object_ICs2 = Vector{OBJECT_AT}([object_ICs[o] for o in Int(M/2)+1:M])
     project_spec2 = construct_random_project_spec(Int(M/2),object_ICs2,object_FCs2;max_parents=3,depth_bias=0.25,Δt_min=0,Δt_max=0)
     project_spec = combine_project_specs([project_spec1, project_spec2])
 
@@ -124,7 +124,6 @@ let
         TOML.print(io, TOML.parse(problem_def))
     end
     problem_def = read_problem_def(filename)
-
 
     delivery_graph = construct_delivery_graph(project_spec,M)
     project_spec, problem_spec, object_ICs, object_FCs, robot_ICs = construct_task_graphs_problem(project_spec,r0,s0,sF,dist_matrix)

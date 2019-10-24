@@ -57,8 +57,8 @@ function initialize_toy_problem_1(;verbose=false)
     s0 = [5,8,14]
     sF = [13,12,15]
 
-    object_ICs = Dict{Int,OBJECT_AT}(o => OBJECT_AT(o,s0[o]) for o in 1:M) # initial_conditions
-    object_FCs = Dict{Int,OBJECT_AT}(o => OBJECT_AT(o,sF[o]) for o in 1:M) # final conditions
+    object_ICs = Vector{OBJECT_AT}([OBJECT_AT(o,s0[o]) for o in 1:M]) # initial_conditions
+    object_FCs = Vector{OBJECT_AT}([OBJECT_AT(o,sF[o]) for o in 1:M]) # final conditions
     robot_ICs = Dict{Int,ROBOT_AT}(r => ROBOT_AT(r,r0[r]) for r in 1:N)
     for r in N+1:N+M
         robot_ICs[r] = ROBOT_AT(r,sF[r-N])
@@ -99,8 +99,8 @@ function initialize_toy_problem_2(;verbose=false)
     s0 = [5,8,13]
     sF = [9,32,17]
 
-    object_ICs = Dict{Int,OBJECT_AT}(o => OBJECT_AT(o,s0[o]) for o in 1:M) # initial_conditions
-    object_FCs = Dict{Int,OBJECT_AT}(o => OBJECT_AT(o,sF[o]) for o in 1:M) # final conditions
+    object_ICs = Vector{OBJECT_AT}([OBJECT_AT(o,s0[o]) for o in 1:M]) # initial_conditions
+    object_FCs = Vector{OBJECT_AT}([OBJECT_AT(o,sF[o]) for o in 1:M]) # final conditions
     robot_ICs = Dict{Int,ROBOT_AT}(r => ROBOT_AT(r,r0[r]) for r in 1:N)
     for r in N+1:N+M
         robot_ICs[r] = ROBOT_AT(r,sF[r-N])
@@ -154,8 +154,8 @@ function initialize_toy_problem_3(;verbose=false,Δt_op=0,Δt_collect=[0,0,0],Δ
     s0 = [7,30,12]
     sF = [8,32,16]
 
-    object_ICs = Dict{Int,OBJECT_AT}(o => OBJECT_AT(o,s0[o]) for o in 1:M) # initial_conditions
-    object_FCs = Dict{Int,OBJECT_AT}(o => OBJECT_AT(o,sF[o]) for o in 1:M) # final conditions
+    object_ICs = Vector{OBJECT_AT}([OBJECT_AT(o,s0[o]) for o in 1:M]) # initial_conditions
+    object_FCs = Vector{OBJECT_AT}([OBJECT_AT(o,sF[o]) for o in 1:M]) # final conditions
     robot_ICs = Dict{Int,ROBOT_AT}(r => ROBOT_AT(r,r0[r]) for r in 1:N)
     for r in N+1:N+M
         robot_ICs[r] = ROBOT_AT(r,sF[r-N])
@@ -210,8 +210,8 @@ function initialize_toy_problem_4(;verbose=false)
     s0 = [2,4]
     sF = [8,6]
 
-    object_ICs = Dict{Int,OBJECT_AT}(o => OBJECT_AT(o,s0[o]) for o in 1:M) # initial_conditions
-    object_FCs = Dict{Int,OBJECT_AT}(o => OBJECT_AT(o,sF[o]) for o in 1:M) # final conditions
+    object_ICs = Vector{OBJECT_AT}([OBJECT_AT(o,s0[o]) for o in 1:M]) # initial_conditions
+    object_FCs = Vector{OBJECT_AT}([OBJECT_AT(o,sF[o]) for o in 1:M]) # final conditions
     robot_ICs = Dict{Int,ROBOT_AT}(r => ROBOT_AT(r,r0[r]) for r in 1:N)
     for r in N+1:N+M
         robot_ICs[r] = ROBOT_AT(r,sF[r-N])
@@ -265,8 +265,8 @@ function initialize_toy_problem_5(;verbose=false)
     s0 = [3,15]
     sF = [11,7]
 
-    object_ICs = Dict{Int,OBJECT_AT}(o => OBJECT_AT(o,s0[o]) for o in 1:M) # initial_conditions
-    object_FCs = Dict{Int,OBJECT_AT}(o => OBJECT_AT(o,sF[o]) for o in 1:M) # final conditions
+    object_ICs = Vector{OBJECT_AT}([OBJECT_AT(o,s0[o]) for o in 1:M]) # initial_conditions
+    object_FCs = Vector{OBJECT_AT}([OBJECT_AT(o,sF[o]) for o in 1:M]) # final conditions
     robot_ICs = Dict{Int,ROBOT_AT}(r => ROBOT_AT(r,r0[r]) for r in 1:N)
     for r in N+1:N+M
         robot_ICs[r] = ROBOT_AT(r,sF[r-N])
@@ -316,8 +316,8 @@ function initialize_toy_problem_6(;verbose=false,Δt_op=1,Δt_collect=[0,0,0],Δ
     s0 = [5,12,13]
     sF = [9,32,17]
 
-    object_ICs = Dict{Int,OBJECT_AT}(o => OBJECT_AT(o,s0[o]) for o in 1:M) # initial_conditions
-    object_FCs = Dict{Int,OBJECT_AT}(o => OBJECT_AT(o,sF[o]) for o in 1:M) # final conditions
+    object_ICs = Vector{OBJECT_AT}([OBJECT_AT(o,s0[o]) for o in 1:M]) # initial_conditions
+    object_FCs = Vector{OBJECT_AT}([OBJECT_AT(o,sF[o]) for o in 1:M]) # final conditions
     robot_ICs = Dict{Int,ROBOT_AT}(r => ROBOT_AT(r,r0[r]) for r in 1:N)
     for r in N+1:N+M
         robot_ICs[r] = ROBOT_AT(r,sF[r-N])
@@ -354,8 +354,8 @@ function initialize_toy_problem_7(;verbose=false,Δt_op=0,Δt_collect=[0,4,0],Δ
     s0 = [6,10,15]
     sF = [14,12,16]
 
-    object_ICs = Dict{Int,OBJECT_AT}(o => OBJECT_AT(o,s0[o]) for o in 1:M) # initial_conditions
-    object_FCs = Dict{Int,OBJECT_AT}(o => OBJECT_AT(o,sF[o]) for o in 1:M) # final conditions
+    object_ICs = Vector{OBJECT_AT}([OBJECT_AT(o,s0[o]) for o in 1:M]) # initial_conditions
+    object_FCs = Vector{OBJECT_AT}([OBJECT_AT(o,sF[o]) for o in 1:M]) # final conditions
     robot_ICs = Dict{Int,ROBOT_AT}(r => ROBOT_AT(r,r0[r]) for r in 1:N)
     for r in N+1:N+M
         robot_ICs[r] = ROBOT_AT(r,sF[r-N])
@@ -391,8 +391,8 @@ function initialize_toy_problem_8(;verbose=false,Δt_op=0,Δt_collect=[0,0,0,0],
     s0 = [5,25,12,24]
     sF = [8,28,9,21]
 
-    object_ICs = Dict{Int,OBJECT_AT}(o => OBJECT_AT(o,s0[o]) for o in 1:M) # initial_conditions
-    object_FCs = Dict{Int,OBJECT_AT}(o => OBJECT_AT(o,sF[o]) for o in 1:M) # final conditions
+    object_ICs = Vector{OBJECT_AT}([OBJECT_AT(o,s0[o]) for o in 1:M]) # initial_conditions
+    object_FCs = Vector{OBJECT_AT}([OBJECT_AT(o,sF[o]) for o in 1:M]) # final conditions
     robot_ICs = Dict{Int,ROBOT_AT}(r => ROBOT_AT(r,r0[r]) for r in 1:N)
     for r in N+1:N+M
         robot_ICs[r] = ROBOT_AT(r,sF[r-N])
@@ -432,8 +432,8 @@ function initialize_toy_problem_9(;verbose=false,Δt_op=0,Δt_collect=[0,0],Δt_
     s0 = [5,5]
     sF = [8,6]
 
-    object_ICs = Dict{Int,OBJECT_AT}(o => OBJECT_AT(o,s0[o]) for o in 1:M) # initial_conditions
-    object_FCs = Dict{Int,OBJECT_AT}(o => OBJECT_AT(o,sF[o]) for o in 1:M) # final conditions
+    object_ICs = Vector{OBJECT_AT}([OBJECT_AT(o,s0[o]) for o in 1:M]) # initial_conditions
+    object_FCs = Vector{OBJECT_AT}([OBJECT_AT(o,sF[o]) for o in 1:M]) # final conditions
     robot_ICs = Dict{Int,ROBOT_AT}(r => ROBOT_AT(r,r0[r]) for r in 1:N)
     for r in N+1:N+M
         robot_ICs[r] = ROBOT_AT(r,sF[r-N])

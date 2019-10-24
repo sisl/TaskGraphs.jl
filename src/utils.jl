@@ -44,6 +44,8 @@ export
             are roots of the project
         `weights` - a vector of weights that determines the contribution of each
             root_node to the objective
+        `s0` - pickup stations for the tasks
+        `sF` - dropoff stations for the tasks
         `optimizer` - a JuMP optimizer (e.g., Gurobi.optimizer)
     Keyword Args:
         `TimeLimit=100`
@@ -56,7 +58,7 @@ export
     Outputs:
         `model` - the optimization model
 """
-function formulate_optimization_problem(G,Drs,Dss,Δt,Δt_collect,Δt_deliver,to0_,tr0_,root_nodes,weights,s0,sF,optimizer;
+function formulate_optimization_problem(G,Drs,Dss,Δt,Δt_collect,Δt_deliver,to0_,tr0_,root_nodes,weights,s0,sF,nR,optimizer;
     TimeLimit=100,
     OutputFlag=0,
     assignments=Dict{Int64,Int64}(),
@@ -79,7 +81,7 @@ function formulate_optimization_problem(G,Drs,Dss,Δt,Δt_collect,Δt_deliver,to
     # Assignment matrix x
     @variable(model, x[1:N+M,1:M], binary = true) # x[i,j] ∈ {0,1}
     @constraint(model, x * ones(M) .<= 1)         # each robot may have no more than 1 task
-    @constraint(model, x' * ones(N+M) .== 1)      # each task must have exactly 1 assignment
+    @constraint(model, x' * ones(N+M) .== nR)     # each task must have exactly 1 assignment
     for (i,t) in tr0_
         # start time for robot i
         @constraint(model, tr0[i] == t)
@@ -196,6 +198,7 @@ function formulate_optimization_problem(spec::T,optimizer;
         spec.weights,
         spec.s0,
         spec.sF,
+        spec.nR,
         optimizer;
         kwargs...
         )
@@ -275,8 +278,8 @@ function construct_task_graphs_problem(
     N = length(r0)
     M = length(s0)
 
-    object_ICs = Dict{Int,OBJECT_AT}(o => OBJECT_AT(o,s0[o]) for o in 1:M) # initial object conditions
-    object_FCs = Dict{Int,OBJECT_AT}(o => OBJECT_AT(o,sF[o]) for o in 1:M) # final object conditions
+    object_ICs = Vector{OBJECT_AT}([OBJECT_AT(o,s0[o]) for o in 1:M]) # initial object conditions
+    object_FCs = Vector{OBJECT_AT}([OBJECT_AT(o,sF[o]) for o in 1:M]) # final object conditions
     robot_ICs = Dict{Int,ROBOT_AT}(r => ROBOT_AT(r,r0[r]) for r in 1:N) # initial robot conditions
     for r in 1:M # dummy robots
         robot_ICs[r+N] = ROBOT_AT(r+N,sF[r])
@@ -324,7 +327,7 @@ export
             For `depth_bias` == 0.0, the graph will be as "strung out" as
             possible.
 """
-function construct_random_project_spec(M::Int,object_ICs::Dict{Int,OBJECT_AT},object_FCs::Dict{Int,OBJECT_AT};
+function construct_random_project_spec(M::Int,object_ICs::Vector{OBJECT_AT},object_FCs::Vector{OBJECT_AT};
     max_parents=1,depth_bias=1.0,Δt_min=0,Δt_max=0)
     project_spec = ProjectSpec(
         M=M,
@@ -352,33 +355,41 @@ function construct_random_project_spec(M::Int,object_ICs::Dict{Int,OBJECT_AT},ob
         for p in pairs[1:end-1]
             enqueue!(frontier,p)
         end
-        output_id = pairs[end].first
-        station_id = output_id
-        input_ids = collect(max(1,1+i-rand(1:max_parents)):i)
-        i = i - length(input_ids)
+        output_idx = pairs[end].first
+        station_id = output_idx
+        input_idxs = collect(max(1,1+i-rand(1:max_parents)):i)
+        i = i - length(input_idxs)
         # Δt = Δt_min + (Δt_max-Δt_min)*rand()
         Δt=rand(Δt_min:Δt_max)
         # add_operation!(project_spec,construct_operation(station_id, input_ids, [output_id], Δt))
-        add_operation!(project_spec,construct_operation(project_spec, station_id, input_ids, [output_id], Δt))
-        for id in input_ids
-            enqueue!(frontier, id=>M-i)
+        input_ids = map(idx->get_id(get_object_id(project_spec.initial_conditions[idx])), input_idxs)
+        output_ids = map(idx->get_id(get_object_id(project_spec.initial_conditions[idx])), [output_idx])
+        @show input_ids, output_ids
+        @show project_spec.initial_conditions
+        @show project_spec.id_to_idx
+        @show map(id->project_spec.id_to_idx[id], input_ids)
+        @show map(id->project_spec.id_to_idx[id], output_ids)
+        add_operation!(project_spec,construct_operation(project_spec, station_id, input_ids, output_ids, Δt))
+        for idx in input_idxs
+            enqueue!(frontier, idx=>M-i)
         end
     end
     Δt=0
-    add_operation!(project_spec,construct_operation(project_spec, -1, [M], [], Δt))
+    final_idx = get_id(get_object_id(project_spec.initial_conditions[M]))
+    add_operation!(project_spec,construct_operation(project_spec, -1, [final_idx], [], Δt))
     project_spec
 end
-function construct_random_project_spec(M::Int,object_ICs::Vector{OBJECT_AT},object_FCs::Vector{OBJECT_AT};
-    kwargs...)
-    object_IC_dict = Dict{Int,OBJECT_AT}(get_id(get_object_id(pred))=>pred for pred in object_ICs)
-    object_FC_dict = Dict{Int,OBJECT_AT}(get_id(get_object_id(pred))=>pred for pred in object_FCs)
-    construct_random_project_spec(M,object_IC_dict,object_FC_dict;
-        kwargs...)
-end
+# function construct_random_project_spec(M::Int,object_ICs::Vector{OBJECT_AT},object_FCs::Vector{OBJECT_AT};
+#     kwargs...)
+#     object_IC_dict = Vector{OBJECT_AT}([pred for pred in object_ICs])
+#     object_FC_dict = Vector{OBJECT_AT}([pred for pred in object_FCs])
+#     construct_random_project_spec(M,object_IC_dict,object_FC_dict;
+#         kwargs...)
+# end
 function construct_random_project_spec(M::Int,s0::Vector{Int},sF::Vector{Int};
     kwargs...)
-    object_ICs = Dict{Int,OBJECT_AT}(o=>OBJECT_AT(o,s) for (o,s) in enumerate(s0))
-    object_FCs = Dict{Int,OBJECT_AT}(o=>OBJECT_AT(o,s) for (o,s) in enumerate(sF))
+    object_ICs = Vector{OBJECT_AT}([OBJECT_AT(o,s) for (o,s) in enumerate(s0)])
+    object_FCs = Vector{OBJECT_AT}([OBJECT_AT(o,s) for (o,s) in enumerate(sF)])
     construct_random_project_spec(M,object_ICs,object_FCs;
         kwargs...)
 end
@@ -428,23 +439,22 @@ export
 function combine_project_specs(specs::Vector{P}) where {P<:ProjectSpec}
     M = 0
     new_spec = ProjectSpec(
-        # M=sum(map(spec->length(spec.initial_conditions), specs)),
-        initial_conditions=merge(map(spec->spec.initial_conditions, specs)...),
-        final_conditions=merge(map(spec->spec.final_conditions, specs)...)
+        initial_conditions=vcat(map(spec->spec.initial_conditions, specs)...),
+        final_conditions=vcat(map(spec->spec.final_conditions, specs)...)
         )
     for spec in specs
-        spec_M = length(spec.initial_conditions)
+        # spec_M = length(spec.initial_conditions)
         for op in spec.operations
             new_op = Operation(station_id=op.station_id, Δt = op.Δt)
             for pred in preconditions(op)
-                push!(new_op.pre, OBJECT_AT(get_object_id(pred)+M, get_location_id(pred)+M))
+                push!(new_op.pre, OBJECT_AT(get_object_id(pred), get_location_id(pred)))
             end
             for pred in postconditions(op)
-                push!(new_op.post, OBJECT_AT(get_object_id(pred)+M, get_location_id(pred)+M))
+                push!(new_op.post, OBJECT_AT(get_object_id(pred), get_location_id(pred)))
             end
             add_operation!(new_spec, new_op)
         end
-        M = M + spec_M
+        # M = M + spec_M
     end
     new_spec
 end
