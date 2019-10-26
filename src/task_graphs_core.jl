@@ -9,10 +9,6 @@ using TOML
 
 using ..PlanningPredicates
 
-struct TaskIDCounter
-    count::Int
-end
-
 export
     TaskGraphProblemSpec
 
@@ -83,7 +79,7 @@ export
     - weights::Dict{Int,Float64}
     - M::Int
     - weight::Float64
-    - id_to_idx::Dict{Int,Int}
+    - object_id_to_idx::Dict{Int,Int}
 """
 @with_kw struct ProjectSpec{G}
     initial_conditions::Vector{OBJECT_AT} = Vector{OBJECT_AT}()
@@ -96,14 +92,15 @@ export
     weights::Dict{Int,Float64}    = Dict{Int,Float64}(v=>1.0 for v in root_nodes)
     M::Int                        = length(initial_conditions)
     weight::Float64               = 1.0
-    id_to_idx::Dict{Int,Int}      = Dict{Int,Int}(get_id(get_object_id(id))=>k for (k,id) in enumerate(initial_conditions))
+    object_id_to_idx::Dict{Int,Int} = Dict{Int,Int}(get_id(get_object_id(id))=>k for (k,id) in enumerate(initial_conditions))
+    op_id_to_vtx::Dict{Int,Int}    = Dict{Int,Int}()
 end
-get_initial_nodes(tg::ProjectSpec) = setdiff(
-    Set(collect(vertices(tg.graph))),collect(keys(tg.pre_deps)))
+get_initial_nodes(spec::ProjectSpec) = setdiff(
+    Set(collect(vertices(spec.graph))),collect(keys(spec.pre_deps)))
 get_input_ids(op::Operation) = Set{Int}([get_id(get_object_id(p)) for p in op.pre])
 get_output_ids(op::Operation) = Set{Int}([get_id(get_object_id(p)) for p in op.post])
-get_pre_deps(tg::ProjectSpec, i::Int) = get(tg.pre_deps, i, Set{Int}())
-get_post_deps(tg::ProjectSpec, i::Int) = get(tg.post_deps, i, Set{Int}())
+get_pre_deps(spec::ProjectSpec, op_id::Int) = get(spec.pre_deps, op_id, Set{Int}())
+get_post_deps(spec::ProjectSpec, op_id::Int) = get(spec.post_deps, op_id, Set{Int}())
 get_num_delivery_tasks(spec::ProjectSpec) = length(collect(union(map(op->union(get_input_ids(op),get_output_ids(op)),spec.operations)...)))
 function get_duration_vector(spec::P) where {P<:ProjectSpec}
     Δt = zeros(get_num_delivery_tasks(spec))
@@ -114,44 +111,49 @@ function get_duration_vector(spec::P) where {P<:ProjectSpec}
     end
     Δt
 end
-function add_pre_dep!(tg::ProjectSpec, i::Int, op_idx::Int)
-    push!(get!(tg.pre_deps, i, Set{Int}()),op_idx)
+function add_pre_dep!(spec::ProjectSpec, object_id::Int, op_id::Int)
+    # operation[op_id] is a prereq of object[object_id]
+    push!(get!(spec.pre_deps, object_id, Set{Int}()),op_id)
 end
-function add_post_dep!(tg::ProjectSpec, i::Int, op_idx::Int)
-    push!(get!(tg.post_deps, i, Set{Int}()),op_idx)
+function add_post_dep!(spec::ProjectSpec, object_id::Int, op_id::Int)
+    # operation[op_id] is a postreq of object[object_id]
+    push!(get!(spec.post_deps, object_id, Set{Int}()),op_id)
 end
-function add_operation!(task_graph::ProjectSpec, op::Operation)
-    G = task_graph.graph
-    ops = task_graph.operations
+function add_operation!(spec::ProjectSpec, op::Operation)
+    G = spec.graph
+    ops = spec.operations
     add_vertex!(G)
     push!(ops, op)
+    spec.op_id_to_vtx[get_id(op)] = nv(G)
     op_id = length(ops)
     for id in get_output_ids(op)
         # object[id] is a product of operation[op_id]
-        add_pre_dep!(task_graph, id, op_id)
-        for op0_id in get_post_deps(task_graph, id)
+        add_pre_dep!(spec, id, op_id)
+        for op0_id in get_post_deps(spec, id)
             # for each operation that requires object[id]
             add_edge!(G, op_id, op0_id)
         end
     end
     for id in get_input_ids(op)
         # object[id] is a prereq for operation[op_id]
-        add_post_dep!(task_graph, id, op_id)
-        for op0_id in get_pre_deps(task_graph, id)
+        add_post_dep!(spec, id, op_id)
+        for op0_id in get_pre_deps(spec, id)
             # for each (1) operation that generates object[id]
             add_edge!(G, op0_id, op_id)
         end
     end
-    union!(task_graph.root_nodes, get_all_root_nodes(task_graph.graph))
-    intersect!(task_graph.root_nodes, get_all_root_nodes(task_graph.graph))
-    task_graph
+    union!(spec.root_nodes, get_all_root_nodes(spec.graph))
+    intersect!(spec.root_nodes, get_all_root_nodes(spec.graph))
+    spec
 end
-function construct_operation(spec::ProjectSpec, station_id, input_ids, output_ids, Δt)
+function construct_operation(spec::ProjectSpec, station_id, input_ids, output_ids, Δt, id=get_unique_operation_id())
     Operation(
-        Set{OBJECT_AT}(map(id->get(spec.final_conditions, spec.id_to_idx[id], OBJECT_AT(id,station_id)), input_ids)),
-        Set{OBJECT_AT}(map(id->get(spec.initial_conditions, spec.id_to_idx[id], OBJECT_AT(id,station_id)), output_ids)),
-        Δt,
-        StationID(station_id)
+        pre = Set{OBJECT_AT}(map(id->get(spec.final_conditions, spec.object_id_to_idx[id], OBJECT_AT(id,station_id)), input_ids)),
+        post = Set{OBJECT_AT}(map(id->get(spec.initial_conditions, spec.object_id_to_idx[id], OBJECT_AT(id,station_id)), output_ids)),
+        Δt = Δt,
+        station_id = StationID(station_id),
+        # id = nv(spec.graph)+1
+        id = id
     )
 end
 
@@ -164,7 +166,18 @@ function TOML.parse(op::Operation)
     toml_dict["pre"] = map(pred->[get_id(get_object_id(pred)),get_id(get_location_id(pred))], collect(op.pre))
     toml_dict["post"] = map(pred->[get_id(get_object_id(pred)),get_id(get_location_id(pred))], collect(op.post))
     toml_dict["Δt"] = duration(op)
+    toml_dict["station_id"] = get_id(op.station_id)
+    toml_dict["id"] = op.id
     return toml_dict
+end
+function read_operation(toml_dict::Dict)
+    op = Operation(
+        pre     = Set{OBJECT_AT}(map(arr->OBJECT_AT(arr[1],arr[2]),toml_dict["pre"])),
+        post    = Set{OBJECT_AT}(map(arr->OBJECT_AT(arr[1],arr[2]),toml_dict["post"])),
+        Δt      = toml_dict["Δt"],
+        station_id = StationID(toml_dict["station_id"]),
+        id = toml_dict["id"]
+        )
 end
 function TOML.parse(project_spec::ProjectSpec)
     toml_dict = Dict()
@@ -182,10 +195,11 @@ function read_project_spec(toml_dict::Dict)
     #     station_id = arr[2]
     #     project_spec.initial_conditions[object_id] = OBJECT_AT(object_id, station_id)
     # end
-    for arr in toml_dict["initial_conditions"]
+    for (i,arr) in enumerate(toml_dict["initial_conditions"])
         object_id = arr[1]
         station_id = arr[2]
         push!(project_spec.initial_conditions, OBJECT_AT(object_id, station_id))
+        project_spec.object_id_to_idx[object_id] = i
     end
     # for (k,arr) in toml_dict["final_conditions"]
     #     object_id = arr[1]
@@ -198,11 +212,7 @@ function read_project_spec(toml_dict::Dict)
         push!(project_spec.final_conditions, OBJECT_AT(object_id, station_id))
     end
     for op_dict in toml_dict["operations"]
-        op = Operation(
-            pre     = Set{OBJECT_AT}(map(arr->OBJECT_AT(arr[1],arr[2]),op_dict["pre"])),
-            post    = Set{OBJECT_AT}(map(arr->OBJECT_AT(arr[1],arr[2]),op_dict["post"])),
-            Δt      = op_dict["Δt"]
-            )
+        op = read_operation(op_dict)
         add_operation!(project_spec, op)
     end
     return project_spec
@@ -274,12 +284,12 @@ function construct_delivery_graph(project_spec::ProjectSpec,M::Int)
         # for i in get_input_ids(op)
         for pred in preconditions(op)
             id = get_id(get_object_id(pred))
-            idx = project_spec.id_to_idx[id]
+            idx = project_spec.object_id_to_idx[id]
             pre = project_spec.initial_conditions[idx]
             post = project_spec.final_conditions[idx]
             push!(delivery_graph.tasks,DeliveryTask(id,get_id(get_location_id(pre)),get_id(get_location_id(post))))
             for j in get_output_ids(op)
-                idx2 = project_spec.id_to_idx[j]
+                idx2 = project_spec.object_id_to_idx[j]
                 add_edge!(delivery_graph.graph, idx, idx2)
                 # push!(delivery_graph.tasks,DeliveryTask(i,i,j))
             end
@@ -418,7 +428,6 @@ end
 
 function insert_to_vtx_map!(schedule::P,pred::OBJECT_AT,id::ObjectID,idx::Int) where {P<:ProjectSchedule}
     push!(schedule.vtx_ids, id)
-    # push!(schedule.object_ICs, pred)
     get_object_ICs(schedule)[get_id(id)] = pred
     schedule.object_vtx_map[get_id(id)] = idx
 end
@@ -687,7 +696,8 @@ function construct_project_schedule(
     # add operations to graph
     for op_vtx in topological_sort(project_spec.graph)
         op = project_spec.operations[op_vtx]
-        operation_id = OperationID(get_num_operations(schedule) + 1)
+        # operation_id = OperationID(get_num_operations(schedule) + 1)
+        operation_id = OperationID(get_id(op))
         add_to_schedule!(schedule, problem_spec, op, operation_id)
         v = nv(get_graph(schedule))
         if op_vtx in project_spec.root_nodes

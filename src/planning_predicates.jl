@@ -28,10 +28,21 @@ export
 
 
 export
-	get_unique_id
+    reset_task_id_counter!,
+    get_unique_task_id,
+    reset_operation_id_counter!,
+    get_unique_operation_id
 
-ID_COUNTER = 0
-get_unique_id() = Int(global ID_COUNTER += 1)
+TASK_ID_COUNTER = 0
+get_unique_task_id() = Int(global TASK_ID_COUNTER += 1)
+function reset_task_id_counter!()
+    global TASK_ID_COUNTER = 0
+end
+OPERATION_ID_COUNTER = 0
+get_unique_operation_id() = Int(global OPERATION_ID_COUNTER += 1)
+function reset_operation_id_counter!()
+    global OPERATION_ID_COUNTER = 0
+end
 
 """ Planning Resources (at the assignment level) """
 abstract type AbstractResource end
@@ -86,8 +97,6 @@ function matches_resource_spec(required::T,available::R) where {T<:AbstractResou
     matches_resource_spec(get_type(required),get_id(required),available)
 end
 
-
-
 """
 	`ResourceTable`
 
@@ -100,6 +109,11 @@ struct ResourceTable
     stations::Dict{Int,StationResource}
 end
 
+export
+    get_id,
+    get_object_id,
+    get_location_id,
+    get_robot_id
 
 abstract type AbstractID end
 get_id(id::AbstractID) = id.id
@@ -148,6 +162,27 @@ struct CAN_CARRY <: AbstractPlanningPredicate
 end
 get_robot_id(pred::CAN_CARRY) = pred.r
 get_object_id(pred::CAN_CARRY) = pred.o
+
+export
+    Operation,
+    preconditions,
+    postconditions,
+    duration
+
+@with_kw struct Operation
+    pre::Set{OBJECT_AT}     = Set{OBJECT_AT}()
+    post::Set{OBJECT_AT}    = Set{OBJECT_AT}()
+    Δt::Int 				= 0
+    station_id::StationID   = StationID(-1)
+    id::Int                 = -1
+end
+get_location_id(op::Operation) = op.station_id
+duration(op::Operation) = op.Δt
+preconditions(op::Operation) = op.pre
+postconditions(op::Operation) = op.post
+add_conditions(op::Operation) = op.post
+delete_conditions(op::Operation) = op.pre
+get_id(op::Operation) = op.id
 
 export
     AbstractRobotAction,
@@ -248,27 +283,6 @@ get_object_id(a::A) where {A<:COLLABORATE}                          = get_object
 #         ROBOT_AT(a.r,a.s1),
 #         OBJECT_AT(a.o,a.s1)
 #         ])
-
-export
-    Operation,
-    get_object_id,
-    get_location_id,
-    preconditions,
-    postconditions,
-    duration
-
-@with_kw struct Operation
-    pre::Set{OBJECT_AT}     = Set{OBJECT_AT}()
-    post::Set{OBJECT_AT}    = Set{OBJECT_AT}()
-    Δt::Int 				= 0
-    station_id::StationID   = StationID(-1)
-end
-get_location_id(op::Operation) = op.station_id
-duration(op::Operation) = op.Δt
-preconditions(op::Operation) = op.pre
-postconditions(op::Operation) = op.post
-add_conditions(op::Operation) = op.post
-delete_conditions(op::Operation) = op.pre
 
 # const Status            = Symbol
 # const Status()          = :waiting

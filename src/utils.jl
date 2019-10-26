@@ -276,10 +276,12 @@ function construct_task_graphs_problem(
     # r0,s0,sF        = get_random_problem_instantiation(N,M,pickup_vtxs,dropoff_vtxs,free_vtxs)
     # project_spec    = construct_random_project_spec(M,s0,sF;max_parents=3,depth_bias=1.0,Δt_min=0,Δt_max=0)
     N = length(r0)
-    M = length(s0)
-
-    object_ICs = Vector{OBJECT_AT}([OBJECT_AT(o,s0[o]) for o in 1:M]) # initial object conditions
-    object_FCs = Vector{OBJECT_AT}([OBJECT_AT(o,sF[o]) for o in 1:M]) # final object conditions
+    # M = length(s0)
+    # object_ICs = Vector{OBJECT_AT}([OBJECT_AT(o,s0[o]) for o in 1:M]) # initial object conditions
+    # object_FCs = Vector{OBJECT_AT}([OBJECT_AT(o,sF[o]) for o in 1:M]) # final object conditions
+    M = length(project_spec.initial_conditions)
+    object_ICs = project_spec.initial_conditions
+    object_FCs = project_spec.final_conditions
     robot_ICs = Dict{Int,ROBOT_AT}(r => ROBOT_AT(r,r0[r]) for r in 1:N) # initial robot conditions
     for r in 1:M # dummy robots
         robot_ICs[r+N] = ROBOT_AT(r+N,sF[r])
@@ -364,11 +366,11 @@ function construct_random_project_spec(M::Int,object_ICs::Vector{OBJECT_AT},obje
         # add_operation!(project_spec,construct_operation(station_id, input_ids, [output_id], Δt))
         input_ids = map(idx->get_id(get_object_id(project_spec.initial_conditions[idx])), input_idxs)
         output_ids = map(idx->get_id(get_object_id(project_spec.initial_conditions[idx])), [output_idx])
-        @show input_ids, output_ids
-        @show project_spec.initial_conditions
-        @show project_spec.id_to_idx
-        @show map(id->project_spec.id_to_idx[id], input_ids)
-        @show map(id->project_spec.id_to_idx[id], output_ids)
+        # @show input_ids, output_ids
+        # @show project_spec.initial_conditions
+        # @show project_spec.object_id_to_idx
+        # @show map(id->project_spec.object_id_to_idx[id], input_ids)
+        # @show map(id->project_spec.object_id_to_idx[id], output_ids)
         add_operation!(project_spec,construct_operation(project_spec, station_id, input_ids, output_ids, Δt))
         for idx in input_idxs
             enqueue!(frontier, idx=>M-i)
@@ -524,6 +526,41 @@ function get_display_metagraph(project_schedule::ProjectSchedule;
         end
     end
     graph
+end
+
+################################################################################
+######################### COMPARISONS AND VERIFICATION #########################
+################################################################################
+function Base.:(==)(op1::Operation,op2::Operation)
+    try
+        @assert(op1.pre == op2.pre)
+        @assert(op1.post == op2.post)
+        @assert(op1.Δt == op2.Δt)
+        @assert(op1.station_id == op2.station_id)
+    catch e
+        println(e.msg)
+        # throw(e)
+        return false
+    end
+    return true
+end
+function Base.:(==)(spec1::ProjectSpec,spec2::ProjectSpec)
+    try
+        @assert(spec1.initial_conditions == spec2.initial_conditions)
+        @assert(spec1.final_conditions == spec2.final_conditions)
+        @assert(spec1.operations == spec2.operations)
+        @assert(spec1.pre_deps == spec2.pre_deps)
+        @assert(spec1.graph == spec2.graph)
+        @assert(spec1.root_nodes == spec2.root_nodes)
+        @assert(spec1.weights == spec2.weights)
+        @assert(spec1.weight == spec2.weight)
+        @assert(spec1.object_id_to_idx == spec2.object_id_to_idx)
+    catch e
+        println(e.msg)
+        # throw(e)
+        return false
+    end
+    return true
 end
 
 end # module TaskGraphsUtils

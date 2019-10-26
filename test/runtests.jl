@@ -3,6 +3,7 @@ using TaskGraphs
 using Gurobi
 using JuMP, MathOptInterface
 using TOML
+using Random
 
 using Test
 using Logging
@@ -51,4 +52,5 @@ global_logger(SimpleLogger(stderr, Logging.Debug))
     @time @testset "TaskGraphs.ExampleTests" begin
         include(joinpath(testdir, "test_examples.jl"))
     end
+    @show get_unique_operation_id()
 end
