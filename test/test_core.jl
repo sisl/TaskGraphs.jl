@@ -78,7 +78,7 @@ let
         @test get_vtx(project_schedule, id) == v
     end
 end
-
+# combining two project specs
 let
     Random.seed!(0)
     N = 4                  # num robots

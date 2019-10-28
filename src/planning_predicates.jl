@@ -174,7 +174,7 @@ export
     post::Set{OBJECT_AT}    = Set{OBJECT_AT}()
     Δt::Int 				= 0
     station_id::StationID   = StationID(-1)
-    id::Int                 = -1
+    id::OperationID         = OperationID(-1)
 end
 get_location_id(op::Operation) = op.station_id
 duration(op::Operation) = op.Δt
@@ -182,7 +182,7 @@ preconditions(op::Operation) = op.pre
 postconditions(op::Operation) = op.post
 add_conditions(op::Operation) = op.post
 delete_conditions(op::Operation) = op.pre
-get_id(op::Operation) = op.id
+get_id(op::Operation) = get_id(op.id)
 
 export
     AbstractRobotAction,
