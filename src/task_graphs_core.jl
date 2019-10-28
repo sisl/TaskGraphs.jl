@@ -328,7 +328,6 @@ export
     # deadline            ::Int           = 0.0
 end
 
-
 export
     ProjectSchedule,
     get_graph,
