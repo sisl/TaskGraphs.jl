@@ -276,12 +276,12 @@ function construct_task_graphs_problem(
     # r0,s0,sF        = get_random_problem_instantiation(N,M,pickup_vtxs,dropoff_vtxs,free_vtxs)
     # project_spec    = construct_random_project_spec(M,s0,sF;max_parents=3,depth_bias=1.0,Δt_min=0,Δt_max=0)
     N = length(r0)
-    # M = length(s0)
-    # object_ICs = Vector{OBJECT_AT}([OBJECT_AT(o,s0[o]) for o in 1:M]) # initial object conditions
-    # object_FCs = Vector{OBJECT_AT}([OBJECT_AT(o,sF[o]) for o in 1:M]) # final object conditions
-    M = length(project_spec.initial_conditions)
-    object_ICs = project_spec.initial_conditions
-    object_FCs = project_spec.final_conditions
+    M = length(s0)
+    object_ICs = Vector{OBJECT_AT}([OBJECT_AT(o,s0[o]) for o in 1:M]) # initial object conditions
+    object_FCs = Vector{OBJECT_AT}([OBJECT_AT(o,sF[o]) for o in 1:M]) # final object conditions
+    # M = length(object_ICs)
+    # object_ICs = project_spec.initial_conditions
+    # object_FCs = project_spec.final_conditions
     robot_ICs = Dict{Int,ROBOT_AT}(r => ROBOT_AT(r,r0[r]) for r in 1:N) # initial robot conditions
     for r in 1:M # dummy robots
         robot_ICs[r+N] = ROBOT_AT(r+N,sF[r])
@@ -307,6 +307,58 @@ function construct_task_graphs_problem(
     root_node_groups = map(v->get_input_ids(project_spec.operations[v]),collect(project_spec.root_nodes))
     problem_spec = TaskGraphProblemSpec(N=N,M=M,graph=G,D=dist_matrix,Drs=Drs,
         Dss=Dss,Δt=Δt,tr0_=tr0_,to0_=to0_,root_nodes=root_node_groups,
+        Δt_collect=Δt_collect,Δt_deliver=Δt_deliver,s0=s0,sF=sF)
+    # @show problem_spec.root_nodes
+    return project_spec, problem_spec, object_ICs, object_FCs, robot_ICs
+end
+function construct_task_graphs_problem(
+        operations::Vector{Operation},
+        robot_ICs::Vector{ROBOT_AT},
+        object_ICs::Vector{OBJECT_AT},
+        object_FCs::Vector{OBJECT_AT},
+        dist_function,
+        Δt_collect=zeros(length(object_ICs)),
+        Δt_deliver=zeros(length(object_ICs)),
+        Δt_process=zeros(length(operations))
+        ) where {P<:ProjectSpec}
+    # select subset of pickup, dropoff and free locations to instantiate objects and robots
+    # r0,s0,sF        = get_random_problem_instantiation(N,M,pickup_vtxs,dropoff_vtxs,free_vtxs)
+    # project_spec    = construct_random_project_spec(M,s0,sF;max_parents=3,depth_bias=1.0,Δt_min=0,Δt_max=0)
+    N = length(robot_ICs)
+    M = length(object_ICs)
+    r0 = map(pred->get_id(get_initial_location_id(pred)),robot_ICs)
+    s0 = map(pred->get_id(get_initial_location_id(pred)),object_ICs)
+    sF = map(pred->get_id(get_initial_location_id(pred)),object_FCs)
+    # object_ICs = Vector{OBJECT_AT}([OBJECT_AT(o,s0[o]) for o in 1:M]) # initial object conditions
+    # object_FCs = Vector{OBJECT_AT}([OBJECT_AT(o,sF[o]) for o in 1:M]) # final object conditions
+    # M = length(object_ICs)
+    # object_ICs = project_spec.initial_conditions
+    # object_FCs = project_spec.final_conditions
+    # robot_ICs = Dict{Int,ROBOT_AT}(r => ROBOT_AT(r,r0[r]) for r in 1:N) # initial robot conditions
+    for r in 1:M # dummy robots
+        robot_ICs[r+N] = ROBOT_AT(r+N,sF[r])
+    end
+
+    Drs, Dss = cached_pickup_and_delivery_distances(r0,s0,sF,dist_function)
+
+    delivery_graph = construct_delivery_graph(project_spec,M)
+    # display(delivery_graph.tasks)
+    G = delivery_graph.graph
+    # Δt = get_duration_vector(project_spec) # initialize vector of operation times
+    # set initial conditions
+    to0_ = Dict{Int,Float64}()
+    for v in vertices(G)
+        if is_root_node(G,v)
+            to0_[v] = 0.0
+        end
+    end
+    tr0_ = Dict{Int,Float64}()
+    for i in 1:N
+        tr0_[i] = 0.0
+    end
+    root_node_groups = map(v->get_input_ids(project_spec.operations[v]),collect(project_spec.root_nodes))
+    problem_spec = TaskGraphProblemSpec(N=N,M=M,graph=G,D=dist_matrix,Drs=Drs,
+        Dss=Dss,Δt=Δt_process,tr0_=tr0_,to0_=to0_,root_nodes=root_node_groups,
         Δt_collect=Δt_collect,Δt_deliver=Δt_deliver,s0=s0,sF=sF)
     # @show problem_spec.root_nodes
     return project_spec, problem_spec, object_ICs, object_FCs, robot_ICs

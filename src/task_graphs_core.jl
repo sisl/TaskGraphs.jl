@@ -9,6 +9,17 @@ using TOML
 
 using ..PlanningPredicates
 
+
+export
+    EnvironmentState
+
+@with_kw struct EnvironmentState
+    robot_states::Vector{ROBOT_AT}      = Vector{ROBOT_AT}()
+    object_states::Vector{OBJECT_AT}    = Vector{OBJECT_AT}()
+    object_id_map::Dict{ObjectID,Int}   = Dict{ObjectID,Int}(get_object_id(o)=>i for (i,o) in enumerate(object_states))
+end
+
+
 export
     TaskGraphProblemSpec
 
@@ -82,16 +93,18 @@ export
     - object_id_to_idx::Dict{Int,Int}
 """
 @with_kw struct ProjectSpec{G}
+    # initial state
     initial_conditions::Vector{OBJECT_AT} = Vector{OBJECT_AT}()
     final_conditions::Vector{OBJECT_AT} = Vector{OBJECT_AT}()
+    # project specifications
     operations::Vector{Operation} = Vector{Operation}()
     pre_deps::Dict{Int,Set{Int}}  = Dict{Int,Set{Int}}() # id => (pre_conditions)
     post_deps::Dict{Int,Set{Int}} = Dict{Int,Set{Int}}()
     graph::G                      = MetaDiGraph()
     root_nodes::Set{Int}          = Set{Int}()
     weights::Dict{Int,Float64}    = Dict{Int,Float64}(v=>1.0 for v in root_nodes)
-    M::Int                        = length(initial_conditions)
     weight::Float64               = 1.0
+    M::Int                        = length(initial_conditions)
     object_id_to_idx::Dict{Int,Int} = Dict{Int,Int}(get_id(get_object_id(id))=>k for (k,id) in enumerate(initial_conditions))
     op_id_to_vtx::Dict{Int,Int}    = Dict{Int,Int}()
 end
@@ -126,18 +139,18 @@ function add_operation!(spec::ProjectSpec, op::Operation)
     push!(ops, op)
     spec.op_id_to_vtx[get_id(op)] = nv(G)
     op_id = length(ops)
-    for id in get_output_ids(op)
+    for object_id in get_output_ids(op)
         # object[id] is a product of operation[op_id]
-        add_pre_dep!(spec, id, op_id)
-        for op0_id in get_post_deps(spec, id)
+        add_pre_dep!(spec, object_id, op_id)
+        for op0_id in get_post_deps(spec, object_id)
             # for each operation that requires object[id]
             add_edge!(G, op_id, op0_id)
         end
     end
-    for id in get_input_ids(op)
+    for object_id in get_input_ids(op)
         # object[id] is a prereq for operation[op_id]
-        add_post_dep!(spec, id, op_id)
-        for op0_id in get_pre_deps(spec, id)
+        add_post_dep!(spec, object_id, op_id)
+        for op0_id in get_pre_deps(spec, object_id)
             # for each (1) operation that generates object[id]
             add_edge!(G, op0_id, op_id)
         end
@@ -165,18 +178,18 @@ function TOML.parse(op::Operation)
     toml_dict = Dict()
     toml_dict["pre"] = map(pred->[get_id(get_object_id(pred)),get_id(get_location_id(pred))], collect(op.pre))
     toml_dict["post"] = map(pred->[get_id(get_object_id(pred)),get_id(get_location_id(pred))], collect(op.post))
-    toml_dict["Δt"] = duration(op)
+    toml_dict["dt"] = duration(op)
     toml_dict["station_id"] = get_id(op.station_id)
-    toml_dict["id"] = op.id
+    toml_dict["id"] = get_id(op.id)
     return toml_dict
 end
 function read_operation(toml_dict::Dict)
     op = Operation(
         pre     = Set{OBJECT_AT}(map(arr->OBJECT_AT(arr[1],arr[2]),toml_dict["pre"])),
         post    = Set{OBJECT_AT}(map(arr->OBJECT_AT(arr[1],arr[2]),toml_dict["post"])),
-        Δt      = toml_dict["Δt"],
+        Δt      = toml_dict["dt"],
         station_id = StationID(toml_dict["station_id"]),
-        id = toml_dict["id"]
+        id = OperationID(toml_dict["id"])
         )
 end
 function TOML.parse(project_spec::ProjectSpec)
@@ -458,7 +471,8 @@ function generate_path_spec(schedule::P,spec::T,a::GO) where {P<:ProjectSchedule
         node_type=Symbol(typeof(a)),
         start_vtx=s0,
         final_vtx=s,
-        min_path_duration=get(spec.D,(s0,s),typemax(Int)), # TaskGraphProblemSpec distance matrix
+        # min_path_duration=get(spec.D,(s0,s),typemax(Int)), # TaskGraphProblemSpec distance matrix
+        min_path_duration=get(spec.D,(s0,s),0), # TaskGraphProblemSpec distance matrix
         path_id=get_next_path_id(schedule),
         dummy_id=r,
         agent_id=get(schedule.robot_id_map,r,-1),
@@ -474,7 +488,8 @@ function generate_path_spec(schedule::P,spec::T,a::CARRY) where {P<:ProjectSched
         node_type=Symbol(typeof(a)),
         start_vtx=s0,
         final_vtx=s,
-        min_path_duration=get(spec.D,(s0,s),typemax(Int)), # TaskGraphProblemSpec distance matrix
+        # min_path_duration=get(spec.D,(s0,s),typemax(Int)), # TaskGraphProblemSpec distance matrix
+        min_path_duration=get(spec.D,(s0,s),0), # TaskGraphProblemSpec distance matrix
         path_id=get_next_path_id(schedule),
         dummy_id=r,
         agent_id=get(schedule.robot_id_map,r,-1),
@@ -490,7 +505,8 @@ function generate_path_spec(schedule::P,spec::T,a::COLLECT) where {P<:ProjectSch
         node_type=Symbol(typeof(a)),
         start_vtx=s0,
         final_vtx=s,
-        min_path_duration=get(spec.Δt_collect,o,typemax(Int)),
+        # min_path_duration=get(spec.Δt_collect,o,typemax(Int)),
+        min_path_duration=get(spec.Δt_collect,o,0),
         path_id=get_next_path_id(schedule),
         dummy_id=r,
         agent_id=get(schedule.robot_id_map,r,-1),
@@ -507,7 +523,8 @@ function generate_path_spec(schedule::P,spec::T,a::DEPOSIT) where {P<:ProjectSch
         node_type=Symbol(typeof(a)),
         start_vtx=s0,
         final_vtx=s,
-        min_path_duration=get(spec.Δt_deliver,o,typemax(Int)),
+        # min_path_duration=get(spec.Δt_deliver,o,typemax(Int)),
+        min_path_duration=get(spec.Δt_deliver,o,0),
         path_id=get_next_path_id(schedule),
         dummy_id=r,
         agent_id=get(schedule.robot_id_map,r,-1),
@@ -527,8 +544,7 @@ end
 function generate_path_spec(schedule::P,spec::T,pred::ROBOT_AT) where {P<:ProjectSchedule,T<:TaskGraphProblemSpec}
     r = get_id(get_robot_id(pred))
     if !(r in collect(keys(schedule.robot_id_map)))
-        @show r
-        @show schedule.robot_id_map
+        println("generate_path_spec: r = ",r," not in schedule.robot_id_map = ",schedule.robot_id_map)
     end
     path_spec = PathSpec(
         node_type=Symbol(typeof(pred)),
@@ -549,12 +565,23 @@ function generate_path_spec(schedule::P,spec::T,op::Operation) where {P<:Project
         min_path_duration=duration(op)
         )
 end
+function generate_path_spec(schedule::P,pred) where {P<:ProjectSchedule}
+    generate_path_spec(schedule,TaskGraphProblemSpec(),pred)
+end
 
 function add_to_schedule!(schedule::P,spec::T,pred,id::ID) where {P<:ProjectSchedule,T<:TaskGraphProblemSpec,ID<:AbstractID}
     @assert get_vtx(schedule, id) == -1
     add_vertex!(get_graph(schedule))
     insert_to_vtx_map!(schedule,pred,id,nv(get_graph(schedule)))
     path_spec = generate_path_spec(schedule,spec,pred)
+    add_path_spec!(schedule,path_spec)
+    schedule
+end
+function add_to_schedule!(schedule::P,pred,id::ID) where {P<:ProjectSchedule,ID<:AbstractID}
+    @assert get_vtx(schedule, id) == -1
+    add_vertex!(get_graph(schedule))
+    insert_to_vtx_map!(schedule,pred,id,nv(get_graph(schedule)))
+    path_spec = generate_path_spec(schedule,pred)
     add_path_spec!(schedule,path_spec)
     schedule
 end
@@ -617,6 +644,8 @@ function populate_agent_ids!(schedule::P,spec::T,assignments) where {P<:ProjectS
     populate_agent_ids!(schedule.robot_id_map,spec,assignments)
 end
 
+export
+    add_single_robot_delivery_task!
 
 function add_single_robot_delivery_task!(
         schedule::S,
