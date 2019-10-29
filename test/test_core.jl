@@ -15,6 +15,7 @@ let
     robot_ICs = [ROBOT_AT(i,i) for i in 1:N];
     spec = construct_random_project_spec(M,object_ICs,object_FCs;max_parents=3);
     operations = spec.operations;
+    root_ops = map(op->op.id, spec.operations[collect(spec.root_nodes)])
     problem_spec = TaskGraphProblemSpec(N=N,M=M,D=dist_matrix);
     # Construct Partial Project Schedule
     project_schedule = ProjectSchedule();
@@ -28,6 +29,12 @@ let
        operation_id = op.id
        add_to_schedule!(project_schedule, problem_spec, op, operation_id)
     end
+    # add root nodes
+    for operation_id in root_ops
+        v = get_vtx(project_schedule, operation_id)
+        push!(project_schedule.root_nodes, v)
+        project_schedule.weights[v] = 1.0
+    end
     # Fill in gaps in project schedule (except for GO assignments)
     for op in operations
         operation_id = op.id
@@ -37,7 +44,6 @@ let
             pickup_station_id = get_id(get_location_id(object_ic))
             object_fc = object_FCs[object_id]
             dropoff_station_id = get_id(get_location_id(object_fc))
-
             # TODO Handle collaborative tasks
             # if is_single_robot_task(project_spec, object_id)
             robot_id = -1
@@ -45,7 +51,6 @@ let
                 object_id,pickup_station_id,dropoff_station_id)
             # elseif is_collaborative_robot_task(project_spec, object_id)
             # end
-
             action_id = ActionID(get_num_actions(project_schedule))
             add_edge!(project_schedule, action_id, operation_id)
         end
@@ -53,147 +58,136 @@ let
             add_edge!(project_schedule, operation_id, ObjectID(object_id))
         end
     end
-    [v for v in vertices(get_graph(project_schedule)) if typeof(get_node_from_id(project_schedule,get_vtx_id(project_schedule,v)))==CARRY]
+    project_schedule
     # Formulate MILP problem
-    tr0_ = Dict{Int,Float64}()
-    to0_ = Dict{Int,Float64}()
-    assignments = []
+    G = get_graph(project_schedule);
+    t0_ = Dict{AbstractID,Float64}();
+    assignments = [];
+    optimizer = Gurobi.Optimizer;
+    TimeLimit=100;
+    OutputFlag=0;
     model = Model(with_optimizer(optimizer,
-        TimeLimit=100,
-        OutputFlag=0
-        ))
-    NV = nv(get_graph(project_schedule))
-    @variable(t0[1:NV] >= 0.0) # initial times for all nodes
-    @variable(tF[1:NV] >= 0.0) # final times for all nodes
-    Δt = map(v->get_path_spec(project_schedule, v).min_path_duration, vertices(get_graph(project_schedule)))
-    # @variable(model, to0[1:M] >= 0.0) # object availability time
-    # @variable(model, tor[1:M] >= 0.0) # object robot arrival time
-    # @variable(model, toc[1:M] >= 0.0) # object collection complete time
-    # @variable(model, tod[1:M] >= 0.0) # object deliver begin time
-    # @variable(model, tof[1:M] >= 0.0) # object termination time
-    # @variable(model, tr0[1:N+M] >= 0.0) # robot availability time
+        TimeLimit=TimeLimit,
+        OutputFlag=OutputFlag
+        ));
+    nR = ones(M);
+    NV = nv(get_graph(project_schedule));
+    @variable(model, t0[1:NV] >= 0.0); # initial times for all nodes
+    @variable(model, tF[1:NV] >= 0.0); # final times for all nodes
+    Δt = map(v->get_path_spec(project_schedule, v).min_path_duration, vertices(G));
 
     # Assignment matrix x
-    @variable(model, x[1:N+M,1:M], binary = true) # x[i,j] ∈ {0,1}
-    @constraint(model, x * ones(M) .<= 1)         # each robot may have no more than 1 task
-    @constraint(model, x' * ones(N+M) .== nR)     # each task must have exactly 1 assignment
-    # for (i,t) in tr0_
-    #     # start time for robot i
-    #     @constraint(model, tr0[i] == t)
-    # end
-    # for (j,t) in to0_
-    #     # start time for task j (applies only to tasks with no prereqs)
-    #     @constraint(model, to0[j] == t)
-    # end
-    # for (i,j) in assignments
-    #     # start time for task j (applies only to tasks with no prereqs)
-    #     @constraint(model, x[i,j] == 1)
-    # end
-    # constraints
+    robot_ids = sort(collect(keys(get_robot_ICs(project_schedule))));
+    object_ids = sort(collect(keys(get_object_ICs(project_schedule))));
+    robot_id_map = Dict(RobotID(k)=>i for (i,k) in enumerate(robot_ids));
+    object_id_map = Dict(ObjectID(k)=>j for (j,k) in enumerate(object_ids));
+
+    @assert length(object_id_map) == M;
+    n_robots = length(robot_id_map); # different than N because dummy robots have been added
+    @variable(model, x[1:n_robots,1:M], binary = true); # x[i,j] ∈ {0,1}
+    @constraint(model, x * ones(M) .<= 1);              # each robot may have no more than 1 task
+    @constraint(model, x' * ones(n_robots) .== nR);     # each task must have exactly 1 assignment
+    for (id,t) in t0_
+        v = get_vtx(project_schedule, id)
+        @constraint(model, t0[v] == t)
+    end
+    for (robot_id,object_id) in assignments
+        i = robot_id_map[robot_id]
+        j = object_id_map[object_id]
+        @constraint(model, x[i,j] == 1)
+    end
+    # other constraints
     Mm = 10000 # for big-M constraints
-    for v in vertices(get_graph(project_schedule))
+    for v in vertices(G)
         @constraint(model, tF[v] >= t0[v] + Δt[v])
-        for v2 in inneighbors(get_graph(project_schedule),v)
-            @constraint(model, t0[v] >= tof[v])
+        for v2 in inneighbors(G,v)
+            @constraint(model, t0[v] >= tF[v2])
         end
-        node = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v))
-        if typeof(node) <: GO && (get_path_spec(project_schedule, v).dummy_id == -1)
-            # TODO add big M assignment constraints
-            j = # How to easily get j?
-            for (i,pred) in get_robot_ICs(project_schedule)
-                v2 = get_vtx(project_schedule, get_robot_id(pred))
-                start_idx = get_location_id(pred)
-                end_idx = get_destination_location_id(node)
-                dt_min = problem_spec.D[start_idx,end_idx]
-                # @constraint(model, tor[j] - (t0[v2] + dt_min) >= -Mm*(1 - x[i,j]))
+    end
+    for (object_id,j) in object_id_map
+        vj = get_vtx(project_schedule, object_id)
+        node_j = get_node_from_id(project_schedule, object_id)
+        downstream_vertices = map(e->e.dst,collect(edges(bfs_tree(G,vj;dir=:out))))
+        v_collect = outneighbors(G,vj)[1]
+        node_collect = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v_collect))
+        for (robot_id,i) in robot_id_map
+            vi = get_vtx(project_schedule, robot_id)
+            node_i = get_node_from_id(project_schedule, robot_id)
+            if (vi in downstream_vertices)
+                @constraint(model, x[i,j] == 0) # cannot assign to a downstream robot
+            else
+                for v in inneighbors(G, v_collect)
+                    node_go = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v))
+                    if typeof(node_go) <: GO
+                        start_idx = get_id(get_location_id(node_i)) # robot location
+                        end_idx = get_id(get_destination_location_id(node_go)) # object location
+                        dt_min = problem_spec.D[start_idx,end_idx]
+                        @constraint(model, tF[v] - (t0[v] + dt_min) >= -Mm*(1 - x[i,j]))
+                    end
+                end
             end
         end
     end
-    for j in 1:M
-        # constraint on task start time
-        if !is_root_node(G,j)
-            for v in inneighbors(G,j)
-                @constraint(model, to0[j] >= tof[v] + Δt[j])
-            end
-        end
-        # constraint on dummy robot start time (corresponds to moment of object delivery)
-        @constraint(model, tr0[j+N] == tof[j])
-        # dummy robots can't do upstream jobs
-        upstream_jobs = [j, map(e->e.dst,collect(edges(bfs_tree(G,j;dir=:in))))...]
-        for v in upstream_jobs
-            @constraint(model, x[j+N,v] == 0)
-        end
-        # lower bound on task completion time (task can't start until it's available).
-        # tof[j] = to0[j] + Dss[j,j] + slack[j]
-        @constraint(model, tor[j] >= to0[j])
-        # @constraint(model, tof[j] >= tor[j] + Dss[j,j] + Δt_collect[j] + Δt_deliver[j])
-        # bound on task completion time (assigned robot must first complete delivery)
-        # Big M constraint (thanks Oriana!): When x[i,j] == 1, this constrains the final time
-        # to be no less than the time it takes for the delivery to be completed by robot i.
-        # When x[i,j] == 0, this constrains the final time to be greater than a large negative
-        # number (meaning that this is a trivial constraint)
-        for i in 1:N+M
-            @constraint(model, tor[j] - (tr0[i] + Drs[i,j]) >= -Mm*(1 - x[i,j]))
-        end
-        @constraint(model, toc[j] == tor[j] + Δt_collect[j])
-        @constraint(model, tod[j] == toc[j] + Dss[j,j])
-        @constraint(model, tof[j] == tod[j] + Δt_deliver[j])
-        # "Job-shop" constraints specifying that no station may be double-booked. A station
-        # can only support a single COLLECT or DEPOSIT operation at a time, meaning that all
-        # the windows for these operations cannot overlap. In the constraints below, t1 and t2
-        # represent the intervals for the COLLECT or DEPOSIT operations of tasks j and j2,
-        # respectively. If eny of the operations for these two tasks require use of the same
-        # station, we introduce a 2D binary variable y. if y = [1,0], the operation for task
-        # j must occur before the operation for task j2. The opposite is true for y == [0,1].
-        # We use the big M method here as well to tightly enforce the binary constraints.
-        for j2 in j+1:M
-            if (s0[j] == s0[j2]) || (s0[j] == sF[j2]) || (sF[j] == s0[j2]) || (sF[j] == sF[j2])
-                # @show j, j2
-                if s0[j] == s0[j2]
-                    t1 = [tor[j], toc[j]]
-                    t2 = [tor[j2], toc[j2]]
-                elseif s0[j] == sF[j2]
-                    t1 = [tor[j], toc[j]]
-                    t2 = [tod[j2], tof[j2]]
-                elseif sF[j] == s0[j2]
-                    t1 = [tod[j], tof[j]]
-                    t2 = [tor[j2], toc[j2]]
-                elseif sF[j] == sF[j2]
-                    t1 = [tod, tof[j]]
-                    t2 = [tod, tof[j2]]
-                end
+
+    # "Job-shop" constraints specifying that no station may be double-booked. A station
+    # can only support a single COLLECT or DEPOSIT operation at a time, meaning that all
+    # the windows for these operations cannot overlap. In the constraints below, t1 and t2
+    # represent the intervals for the COLLECT or DEPOSIT operations of tasks j and j2,
+    # respectively. If eny of the operations for these two tasks require use of the same
+    # station, we introduce a 2D binary variable y. if y = [1,0], the operation for task
+    # j must occur before the operation for task j2. The opposite is true for y == [0,1].
+    # We use the big M method here as well to tightly enforce the binary constraints.
+    job_shop_variables = Dict{Tuple{Int,Int},JuMP.VariableRef}();
+    for v in 1:nv(G)
+        node = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v))
+        for v2 in nv(G)
+            node2 = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v2))
+            common_resources = intersect(resources_reserved(node),resources_reserved(node2))
+            if length(common_resources) > 0
+                @show common_resources
                 tmax = @variable(model)
                 tmin = @variable(model)
                 y = @variable(model, binary=true)
-                @constraint(model, tmax >= t1[1])
-                @constraint(model, tmax >= t2[1])
-                @constraint(model, tmin <= t1[2])
-                @constraint(model, tmin <= t2[2])
+                job_shop_variables[(v,v2)] = y
+                @constraint(model, tmax >= t0[v])
+                @constraint(model, tmax >= t0[v2])
+                @constraint(model, tmin <= tF[v])
+                @constraint(model, tmin <= tF[v2])
 
-                @constraint(model, tmax - t2[1] <= (1 - y)*Mm)
-                @constraint(model, tmax - t1[1] <= y*Mm)
-                @constraint(model, tmin - t1[2] >= (1 - y)*-Mm)
-                @constraint(model, tmin - t2[2] >= y*-Mm)
+                @constraint(model, tmax - t0[v2] <= (1 - y)*Mm)
+                @constraint(model, tmax - t0[v] <= y*Mm)
+                @constraint(model, tmin - tF[v] >= (1 - y)*-Mm)
+                @constraint(model, tmin - tF[v2] >= y*-Mm)
                 @constraint(model, tmin + 1 <= tmax)
             end
         end
     end
     # cost depends only on root node(s)
+    # cost_model = :MakeSpan
+    cost_model = :SumOfMakeSpans
+    weights = project_schedule.weights
     if cost_model == :SumOfMakeSpans
+        root_nodes = project_schedule.root_nodes
         @variable(model, T[1:length(root_nodes)])
         for (i,project_head) in enumerate(root_nodes)
             for v in project_head
-                @constraint(model, T[i] >= tof[v])
+                @show v
+                @constraint(model, T[i] >= tF[v])
             end
         end
-        @objective(model, Min, sum(map(i->T[i]*get(weights,i,0.0), 1:length(root_nodes))))
-        # @objective(model, Min, sum(map(v->tof[v]*get(weights,v,0.0), root_nodes)))
+        @objective(model, Min, sum(map(v->tF[v]*get(weights,v,0.0), root_nodes)))
     elseif cost_model == :MakeSpan
         @variable(model, T)
-        @constraint(model, T .>= tof)
+        @constraint(model, T .>= tF)
         @objective(model, Min, T)
     end
-    model;
+    # Optimize!
+    optimize!(model)
+    status = termination_status(model)
+    obj_val = Int(round(value(objective_function(model))))
+    assignment_matrix = Int.(round.(value.(x)))
+
+    model, status, obj_val, assignment_matrix
 end
 let
     M = 3

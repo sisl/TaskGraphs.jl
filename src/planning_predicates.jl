@@ -228,6 +228,47 @@ get_initial_location_id(a::A) where {A<:Union{COLLECT,DEPOSIT}}     = a.x
 get_destination_location_id(a::A) where {A<:Union{COLLECT,DEPOSIT}} = a.x
 get_object_id(a::A) where {A<:Union{CARRY,COLLECT,DEPOSIT}}         = a.o
 
+export
+    eligible_successors,
+    eligible_predecessors,
+    required_predecessors,
+    required_successors,
+    resources_reserved
+
+eligible_predecessors(node::GO)         = Dict(ROBOT_AT=>1,DEPOSIT=>1)
+eligible_successors(node::GO)           = Dict(COLLECT=>1)
+eligible_predecessors(node::COLLECT)    = Dict(OBJECT_AT=>1,GO=>1)
+eligible_successors(node::COLLECT)      = Dict(CARRY=>1)
+eligible_predecessors(node::CARRY)      = Dict(COLLECT=>1)
+eligible_successors(node::CARRY)        = Dict(DEPOSIT=>1)
+eligible_predecessors(node::DEPOSIT)    = Dict(CARRY=>1)
+eligible_successors(node::DEPOSIT)      = Dict(GO=>1)
+eligible_predecessors(node::Operation)  = Dict(DEPOSIT=>length(node.pre))
+eligible_successors(node::Operation)    = Dict(OBJECT_AT=>length(node.post))
+eligible_predecessors(node::OBJECT_AT)  = Dict(Operation=>1)
+eligible_successors(node::OBJECT_AT)    = Dict(COLLECT=>1)
+eligible_predecessors(node::ROBOT_AT)   = Dict()
+eligible_successors(node::ROBOT_AT)     = Dict(GO=>1)
+
+required_predecessors(node::GO)         = Dict((ROBOT_AT,DEPOSIT)=>1)
+required_successors(node::GO)           = Dict(COLLECT=>1)
+required_predecessors(node::COLLECT)    = Dict(OBJECT_AT=>1,GO=>1)
+required_successors(node::COLLECT)      = Dict(CARRY=>1)
+required_predecessors(node::CARRY)      = Dict(COLLECT=>1)
+required_successors(node::CARRY)        = Dict(DEPOSIT=>1)
+required_predecessors(node::DEPOSIT)    = Dict(CARRY=>1)
+required_successors(node::DEPOSIT)      = Dict()
+required_predecessors(node::Operation)  = Dict(DEPOSIT=>length(node.pre))
+required_successors(node::Operation)    = Dict(OBJECT_AT=>length(node.post))
+required_predecessors(node::OBJECT_AT)  = Dict()
+required_successors(node::OBJECT_AT)    = Dict(COLLECT=>1)
+required_predecessors(node::ROBOT_AT)   = Dict()
+required_successors(node::ROBOT_AT)     = Dict()
+
+resources_reserved(node)                = AbstractID[]
+resources_reserved(node::COLLECT)       = AbstractID[get_location_id(node)]
+resources_reserved(node::DEPOSIT)       = AbstractID[get_location_id(node)]
+
 """
     COLLABORATE
 
