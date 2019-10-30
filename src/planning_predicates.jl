@@ -280,6 +280,7 @@ resources_reserved(node::DEPOSIT)       = AbstractID[get_location_id(node)]
 is_valid(id::A) where {A<:AbstractID} = get_id(id) != -1
 first_valid(a,b) = is_valid(a) ? a : b
 
+align_with_predecessor(node,pred) 						= node
 align_with_predecessor(node::GO,pred::ROBOT_AT) 		= GO(first_valid(node.r,pred.r), first_valid(node.x1,pred.x), node.x2)
 align_with_predecessor(node::GO,pred::DEPOSIT) 			= GO(first_valid(node.r,pred.r), first_valid(node.x1,pred.x), node.x2)
 align_with_predecessor(node::COLLECT,pred::OBJECT_AT) 	= COLLECT(node.r, first_valid(node.o,pred.o), first_valid(node.x,pred.x))

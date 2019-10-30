@@ -364,6 +364,7 @@ export
     get_vtx_id,
     get_path_spec,
     set_path_spec!,
+    replace_in_schedule!,
     add_to_schedule!,
     construct_project_schedule,
     process_schedule
@@ -569,6 +570,13 @@ function generate_path_spec(schedule::P,pred) where {P<:ProjectSchedule}
     generate_path_spec(schedule,TaskGraphProblemSpec(),pred)
 end
 
+function replace_in_schedule!(schedule::P,spec::T,pred,id::ID) where {P<:ProjectSchedule,T<:TaskGraphProblemSpec,ID<:AbstractID}
+    v = get_vtx(schedule, id)
+    @assert v != -1
+    path_spec = generate_path_spec(schedule,spec,pred)
+    set_path_spec!(schedule,v,path_spec)
+    schedule
+end
 function add_to_schedule!(schedule::P,spec::T,pred,id::ID) where {P<:ProjectSchedule,T<:TaskGraphProblemSpec,ID<:AbstractID}
     @assert get_vtx(schedule, id) == -1
     add_vertex!(get_graph(schedule))
