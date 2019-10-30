@@ -62,73 +62,89 @@ let
         end
     end
     project_schedule
+    edge_list = collect(edges(project_schedule.graph))
+    nodes = map(id->get_node_from_id(project_schedule, id), project_schedule.vtx_ids)
+    nodes, edge_list
 
     # Formulate MILP problem
     G = get_graph(project_schedule);
     t0_ = Dict{AbstractID,Float64}();
-    nR = ones(M); # number of robots required for each task
-    NV = nv(G);
+    # nR = ones(M); # number of robots required for each task
     assignments = [];
-    Δt = map(v->get_path_spec(project_schedule, v).min_path_duration, vertices(G));
-    robot_ids = sort(collect(keys(get_robot_ICs(project_schedule))));
-    object_ids = sort(collect(keys(get_object_ICs(project_schedule))));
-    robot_id_map = Dict(RobotID(k)=>i for (i,k) in enumerate(robot_ids));
-    object_id_map = Dict(ObjectID(k)=>j for (j,k) in enumerate(object_ids));
-    @assert length(object_id_map) == M;
-    n_robots = length(robot_id_map); # different than N because dummy robots have been added
+    Δt = map(v->get_path_spec(project_schedule, v).min_path_duration, vertices(G))
+
+    # robot_ids = sort(collect(keys(get_robot_ICs(project_schedule))));
+    # object_ids = sort(collect(keys(get_object_ICs(project_schedule))));
+    # robot_id_map = Dict(RobotID(k)=>i for (i,k) in enumerate(robot_ids));
+    # object_id_map = Dict(ObjectID(k)=>j for (j,k) in enumerate(object_ids));
+    # @assert length(object_id_map) == M;
+    # n_robots = length(robot_id_map); # different than N because dummy robots have been added
 
     optimizer = Gurobi.Optimizer;
     TimeLimit=100;
-    OutputFlag=0;
+    OutputFlag=1;
     model = Model(with_optimizer(optimizer,
         TimeLimit=TimeLimit,
         OutputFlag=OutputFlag
         ));
-    @variable(model, t0[1:NV] >= 0.0); # initial times for all nodes
-    @variable(model, tF[1:NV] >= 0.0); # final times for all nodes
+    # Start and End Times
+    @variable(model, t0[1:nv(G)] >= 0.0); # initial times for all nodes
+    @variable(model, tF[1:nv(G)] >= 0.0); # final times for all nodes
     # Assignment matrix x
-    @variable(model, x[1:n_robots,1:M], binary = true); # x[i,j] ∈ {0,1}
-    @constraint(model, x * ones(M) .<= 1);              # each robot may have no more than 1 task
-    @constraint(model, x' * ones(n_robots) .== nR);     # each task must have exactly 1 assignment
+    # @variable(model, x[1:n_robots,1:M], binary = true); # x[i,j] ∈ {0,1}
+    # @constraint(model, x * ones(M) .<= 1);              # each robot may have no more than 1 task
+    # @constraint(model, x' * ones(n_robots) .== nR);     # each task must have exactly 1 assignment
+    # Adjacency Matrix
+    @variable(model, X[1:nv(G),1:nv(G)], binary = true); # x[i,j] ∈ {0,1}
+    @constraint(model, X .+ X' .<= 1) # no bidirectional edges (also guarantees that diagonal is zero)
     for (id,t) in t0_
         v = get_vtx(project_schedule, id)
         @constraint(model, t0[v] == t)
     end
-    for (robot_id,object_id) in assignments
-        i = robot_id_map[robot_id]
-        j = object_id_map[object_id]
-        @constraint(model, x[i,j] == 1)
-    end
+    # for (robot_id,object_id) in assignments
+    #     i = robot_id_map[robot_id]
+    #     j = object_id_map[object_id]
+    #     @constraint(model, x[i,j] == 1)
+    # end
     # other constraints
     Mm = 10000 # for big-M constraints
     for v in vertices(G)
+        # @constraint(model, X[v,v] == 0) # no self edges (alreadt taken care of above)
         @constraint(model, tF[v] >= t0[v] + Δt[v])
-        for v2 in inneighbors(G,v)
-            @constraint(model, t0[v] >= tF[v2])
+        for v2 in outneighbors(G,v)
+            @constraint(model, X[v,v2] == 1)
+            @constraint(model, t0[v2] >= tF[v])
         end
     end
     # what edges to add?
-    @variable(model, X[1:nv(G),1:nv(G)], binary = true); # x[i,j] ∈ {0,1}
     missing_successors      = Dict{Int,Dict}()
     missing_predecessors    = Dict{Int,Dict}()
-    n_successors            = zeros(nv(G))
-    n_predecessors          = zeros(nv(G))
+    n_eligible_successors   = zeros(Int,nv(G))
+    n_eligible_predecessors = zeros(Int,nv(G))
+    n_required_successors   = zeros(Int,nv(G))
+    n_required_predecessors = zeros(Int,nv(G))
     for v in vertices(G)
         node = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v))
+        for (key,val) in required_successors(node)
+            n_required_successors[v] += val
+        end
+        for (key,val) in required_predecessors(node)
+            n_required_predecessors[v] += val
+        end
         for (key,val) in eligible_successors(node)
-            n_successors[v] += 1
+            n_eligible_successors[v] += val
         end
         for (key,val) in eligible_predecessors(node)
-            n_predecessors[v] += 1
+            n_eligible_predecessors[v] += val
         end
         missing_successors[v] = eligible_successors(node)
         for v2 in outneighbors(G,v)
-            @constraint(model, X[v,v2] == 1)
             id2 = get_vtx_id(project_schedule, v2)
             node2 = get_node_from_id(project_schedule, id2)
             for key in collect(keys(missing_successors[v]))
                 if matches_template(key,typeof(node2))
                     missing_successors[v][key] -= 1
+                    break
                 end
             end
             # missing_successors[v][typeof(node2)] = get(missing_successors[v], typeof(node2), 0) - 1
@@ -140,19 +156,32 @@ let
             for key in collect(keys(missing_predecessors[v]))
                 if matches_template(key,typeof(node2))
                     missing_predecessors[v][key] -= 1
+                    break
                 end
             end
             # missing_predecessors[v][typeof(node2)] = get(missing_predecessors[v], typeof(node2), 0) - 1
         end
     end
-    @constraint(model, X * ones(NV) .<= n_successors);
-    @constraint(model, X' * ones(NV) .<= n_predecessors);
-    @show missing_predecessors
-    @show missing_successors
+    @assert(!any(n_eligible_predecessors .< n_required_predecessors))
+    @assert(!any(n_eligible_successors .< n_required_successors))
+    nodes, edge_list, n_eligible_predecessors, n_required_predecessors, n_eligible_successors, n_required_successors
+
+    # @constraint(model, X * ones(nv(G)) .<= n_eligible_successors);
+    @constraint(model, X * ones(nv(G)) .>= n_required_successors);
+    # @constraint(model, X' * ones(nv(G)) .<= n_eligible_predecessors);
+    @constraint(model, X' * ones(nv(G)) .>= n_required_predecessors);
+    nodes, edge_list, missing_predecessors, missing_successors
+
+    v = 4
+    upstream_vertices = map(e->e.dst,collect(edges(bfs_tree(G,v;dir=:in))))
+
     for v in vertices(G)
+        upstream_vertices = map(e->e.dst,collect(edges(bfs_tree(G,v;dir=:in))))
+        for v2 in upstream_vertices
+            @constraint(model, X[v,v2] == 0)
+        end
         node = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v))
         # @show v, typeof(node)
-        upstream_vertices = map(e->e.dst,collect(edges(bfs_tree(G,v;dir=:in))))
         for (template, val) in missing_successors[v]
             # @show template, val
             for v2 in vertices(G)
@@ -175,12 +204,12 @@ let
                         @show v,v2,typeof(node),typeof(node2)
                         # possible to add and edge
                         # TODO build the bridge
-                        new_node = align_with_predecessor(node2,node)
+                        @show new_node = align_with_predecessor(node2,node)
                         # TODO how to get dt_min? Perhaps it can be done with generate_path_spec?
                         @show dt_min = generate_path_spec(project_schedule,problem_spec,new_node).min_path_duration
                         @constraint(model, tF[v2] - (t0[v2] + dt_min) >= -Mm*(1 - X[v,v2]))
                     else
-                        @constraint(model, X[v,v2] == 0)
+                        # @constraint(model, X[v,v2] == 0)
                     end
                 end
             end
@@ -188,30 +217,30 @@ let
     end
 
     # assignments and associated big M constraints
-    for (object_id,j) in object_id_map
-        vj = get_vtx(project_schedule, object_id)
-        node_j = get_node_from_id(project_schedule, object_id)
-        downstream_vertices = map(e->e.dst,collect(edges(bfs_tree(G,vj;dir=:out))))
-        v_collect = outneighbors(G,vj)[1]
-        node_collect = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v_collect))
-        for (robot_id,i) in robot_id_map
-            vi = get_vtx(project_schedule, robot_id)
-            node_i = get_node_from_id(project_schedule, robot_id)
-            if (vi in downstream_vertices)
-                @constraint(model, x[i,j] == 0) # cannot assign to a downstream robot
-            else
-                for v in inneighbors(G, v_collect)
-                    node_go = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v))
-                    if typeof(node_go) <: GO
-                        start_idx = get_id(get_location_id(node_i)) # robot location
-                        end_idx = get_id(get_destination_location_id(node_go)) # object location
-                        dt_min = problem_spec.D[start_idx,end_idx]
-                        @constraint(model, tF[v] - (t0[v] + dt_min) >= -Mm*(1 - x[i,j]))
-                    end
-                end
-            end
-        end
-    end
+    # for (object_id,j) in object_id_map
+    #     vj = get_vtx(project_schedule, object_id)
+    #     node_j = get_node_from_id(project_schedule, object_id)
+    #     downstream_vertices = map(e->e.dst,collect(edges(bfs_tree(G,vj;dir=:out))))
+    #     v_collect = outneighbors(G,vj)[1]
+    #     node_collect = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v_collect))
+    #     for (robot_id,i) in robot_id_map
+    #         vi = get_vtx(project_schedule, robot_id)
+    #         node_i = get_node_from_id(project_schedule, robot_id)
+    #         if (vi in downstream_vertices)
+    #             @constraint(model, x[i,j] == 0) # cannot assign to a downstream robot
+    #         else
+    #             for v in inneighbors(G, v_collect)
+    #                 node_go = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v))
+    #                 if typeof(node_go) <: GO
+    #                     start_idx = get_id(get_location_id(node_i)) # robot location
+    #                     end_idx = get_id(get_destination_location_id(node_go)) # object location
+    #                     dt_min = problem_spec.D[start_idx,end_idx]
+    #                     @constraint(model, tF[v] - (t0[v] + dt_min) >= -Mm*(1 - x[i,j]))
+    #                 end
+    #             end
+    #         end
+    #     end
+    # end
 
     # "Job-shop" constraints specifying that no station may be double-booked. A station
     # can only support a single COLLECT or DEPOSIT operation at a time, meaning that all
@@ -224,7 +253,7 @@ let
     job_shop_variables = Dict{Tuple{Int,Int},JuMP.VariableRef}();
     for v in 1:nv(G)
         node = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v))
-        for v2 in nv(G)
+        for v2 in v+1:nv(G)
             node2 = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v2))
             common_resources = intersect(resources_reserved(node),resources_reserved(node2))
             if length(common_resources) > 0
@@ -247,8 +276,8 @@ let
         end
     end
     # cost depends only on root node(s)
-    # cost_model = :MakeSpan
-    cost_model = :SumOfMakeSpans
+    cost_model = :MakeSpan
+    # cost_model = :SumOfMakeSpans
     if cost_model == :SumOfMakeSpans
         root_nodes = project_schedule.root_nodes
         @variable(model, T[1:length(root_nodes)])
@@ -268,9 +297,9 @@ let
     optimize!(model)
     status = termination_status(model)
     obj_val = Int(round(value(objective_function(model))))
-    assignment_matrix = Int.(round.(value.(x)))
+    adj_matrix = Int.(round.(value.(X)))
 
-    model, status, obj_val, assignment_matrix
+    model, status, obj_val, edge_list, adj_matrix', n_required_predecessors, nodes
 end
 let
     M = 3
