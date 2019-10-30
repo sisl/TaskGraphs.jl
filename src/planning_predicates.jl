@@ -142,19 +142,19 @@ end
 abstract type AbstractPlanningPredicate end
 struct OBJECT_AT <: AbstractPlanningPredicate
     o::ObjectID
-    s::StationID
+    x::StationID
 end
-OBJECT_AT(o::Int,s::Int) = OBJECT_AT(ObjectID(o),StationID(s))
+OBJECT_AT(o::Int,x::Int) = OBJECT_AT(ObjectID(o),StationID(x))
 get_object_id(pred::OBJECT_AT) = pred.o
-get_location_id(pred::OBJECT_AT) = pred.s
+get_location_id(pred::OBJECT_AT) = pred.x
 
 struct ROBOT_AT <: AbstractPlanningPredicate
     r::RobotID
-    s::StationID
+    x::StationID
 end
-ROBOT_AT(r::Int,s::Int) = ROBOT_AT(RobotID(r),StationID(s))
+ROBOT_AT(r::Int,x::Int) = ROBOT_AT(RobotID(r),StationID(x))
 get_robot_id(pred::ROBOT_AT) = pred.r
-get_location_id(pred::ROBOT_AT) = pred.s
+get_location_id(pred::ROBOT_AT) = pred.x
 
 struct CAN_CARRY <: AbstractPlanningPredicate
     r::RobotID
@@ -233,9 +233,11 @@ export
     eligible_predecessors,
     required_predecessors,
     required_successors,
-    resources_reserved
+	matches_template,
+    resources_reserved,
+	align_with_predecessor
 
-eligible_predecessors(node::GO)         = Dict(ROBOT_AT=>1,DEPOSIT=>1)
+eligible_predecessors(node::GO)         = Dict((ROBOT_AT,DEPOSIT)=>1)
 eligible_successors(node::GO)           = Dict(COLLECT=>1)
 eligible_predecessors(node::COLLECT)    = Dict(OBJECT_AT=>1,GO=>1)
 eligible_successors(node::COLLECT)      = Dict(CARRY=>1)
@@ -265,9 +267,27 @@ required_successors(node::OBJECT_AT)    = Dict(COLLECT=>1)
 required_predecessors(node::ROBOT_AT)   = Dict()
 required_successors(node::ROBOT_AT)     = Dict()
 
+matches_template(template,node) = false
+matches_template(template::T,node::T) where {T} = true
+matches_template(template::DataType,node::DataType) = template == node
+matches_template(template::T,node::DataType) where {T<:Tuple} = (node in template)
+matches_template(template::T,node) where {T<:Tuple} = matches_template(template, typeof(node))
+
 resources_reserved(node)                = AbstractID[]
 resources_reserved(node::COLLECT)       = AbstractID[get_location_id(node)]
 resources_reserved(node::DEPOSIT)       = AbstractID[get_location_id(node)]
+
+is_valid(id::A) where {A<:AbstractID} = get_id(id) != -1
+first_valid(a,b) = is_valid(a) ? a : b
+
+align_with_predecessor(node::GO,pred::ROBOT_AT) 		= GO(first_valid(node.r,pred.r), first_valid(node.x1,pred.x), node.x2)
+align_with_predecessor(node::GO,pred::DEPOSIT) 			= GO(first_valid(node.r,pred.r), first_valid(node.x1,pred.x), node.x2)
+align_with_predecessor(node::COLLECT,pred::OBJECT_AT) 	= COLLECT(node.r, first_valid(node.o,pred.o), first_valid(node.x,pred.x))
+align_with_predecessor(node::COLLECT,pred::GO) 			= COLLECT(first_valid(node.r,pred.r), node.o, first_valid(node.x,pred.x2))
+align_with_predecessor(node::CARRY,pred::COLLECT) 		= CARRY(first_valid(node.r,pred.r), first_valid(node.o,pred.o), first_valid(node.x1,pred.x), node.x2)
+align_with_predecessor(node::DEPOSIT,pred::CARRY)		= DEPOSIT(first_valid(node.r,pred.r), first_valid(node.o,pred.o), first_valid(node.x,pred.x2))
+
+
 
 """
     COLLABORATE

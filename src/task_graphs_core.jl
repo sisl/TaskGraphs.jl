@@ -681,11 +681,11 @@ function add_single_robot_delivery_task!(
     add_to_schedule!(schedule, problem_spec, DEPOSIT(robot_id, object_id, dropoff_station_id), action_id+=1)
     add_edge!(schedule, action_id-1, action_id)
 
-    new_robot_id = object_id + problem_spec.N
-    if get_vtx(schedule, RobotID(new_robot_id)) == -1
-        add_to_schedule!(schedule, problem_spec, ROBOT_AT(RobotID(new_robot_id),StationID(dropoff_station_id)), RobotID(new_robot_id))
-    end
-    add_edge!(schedule, action_id, RobotID(new_robot_id))
+    # new_robot_id = object_id + problem_spec.N
+    # if get_vtx(schedule, RobotID(new_robot_id)) == -1
+    #     add_to_schedule!(schedule, problem_spec, ROBOT_AT(RobotID(new_robot_id),StationID(dropoff_station_id)), RobotID(new_robot_id))
+    # end
+    # add_edge!(schedule, action_id, RobotID(new_robot_id))
 
     schedule
 end

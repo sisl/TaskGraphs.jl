@@ -4,10 +4,12 @@ let
 end
 let
     Random.seed!(0);
+
     # Define Environment
     vtx_grid = initialize_dense_vtx_grid(8,8);
     env_graph = initialize_grid_graph_from_vtx_grid(vtx_grid);
     dist_matrix = get_dist_matrix(env_graph);
+
     # Define project
     N = 5; M = 10;
     object_ICs = [OBJECT_AT(j,j) for j in 1:M];
@@ -17,6 +19,7 @@ let
     operations = spec.operations;
     root_ops = map(op->op.id, spec.operations[collect(spec.root_nodes)])
     problem_spec = TaskGraphProblemSpec(N=N,M=M,D=dist_matrix);
+
     # Construct Partial Project Schedule
     project_schedule = ProjectSchedule();
     for pred in object_ICs
@@ -59,10 +62,21 @@ let
         end
     end
     project_schedule
+
     # Formulate MILP problem
     G = get_graph(project_schedule);
     t0_ = Dict{AbstractID,Float64}();
+    nR = ones(M); # number of robots required for each task
+    NV = nv(G);
     assignments = [];
+    Δt = map(v->get_path_spec(project_schedule, v).min_path_duration, vertices(G));
+    robot_ids = sort(collect(keys(get_robot_ICs(project_schedule))));
+    object_ids = sort(collect(keys(get_object_ICs(project_schedule))));
+    robot_id_map = Dict(RobotID(k)=>i for (i,k) in enumerate(robot_ids));
+    object_id_map = Dict(ObjectID(k)=>j for (j,k) in enumerate(object_ids));
+    @assert length(object_id_map) == M;
+    n_robots = length(robot_id_map); # different than N because dummy robots have been added
+
     optimizer = Gurobi.Optimizer;
     TimeLimit=100;
     OutputFlag=0;
@@ -70,20 +84,9 @@ let
         TimeLimit=TimeLimit,
         OutputFlag=OutputFlag
         ));
-    nR = ones(M);
-    NV = nv(get_graph(project_schedule));
     @variable(model, t0[1:NV] >= 0.0); # initial times for all nodes
     @variable(model, tF[1:NV] >= 0.0); # final times for all nodes
-    Δt = map(v->get_path_spec(project_schedule, v).min_path_duration, vertices(G));
-
     # Assignment matrix x
-    robot_ids = sort(collect(keys(get_robot_ICs(project_schedule))));
-    object_ids = sort(collect(keys(get_object_ICs(project_schedule))));
-    robot_id_map = Dict(RobotID(k)=>i for (i,k) in enumerate(robot_ids));
-    object_id_map = Dict(ObjectID(k)=>j for (j,k) in enumerate(object_ids));
-
-    @assert length(object_id_map) == M;
-    n_robots = length(robot_id_map); # different than N because dummy robots have been added
     @variable(model, x[1:n_robots,1:M], binary = true); # x[i,j] ∈ {0,1}
     @constraint(model, x * ones(M) .<= 1);              # each robot may have no more than 1 task
     @constraint(model, x' * ones(n_robots) .== nR);     # each task must have exactly 1 assignment
@@ -104,6 +107,87 @@ let
             @constraint(model, t0[v] >= tF[v2])
         end
     end
+    # what edges to add?
+    @variable(model, X[1:nv(G),1:nv(G)], binary = true); # x[i,j] ∈ {0,1}
+    missing_successors      = Dict{Int,Dict}()
+    missing_predecessors    = Dict{Int,Dict}()
+    n_successors            = zeros(nv(G))
+    n_predecessors          = zeros(nv(G))
+    for v in vertices(G)
+        node = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v))
+        for (key,val) in eligible_successors(node)
+            n_successors[v] += 1
+        end
+        for (key,val) in eligible_predecessors(node)
+            n_predecessors[v] += 1
+        end
+        missing_successors[v] = eligible_successors(node)
+        for v2 in outneighbors(G,v)
+            @constraint(model, X[v,v2] == 1)
+            id2 = get_vtx_id(project_schedule, v2)
+            node2 = get_node_from_id(project_schedule, id2)
+            for key in collect(keys(missing_successors[v]))
+                if matches_template(key,typeof(node2))
+                    missing_successors[v][key] -= 1
+                end
+            end
+            # missing_successors[v][typeof(node2)] = get(missing_successors[v], typeof(node2), 0) - 1
+        end
+        missing_predecessors[v] = eligible_predecessors(node)
+        for v2 in inneighbors(G,v)
+            id2 = get_vtx_id(project_schedule, v2)
+            node2 = get_node_from_id(project_schedule, id2)
+            for key in collect(keys(missing_predecessors[v]))
+                if matches_template(key,typeof(node2))
+                    missing_predecessors[v][key] -= 1
+                end
+            end
+            # missing_predecessors[v][typeof(node2)] = get(missing_predecessors[v], typeof(node2), 0) - 1
+        end
+    end
+    @constraint(model, X * ones(NV) .<= n_successors);
+    @constraint(model, X' * ones(NV) .<= n_predecessors);
+    @show missing_predecessors
+    @show missing_successors
+    for v in vertices(G)
+        node = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v))
+        # @show v, typeof(node)
+        upstream_vertices = map(e->e.dst,collect(edges(bfs_tree(G,v;dir=:in))))
+        for (template, val) in missing_successors[v]
+            # @show template, val
+            for v2 in vertices(G)
+                if v2 in upstream_vertices
+                    continue
+                end
+                node2 = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v2))
+                # @show v2, typeof(node2)
+                if !matches_template(template, typeof(node2))
+                    continue
+                end
+                # @show missing_predecessors[v]
+                # @show missing_successors[v2]
+                for (template2, val2) in missing_predecessors[v2]
+                    # @show v2, v, val2, val, template2, template, typeof(node2)
+                    if !(val > 0 && val2 > 0)
+                        continue
+                    end
+                    if matches_template(template2,typeof(node))
+                        @show v,v2,typeof(node),typeof(node2)
+                        # possible to add and edge
+                        # TODO build the bridge
+                        new_node = align_with_predecessor(node2,node)
+                        # TODO how to get dt_min? Perhaps it can be done with generate_path_spec?
+                        @show dt_min = generate_path_spec(project_schedule,problem_spec,new_node).min_path_duration
+                        @constraint(model, tF[v2] - (t0[v2] + dt_min) >= -Mm*(1 - X[v,v2]))
+                    else
+                        @constraint(model, X[v,v2] == 0)
+                    end
+                end
+            end
+        end
+    end
+
+    # assignments and associated big M constraints
     for (object_id,j) in object_id_map
         vj = get_vtx(project_schedule, object_id)
         node_j = get_node_from_id(project_schedule, object_id)
@@ -165,7 +249,6 @@ let
     # cost depends only on root node(s)
     # cost_model = :MakeSpan
     cost_model = :SumOfMakeSpans
-    weights = project_schedule.weights
     if cost_model == :SumOfMakeSpans
         root_nodes = project_schedule.root_nodes
         @variable(model, T[1:length(root_nodes)])
@@ -175,7 +258,7 @@ let
                 @constraint(model, T[i] >= tF[v])
             end
         end
-        @objective(model, Min, sum(map(v->tF[v]*get(weights,v,0.0), root_nodes)))
+        @objective(model, Min, sum(map(v->tF[v]*get(project_schedule.weights,v,0.0), root_nodes)))
     elseif cost_model == :MakeSpan
         @variable(model, T)
         @constraint(model, T .>= tF)
