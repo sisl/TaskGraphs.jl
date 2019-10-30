@@ -73,13 +73,6 @@ let
     assignments = [];
     Δt = map(v->get_path_spec(project_schedule, v).min_path_duration, vertices(G))
 
-    # robot_ids = sort(collect(keys(get_robot_ICs(project_schedule))));
-    # object_ids = sort(collect(keys(get_object_ICs(project_schedule))));
-    # robot_id_map = Dict(RobotID(k)=>i for (i,k) in enumerate(robot_ids));
-    # object_id_map = Dict(ObjectID(k)=>j for (j,k) in enumerate(object_ids));
-    # @assert length(object_id_map) == M;
-    # n_robots = length(robot_id_map); # different than N because dummy robots have been added
-
     optimizer = Gurobi.Optimizer;
     TimeLimit=100;
     OutputFlag=0;
@@ -87,11 +80,9 @@ let
         TimeLimit=TimeLimit,
         OutputFlag=OutputFlag
         ));
-    # Start and End Times
     @variable(model, t0[1:nv(G)] >= 0.0); # initial times for all nodes
     @variable(model, tF[1:nv(G)] >= 0.0); # final times for all nodes
-    # Adjacency Matrix
-    @variable(model, X[1:nv(G),1:nv(G)], binary = true); # x[i,j] ∈ {0,1}
+    @variable(model, X[1:nv(G),1:nv(G)], binary = true); # Adjacency Matrix
     @constraint(model, X .+ X' .<= 1) # no bidirectional edges (also guarantees that diagonal is zero)
     for (id,t) in t0_
         v = get_vtx(project_schedule, id)
@@ -169,22 +160,24 @@ let
         node = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v))
         for (template, val) in missing_successors[v]
             for v2 in vertices(G)
-                if v2 in upstream_vertices
-                    continue
-                end
                 node2 = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v2))
-                if !matches_template(template, typeof(node2))
+                if (v2 in upstream_vertices) || !matches_template(template, typeof(node2))
                     continue
                 end
+                potential_match = false
                 for (template2, val2) in missing_predecessors[v2]
-                    if !(val > 0 && val2 > 0)
-                        continue
-                    end
                     if matches_template(template2,typeof(node)) # possible to add and edge
+                        potential_match = true
+                        if !(val > 0 && val2 > 0)
+                            continue
+                        end
                         @show new_node = align_with_predecessor(node2,node)
                         @show dt_min = generate_path_spec(project_schedule,problem_spec,new_node).min_path_duration
                         @constraint(model, tF[v2] - (t0[v2] + dt_min) >= -Mm*(1 - X[v,v2]))
                     end
+                end
+                if potential_match == false
+                    @constraint(model, X[v,v2] == 0)
                 end
             end
         end
