@@ -244,6 +244,17 @@ let
     obj_val = Int(round(value(objective_function(model))))
     adj_matrix = Int.(round.(value.(X)))
 
+    using Compose
+    using GraphPlottingBFS
+    rg = get_display_metagraph(project_schedule;
+        f=(v,p)->string(v,",",get_path_spec(project_schedule,v).path_id,",",get_path_spec(project_schedule,v).agent_id))
+    plot_graph_bfs(rg;
+        shape_function = (G,v,x,y,r)->Compose.circle(x,y,r),
+        color_function = (G,v,x,y,r)->get_prop(G,v,:color),
+        text_function = (G,v,x,y,r)->title_string(get_node_from_id(project_schedule, get_vtx_id(project_schedule, v)),false)
+    ) |> Compose.SVG("project_schedule1.svg")
+    # inkscape -z project_schedule1.svg -e project_schedule1.png
+
     # Update Project Graph
     @show is_cyclic(G)
     for v in vertices(G)
@@ -254,10 +265,19 @@ let
                     node = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v))
                     node2 = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v2))
                     @show v, v2, typeof(node), typeof(node2), is_cyclic(G)
+                    rem_edge!(G,v,v2)
                 end
             end
         end
     end
+
+    rg = get_display_metagraph(project_schedule;
+        f=(v,p)->string(v,",",get_path_spec(project_schedule,v).path_id,",",get_path_spec(project_schedule,v).agent_id))
+    plot_graph_bfs(rg;
+        shape_function = (G,v,x,y,r)->Compose.circle(x,y,r),
+        color_function = (G,v,x,y,r)->get_prop(G,v,:color),
+        text_function = (G,v,x,y,r)->title_string(get_node_from_id(project_schedule, get_vtx_id(project_schedule, v)),false)
+    ) |> Compose.SVG("project_schedule2.svg")
 
     # for v in topological_sort(G)
     #     node = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v))
