@@ -5,6 +5,9 @@ using JuMP, MathOptInterface
 using TOML
 using Random
 
+using Compose
+using GraphPlottingBFS
+
 using Test
 using Logging
 
@@ -46,11 +49,14 @@ global_logger(SimpleLogger(stderr, Logging.Debug))
 # Define package tests
 @time @testset "TaskGraphs Package Tests" begin
     testdir = joinpath(dirname(@__DIR__), "test")
-    @time @testset "TaskGraphs.CoreTests" begin
-        include(joinpath(testdir, "test_core.jl"))
+    @time @testset "TaskGraphs.Overhaul" begin
+        include(joinpath(testdir, "test_overhaul.jl"))
     end
-    @time @testset "TaskGraphs.ExampleTests" begin
-        include(joinpath(testdir, "test_examples.jl"))
-    end
+#     @time @testset "TaskGraphs.CoreTests" begin
+#         include(joinpath(testdir, "test_core.jl"))
+#     end
+#     @time @testset "TaskGraphs.ExampleTests" begin
+#         include(joinpath(testdir, "test_examples.jl"))
+#     end
     @show get_unique_operation_id()
 end

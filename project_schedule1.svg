@@ -2,7 +2,7 @@
 <svg xmlns="http://www.w3.org/2000/svg"
      xmlns:xlink="http://www.w3.org/1999/xlink"
      version="1.2"
-     width="100mm" height="30mm" viewBox="0 0 100 30"
+     width="200mm" height="40mm" viewBox="0 0 200 40"
      stroke="none"
      fill="#000000"
      stroke-width="0.3"
@@ -14,6 +14,18 @@
   </marker>
 </defs>
 <g stroke="#000000" id="img-efe1a4f0-1">
+  <g transform="translate(180,27.5)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(160,27.5)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(140,27.5)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(70,31.25)">
+    <path fill="none" d="M-55.63,3.48 L 55.63 -3.48" class="primitive"/>
+  </g>
   <g transform="translate(80,20)">
     <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
   </g>
@@ -26,46 +38,102 @@
   <g transform="translate(20,22.5)">
     <path fill="none" d="M-6.06,1.52 L 6.06 -1.52" class="primitive"/>
   </g>
+  <g transform="translate(100,20)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(120,23.75)">
+    <path fill="none" d="M-6.48,-2.43 L 6.48 2.43" class="primitive"/>
+  </g>
   <g transform="translate(20,17.5)">
     <path fill="none" d="M-6.06,-1.52 L 6.06 1.52" class="primitive"/>
   </g>
 </g>
 <g fill="#00FFFF" id="img-efe1a4f0-2">
-  <g transform="translate(70,20)">
+  <g transform="translate(170,27.5)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
 <g fill="#00FFFF" id="img-efe1a4f0-3">
-  <g transform="translate(50,20)">
+  <g transform="translate(150,27.5)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
 <g fill="#00FFFF" id="img-efe1a4f0-4">
-  <g transform="translate(30,20)">
+  <g transform="translate(130,27.5)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
 <g fill="#00FFFF" id="img-efe1a4f0-5">
+  <g transform="translate(10,35)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FFFF" id="img-efe1a4f0-6">
+  <g transform="translate(70,20)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FFFF" id="img-efe1a4f0-7">
+  <g transform="translate(50,20)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FFFF" id="img-efe1a4f0-8">
+  <g transform="translate(30,20)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FFFF" id="img-efe1a4f0-9">
   <g transform="translate(10,25)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#FF0000" id="img-efe1a4f0-6">
+<g fill="#FF0000" id="img-efe1a4f0-10">
+  <g transform="translate(190,27.5)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#FF0000" id="img-efe1a4f0-11">
   <g transform="translate(90,20)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#00FF00" id="img-efe1a4f0-7">
+<g fill="#00FF00" id="img-efe1a4f0-12">
   <g transform="translate(10,5)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#FFA500" id="img-efe1a4f0-8">
+<g fill="#FFA500" id="img-efe1a4f0-13">
+  <g transform="translate(110,20)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#FFA500" id="img-efe1a4f0-14">
   <g transform="translate(10,15)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g font-family="futura" font-size="3.53" stroke="#000000" id="img-efe1a4f0-9">
+<g font-family="futura" font-size="3.53" stroke="#000000" id="img-efe1a4f0-15">
+  <g transform="translate(170,27.5)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="0.35em">deposit</text>
+    </g>
+  </g>
+  <g transform="translate(150,27.5)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="0.35em">carry</text>
+    </g>
+  </g>
+  <g transform="translate(130,27.5)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="0.35em">collect</text>
+    </g>
+  </g>
+  <g transform="translate(10,35)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="0.35em">go</text>
+    </g>
+  </g>
   <g transform="translate(70,20)">
     <g class="primitive">
       <text text-anchor="middle" dy="0.35em">deposit</text>
@@ -86,6 +154,11 @@
       <text text-anchor="middle" dy="0.35em">go</text>
     </g>
   </g>
+  <g transform="translate(190,27.5)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="0.35em">op</text>
+    </g>
+  </g>
   <g transform="translate(90,20)">
     <g class="primitive">
       <text text-anchor="middle" dy="0.35em">op</text>
@@ -94,6 +167,11 @@
   <g transform="translate(10,5)">
     <g class="primitive">
       <text text-anchor="middle" dy="0.35em">R1</text>
+    </g>
+  </g>
+  <g transform="translate(110,20)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="0.35em">O2</text>
     </g>
   </g>
   <g transform="translate(10,15)">
