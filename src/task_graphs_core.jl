@@ -155,6 +155,7 @@ function add_operation!(spec::ProjectSpec, op::Operation)
             add_edge!(G, op0_id, op_id)
         end
     end
+    # set spec.root_nodes = get_all_root_nodes(spec.graph)
     union!(spec.root_nodes, get_all_root_nodes(spec.graph))
     intersect!(spec.root_nodes, get_all_root_nodes(spec.graph))
     spec
@@ -165,7 +166,6 @@ function construct_operation(spec::ProjectSpec, station_id, input_ids, output_id
         post = Set{OBJECT_AT}(map(id->get(spec.initial_conditions, spec.object_id_to_idx[id], OBJECT_AT(id,station_id)), output_ids)),
         Δt = Δt,
         station_id = StationID(station_id),
-        # id = nv(spec.graph)+1
         id = id
     )
 end
@@ -781,6 +781,73 @@ function construct_project_schedule(
         project_spec.final_conditions,
         robot_ICs,
         assignments
+    )
+end
+
+"""
+    `construct_partial_project_schedule`
+
+    Constructs a partial project graph
+"""
+function construct_partial_project_schedule(
+    object_ICs::Vector{OBJECT_AT},
+    object_FCs::Vector{OBJECT_AT},
+    robot_ICs::Vector{ROBOT_AT},
+    operations::Vector{Operation},
+    root_ops::Vector{OperationID},
+    problem_spec::TaskGraphProblemSpec
+    )
+
+    # Construct Partial Project Schedule
+    project_schedule = ProjectSchedule();
+    for pred in object_ICs
+       add_to_schedule!(project_schedule, problem_spec, pred, get_object_id(pred))
+    end
+    for pred in robot_ICs
+       add_to_schedule!(project_schedule, problem_spec, pred, get_robot_id(pred))
+    end
+    for op in operations
+       add_to_schedule!(project_schedule, problem_spec, op, get_operation_id(op))
+    end
+    # add root nodes
+    for operation_id in root_ops
+        v = get_vtx(project_schedule, operation_id)
+        push!(project_schedule.root_nodes, v)
+        project_schedule.weights[v] = 1.0
+    end
+    # Fill in gaps in project schedule (except for GO assignments)
+    for op in operations
+        operation_id = get_operation_id(op)
+        for object_id in get_input_ids(op)
+            # add action sequence
+            object_ic = get_object_ICs(project_schedule)[object_id]
+            pickup_station_id = get_id(get_location_id(object_ic))
+            object_fc = object_FCs[object_id]
+            dropoff_station_id = get_id(get_location_id(object_fc))
+            # TODO Handle collaborative tasks
+            # if is_single_robot_task(project_spec, object_id)
+            robot_id = -1
+            add_single_robot_delivery_task!(project_schedule,problem_spec,robot_id,
+                object_id,pickup_station_id,dropoff_station_id)
+            # elseif is_collaborative_robot_task(project_spec, object_id)
+            # end
+            action_id = ActionID(get_num_actions(project_schedule)) # retrieve id of final DEPOSIT action
+            add_edge!(project_schedule, action_id, operation_id)
+        end
+        for object_id in get_output_ids(op)
+            add_edge!(project_schedule, operation_id, ObjectID(object_id))
+        end
+    end
+    project_schedule
+end
+function construct_partial_project_schedule(spec::ProjectSpec,problem_spec::TaskGraphProblemSpec,robot_ICs=Vector{ROBOT_AT}())
+    construct_partial_project_schedule(
+        spec.initial_conditions,
+        spec.final_conditions,
+        robot_ICS,
+        spec.operations,
+        map(op->op.id, spec.operations[collect(spec.root_nodes)]),
+        problem_spec
     )
 end
 

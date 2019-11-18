@@ -165,6 +165,7 @@ get_object_id(pred::CAN_CARRY) = pred.o
 
 export
     Operation,
+	get_operation_id,
     preconditions,
     postconditions,
     duration
@@ -177,6 +178,7 @@ export
     id::OperationID         = OperationID(-1)
 end
 get_location_id(op::Operation) = op.station_id
+get_operation_id(op::Operation) = op.id
 duration(op::Operation) = op.Δt
 preconditions(op::Operation) = op.pre
 postconditions(op::Operation) = op.post
