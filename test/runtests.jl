@@ -49,12 +49,15 @@ global_logger(SimpleLogger(stderr, Logging.Debug))
 # Define package tests
 @time @testset "TaskGraphs Package Tests" begin
     testdir = joinpath(dirname(@__DIR__), "test")
-    # @time @testset "TaskGraphs.Overhaul" begin
-    #     include(joinpath(testdir, "test_overhaul.jl"))
-    # end
-    @time @testset "TaskGraphs.CoreTests" begin
-        include(joinpath(testdir, "test_core.jl"))
+    @time @testset "TaskGraphs.PlanningPredicates" begin
+        include(joinpath(testdir, "test_predicates.jl"))
     end
+#     @time @testset "TaskGraphs.Overhaul" begin
+#         include(joinpath(testdir, "test_overhaul.jl"))
+#     end
+#     @time @testset "TaskGraphs.CoreTests" begin
+#         include(joinpath(testdir, "test_core.jl"))
+#     end
 #     @time @testset "TaskGraphs.ExampleTests" begin
 #         include(joinpath(testdir, "test_examples.jl"))
 #     end

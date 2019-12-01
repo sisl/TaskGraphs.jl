@@ -784,6 +784,9 @@ function construct_project_schedule(
     )
 end
 
+export
+    construct_partial_project_schedule
+
 """
     `construct_partial_project_schedule`
 
@@ -844,7 +847,7 @@ function construct_partial_project_schedule(spec::ProjectSpec,problem_spec::Task
     construct_partial_project_schedule(
         spec.initial_conditions,
         spec.final_conditions,
-        robot_ICS,
+        robot_ICs,
         spec.operations,
         map(op->op.id, spec.operations[collect(spec.root_nodes)]),
         problem_spec
