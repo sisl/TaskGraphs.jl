@@ -52,12 +52,12 @@ global_logger(SimpleLogger(stderr, Logging.Debug))
     @time @testset "TaskGraphs.PlanningPredicates" begin
         include(joinpath(testdir, "test_predicates.jl"))
     end
-#     @time @testset "TaskGraphs.Overhaul" begin
-#         include(joinpath(testdir, "test_overhaul.jl"))
-#     end
-#     @time @testset "TaskGraphs.CoreTests" begin
-#         include(joinpath(testdir, "test_core.jl"))
-#     end
+    @time @testset "TaskGraphs.Overhaul" begin
+        include(joinpath(testdir, "test_overhaul.jl"))
+    end
+    @time @testset "TaskGraphs.CoreTests" begin
+        include(joinpath(testdir, "test_core.jl"))
+    end
 #     @time @testset "TaskGraphs.ExampleTests" begin
 #         include(joinpath(testdir, "test_examples.jl"))
 #     end

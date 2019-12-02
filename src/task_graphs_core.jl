@@ -5,6 +5,7 @@ using LightGraphs, MetaGraphs
 using GraphUtils
 using DataStructures
 using JuMP
+using Gurobi
 using TOML
 
 using ..PlanningPredicates
@@ -362,8 +363,6 @@ export
     get_duration,
     get_vtx,
     get_vtx_id,
-    get_path_spec,
-    set_path_spec!,
     replace_in_schedule!,
     add_to_schedule!,
     construct_project_schedule,
@@ -425,6 +424,11 @@ get_num_paths(schedule::P) where {P<:ProjectSchedule}       = get_num_actions(sc
 
 get_next_path_id(schedule::P) where {P<:ProjectSchedule}    = length(schedule.path_id_to_vtx_map) + 1
 
+export
+    get_path_spec,
+    set_path_spec!,
+    add_path_spec!
+
 get_path_spec(schedule::P,v::Int) where {P<:ProjectSchedule} = schedule.path_specs[v]
 function set_path_spec!(schedule::P,v::Int,spec::S) where {P<:ProjectSchedule,S<:PathSpec}
     schedule.path_specs[v] = spec
@@ -439,25 +443,29 @@ function add_path_spec!(schedule::P,spec::S) where {P<:ProjectSchedule,S<:PathSp
     # push!(schedule.durations, 0.0)
 end
 
-function insert_to_vtx_map!(schedule::P,pred::OBJECT_AT,id::ObjectID,idx::Int) where {P<:ProjectSchedule}
-    push!(schedule.vtx_ids, id)
+export
+    set_vtx_map!,
+    insert_to_vtx_map!
+
+function set_vtx_map!(schedule::P,pred::OBJECT_AT,id::ObjectID,idx::Int) where {P<:ProjectSchedule}
     get_object_ICs(schedule)[get_id(id)] = pred
     schedule.object_vtx_map[get_id(id)] = idx
 end
-function insert_to_vtx_map!(schedule::P,pred::ROBOT_AT,id::RobotID,idx::Int) where {P<:ProjectSchedule}
-    push!(schedule.vtx_ids, id)
+function set_vtx_map!(schedule::P,pred::ROBOT_AT,id::RobotID,idx::Int) where {P<:ProjectSchedule}
     get_robot_ICs(schedule)[get_id(id)] = pred
     schedule.robot_vtx_map[get_id(id)] = idx
 end
-function insert_to_vtx_map!(schedule::P,op::Operation,id::OperationID,idx::Int) where {P<:ProjectSchedule}
-    push!(schedule.vtx_ids, id)
+function set_vtx_map!(schedule::P,op::Operation,id::OperationID,idx::Int) where {P<:ProjectSchedule}
     get_operations(schedule)[get_id(id)] = op
     schedule.operation_vtx_map[get_id(id)] = idx
 end
-function insert_to_vtx_map!(schedule::P,a::A,id::ActionID,idx::Int) where {P<:ProjectSchedule,A<:AbstractRobotAction}
-    push!(schedule.vtx_ids, id)
+function set_vtx_map!(schedule::P,a::A,id::ActionID,idx::Int) where {P<:ProjectSchedule,A<:AbstractRobotAction}
     get_actions(schedule)[get_id(id)] = a
     schedule.action_vtx_map[get_id(id)] = idx
+end
+function insert_to_vtx_map!(schedule::P,pred,id::ID,idx::Int) where {P<:ProjectSchedule,ID<:AbstractID}
+    push!(schedule.vtx_ids, id)
+    set_vtx_map!(schedule,pred,id,idx)
 end
 
 """
@@ -573,6 +581,7 @@ end
 function replace_in_schedule!(schedule::P,spec::T,pred,id::ID) where {P<:ProjectSchedule,T<:TaskGraphProblemSpec,ID<:AbstractID}
     v = get_vtx(schedule, id)
     @assert v != -1
+    set_vtx_map!(schedule,pred,id,v)
     path_spec = generate_path_spec(schedule,spec,pred)
     set_path_spec!(schedule,v,path_spec)
     schedule
@@ -959,6 +968,233 @@ function add_job_shop_constraints!(schedule::P,spec::T,model::JuMP.Model) where 
             end
         end
     end
+end
+
+export
+    formulate_schedule_milp
+
+"""
+    `formulate_schedule_milp`
+
+    Formulate the adjacency matrix milp problem over the project schedule.
+    #TODO: I am not positive that the current version guarantees t0[v2] <= tF[v]
+    for all (v,v2) in edges(project_schedule.graph) following optimization.
+"""
+function formulate_schedule_milp(project_schedule::ProjectSchedule,problem_spec::TaskGraphProblemSpec;
+        optimizer = Gurobi.Optimizer,
+        TimeLimit=100,
+        OutputFlag=0,
+        t0_ = Dict{AbstractID,Float64}(), # dictionary of initial times. Default is empty
+        Mm = 10000, # for big M constraints
+        cost_model = :SumOfMakeSpans,
+    )
+    G = get_graph(project_schedule);
+    assignments = [];
+    Δt = map(v->get_path_spec(project_schedule, v).min_path_duration, vertices(G))
+
+    model = Model(with_optimizer(optimizer,
+        TimeLimit=TimeLimit,
+        OutputFlag=OutputFlag
+        ));
+    @variable(model, t0[1:nv(G)] >= 0.0); # initial times for all nodes
+    @variable(model, tF[1:nv(G)] >= 0.0); # final times for all nodes
+    @variable(model, X[1:nv(G),1:nv(G)], binary = true); # Adjacency Matrix
+    @constraint(model, X .+ X' .<= 1) # no bidirectional or self edges
+    # set all initial times that are provided
+    for (id,t) in t0_
+        v = get_vtx(project_schedule, id)
+        @constraint(model, t0[v] == t)
+    end
+    # Precedence constraints and duration constraints for existing nodes and edges
+    for v in vertices(G)
+        @constraint(model, tF[v] >= t0[v] + Δt[v])
+        for v2 in outneighbors(G,v)
+            @constraint(model, X[v,v2] == 1)
+            @constraint(model, t0[v2] >= tF[v])
+        end
+    end
+    # Identify required and eligible edges
+    missing_successors      = Dict{Int,Dict}()
+    missing_predecessors    = Dict{Int,Dict}()
+    n_eligible_successors   = zeros(Int,nv(G))
+    n_eligible_predecessors = zeros(Int,nv(G))
+    n_required_successors   = zeros(Int,nv(G))
+    n_required_predecessors = zeros(Int,nv(G))
+    for v in vertices(G)
+        node = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v))
+        for (key,val) in required_successors(node)
+            n_required_successors[v] += val
+        end
+        for (key,val) in required_predecessors(node)
+            n_required_predecessors[v] += val
+        end
+        for (key,val) in eligible_successors(node)
+            n_eligible_successors[v] += val
+        end
+        for (key,val) in eligible_predecessors(node)
+            n_eligible_predecessors[v] += val
+        end
+        missing_successors[v] = eligible_successors(node)
+        for v2 in outneighbors(G,v)
+            id2 = get_vtx_id(project_schedule, v2)
+            node2 = get_node_from_id(project_schedule, id2)
+            for key in collect(keys(missing_successors[v]))
+                if matches_template(key,typeof(node2))
+                    missing_successors[v][key] -= 1
+                    break
+                end
+            end
+        end
+        missing_predecessors[v] = eligible_predecessors(node)
+        for v2 in inneighbors(G,v)
+            id2 = get_vtx_id(project_schedule, v2)
+            node2 = get_node_from_id(project_schedule, id2)
+            for key in collect(keys(missing_predecessors[v]))
+                if matches_template(key,typeof(node2))
+                    missing_predecessors[v][key] -= 1
+                    break
+                end
+            end
+        end
+    end
+    @assert(!any(n_eligible_predecessors .< n_required_predecessors))
+    @assert(!any(n_eligible_successors .< n_required_successors))
+    @constraint(model, X * ones(nv(G)) .<= n_eligible_successors);
+    @constraint(model, X * ones(nv(G)) .>= n_required_successors);
+    @constraint(model, X' * ones(nv(G)) .<= n_eligible_predecessors);
+    @constraint(model, X' * ones(nv(G)) .>= n_required_predecessors);
+
+    for v in vertices(G)
+        upstream_vertices = [v, map(e->e.dst,collect(edges(bfs_tree(G,v;dir=:in))))...]
+        for v2 in upstream_vertices
+            @constraint(model, X[v,v2] == 0)
+        end
+        node = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v))
+        for (template, val) in missing_successors[v]
+            for v2 in vertices(G)
+                node2 = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v2))
+                if (v2 in upstream_vertices) || !matches_template(template, typeof(node2))
+                    # @constraint(model, X[v,v2] == 0)
+                    continue
+                end
+                potential_match = false
+                for (template2, val2) in missing_predecessors[v2]
+                    if matches_template(template2,typeof(node)) # possible to add and edge
+                        potential_match = true
+                        if !(val > 0 && val2 > 0)
+                            continue
+                        end
+                        new_node = align_with_predecessor(node2,node)
+                        dt_min = generate_path_spec(project_schedule,problem_spec,new_node).min_path_duration
+                        @constraint(model, tF[v2] - (t0[v2] + dt_min) >= -Mm*(1 - X[v,v2]))
+                    end
+                end
+                if potential_match == false
+                    @constraint(model, X[v,v2] == 0)
+                end
+            end
+        end
+    end
+
+    # "Job-shop" constraints specifying that no station may be double-booked. A station
+    # can only support a single COLLECT or DEPOSIT operation at a time, meaning that all
+    # the windows for these operations cannot overlap. In the constraints below, t1 and t2
+    # represent the intervals for the COLLECT or DEPOSIT operations of tasks j and j2,
+    # respectively. If eny of the operations for these two tasks require use of the same
+    # station, we introduce a 2D binary variable y. if y = [1,0], the operation for task
+    # j must occur before the operation for task j2. The opposite is true for y == [0,1].
+    # We use the big M method here as well to tightly enforce the binary constraints.
+    job_shop_variables = Dict{Tuple{Int,Int},JuMP.VariableRef}();
+    for v in 1:nv(G)
+        node = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v))
+        for v2 in v+1:nv(G)
+            node2 = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v2))
+            common_resources = intersect(resources_reserved(node),resources_reserved(node2))
+            if length(common_resources) > 0
+                # @show common_resources
+                tmax = @variable(model)
+                tmin = @variable(model)
+                y = @variable(model, binary=true)
+                job_shop_variables[(v,v2)] = y
+                @constraint(model, tmax >= t0[v])
+                @constraint(model, tmax >= t0[v2])
+                @constraint(model, tmin <= tF[v])
+                @constraint(model, tmin <= tF[v2])
+
+                @constraint(model, tmax - t0[v2] <= (1 - y)*Mm)
+                @constraint(model, tmax - t0[v] <= y*Mm)
+                @constraint(model, tmin - tF[v] >= (1 - y)*-Mm)
+                @constraint(model, tmin - tF[v2] >= y*-Mm)
+                @constraint(model, tmin + 1 <= tmax)
+            end
+        end
+    end
+
+    # Formulate Objective
+    if cost_model == :SumOfMakeSpans
+        root_nodes = project_schedule.root_nodes
+        @variable(model, T[1:length(root_nodes)])
+        for (i,project_head) in enumerate(root_nodes)
+            for v in project_head
+                @constraint(model, T[i] >= tF[v])
+            end
+        end
+        cost1 = @expression(model, sum(map(v->tF[v]*get(project_schedule.weights,v,0.0), root_nodes)))
+    elseif cost_model == :MakeSpan
+        @variable(model, T)
+        @constraint(model, T .>= tF)
+        cost1 = @expression(model, T)
+    end
+    sparsity_cost = @expression(model, (0.5/(nv(G)^2))*sum(X)) # cost term to encourage sparse X. Otherwise the solver may add pointless edges
+    @objective(model, Min, cost1 + sparsity_cost)
+    model, job_shop_variables
+end
+
+
+
+export
+    update_project_schedule!
+
+"""
+    `update_project_schedule!`
+
+    Args:
+    - project_schedule
+    - adj_matrix - adjacency_matrix encoding the edges that need to be added to
+        the project schedule
+
+    Adds all required edges to the project graph and modifies all nodes to
+    reflect the appropriate valid IDs (e.g., `Action` nodes are populated with
+    the correct `RobotID`s)
+"""
+function update_project_schedule!(project_schedule::P,problem_spec::T,adj_matrix,DEBUG::Bool=false) where {P<:ProjectSchedule,T<:TaskGraphProblemSpec}
+    # Add all new edges to project schedule
+    G = get_graph(project_schedule)
+    DEBUG ? @assert(is_cyclic(G) == false) : nothing
+    for v in vertices(G)
+        for v2 in vertices(G)
+            if adj_matrix[v,v2] == 1
+                add_edge!(G,v,v2)
+                DEBUG ? @assert(is_cyclic(G) == false) : nothing
+                # if is_cyclic(G)
+                #     node = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v))
+                #     node2 = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v2))
+                #     rem_edge!(G,v,v2)
+                # end
+            end
+        end
+    end
+    # Propagate valid IDs through the schedule
+    for v in topological_sort(G)
+        node = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v))
+        for v2 in outneighbors(G,v)
+            id2 = get_vtx_id(project_schedule, v2)
+            node2 = get_node_from_id(project_schedule, id2)
+            new_node = align_with_predecessor(node2,node)
+            replace_in_schedule!(project_schedule, problem_spec, new_node, id2)
+        end
+    end
+    project_schedule
 end
 
 

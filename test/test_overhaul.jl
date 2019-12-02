@@ -1,6 +1,6 @@
 # using Pkg
 # Pkg.activate("/home/kylebrown/.julia/dev/TaskGraphs")
-
+using Test
 using LightGraphs, MetaGraphs, GraphUtils
 using TaskGraphs
 using Gurobi
@@ -339,6 +339,15 @@ using GraphPlottingBFS
 #     model, status, obj_val, adj_matrix, nodes, edge_list, project_schedule = test_generic_formulation(N,M)
 # end
 
+function print_project_schedule(project_schedule,filename="project_schedule1")
+    rg = get_display_metagraph(project_schedule;
+        f=(v,p)->string(v,",",get_path_spec(project_schedule,v).path_id,",",get_path_spec(project_schedule,v).agent_id))
+    plot_graph_bfs(rg;
+        shape_function = (G,v,x,y,r)->Compose.circle(x,y,r),
+        color_function = (G,v,x,y,r)->get_prop(G,v,:color),
+        text_function = (G,v,x,y,r)->title_string(get_node_from_id(project_schedule, get_vtx_id(project_schedule, v)),true)
+    ) |> Compose.SVG(string(filename,".svg"))
+end
 
 let
 
@@ -359,7 +368,7 @@ let
 
     # Construct Partial Project Schedule
     project_schedule = construct_partial_project_schedule(spec,problem_spec,robot_ICs)
-    
+
     # edge_list = collect(edges(project_schedule.graph))
     # nodes = map(id->get_node_from_id(project_schedule, id), project_schedule.vtx_ids)
     # nodes, edge_list
@@ -373,53 +382,15 @@ let
     obj_val = Int(round(value(objective_function(model))))
     @show adj_matrix = Int.(round.(value.(model[:X])))
 
-    rg = get_display_metagraph(project_schedule;
-        f=(v,p)->string(v,",",get_path_spec(project_schedule,v).path_id,",",get_path_spec(project_schedule,v).agent_id))
-    plot_graph_bfs(rg;
-        shape_function = (G,v,x,y,r)->Compose.circle(x,y,r),
-        color_function = (G,v,x,y,r)->get_prop(G,v,:color),
-        text_function = (G,v,x,y,r)->title_string(get_node_from_id(project_schedule, get_vtx_id(project_schedule, v)),true)
-    ) |> Compose.SVG("project_schedule1.svg")
+    print_project_schedule(project_schedule,"project_schedule1")
     # `inkscape -z project_schedule1.svg -e project_schedule1.png`
     # OR: `for f in *.svg; do inkscape -z $f -e $f.png; done`
 
     # Update Project Graph by adding all edges encoded by the optimized adjacency graph
-    G = get_graph(project_schedule)
-    @test is_cyclic(G) == false
-    for v in vertices(G)
-        for v2 in vertices(G)
-            if adj_matrix[v,v2] == 1
-                add_edge!(G,v,v2)
-                @test is_cyclic(G) == false
-                if is_cyclic(G)
-                    node = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v))
-                    node2 = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v2))
-                    @show v, v2, typeof(node), typeof(node2), is_cyclic(G)
-                    rem_edge!(G,v,v2)
-                end
-            end
-        end
-    end
+    update_project_schedule!(project_schedule,problem_spec,adj_matrix)
 
-    rg = get_display_metagraph(project_schedule;
-        f=(v,p)->string(v,",",get_path_spec(project_schedule,v).path_id,",",get_path_spec(project_schedule,v).agent_id))
-    plot_graph_bfs(rg;
-        shape_function = (G,v,x,y,r)->Compose.circle(x,y,r),
-        color_function = (G,v,x,y,r)->get_prop(G,v,:color),
-        text_function = (G,v,x,y,r)->title_string(get_node_from_id(project_schedule, get_vtx_id(project_schedule, v)),true)
-    ) |> Compose.SVG("project_schedule2.svg")
+    print_project_schedule(project_schedule,"project_schedule2")
 
-    # for v in topological_sort(G)
-    #     node = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v))
-    #     for v2 in outneighbors(G,v)
-    #         id2 = get_vtx_id(project_schedule, v2)
-    #         node2 = get_node_from_id(project_schedule, id2)
-    #         @show new_node = align_with_predecessor(node2,node)
-    #         replace_in_schedule!(project_schedule, spec, new_node, id2)
-    #         # @show path_spec = generate_path_spec(project_schedule,problem_spec,new_node)
-    #     end
-    # end
-
-    # model, status, obj_val, adj_matrix, nodes, collect(edges(G)), project_schedule
+    job_shop_variables
 
 end
