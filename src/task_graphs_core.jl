@@ -71,7 +71,6 @@ export
     get_output_ids,
     add_operation!,
     get_duration_vector,
-    read_project_spec,
     construct_operation
 
 """
@@ -171,6 +170,10 @@ function construct_operation(spec::ProjectSpec, station_id, input_ids, output_id
     )
 end
 
+export
+    read_operation,
+    read_project_spec
+
 # Some tools for writing and reading project specs
 function TOML.parse(pred::OBJECT_AT)
     [get_id(get_object_id(pred)),get_id(get_location_id(pred))]
@@ -185,12 +188,16 @@ function TOML.parse(op::Operation)
     return toml_dict
 end
 function read_operation(toml_dict::Dict)
+    op_id = OperationID(get(toml_dict,"id",-1))
+    if get_id(op_id) == -1
+        op_id = OperationID(get_unique_operation_id())
+    end
     op = Operation(
         pre     = Set{OBJECT_AT}(map(arr->OBJECT_AT(arr[1],arr[2]),toml_dict["pre"])),
         post    = Set{OBJECT_AT}(map(arr->OBJECT_AT(arr[1],arr[2]),toml_dict["post"])),
-        Δt      = toml_dict["dt"],
-        station_id = StationID(toml_dict["station_id"]),
-        id = OperationID(toml_dict["id"])
+        Δt      = get(toml_dict,"dt",get(toml_dict,"Δt",0.0)),
+        station_id = StationID(get(toml_dict,"station_id",-1)),
+        id = op_id
         )
 end
 function TOML.parse(project_spec::ProjectSpec)
@@ -204,26 +211,33 @@ function TOML.parse(project_spec::ProjectSpec)
 end
 function read_project_spec(toml_dict::Dict)
     project_spec = ProjectSpec()
-    # for (k,arr) in toml_dict["initial_conditions"]
-    #     object_id = arr[1]
-    #     station_id = arr[2]
-    #     project_spec.initial_conditions[object_id] = OBJECT_AT(object_id, station_id)
-    # end
-    for (i,arr) in enumerate(toml_dict["initial_conditions"])
-        object_id = arr[1]
-        station_id = arr[2]
-        push!(project_spec.initial_conditions, OBJECT_AT(object_id, station_id))
-        project_spec.object_id_to_idx[object_id] = i
+    if typeof(toml_dict["initial_conditions"]) <: Dict
+        for (i,arr) in toml_dict["initial_conditions"]
+            object_id = arr[1]
+            station_id = arr[2]
+            push!(project_spec.initial_conditions, OBJECT_AT(object_id, station_id))
+            project_spec.object_id_to_idx[object_id] = parse(Int,string(i))
+        end
+    elseif typeof(toml_dict["initial_conditions"]) <: AbstractArray
+        for (i,arr) in enumerate(toml_dict["initial_conditions"])
+            object_id = arr[1]
+            station_id = arr[2]
+            push!(project_spec.initial_conditions, OBJECT_AT(object_id, station_id))
+            project_spec.object_id_to_idx[object_id] = i
+        end
     end
-    # for (k,arr) in toml_dict["final_conditions"]
-    #     object_id = arr[1]
-    #     station_id = arr[2]
-    #     project_spec.final_conditions[object_id] = OBJECT_AT(object_id, station_id)
-    # end
-    for arr in toml_dict["final_conditions"]
-        object_id = arr[1]
-        station_id = arr[2]
-        push!(project_spec.final_conditions, OBJECT_AT(object_id, station_id))
+    if typeof(toml_dict["final_conditions"]) <: Dict
+        for (k,arr) in toml_dict["final_conditions"]
+            object_id = arr[1]
+            station_id = arr[2]
+            push!(project_spec.final_conditions, OBJECT_AT(object_id, station_id))
+        end
+    elseif typeof(toml_dict["final_conditions"]) <: AbstractArray
+        for (i,arr) in enumerate(toml_dict["final_conditions"])
+            object_id = arr[1]
+            station_id = arr[2]
+            push!(project_spec.final_conditions, OBJECT_AT(object_id, station_id))
+        end
     end
     for op_dict in toml_dict["operations"]
         op = read_operation(op_dict)
@@ -1150,9 +1164,9 @@ function formulate_schedule_milp(project_schedule::ProjectSchedule,problem_spec:
         @constraint(model, T .>= tF)
         cost1 = @expression(model, T)
     end
-    # sparsity_cost = @expression(model, (0.5/(nv(G)^2))*sum(X)) # cost term to encourage sparse X. Otherwise the solver may add pointless edges
-    # @objective(model, Min, cost1 + sparsity_cost)
-    @objective(model, Min, cost1 )
+    sparsity_cost = @expression(model, (0.5/(nv(G)^2))*sum(X)) # cost term to encourage sparse X. Otherwise the solver may add pointless edges
+    @objective(model, Min, cost1 + sparsity_cost)
+    # @objective(model, Min, cost1 )
     model, job_shop_variables
 end
 
@@ -1178,7 +1192,8 @@ function update_project_schedule!(project_schedule::P,problem_spec::T,adj_matrix
             end
         end
     end
-    DEBUG ? @assert(is_cyclic(G) == false) : nothing
+    # DEBUG ? @assert(is_cyclic(G) == false) : nothing
+    @assert(is_cyclic(G) == false)
     # Propagate valid IDs through the schedule
     for v in topological_sort(G)
         node = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v))
