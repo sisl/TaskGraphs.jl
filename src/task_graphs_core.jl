@@ -970,8 +970,13 @@ function add_job_shop_constraints!(schedule::P,spec::T,model::JuMP.Model) where 
     end
 end
 
+################################################################################
+############################## New Functionality ###############################
+################################################################################
+
 export
-    formulate_schedule_milp
+    formulate_schedule_milp,
+    update_project_schedule!
 
 """
     `formulate_schedule_milp`
@@ -1145,15 +1150,11 @@ function formulate_schedule_milp(project_schedule::ProjectSchedule,problem_spec:
         @constraint(model, T .>= tF)
         cost1 = @expression(model, T)
     end
-    sparsity_cost = @expression(model, (0.5/(nv(G)^2))*sum(X)) # cost term to encourage sparse X. Otherwise the solver may add pointless edges
-    @objective(model, Min, cost1 + sparsity_cost)
+    # sparsity_cost = @expression(model, (0.5/(nv(G)^2))*sum(X)) # cost term to encourage sparse X. Otherwise the solver may add pointless edges
+    # @objective(model, Min, cost1 + sparsity_cost)
+    @objective(model, Min, cost1 )
     model, job_shop_variables
 end
-
-
-
-export
-    update_project_schedule!
 
 """
     `update_project_schedule!`
@@ -1170,20 +1171,14 @@ export
 function update_project_schedule!(project_schedule::P,problem_spec::T,adj_matrix,DEBUG::Bool=false) where {P<:ProjectSchedule,T<:TaskGraphProblemSpec}
     # Add all new edges to project schedule
     G = get_graph(project_schedule)
-    DEBUG ? @assert(is_cyclic(G) == false) : nothing
     for v in vertices(G)
         for v2 in vertices(G)
             if adj_matrix[v,v2] == 1
                 add_edge!(G,v,v2)
-                DEBUG ? @assert(is_cyclic(G) == false) : nothing
-                # if is_cyclic(G)
-                #     node = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v))
-                #     node2 = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v2))
-                #     rem_edge!(G,v,v2)
-                # end
             end
         end
     end
+    DEBUG ? @assert(is_cyclic(G) == false) : nothing
     # Propagate valid IDs through the schedule
     for v in topological_sort(G)
         node = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v))
