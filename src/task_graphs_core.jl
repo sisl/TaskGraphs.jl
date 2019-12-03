@@ -567,7 +567,7 @@ end
 function generate_path_spec(schedule::P,spec::T,pred::ROBOT_AT) where {P<:ProjectSchedule,T<:TaskGraphProblemSpec}
     r = get_id(get_robot_id(pred))
     if !(r in collect(keys(schedule.robot_id_map)))
-        println("generate_path_spec: r = ",r," not in schedule.robot_id_map = ",schedule.robot_id_map)
+        # println("generate_path_spec: r = ",r," not in schedule.robot_id_map = ",schedule.robot_id_map)
     end
     path_spec = PathSpec(
         node_type=Symbol(typeof(pred)),
@@ -783,6 +783,12 @@ function construct_project_schedule(
 
             action_id = ActionID(get_num_actions(schedule))
             add_edge!(schedule, action_id, operation_id)
+
+            new_robot_id = object_id + problem_spec.N
+            # if get_vtx(schedule, RobotID(new_robot_id)) == -1
+            #     add_to_schedule!(schedule, problem_spec, ROBOT_AT(RobotID(new_robot_id),StationID(dropoff_station_id)), RobotID(new_robot_id))
+            # end
+            add_edge!(schedule, action_id, RobotID(new_robot_id))
         end
         for object_id in get_output_ids(op)
             add_edge!(schedule, operation_id, ObjectID(object_id))
@@ -1106,6 +1112,7 @@ function formulate_schedule_milp(project_schedule::ProjectSchedule,problem_spec:
                         new_node = align_with_predecessor(node2,node)
                         dt_min = generate_path_spec(project_schedule,problem_spec,new_node).min_path_duration
                         @constraint(model, tF[v2] - (t0[v2] + dt_min) >= -Mm*(1 - X[v,v2]))
+                        @constraint(model, t0[v2] - tF[v] >= -Mm*(1 - X[v,v2]))
                     end
                 end
                 if potential_match == false

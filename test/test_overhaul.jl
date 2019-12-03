@@ -10,15 +10,37 @@ using Random
 using Compose
 using GraphPlottingBFS
 
-
-function print_project_schedule(project_schedule,filename="project_schedule1")
+function show_times(sched,v)
+    arr = process_schedule(sched)
+    return string(map(a->string(a[v],","), arr[1:2])...)
+end
+function print_project_schedule(project_schedule,filename)
     rg = get_display_metagraph(project_schedule;
         f=(v,p)->string(v,",",get_path_spec(project_schedule,v).path_id,",",get_path_spec(project_schedule,v).agent_id))
     plot_graph_bfs(rg;
         mode=:root_aligned,
         shape_function = (G,v,x,y,r)->Compose.circle(x,y,r),
         color_function = (G,v,x,y,r)->get_prop(G,v,:color),
-        text_function = (G,v,x,y,r)->title_string(get_node_from_id(project_schedule, get_vtx_id(project_schedule, v)),true)
+        text_function = (G,v,x,y,r)->string(
+            title_string(get_node_from_id(project_schedule, get_vtx_id(project_schedule, v)),true),
+            "\n",show_times(project_schedule,v)
+            )
+    ) |> Compose.SVG(string(filename,".svg"))
+    # `inkscape -z project_schedule1.svg -e project_schedule1.png`
+    # OR: `for f in *.svg; do inkscape -z $f -e $f.png; done`
+end
+function print_project_schedule(project_schedule,model,filename)
+    rg = get_display_metagraph(project_schedule;
+        f=(v,p)->string(v,",",get_path_spec(project_schedule,v).path_id,",",get_path_spec(project_schedule,v).agent_id))
+    plot_graph_bfs(rg;
+        mode=:root_aligned,
+        shape_function = (G,v,x,y,r)->Compose.circle(x,y,r),
+        color_function = (G,v,x,y,r)->get_prop(G,v,:color),
+        text_function = (G,v,x,y,r)->string(
+            title_string(get_node_from_id(project_schedule, get_vtx_id(project_schedule, v)),true),
+            "\n",show_times(project_schedule,v),
+            "-",Int(round(value(model[:t0][v]))),",",Int(round(value(model[:tF][v])))
+            )
     ) |> Compose.SVG(string(filename,".svg"))
     # `inkscape -z project_schedule1.svg -e project_schedule1.png`
     # OR: `for f in *.svg; do inkscape -z $f -e $f.png; done`
@@ -82,8 +104,8 @@ let
 
         project_spec, r0, s0, sF = problem_def.project_spec,problem_def.r0,problem_def.s0,problem_def.sF
         robot_ICs = [ROBOT_AT(i,x) for (i,x) in enumerate(r0)] # remove dummy robots
-
         project_spec, problem_spec, object_ICs, object_FCs, _ = construct_task_graphs_problem(project_spec, r0, s0, sF, dist_matrix)
+
         project_schedule = construct_partial_project_schedule(project_spec,problem_spec,robot_ICs)
         model, job_shop_variables = formulate_schedule_milp(project_schedule,problem_spec)
         optimize!(model)
@@ -112,6 +134,55 @@ let
         print_project_schedule(project_schedule,"project_schedule1")
         update_project_schedule!(project_schedule,problem_spec,adj_matrix)
         print_project_schedule(project_schedule,"project_schedule2")
+
+    end
+    let
+
+        for (i, f) in enumerate([
+            initialize_toy_problem_1,
+            # initialize_toy_problem_2,
+            # initialize_toy_problem_3,
+            # initialize_toy_problem_4,
+            # initialize_toy_problem_5,
+            # initialize_toy_problem_6,
+            # initialize_toy_problem_7,
+            # initialize_toy_problem_8,
+            ])
+            let
+                # Compare against old method
+                f = initialize_toy_problem_1
+                i = 1
+                project_spec, problem_spec, robot_ICs, assignments, env_graph = f(;verbose=false);
+                model1 = formulate_optimization_problem(problem_spec,Gurobi.Optimizer);
+                optimize!(model1)
+                @test termination_status(model1) == MathOptInterface.OPTIMAL
+                assignment_matrix = Int.(round.(value.(model1[:x])))
+                obj_val1 = Int(round(value(objective_function(model1))))
+                assignment_vector = map(j->findfirst(assignment_matrix[:,j] .== 1),1:problem_spec.M);
+                schedule1 = construct_project_schedule(project_spec, problem_spec, robot_ICs, assignment_vector)
+
+                # robot_ICs = map(i->robot_ICs[i], 1:problem_spec.N)
+                schedule2 = construct_partial_project_schedule(project_spec,problem_spec,map(i->robot_ICs[i], 1:problem_spec.N))
+                model2, job_shop_variables = formulate_schedule_milp(schedule2,problem_spec)
+                optimize!(model2)
+                @test termination_status(model2) == MathOptInterface.OPTIMAL
+                obj_val2 = Int(round(value(objective_function(model2))))
+                adj_matrix = Int.(round.(value.(model2[:X])))
+                update_project_schedule!(schedule2,problem_spec,adj_matrix)
+
+                t0,tF,slack,local_slack = process_schedule(schedule1)
+
+                t0,tF,slack,local_slack = process_schedule(schedule2)
+
+                # @test obj_val1 == obj_val2
+                @show i, (obj_val1 == obj_val2), obj_val1, obj_val2
+                # @test schedule1 == schedule2
+                if !(obj_val1 == obj_val2)
+                    print_project_schedule(schedule1,string("project_schedule1_",i))
+                    print_project_schedule(schedule2,model2,string("project_schedule2_",i))
+                end
+            end
+        end
 
     end
 end
