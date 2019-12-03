@@ -182,7 +182,4 @@ let
         solver, env_graph, project_spec, problem_spec, robot_ICs, Gurobi.Optimizer);
 
     robot_paths = convert_to_vertex_lists(solution)
-
-    start_vtxs, start_headings, instructions = convert_solution_to_gridworld_instructions(factory_env,robot_paths)
-    initialize_webots_world_file(factory_env, start_vtxs, start_headings, instructions)
 end

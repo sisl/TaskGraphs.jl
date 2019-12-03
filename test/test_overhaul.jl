@@ -224,15 +224,16 @@ let
 
                     # Call CBS to get path plan
 
-                    @test obj_val1 == obj_val2
-                    @show i, (obj_val1 == obj_val2), obj_val1, obj_val2
-                    # @test schedule1 == schedule2
-                    if !(obj_val1 == obj_val2)
-                        print_project_schedule(schedule1,string("project_schedule1_",i))
-                        print_project_schedule(schedule2,model2,string("project_schedule2_",i))
-                    end
+                    # @test obj_val1 == obj_val2
+                    # @show i, (obj_val1 == obj_val2), obj_val1, obj_val2
+                    # # @test schedule1 == schedule2
+                    # if !(obj_val1 == obj_val2)
+                    #     print_project_schedule(schedule1,string("project_schedule1_",i))
+                    #     print_project_schedule(schedule2,model2,string("project_schedule2_",i))
+                    # end
                 end
             end
         end
     end
+
 end

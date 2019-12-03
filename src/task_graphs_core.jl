@@ -400,24 +400,30 @@ export
     weights             ::Dict{Int,Float64}     = Dict{Int,Float64}() # weights corresponding to project heads
     path_id_to_vtx_map  ::Dict{Int,Int}         = Dict{Int,Int}() # maps path_id to vertex
 
-    object_ICs          ::Dict{Int,OBJECT_AT} = Dict{Int,OBJECT_AT}()
-    robot_ICs           ::Dict{Int,ROBOT_AT}  = Dict{Int,ROBOT_AT}()
-    robot_FCs           ::Dict{Int,TERMINAL_ROBOT_AT}  = Dict{Int,TERMINAL_ROBOT_AT}()
-    actions             ::Dict{Int,AbstractRobotAction} = Dict{Int,AbstractRobotAction}()
-    operations          ::Dict{Int,Operation} = Dict{Int,Operation}()
+    # object_ICs          ::Dict{Int,OBJECT_AT} = Dict{Int,OBJECT_AT}()
+    # robot_ICs           ::Dict{Int,ROBOT_AT}  = Dict{Int,ROBOT_AT}()
+    # robot_FCs           ::Dict{Int,TERMINAL_ROBOT_AT}  = Dict{Int,TERMINAL_ROBOT_AT}()
+    # actions             ::Dict{Int,AbstractRobotAction} = Dict{Int,AbstractRobotAction}()
+    # operations          ::Dict{Int,Operation} = Dict{Int,Operation}()
     #
     robot_id_map        ::Dict{Int,Int}   = Dict{Int,Int}() # maps dummy id to true id
-    object_vtx_map      ::Dict{Int,Int}   = Dict{Int,Int}()
-    robot_vtx_map       ::Dict{Int,Int}   = Dict{Int,Int}()
-    operation_vtx_map   ::Dict{Int,Int}   = Dict{Int,Int}()
-    action_vtx_map      ::Dict{Int,Int}   = Dict{Int,Int}()
+    # object_vtx_map      ::Dict{Int,Int}   = Dict{Int,Int}()
+    # robot_vtx_map       ::Dict{Int,Int}   = Dict{Int,Int}()
+    # operation_vtx_map   ::Dict{Int,Int}   = Dict{Int,Int}()
+    # action_vtx_map      ::Dict{Int,Int}   = Dict{Int,Int}()
 end
 get_graph(schedule::P) where {P<:ProjectSchedule}       = schedule.graph
-get_object_ICs(schedule::P) where {P<:ProjectSchedule}  = schedule.object_ICs
-get_robot_ICs(schedule::P) where {P<:ProjectSchedule}   = schedule.robot_ICs
-get_robot_FCs(schedule::P) where {P<:ProjectSchedule}   = schedule.robot_FCs
-get_actions(schedule::P) where {P<:ProjectSchedule}     = schedule.actions
-get_operations(schedule::P) where {P<:ProjectSchedule}  = schedule.operations
+get_nodes_of_type(schedule::P,T) where {P<:ProjectSchedule} = Dict(get_id(id)=>schedule.planning_nodes[id] for id in schedule.vtx_ids if typeof(id)<:T)
+get_object_ICs(schedule::P) where {P<:ProjectSchedule}  = get_nodes_of_type(schedule,ObjectID)
+get_robot_ICs(schedule::P) where {P<:ProjectSchedule}   = get_nodes_of_type(schedule,RobotID)
+get_robot_FCs(schedule::P) where {P<:ProjectSchedule}   = get_nodes_of_type(schedule,TerminalRobotID)
+get_actions(schedule::P) where {P<:ProjectSchedule}     = get_nodes_of_type(schedule,ActionID)
+get_operations(schedule::P) where {P<:ProjectSchedule}  = get_nodes_of_type(schedule,OperationID)
+# get_object_ICs(schedule::P) where {P<:ProjectSchedule}  = schedule.object_ICs
+# get_robot_ICs(schedule::P) where {P<:ProjectSchedule}   = schedule.robot_ICs
+# get_robot_FCs(schedule::P) where {P<:ProjectSchedule}   = schedule.robot_FCs
+# get_actions(schedule::P) where {P<:ProjectSchedule}     = schedule.actions
+# get_operations(schedule::P) where {P<:ProjectSchedule}  = schedule.operations
 get_vtx_ids(schedule::P) where {P<:ProjectSchedule}     = schedule.vtx_ids
 get_root_nodes(schedule::P) where {P<:ProjectSchedule}  = schedule.root_nodes
 get_root_node_weights(schedule::P) where {P<:ProjectSchedule}  = schedule.weights
@@ -797,7 +803,6 @@ function construct_project_schedule(
         end
         for object_id in get_input_ids(op)
             # add action sequence
-            # object_ic = get_object_ICs(schedule)[object_id]
             object_ic           = get_node_from_id(schedule, ObjectID(object_id))
             pickup_station_id   = get_id(get_location_id(object_ic))
             object_fc           = object_FCs[object_id]
@@ -811,7 +816,6 @@ function construct_project_schedule(
             # elseif is_collaborative_robot_task(project_spec, object_id)
             # end
 
-            # action_id = ActionID(get_num_actions(schedule))
             add_edge!(schedule, action_id, operation_id)
 
             new_robot_id = object_id + problem_spec.N
@@ -882,18 +886,17 @@ function construct_partial_project_schedule(
         operation_id = get_operation_id(op)
         for object_id in get_input_ids(op)
             # add action sequence
-            object_ic = get_object_ICs(project_schedule)[object_id]
-            pickup_station_id = get_id(get_location_id(object_ic))
-            object_fc = object_FCs[object_id]
-            dropoff_station_id = get_id(get_location_id(object_fc))
+            object_ic           = get_node_from_id(project_schedule, ObjectID(object_id))
+            pickup_station_id   = get_id(get_location_id(object_ic))
+            object_fc           = object_FCs[object_id]
+            dropoff_station_id  = get_id(get_location_id(object_fc))
             # TODO Handle collaborative tasks
             # if is_single_robot_task(project_spec, object_id)
             robot_id = -1
-            add_single_robot_delivery_task!(project_schedule,problem_spec,robot_id,
+            action_id = add_single_robot_delivery_task!(project_schedule,problem_spec,robot_id,
                 object_id,pickup_station_id,dropoff_station_id)
             # elseif is_collaborative_robot_task(project_spec, object_id)
             # end
-            action_id = ActionID(get_num_actions(project_schedule)) # retrieve id of final DEPOSIT action
             add_edge!(project_schedule, action_id, operation_id)
         end
         for object_id in get_output_ids(op)
