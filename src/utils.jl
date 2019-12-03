@@ -7,6 +7,8 @@ using LinearAlgebra
 using DataStructures
 using JuMP, Gurobi
 
+# using ..TaskGraphs
+using ..FactoryWorlds
 using ..PlanningPredicates
 using ..TaskGraphsCore
 
@@ -480,6 +482,25 @@ function construct_random_task_graphs_problem(N::Int,M::Int,
 
     construct_task_graphs_problem(project_spec,r0,s0,sF,dist_matrix,Δt_collect,Δt_deliver)
 end
+
+export
+    initialize_test_problem
+
+function initialize_test_problem(N=8,M=12;env_id=2)
+    # experiment_dir = joinpath(dirname(pathof(WebotsSim)),"..","experiments")
+    filename = string(ENVIRONMENT_DIR,"/env_",env_id,".toml");
+    factory_env = read_env(filename);
+
+    project_spec, problem_spec, object_ICs, object_FCs, robot_ICs = construct_random_task_graphs_problem(
+        N,M,
+        get_pickup_zones(factory_env),
+        get_dropoff_zones(factory_env),
+        get_free_zones(factory_env),
+        get_dist_matrix(factory_env.graph));
+
+    project_spec, problem_spec, robot_ICs, factory_env.graph
+end
+
 
 export
     combine_project_specs

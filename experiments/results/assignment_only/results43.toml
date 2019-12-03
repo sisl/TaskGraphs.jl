@@ -1,0 +1,4 @@
+cost = 62
+time = 0.012515294
+assignment = [15, 4, 28, 13, 5, 23, 3, 2, 1, 8]
+optimal = true

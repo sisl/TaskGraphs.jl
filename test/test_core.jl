@@ -349,11 +349,6 @@ end
 let
     problem_spec = TaskGraphProblemSpec()
 end
-let
-    G = DiGraph(3)
-    add_edge!(G,1,2)
-    @test get_all_root_nodes(G) == Set([2,3])
-end
 # Simple Hand Crafted Problem
 let
     project_spec, problem_spec, robot_ICs, optimal_assignments, env_graph = initialize_toy_problem_1()

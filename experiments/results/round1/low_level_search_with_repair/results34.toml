@@ -1,0 +1,4 @@
+valid_flag = true
+cost = [123.0, 2.0, 753.0, 0.0]
+time = 0.116030542
+num_conflicts = 1

@@ -3,10 +3,12 @@ module Helpers
 using LightGraphs
 using MetaGraphs
 using GraphUtils
+using CRCBS
 
-using ..PlanningPredicates
-using ..TaskGraphsCore
-using ..TaskGraphsUtils
+# using ..PlanningPredicates
+# using ..TaskGraphsCore
+# using ..TaskGraphsUtils
+using ..TaskGraphs
 
 export
     initialize_toy_problem_1,
@@ -453,6 +455,38 @@ function initialize_toy_problem_9(;verbose=false,Δt_op=0,Δt_collect=[0,0],Δt_
             """,vtx_grid,r0,s0,sF,project_spec,problem_spec.graph)
     end
     return project_spec, problem_spec, robot_ICs, assignments, env_graph
+end
+
+export
+    get_object_paths
+
+function get_object_paths(solution,env)
+    schedule = env.schedule
+    cache = env.cache
+    robot_paths = convert_to_vertex_lists(solution)
+    tF = maximum(map(length, robot_paths))
+    object_paths = map(j->Vector{Int}(),1:length(env.schedule.object_ICs))
+    for v in vertices(schedule.graph)
+        node = get_node_from_id(schedule,get_vtx_id(schedule,v))
+        if typeof(node) <: CARRY
+            path_spec = get_path_spec(schedule,v)
+            agent_id = path_spec.agent_id
+            s0 = get_id(get_initial_location_id(node))
+            sF = get_id(get_destination_location_id(node))
+            for v2 in inneighbors(schedule.graph,v)
+                node2 = get_node_from_id(schedule,get_vtx_id(schedule,v2))
+                if typeof(node2) <: COLLECT
+                    object_id = get_id(get_object_id(node2))
+                    object_paths[object_id] = [
+                        map(t->s0,0:cache.t0[v]-1)...,
+                        map(t->robot_paths[agent_id][t],min(cache.t0[v]+1,tF):min(cache.tF[v]+1,tF))...,
+                        map(t->sF,min(cache.tF[v]+1,tF):tF)...
+                    ]
+                end
+            end
+        end
+    end
+    object_paths
 end
 
 end
