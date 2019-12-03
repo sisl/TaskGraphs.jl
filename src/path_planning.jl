@@ -464,7 +464,7 @@ function plan_next_path!(solver::S, env::E, mapf::M, node::N;
             end
             log_info(2,solver,string("LOW LEVEL SEARCH: solver.num_A_star_iterations = ",solver.num_A_star_iterations))
             # Make sure every robot sticks around for the entire time horizon
-            if length(outneighbors(get_graph(schedule),v)) == 0
+            if is_terminal_node(get_graph(schedule),v)
                 log_info(2,solver,string("LOW LEVEL SEARCH: Extending terminal node",
                 " (SHOULD NEVER HAPPEN IF THINGS ARE WORKING CORRECTLY)"))
                 extend_path!(cbs_env,path,maximum(cache.tF))
@@ -515,6 +515,7 @@ function CRCBS.low_level_search!(
             return false
         end
     end
+    # aggregate_costs here?
     return true
 end
 
@@ -691,7 +692,7 @@ function high_level_search!(solver::P, env_graph, project_spec, problem_spec,
         lower_bound_cost = max(lower_bound_cost, optimal_TA_cost)
         log_info(0,solver,string("HIGH LEVEL SEARCH: Current assignment vector = ",assignments))
         log_info(0,solver,string("HIGH LEVEL SEARCH: Current lower bound cost = ",lower_bound_cost))
-        if lower_bound_cost >= solver.best_cost[1]
+        if lower_bound_cost >= solver.best_cost[1] # TODO make sure that the operation duration is accounted for here
             # log_info(-1,solver.verbosity,string("HIGH LEVEL SEARCH: optimality gap = ",solver.best_cost[1] - lower_bound_cost,". Returning best solution with cost ", solver.best_cost,"\n"))
             break
         end
@@ -704,7 +705,7 @@ function high_level_search!(solver::P, env_graph, project_spec, problem_spec,
         if cost < solver.best_cost
             best_solution = solution
             best_assignment = assignments
-            solver.best_cost = cost
+            solver.best_cost = cost # TODO make sure that the operation duration is accounted for here
             best_env = env
         end
         log_info(0,solver,string("HIGH LEVEL SEARCH: Best cost so far = ", solver.best_cost[1]))

@@ -136,6 +136,9 @@ let
         print_project_schedule(project_schedule,"project_schedule2")
 
     end
+
+    # Verify that old method (assignment milp) and new method (adjacency matrix
+    # milp) yield the same costs
     let
 
         for (i, f) in enumerate([
@@ -171,10 +174,6 @@ let
                     adj_matrix = Int.(round.(value.(model2[:X])))
                     update_project_schedule!(schedule2,problem_spec,adj_matrix)
 
-                    t0,tF,slack,local_slack = process_schedule(schedule1)
-
-                    t0,tF,slack,local_slack = process_schedule(schedule2)
-
                     @test obj_val1 == obj_val2
                     @show i, (obj_val1 == obj_val2), obj_val1, obj_val2
                     # @test schedule1 == schedule2
@@ -186,5 +185,54 @@ let
             end
         end
 
+    end
+
+    # Test the adjacency matrix solver as a part of the full pipeline
+    let
+        for (i, f) in enumerate([
+            initialize_toy_problem_1,
+            initialize_toy_problem_2,
+            initialize_toy_problem_3,
+            initialize_toy_problem_4,
+            initialize_toy_problem_5,
+            initialize_toy_problem_6,
+            initialize_toy_problem_7,
+            initialize_toy_problem_8,
+            ])
+            for cost_model in [:SumOfMakeSpans, :MakeSpan]
+                let
+                    # Compare against old method
+                    # f = initialize_toy_problem_1
+                    # i = 1
+                    project_spec, problem_spec, robot_ICs, assignments, env_graph = f(;verbose=false);
+                    # model1 = formulate_optimization_problem(problem_spec,Gurobi.Optimizer;cost_model=cost_model);
+                    # optimize!(model1)
+                    # @test termination_status(model1) == MathOptInterface.OPTIMAL
+                    # assignment_matrix = Int.(round.(value.(model1[:x])))
+                    # obj_val1 = Int(round(value(objective_function(model1))))
+                    # assignment_vector = map(j->findfirst(assignment_matrix[:,j] .== 1),1:problem_spec.M);
+                    # schedule1 = construct_project_schedule(project_spec, problem_spec, robot_ICs, assignment_vector)
+
+                    # robot_ICs = map(i->robot_ICs[i], 1:problem_spec.N)
+                    schedule2 = construct_partial_project_schedule(project_spec,problem_spec,map(i->robot_ICs[i], 1:problem_spec.N))
+                    model2, job_shop_variables = formulate_schedule_milp(schedule2,problem_spec;cost_model=cost_model)
+                    optimize!(model2)
+                    @test termination_status(model2) == MathOptInterface.OPTIMAL
+                    obj_val2 = Int(round(value(objective_function(model2))))
+                    adj_matrix = Int.(round.(value.(model2[:X])))
+                    update_project_schedule!(schedule2,problem_spec,adj_matrix)
+
+                    # Call CBS to get path plan
+
+                    @test obj_val1 == obj_val2
+                    @show i, (obj_val1 == obj_val2), obj_val1, obj_val2
+                    # @test schedule1 == schedule2
+                    if !(obj_val1 == obj_val2)
+                        print_project_schedule(schedule1,string("project_schedule1_",i))
+                        print_project_schedule(schedule2,model2,string("project_schedule2_",i))
+                    end
+                end
+            end
+        end
     end
 end

@@ -509,7 +509,7 @@ let
     assignments = map(j->findfirst(assignment_matrix[:,j] .== 1),1:M)
     project_schedule = construct_project_schedule(project_spec, problem_spec, object_ICs, object_FCs, robot_ICs, assignments);
 
-    o_keys = Set(collect(keys(get_object_ICs(project_schedule))))
-    input_ids = union([get_input_ids(op) for (k,op) in get_operations(project_schedule)]...)
-    @test o_keys == input_ids
+    # o_keys = Set(collect(keys(get_object_ICs(project_schedule))))
+    # input_ids = union([get_input_ids(op) for (k,op) in get_operations(project_schedule)]...)
+    # @test o_keys == input_ids
 end

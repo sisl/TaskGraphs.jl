@@ -8,6 +8,7 @@ export
     LocationID,
     ObjectID,
     RobotID,
+    TerminalRobotID,
     StationID,
     ActionID,
     OperationID,
@@ -15,6 +16,7 @@ export
     AbstractPlanningPredicate,
     OBJECT_AT,
     ROBOT_AT,
+	TERMINAL_ROBOT_AT,
     get_object_id, get_location_id, get_robot_id,
 
     AbstractPlanningAction,
@@ -31,7 +33,9 @@ export
     reset_task_id_counter!,
     get_unique_task_id,
     reset_operation_id_counter!,
-    get_unique_operation_id
+    get_unique_operation_id,
+    reset_action_id_counter!,
+    get_unique_action_id
 
 TASK_ID_COUNTER = 0
 get_unique_task_id() = Int(global TASK_ID_COUNTER += 1)
@@ -42,6 +46,11 @@ OPERATION_ID_COUNTER = 0
 get_unique_operation_id() = Int(global OPERATION_ID_COUNTER += 1)
 function reset_operation_id_counter!()
     global OPERATION_ID_COUNTER = 0
+end
+ACTION_ID_COUNTER = 0
+get_unique_action_id() = Int(global ACTION_ID_COUNTER += 1)
+function reset_action_id_counter!()
+    global ACTION_ID_COUNTER = 0
 end
 
 """ Planning Resources (at the assignment level) """
@@ -129,6 +138,9 @@ end
 @with_kw struct RobotID <: AbstractID
 	id::Int = 0
 end
+@with_kw struct TerminalRobotID <: AbstractID
+	id::Int = 0
+end
 @with_kw struct StationID <: AbstractID
 	id::Int = 0
 end
@@ -156,6 +168,14 @@ ROBOT_AT(r::Int,x::Int) = ROBOT_AT(RobotID(r),StationID(x))
 get_robot_id(pred::ROBOT_AT) = pred.r
 get_location_id(pred::ROBOT_AT) = pred.x
 
+struct TERMINAL_ROBOT_AT <: AbstractPlanningPredicate
+    r::TerminalRobotID
+    x::StationID
+end
+TERMINAL_ROBOT_AT(r::Int,x::Int) = TERMINAL_ROBOT_AT(TerminalRobotID(r),StationID(x))
+get_robot_id(pred::TERMINAL_ROBOT_AT) = pred.r
+get_location_id(pred::TERMINAL_ROBOT_AT) = pred.x
+
 struct CAN_CARRY <: AbstractPlanningPredicate
     r::RobotID
     o::ObjectID
@@ -170,7 +190,7 @@ export
     postconditions,
     duration
 
-@with_kw struct Operation
+@with_kw struct Operation <: AbstractPlanningPredicate
     pre::Set{OBJECT_AT}     = Set{OBJECT_AT}()
     post::Set{OBJECT_AT}    = Set{OBJECT_AT}()
     Δt::Int 				= 0
@@ -191,7 +211,7 @@ export
     GO,COLLECT,CARRY,DEPOSIT,
 	get_initial_location_id, get_destination_location_id
 
-abstract type AbstractRobotAction end
+abstract type AbstractRobotAction <: AbstractPlanningPredicate end
 get_robot_id(a::A) where {A<:AbstractRobotAction} = a.r
 
 struct GO <: AbstractRobotAction # go to position x
