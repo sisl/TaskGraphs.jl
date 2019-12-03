@@ -172,14 +172,14 @@ function formulate_optimization_problem(G,Drs,Dss,Δt,Δt_collect,Δt_deliver,to
         @variable(model, T[1:length(root_nodes)])
         for (i,project_head) in enumerate(root_nodes)
             for v in project_head
-                @constraint(model, T[i] >= tof[v])
+                @constraint(model, T[i] >= tof[v] + Δt[v])
             end
         end
         @objective(model, Min, sum(map(i->T[i]*get(weights,i,0.0), 1:length(root_nodes))))
         # @objective(model, Min, sum(map(v->tof[v]*get(weights,v,0.0), root_nodes)))
     elseif cost_model == :MakeSpan
         @variable(model, T)
-        @constraint(model, T .>= tof)
+        @constraint(model, T .>= tof .+ Δt)
         @objective(model, Min, T)
     end
     model;
