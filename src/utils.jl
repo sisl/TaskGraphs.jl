@@ -203,6 +203,7 @@ function formulate_optimization_problem(spec::T,optimizer;
         spec.sF,
         spec.nR,
         optimizer;
+        # cost_model=spec.cost_function,
         kwargs...
         )
 end

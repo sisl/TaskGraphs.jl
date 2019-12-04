@@ -528,7 +528,7 @@ function generate_path_spec(schedule::P,spec::T,a::GO) where {P<:ProjectSchedule
         min_path_duration=get(spec.D,(s0,s),0), # TaskGraphProblemSpec distance matrix
         path_id=get_next_path_id(schedule),
         dummy_id=r,
-        agent_id=get(schedule.robot_id_map,r,-1),
+        agent_id=get(schedule.robot_id_map,r,r),
         tight=true,
         free = (s==-1) # if destination is -1, there is no goal location
         )
@@ -546,7 +546,7 @@ function generate_path_spec(schedule::P,spec::T,a::CARRY) where {P<:ProjectSched
         min_path_duration=get(spec.D,(s0,s),0), # TaskGraphProblemSpec distance matrix
         path_id=get_next_path_id(schedule),
         dummy_id=r,
-        agent_id=get(schedule.robot_id_map,r,-1),
+        agent_id=get(schedule.robot_id_map,r,r),
         object_id = o
         )
 end
@@ -563,7 +563,7 @@ function generate_path_spec(schedule::P,spec::T,a::COLLECT) where {P<:ProjectSch
         min_path_duration=get(spec.Δt_collect,o,0),
         path_id=get_next_path_id(schedule),
         dummy_id=r,
-        agent_id=get(schedule.robot_id_map,r,-1),
+        agent_id=get(schedule.robot_id_map,r,r),
         object_id = o,
         static=true
         )
@@ -581,7 +581,7 @@ function generate_path_spec(schedule::P,spec::T,a::DEPOSIT) where {P<:ProjectSch
         min_path_duration=get(spec.Δt_deliver,o,0),
         path_id=get_next_path_id(schedule),
         dummy_id=r,
-        agent_id=get(schedule.robot_id_map,r,-1),
+        agent_id=get(schedule.robot_id_map,r,r),
         object_id = o,
         static=true
         )
@@ -929,17 +929,19 @@ function construct_partial_project_schedule(
     # Construct Partial Project Schedule
     project_schedule = ProjectSchedule();
     for op in operations
-       add_to_schedule!(project_schedule, problem_spec, op, get_operation_id(op))
+        add_to_schedule!(project_schedule, problem_spec, op, get_operation_id(op))
     end
     for pred in object_ICs
-       add_to_schedule!(project_schedule, problem_spec, pred, get_object_id(pred))
+        add_to_schedule!(project_schedule, problem_spec, pred, get_object_id(pred))
     end
     for pred in robot_ICs
-       add_to_schedule!(project_schedule, problem_spec, pred, get_robot_id(pred))
-       action_id = ActionID(get_unique_action_id())
-       action = GO(r=get_robot_id(pred),x1=get_location_id(pred))
-       add_to_schedule!(project_schedule, problem_spec, action, action_id)
-       add_edge!(project_schedule, get_robot_id(pred), action_id)
+        robot_id = get_robot_id(pred)
+        project_schedule.robot_id_map[get_id(robot_id)] = get_id(robot_id)
+        add_to_schedule!(project_schedule, problem_spec, pred, robot_id)
+        action_id = ActionID(get_unique_action_id())
+        action = GO(r=robot_id,x1=get_location_id(pred))
+        add_to_schedule!(project_schedule, problem_spec, action, action_id)
+        add_edge!(project_schedule, robot_id, action_id)
     end
     # add root nodes
     for operation_id in root_ops

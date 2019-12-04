@@ -44,8 +44,8 @@ function print_toy_problem_specs(prob_name,vtx_grid,r0,s0,sF,project_spec,delive
     @show sF
     display(project_spec.operations)
     print("\n\n")
-#     display(delivery_graph.tasks)
-#     print("\n\n")
+    # display(delivery_graph.tasks)
+    # print("\n\n")
 end
 
 function initialize_toy_problem(r0,s0,sF,dist_function)
@@ -108,14 +108,7 @@ function initialize_toy_problem_2(;cost_function=SumOfMakeSpans,verbose=false)
     s0 = [5,8,13]
     sF = [9,32,17]
 
-    object_ICs = Vector{OBJECT_AT}([OBJECT_AT(o,s0[o]) for o in 1:M]) # initial_conditions
-    object_FCs = Vector{OBJECT_AT}([OBJECT_AT(o,sF[o]) for o in 1:M]) # final conditions
-    robot_ICs = Dict{Int,ROBOT_AT}(r => ROBOT_AT(r,r0[r]) for r in 1:N)
-    for r in N+1:N+M
-        robot_ICs[r] = ROBOT_AT(r,sF[r-N])
-    end
-    Drs, Dss = cached_pickup_and_delivery_distances(r0,s0,sF,(v1,v2)->dist_matrix[v1,v2])
-    project_spec = ProjectSpec( M=M, initial_conditions=object_ICs, final_conditions=object_FCs )
+    project_spec, robot_ICs = initialize_toy_problem(r0,s0,sF,(v1,v2)->dist_matrix[v1,v2])
     add_operation!(project_spec,construct_operation(project_spec,-1,[1,2],[3],0))
     add_operation!(project_spec,construct_operation(project_spec,-1,[3],  [], 0))
     assignments = [1,2,3]
@@ -163,14 +156,7 @@ function initialize_toy_problem_3(;cost_function=SumOfMakeSpans,verbose=false,Δ
     s0 = [7,30,12]
     sF = [8,32,16]
 
-    object_ICs = Vector{OBJECT_AT}([OBJECT_AT(o,s0[o]) for o in 1:M]) # initial_conditions
-    object_FCs = Vector{OBJECT_AT}([OBJECT_AT(o,sF[o]) for o in 1:M]) # final conditions
-    robot_ICs = Dict{Int,ROBOT_AT}(r => ROBOT_AT(r,r0[r]) for r in 1:N)
-    for r in N+1:N+M
-        robot_ICs[r] = ROBOT_AT(r,sF[r-N])
-    end
-    Drs, Dss = cached_pickup_and_delivery_distances(r0,s0,sF,(v1,v2)->dist_matrix[v1,v2])
-    project_spec = ProjectSpec( M=M, initial_conditions=object_ICs, final_conditions=object_FCs )
+    project_spec, robot_ICs = initialize_toy_problem(r0,s0,sF,(v1,v2)->dist_matrix[v1,v2])
     add_operation!(project_spec,construct_operation(project_spec,-1,[1,2],[3],0.0))
     add_operation!(project_spec,construct_operation(project_spec,-1,[3],  [], 0.0))
     assignments = [1,2,3]
@@ -219,14 +205,7 @@ function initialize_toy_problem_4(;cost_function=SumOfMakeSpans,verbose=false)
     s0 = [2,4]
     sF = [8,6]
 
-    object_ICs = Vector{OBJECT_AT}([OBJECT_AT(o,s0[o]) for o in 1:M]) # initial_conditions
-    object_FCs = Vector{OBJECT_AT}([OBJECT_AT(o,sF[o]) for o in 1:M]) # final conditions
-    robot_ICs = Dict{Int,ROBOT_AT}(r => ROBOT_AT(r,r0[r]) for r in 1:N)
-    for r in N+1:N+M
-        robot_ICs[r] = ROBOT_AT(r,sF[r-N])
-    end
-    Drs, Dss = cached_pickup_and_delivery_distances(r0,s0,sF,(v1,v2)->dist_matrix[v1,v2])
-    project_spec = ProjectSpec( M=M, initial_conditions=object_ICs, final_conditions=object_FCs )
+    project_spec, robot_ICs = initialize_toy_problem(r0,s0,sF,(v1,v2)->dist_matrix[v1,v2])
     add_operation!(project_spec,construct_operation(project_spec,-1,[1,2],[],0))
     assignments = [1,2]
 
@@ -274,14 +253,7 @@ function initialize_toy_problem_5(;cost_function=SumOfMakeSpans,verbose=false)
     s0 = [3,15]
     sF = [11,7]
 
-    object_ICs = Vector{OBJECT_AT}([OBJECT_AT(o,s0[o]) for o in 1:M]) # initial_conditions
-    object_FCs = Vector{OBJECT_AT}([OBJECT_AT(o,sF[o]) for o in 1:M]) # final conditions
-    robot_ICs = Dict{Int,ROBOT_AT}(r => ROBOT_AT(r,r0[r]) for r in 1:N)
-    for r in N+1:N+M
-        robot_ICs[r] = ROBOT_AT(r,sF[r-N])
-    end
-    Drs, Dss = cached_pickup_and_delivery_distances(r0,s0,sF,(v1,v2)->dist_matrix[v1,v2])
-    project_spec = ProjectSpec( M=M, initial_conditions=object_ICs, final_conditions=object_FCs )
+    project_spec, robot_ICs = initialize_toy_problem(r0,s0,sF,(v1,v2)->dist_matrix[v1,v2])
     add_operation!(project_spec,construct_operation(project_spec,-1,[1,2],[],0))
     assignments = [1,2]
 
@@ -325,14 +297,7 @@ function initialize_toy_problem_6(;cost_function=SumOfMakeSpans,verbose=false,Δ
     s0 = [5,12,13]
     sF = [9,32,17]
 
-    object_ICs = Vector{OBJECT_AT}([OBJECT_AT(o,s0[o]) for o in 1:M]) # initial_conditions
-    object_FCs = Vector{OBJECT_AT}([OBJECT_AT(o,sF[o]) for o in 1:M]) # final conditions
-    robot_ICs = Dict{Int,ROBOT_AT}(r => ROBOT_AT(r,r0[r]) for r in 1:N)
-    for r in N+1:N+M
-        robot_ICs[r] = ROBOT_AT(r,sF[r-N])
-    end
-    Drs, Dss = cached_pickup_and_delivery_distances(r0,s0,sF,(v1,v2)->dist_matrix[v1,v2])
-    project_spec = ProjectSpec( M=M, initial_conditions=object_ICs, final_conditions=object_FCs )
+    project_spec, robot_ICs = initialize_toy_problem(r0,s0,sF,(v1,v2)->dist_matrix[v1,v2])
     add_operation!(project_spec,construct_operation(project_spec,-1,[1,2],[3],Δt_op))
     add_operation!(project_spec,construct_operation(project_spec,-1,[3],  [], Δt_op))
     assignments = [1,2,3]
@@ -363,14 +328,7 @@ function initialize_toy_problem_7(;cost_function=SumOfMakeSpans,verbose=false,Δ
     s0 = [6,10,15]
     sF = [14,12,16]
 
-    object_ICs = Vector{OBJECT_AT}([OBJECT_AT(o,s0[o]) for o in 1:M]) # initial_conditions
-    object_FCs = Vector{OBJECT_AT}([OBJECT_AT(o,sF[o]) for o in 1:M]) # final conditions
-    robot_ICs = Dict{Int,ROBOT_AT}(r => ROBOT_AT(r,r0[r]) for r in 1:N)
-    for r in N+1:N+M
-        robot_ICs[r] = ROBOT_AT(r,sF[r-N])
-    end
-    Drs, Dss = cached_pickup_and_delivery_distances(r0,s0,sF,(v1,v2)->dist_matrix[v1,v2])
-    project_spec = ProjectSpec( M=M, initial_conditions=object_ICs, final_conditions=object_FCs )
+    project_spec, robot_ICs = initialize_toy_problem(r0,s0,sF,(v1,v2)->dist_matrix[v1,v2])
     add_operation!(project_spec,construct_operation(project_spec,-1,[1,2],[3],Δt_op))
     add_operation!(project_spec,construct_operation(project_spec,-1,[3],  [], Δt_op))
     assignments = [1,2,3]
@@ -400,14 +358,7 @@ function initialize_toy_problem_8(;cost_function=SumOfMakeSpans,verbose=false,Δ
     s0 = [5,25,12,24]
     sF = [8,28,9,21]
 
-    object_ICs = Vector{OBJECT_AT}([OBJECT_AT(o,s0[o]) for o in 1:M]) # initial_conditions
-    object_FCs = Vector{OBJECT_AT}([OBJECT_AT(o,sF[o]) for o in 1:M]) # final conditions
-    robot_ICs = Dict{Int,ROBOT_AT}(r => ROBOT_AT(r,r0[r]) for r in 1:N)
-    for r in N+1:N+M
-        robot_ICs[r] = ROBOT_AT(r,sF[r-N])
-    end
-    Drs, Dss = cached_pickup_and_delivery_distances(r0,s0,sF,(v1,v2)->dist_matrix[v1,v2])
-    project_spec = ProjectSpec( M=M, initial_conditions=object_ICs, final_conditions=object_FCs )
+    project_spec, robot_ICs = initialize_toy_problem(r0,s0,sF,(v1,v2)->dist_matrix[v1,v2])
     add_operation!(project_spec,construct_operation(project_spec,-1,[1],[4],Δt_op))
     add_operation!(project_spec,construct_operation(project_spec,-1,[2],[3],Δt_op))
     add_operation!(project_spec,construct_operation(project_spec,-1,[4],[],Δt_op))
@@ -441,14 +392,7 @@ function initialize_toy_problem_9(;cost_function=SumOfMakeSpans,verbose=false,Δ
     s0 = [5,5]
     sF = [8,6]
 
-    object_ICs = Vector{OBJECT_AT}([OBJECT_AT(o,s0[o]) for o in 1:M]) # initial_conditions
-    object_FCs = Vector{OBJECT_AT}([OBJECT_AT(o,sF[o]) for o in 1:M]) # final conditions
-    robot_ICs = Dict{Int,ROBOT_AT}(r => ROBOT_AT(r,r0[r]) for r in 1:N)
-    for r in N+1:N+M
-        robot_ICs[r] = ROBOT_AT(r,sF[r-N])
-    end
-    Drs, Dss = cached_pickup_and_delivery_distances(r0,s0,sF,(v1,v2)->dist_matrix[v1,v2])
-    project_spec = ProjectSpec( M=M, initial_conditions=object_ICs, final_conditions=object_FCs )
+    project_spec, robot_ICs = initialize_toy_problem(r0,s0,sF,(v1,v2)->dist_matrix[v1,v2])
     add_operation!(project_spec,construct_operation(project_spec,-1,[1],[],Δt_op))
     add_operation!(project_spec,construct_operation(project_spec,-1,[2],[],Δt_op))
     project_spec, problem_spec, object_ICs, object_FCs, robot_ICs = construct_task_graphs_problem(project_spec,r0,s0,sF,dist_matrix,Δt_collect,Δt_deliver;cost_function=cost_function)
