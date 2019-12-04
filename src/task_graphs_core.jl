@@ -1308,22 +1308,13 @@ function update_project_schedule!(project_schedule::P,problem_spec::T,adj_matrix
         node_id = get_vtx_id(project_schedule, v)
         node = get_node_from_id(project_schedule, node_id)
         for v2 in inneighbors(G,v)
-            # id2 = get_vtx_id(project_schedule, v2)
-            # node2 = get_node_from_vtx(project_schedule, v2)
             node = align_with_predecessor(node,get_node_from_vtx(project_schedule, v2))
         end
         for v2 in outneighbors(G,v)
-            # id2 = get_vtx_id(project_schedule, v2)
-            # node2 = get_node_from_vtx(project_schedule, v2)
             node = align_with_successor(node,get_node_from_vtx(project_schedule, v2))
         end
         replace_in_schedule!(project_schedule, problem_spec, node, node_id)
-        # for v2 in outneighbors(G,v)
-        #     id2 = get_vtx_id(project_schedule, v2)
-        #     node2 = get_node_from_id(project_schedule, id2)
-        #     new_node = align_with_predecessor(node2,node)
-        #     replace_in_schedule!(project_schedule, problem_spec, new_node, id2)
-        # end
+
     end
     project_schedule
 end

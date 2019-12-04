@@ -142,14 +142,14 @@ let
     let
 
         for (i, f) in enumerate([
-            initialize_toy_problem_1,
-            initialize_toy_problem_2,
-            initialize_toy_problem_3,
+            # initialize_toy_problem_1,
+            # initialize_toy_problem_2,
+            # initialize_toy_problem_3,
             initialize_toy_problem_4,
-            initialize_toy_problem_5,
-            initialize_toy_problem_6,
-            initialize_toy_problem_7,
-            initialize_toy_problem_8,
+            # initialize_toy_problem_5,
+            # initialize_toy_problem_6,
+            # initialize_toy_problem_7,
+            # initialize_toy_problem_8,
             ])
             for cost_model in [:SumOfMakeSpans, :MakeSpan]
                 let
@@ -160,7 +160,7 @@ let
                     model1 = formulate_optimization_problem(problem_spec,Gurobi.Optimizer;cost_model=cost_model);
                     optimize!(model1)
                     @test termination_status(model1) == MathOptInterface.OPTIMAL
-                    assignment_matrix = Int.(round.(value.(model1[:x])))
+                    assignment_matrix = Int.(round.(value.(model1[:X])))
                     obj_val1 = Int(round(value(objective_function(model1))))
                     assignment_vector = map(j->findfirst(assignment_matrix[:,j] .== 1),1:problem_spec.M);
                     schedule1 = construct_project_schedule(project_spec, problem_spec, robot_ICs, assignment_vector)
@@ -177,10 +177,10 @@ let
                     @test obj_val1 == obj_val2
                     @show i, (obj_val1 == obj_val2), obj_val1, obj_val2
                     # @test schedule1 == schedule2
-                    if !(obj_val1 == obj_val2)
+                    # if !(obj_val1 == obj_val2)
                         print_project_schedule(schedule1,string("project_schedule1_",i))
                         print_project_schedule(schedule2,model2,string("project_schedule2_",i))
-                    end
+                    # end
                 end
             end
         end
@@ -208,7 +208,7 @@ let
                     # model1 = formulate_optimization_problem(problem_spec,Gurobi.Optimizer;cost_model=cost_model);
                     # optimize!(model1)
                     # @test termination_status(model1) == MathOptInterface.OPTIMAL
-                    # assignment_matrix = Int.(round.(value.(model1[:x])))
+                    # assignment_matrix = Int.(round.(value.(model1[:X])))
                     # obj_val1 = Int(round(value(objective_function(model1))))
                     # assignment_vector = map(j->findfirst(assignment_matrix[:,j] .== 1),1:problem_spec.M);
                     # schedule1 = construct_project_schedule(project_spec, problem_spec, robot_ICs, assignment_vector)
@@ -234,6 +234,34 @@ let
                 end
             end
         end
+    end
+
+    let
+        project_spec, problem_spec, robot_ICs, assignments, env_graph = initialize_toy_problem_4(;verbose=false);
+        solver = PC_TAPF_Solver(verbosity=1)
+
+        project_schedule = construct_partial_project_schedule(project_spec,problem_spec,map(i->robot_ICs[i], 1:problem_spec.N))
+        model, job_shop_variables = formulate_schedule_milp(project_schedule,problem_spec)
+        optimize!(model)
+        @test termination_status(model) == MathOptInterface.OPTIMAL
+        assignment_matrix = get_assignment_matrix(model);
+        # add this assignment to the list of assignments to forbid next iteration
+        update_project_schedule!(project_schedule,problem_spec,assignment_matrix)
+        # env, mapf = construct_search_env(project_spec, problem_spec, robot_ICs, assignments, env_graph);
+        env, mapf = construct_search_env(project_schedule, problem_spec, env_graph);
+        pc_mapf = PC_MAPF(env,mapf);
+        ##### Call CBS Search Routine (LEVEL 2) #####
+        # solution, cost = solve!(solver,pc_mapf);
+
+        node = initialize_root_node(pc_mapf)
+        # low_level_search!(solver,pc_mapf,root_node)
+        plan_next_path!(solver,env,mapf,node;heuristic=get_heuristic_cost,path_finder=A_star)
+        plan_next_path!(solver,env,mapf,node;heuristic=get_heuristic_cost,path_finder=A_star)
+        plan_next_path!(solver,env,mapf,node;heuristic=get_heuristic_cost,path_finder=A_star)
+
+        print_project_schedule(env.schedule,string("project_schedule4"))
+
+        plan_next_path!(solver,env,mapf,node;heuristic=get_heuristic_cost,path_finder=A_star)
     end
 
 end

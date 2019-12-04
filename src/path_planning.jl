@@ -273,8 +273,8 @@ function CRCBS.get_start(env::SearchEnv,v::Int)
     PCCBS.State(start_vtx,start_time)
 end
 
-function construct_search_env(project_spec, problem_spec, robot_ICs, assignments, env_graph;extra_T=50)
-    schedule = construct_project_schedule(project_spec, problem_spec, robot_ICs, assignments)
+function construct_search_env(schedule, problem_spec, env_graph;extra_T=50)
+    # schedule = construct_project_schedule(project_spec, problem_spec, robot_ICs, assignments)
     cache = initialize_planning_cache(schedule)
     # Paths stored as seperate chunks (will need to be concatenated before conflict checking)
     N = problem_spec.N                                          # number of robots
@@ -289,7 +289,6 @@ function construct_search_env(project_spec, problem_spec, robot_ICs, assignments
     end
     cost_model = construct_composite_cost_model(
         SumOfMakeSpans(cache.tF,schedule.root_nodes,map(k->schedule.weights[k],schedule.root_nodes),cache.tF[schedule.root_nodes]),
-        # FullDeadlineCost(DeadlineCost(maximum(cache.tF))), # TODO change for sum of makespans
         HardConflictCost(env_graph,maximum(cache.tF)+extra_T, N),
         SumOfTravelDistance(),
         FullCostModel(sum,NullCost()) # SumOfTravelTime(),
@@ -311,6 +310,10 @@ function construct_search_env(project_spec, problem_spec, robot_ICs, assignments
 
     env = SearchEnv(schedule=schedule, cache=cache, env=mapf.env, num_agents=N)
     return env, mapf #, node
+end
+function construct_search_env(project_spec, problem_spec, robot_ICs, assignments, env_graph;kwargs...)
+    schedule = construct_project_schedule(project_spec, problem_spec, robot_ICs, assignments)
+    construct_search_env(schedule, problem_spec, env_graph;kwargs...)
 end
 
 function default_pc_tapf_solution(N::Int)
@@ -366,6 +369,7 @@ function CRCBS.build_env(solver, env::E, mapf::M, node::N, agent_id::Int, path_i
     v = env.schedule.path_id_to_vtx_map[path_id]
     node_id = get_vtx_id(env.schedule, v)
     schedule_node = get_node_from_id(env.schedule, node_id)
+    @show v,node_id,schedule_node,agent_id
     goal_vtx = mapf.goals[path_id].vtx
     goal_time = env.cache.tF[v]                             # time after which goal can be satisfied
     deadline = env.cache.tF[v] .+ env.cache.slack[v]         # deadline for DeadlineCost
@@ -403,12 +407,14 @@ function CRCBS.build_env(solver, env::E, mapf::M, node::N, agent_id::Int, path_i
     # update deadline in DeadlineCost
     set_deadline!(get_cost_model(cbs_env),deadline)
     # retrieve base_path
-    if !is_root_node(get_graph(env.schedule),v)
+    if !is_root_node(get_graph(env.schedule),v) # && agent_id != -1
         base_path = get_paths(node.solution)[agent_id]
     else
         base_path = Path{PCCBS.State,PCCBS.Action,get_cost_type(cbs_env)}(
             s0=get_start(env,v), cost=get_initial_cost(cbs_env))
     end
+    # base_path = get(get_paths(node.solution), agent_id, Path{PCCBS.State,PCCBS.Action,get_cost_type(cbs_env)}(
+    #     s0=get_start(env,v), cost=get_initial_cost(cbs_env)))
     log_info(2,solver,
     """
     agent_id = $(agent_id)
@@ -668,7 +674,10 @@ function high_level_search!(solver::P, env_graph, project_spec, problem_spec,
     best_solution = default_pc_tapf_solution(problem_spec.N)
     best_env    = SearchEnv()
     best_assignment = Vector{Int}()
-    model = formulate_optimization_problem(problem_spec,optimizer;kwargs...);
+    # model = formulate_optimization_problem(problem_spec,optimizer;kwargs...);
+    #
+    project_schedule = construct_partial_project_schedule(project_spec,problem_spec,map(i->robot_ICs[i], 1:problem_spec.N))
+    model, job_shop_variables = formulate_schedule_milp(project_schedule,problem_spec;optimizer=optimizer,kwargs...)
 
     while solver.best_cost[1] > lower_bound_cost
         solver.num_assignment_iterations += 1
@@ -697,7 +706,9 @@ function high_level_search!(solver::P, env_graph, project_spec, problem_spec,
             break
         end
         ############## Route Planning ###############
-        env, mapf = construct_search_env(project_spec, problem_spec, robot_ICs, assignments, env_graph);
+        update_project_schedule!(project_schedule,problem_spec,assignment_matrix)
+        # env, mapf = construct_search_env(project_spec, problem_spec, robot_ICs, assignments, env_graph);
+        env, mapf = construct_search_env(project_schedule, problem_spec, env_graph);
         pc_mapf = PC_MAPF(env,mapf);
         ##### Call CBS Search Routine (LEVEL 2) #####
         solution, cost = solve!(solver,pc_mapf);

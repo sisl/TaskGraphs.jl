@@ -81,9 +81,9 @@ function formulate_optimization_problem(G,Drs,Dss,Δt,Δt_collect,Δt_deliver,to
     @variable(model, tr0[1:N+M] >= 0.0) # robot availability time
 
     # Assignment matrix x
-    @variable(model, x[1:N+M,1:M], binary = true) # x[i,j] ∈ {0,1}
-    @constraint(model, x * ones(M) .<= 1)         # each robot may have no more than 1 task
-    @constraint(model, x' * ones(N+M) .== nR)     # each task must have exactly 1 assignment
+    @variable(model, X[1:N+M,1:M], binary = true) # X[i,j] ∈ {0,1}
+    @constraint(model, X * ones(M) .<= 1)         # each robot may have no more than 1 task
+    @constraint(model, X' * ones(N+M) .== nR)     # each task must have exactly 1 assignment
     for (i,t) in tr0_
         # start time for robot i
         @constraint(model, tr0[i] == t)
@@ -94,7 +94,7 @@ function formulate_optimization_problem(G,Drs,Dss,Δt,Δt_collect,Δt_deliver,to
     end
     for (i,j) in assignments
         # start time for task j (applies only to tasks with no prereqs)
-        @constraint(model, x[i,j] == 1)
+        @constraint(model, X[i,j] == 1)
     end
     # constraints
     Mm = sum(Drs) + sum(Dss) # for big-M constraints
@@ -110,19 +110,19 @@ function formulate_optimization_problem(G,Drs,Dss,Δt,Δt_collect,Δt_deliver,to
         # dummy robots can't do upstream jobs
         upstream_jobs = [j, map(e->e.dst,collect(edges(bfs_tree(G,j;dir=:in))))...]
         for v in upstream_jobs
-            @constraint(model, x[j+N,v] == 0)
+            @constraint(model, X[j+N,v] == 0)
         end
         # lower bound on task completion time (task can't start until it's available).
         # tof[j] = to0[j] + Dss[j,j] + slack[j]
         @constraint(model, tor[j] >= to0[j])
         # @constraint(model, tof[j] >= tor[j] + Dss[j,j] + Δt_collect[j] + Δt_deliver[j])
         # bound on task completion time (assigned robot must first complete delivery)
-        # Big M constraint (thanks Oriana!): When x[i,j] == 1, this constrains the final time
+        # Big M constraint (thanks Oriana!): When X[i,j] == 1, this constrains the final time
         # to be no less than the time it takes for the delivery to be completed by robot i.
-        # When x[i,j] == 0, this constrains the final time to be greater than a large negative
+        # When X[i,j] == 0, this constrains the final time to be greater than a large negative
         # number (meaning that this is a trivial constraint)
         for i in 1:N+M
-            @constraint(model, tor[j] - (tr0[i] + Drs[i,j]) >= -Mm*(1 - x[i,j]))
+            @constraint(model, tor[j] - (tr0[i] + Drs[i,j]) >= -Mm*(1 - X[i,j]))
         end
         @constraint(model, toc[j] == tor[j] + Δt_collect[j])
         @constraint(model, tod[j] == toc[j] + Dss[j,j])
@@ -206,7 +206,7 @@ function formulate_optimization_problem(spec::T,optimizer;
         )
 end
 function get_assignment_matrix(model::M) where {M<:JuMP.Model}
-    Matrix{Int}(value.(model[:x]))
+    Matrix{Int}(value.(model[:X]))
 end
 # function get_station_precedence_dict(model::M) where {M<:JuMP.Model} end
 
@@ -220,8 +220,8 @@ export
     problem. It simply excludes every specific solution passed to it.
 """
 function exclude_solutions!(model::JuMP.Model,M::Int,forbidden_solutions::Vector{Matrix{Int}})
-    for xf in forbidden_solutions
-        @constraint(model, sum(model[:x] .* xf) <= M-1)
+    for Xf in forbidden_solutions
+        @constraint(model, sum(model[:X] .* Xf) <= M-1)
     end
 end
 
