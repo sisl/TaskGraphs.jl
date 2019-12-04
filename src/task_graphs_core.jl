@@ -431,7 +431,7 @@ get_root_node_weights(schedule::P) where {P<:ProjectSchedule}  = schedule.weight
 get_node_from_id(schedule::P,id::A) where {P<:ProjectSchedule,A<:AbstractID}= schedule.planning_nodes[id]
 get_vtx(schedule::P,id::A) where {P<:ProjectSchedule,A<:AbstractID}         = get(schedule.vtx_map, id, -1)
 get_vtx_id(schedule::P,v::Int) where {P<:ProjectSchedule}                   = schedule.vtx_ids[v]
-get_node_from_vtx(schedule::P,id::A) where {P<:ProjectSchedule,A<:AbstractID}= schedule.planning_nodes[schedule.vtx_ids[v]]
+get_node_from_vtx(schedule::P,v::Int) where {P<:ProjectSchedule}= schedule.planning_nodes[schedule.vtx_ids[v]]
 
 # get_node_from_id(schedule::P,id::ActionID) where {P<:ProjectSchedule}       = get_actions(schedule)[get_id(id)]
 # get_node_from_id(schedule::P,id::OperationID) where {P<:ProjectSchedule}    = get_operations(schedule)[get_id(id)]
@@ -798,8 +798,8 @@ function add_headless_delivery_task!(
     prev_action_id = action_id
     action_id = ActionID(get_unique_action_id())
     add_to_schedule!(schedule, problem_spec, DEPOSIT(robot_id, object_id, dropoff_station_id), action_id)
-    add_edge!(schedule, prev_action_id, action_id)
     add_edge!(schedule, action_id, OperationID(operation_id))
+    add_edge!(schedule, prev_action_id, action_id)
 
     prev_action_id = action_id
     action_id = ActionID(get_unique_action_id())
@@ -925,6 +925,9 @@ function construct_partial_project_schedule(
 
     # Construct Partial Project Schedule
     project_schedule = ProjectSchedule();
+    for op in operations
+       add_to_schedule!(project_schedule, problem_spec, op, get_operation_id(op))
+    end
     for pred in object_ICs
        add_to_schedule!(project_schedule, problem_spec, pred, get_object_id(pred))
     end
@@ -934,9 +937,6 @@ function construct_partial_project_schedule(
        action = GO(r=get_robot_id(pred),x1=get_location_id(pred))
        add_to_schedule!(project_schedule, problem_spec, action, action_id)
        add_edge!(project_schedule, get_robot_id(pred), action_id)
-    end
-    for op in operations
-       add_to_schedule!(project_schedule, problem_spec, op, get_operation_id(op))
     end
     # add root nodes
     for operation_id in root_ops
@@ -1210,7 +1210,7 @@ function formulate_schedule_milp(project_schedule::ProjectSchedule,problem_spec:
                         # dt_min = generate_path_spec(project_schedule,problem_spec,new_node).min_path_duration
                         # @constraint(model, tF[v2] - (t0[v2] + dt_min) >= -Mm*(1 - X[v,v2]))
                         # @constraint(model, t0[v2] - tF[v] >= -Mm*(1 - X[v,v2]))
-                        
+
                         new_node = align_with_successor(node,node2)
                         dt_min = generate_path_spec(project_schedule,problem_spec,new_node).min_path_duration
                         @constraint(model, tF[v] - (t0[v] + dt_min) >= -Mm*(1 - X[v,v2]))
@@ -1305,13 +1305,25 @@ function update_project_schedule!(project_schedule::P,problem_spec::T,adj_matrix
     @assert(is_cyclic(G) == false)
     # Propagate valid IDs through the schedule
     for v in topological_sort(G)
-        node = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v))
-        for v2 in outneighbors(G,v)
-            id2 = get_vtx_id(project_schedule, v2)
-            node2 = get_node_from_id(project_schedule, id2)
-            new_node = align_with_predecessor(node2,node)
-            replace_in_schedule!(project_schedule, problem_spec, new_node, id2)
+        node_id = get_vtx_id(project_schedule, v)
+        node = get_node_from_id(project_schedule, node_id)
+        for v2 in inneighbors(G,v)
+            # id2 = get_vtx_id(project_schedule, v2)
+            # node2 = get_node_from_vtx(project_schedule, v2)
+            node = align_with_predecessor(node,get_node_from_vtx(project_schedule, v2))
         end
+        for v2 in outneighbors(G,v)
+            # id2 = get_vtx_id(project_schedule, v2)
+            # node2 = get_node_from_vtx(project_schedule, v2)
+            node = align_with_successor(node,get_node_from_vtx(project_schedule, v2))
+        end
+        replace_in_schedule!(project_schedule, problem_spec, node, node_id)
+        # for v2 in outneighbors(G,v)
+        #     id2 = get_vtx_id(project_schedule, v2)
+        #     node2 = get_node_from_id(project_schedule, id2)
+        #     new_node = align_with_predecessor(node2,node)
+        #     replace_in_schedule!(project_schedule, problem_spec, new_node, id2)
+        # end
     end
     project_schedule
 end

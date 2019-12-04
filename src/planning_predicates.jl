@@ -315,7 +315,7 @@ align_with_predecessor(node::CARRY,pred::COLLECT) 		= CARRY(first_valid(node.r,p
 align_with_predecessor(node::DEPOSIT,pred::CARRY)		= DEPOSIT(first_valid(node.r,pred.r), first_valid(node.o,pred.o), first_valid(node.x,pred.x2))
 
 align_with_successor(node,pred) 						= node
-align_with_successor(node::GO,succ::COLLECT) 			= GO(first_valid(succ.r,node.r), node.x1, first_valid(succ.x,node.x2))
+align_with_successor(node::GO,succ::COLLECT) 			= GO(first_valid(node.r,succ.r), node.x1, first_valid(node.x2,succ.x))
 # align_with_successor(node::COLLECT,pred::CARRY) 	= COLLECT(node.r, first_valid(succ.o,node.o), first_valid(succ.x,node.x))
 # align_with_successor(node::COLLECT,pred::GO) 			= COLLECT(first_valid(succ.r,node.r), node.o, first_valid(succ.x2,node.x))
 # align_with_successor(node::CARRY,pred::COLLECT) 		= CARRY(first_valid(succ.r,node.r), first_valid(succ.o,node.o), first_valid(succ.x,node.x1), node.x2)

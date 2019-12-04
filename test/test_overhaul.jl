@@ -14,11 +14,11 @@ function show_times(sched,v)
     arr = process_schedule(sched)
     return string(map(a->string(a[v],","), arr[1:2])...)
 end
-function print_project_schedule(project_schedule,filename)
+function print_project_schedule(project_schedule,filename;mode=:root_aligned)
     rg = get_display_metagraph(project_schedule;
         f=(v,p)->string(v,",",get_path_spec(project_schedule,v).path_id,",",get_path_spec(project_schedule,v).agent_id))
     plot_graph_bfs(rg;
-        mode=:root_aligned,
+        mode=mode,
         shape_function = (G,v,x,y,r)->Compose.circle(x,y,r),
         color_function = (G,v,x,y,r)->get_prop(G,v,:color),
         text_function = (G,v,x,y,r)->string(
@@ -29,11 +29,11 @@ function print_project_schedule(project_schedule,filename)
     # `inkscape -z project_schedule1.svg -e project_schedule1.png`
     # OR: `for f in *.svg; do inkscape -z $f -e $f.png; done`
 end
-function print_project_schedule(project_schedule,model,filename)
+function print_project_schedule(project_schedule,model,filename;mode=:root_aligned)
     rg = get_display_metagraph(project_schedule;
         f=(v,p)->string(v,",",get_path_spec(project_schedule,v).path_id,",",get_path_spec(project_schedule,v).agent_id))
     plot_graph_bfs(rg;
-        mode=:root_aligned,
+        mode=mode,
         shape_function = (G,v,x,y,r)->Compose.circle(x,y,r),
         color_function = (G,v,x,y,r)->get_prop(G,v,:color),
         text_function = (G,v,x,y,r)->string(
@@ -79,7 +79,7 @@ let
     obj_val = Int(round(value(objective_function(model))))
     @show adj_matrix = Int.(round.(value.(model[:X])))
 
-    print_project_schedule(project_schedule,"project_schedule1")
+    print_project_schedule(project_schedule,"project_schedule1";mode=:leaf_aligned)
 
     # Update Project Graph by adding all edges encoded by the optimized adjacency graph
     update_project_schedule!(project_schedule,problem_spec,adj_matrix)
