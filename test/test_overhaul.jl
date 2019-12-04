@@ -202,38 +202,61 @@ let
         project_spec, problem_spec, robot_ICs, assignments, env_graph = initialize_toy_problem_4(;verbose=false);
         solver = PC_TAPF_Solver(verbosity=1)
         high_level_search!(solver, env_graph, project_spec, problem_spec, robot_ICs, Gurobi.Optimizer);
+        high_level_search!(solver, env_graph, project_spec, problem_spec, robot_ICs, Gurobi.Optimizer;primary_objective=MakeSpan);
     end
     let
         project_spec, problem_spec, robot_ICs, assignments, env_graph = initialize_toy_problem_4(;verbose=false);
         solver = PC_TAPF_Solver(verbosity=1)
         high_level_search_mod!(solver, env_graph, project_spec, problem_spec, robot_ICs, Gurobi.Optimizer);
+        high_level_search_mod!(solver, env_graph, project_spec, problem_spec, robot_ICs, Gurobi.Optimizer;primary_objective=MakeSpan);
     end
+
+    # Test that the full planning stack works with the new model and returns the same final cost
     let
-        project_spec, problem_spec, robot_ICs, assignments, env_graph = initialize_toy_problem_4(;verbose=false);
-        solver = PC_TAPF_Solver(verbosity=1)
-        project_schedule = construct_partial_project_schedule(project_spec,problem_spec,map(i->robot_ICs[i], 1:problem_spec.N))
-        model, job_shop_variables = formulate_schedule_milp(project_schedule,problem_spec)
-        optimize!(model)
-        @test termination_status(model) == MathOptInterface.OPTIMAL
-        assignment_matrix = get_assignment_matrix(model);
-        # add this assignment to the list of assignments to forbid next iteration
-        update_project_schedule!(project_schedule,problem_spec,assignment_matrix)
-        # env, mapf = construct_search_env(project_spec, problem_spec, robot_ICs, assignments, env_graph);
-        env, mapf = construct_search_env(project_schedule, problem_spec, env_graph);
-        pc_mapf = PC_MAPF(env,mapf);
-        ##### Call CBS Search Routine (LEVEL 2) #####
-        # solution, cost = solve!(solver,pc_mapf);
 
-        node = initialize_root_node(pc_mapf)
-        # low_level_search!(solver,pc_mapf,root_node)
-        plan_next_path!(solver,env,mapf,node;heuristic=get_heuristic_cost,path_finder=A_star)
-        plan_next_path!(solver,env,mapf,node;heuristic=get_heuristic_cost,path_finder=A_star)
-        plan_next_path!(solver,env,mapf,node;heuristic=get_heuristic_cost,path_finder=A_star)
+        for (i, f) in enumerate([
+            initialize_toy_problem_1,
+            initialize_toy_problem_2,
+            initialize_toy_problem_3,
+            initialize_toy_problem_4,
+            initialize_toy_problem_5,
+            initialize_toy_problem_6,
+            initialize_toy_problem_7,
+            initialize_toy_problem_8,
+            ])
+            for cost_model in [SumOfMakeSpans, MakeSpan]
+                let
+                    # Assignment method
+                    project_spec, problem_spec, robot_ICs, assignments, env_graph = f(;verbose=false);
+                    solver = PC_TAPF_Solver(verbosity=1)
+                    solution1, assignment1, cost1, env1 = high_level_search!(
+                        solver,
+                        env_graph,
+                        project_spec,
+                        problem_spec,
+                        robot_ICs,
+                        Gurobi.Optimizer;
+                        primary_objective=cost_model
+                        );
 
-        # print_project_schedule(env.schedule,string("project_schedule4"))
+                    # Adjacency method
+                    solver = PC_TAPF_Solver(verbosity=1)
+                    solution2, assignment2, cost2, env2 = high_level_search!(
+                        solver,
+                        env_graph,
+                        project_spec,
+                        problem_spec,
+                        robot_ICs,
+                        Gurobi.Optimizer;
+                        primary_objective=cost_model
+                        );
 
+                    @test cost2[1] == cost1[1]
 
-        plan_next_path!(solver,env,mapf,node;heuristic=get_heuristic_cost,path_finder=A_star)
+                end
+            end
+        end
+
     end
 
 end

@@ -708,7 +708,7 @@ function high_level_search!(solver::P, env_graph, project_spec, problem_spec,
     best_solution = default_pc_tapf_solution(problem_spec.N)
     best_env    = SearchEnv()
     best_assignment = Vector{Int}()
-    model = formulate_optimization_problem(problem_spec,optimizer;kwargs...);
+    model = formulate_optimization_problem(problem_spec,optimizer;cost_model=primary_objective,kwargs...);
     #
     # project_schedule = construct_partial_project_schedule(project_spec,problem_spec,map(i->robot_ICs[i], 1:problem_spec.N))
     # model, job_shop_variables = formulate_schedule_milp(project_schedule,problem_spec;optimizer=optimizer,kwargs...)
@@ -742,7 +742,8 @@ function high_level_search!(solver::P, env_graph, project_spec, problem_spec,
         ############## Route Planning ###############
         # update_project_schedule!(project_schedule,problem_spec,assignment_matrix)
         # env, mapf = construct_search_env(project_schedule, problem_spec, env_graph);
-        env, mapf = construct_search_env(project_spec, problem_spec, robot_ICs, assignments, env_graph;primary_objective=primary_objective);
+        env, mapf = construct_search_env(project_spec, problem_spec, robot_ICs, assignments, env_graph;
+            primary_objective=primary_objective);
         pc_mapf = PC_MAPF(env,mapf);
         ##### Call CBS Search Routine (LEVEL 2) #####
         solution, cost = solve!(solver,pc_mapf);
@@ -764,7 +765,9 @@ end
     matrix MILP formulation.
 """
 function high_level_search_mod!(solver::P, env_graph, project_spec, problem_spec,
-        robot_ICs, optimizer;kwargs...) where {P<:PC_TAPF_Solver}
+        robot_ICs, optimizer;
+        primary_objective=SumOfMakeSpans,
+        kwargs...) where {P<:PC_TAPF_Solver}
 
     enter_assignment!(solver)
     log_info(0,solver,string("\nHIGH LEVEL SEARCH: beginning search ..."))
@@ -777,7 +780,8 @@ function high_level_search_mod!(solver::P, env_graph, project_spec, problem_spec
     # model = formulate_optimization_problem(problem_spec,optimizer;kwargs...);
     #
     project_schedule = construct_partial_project_schedule(project_spec,problem_spec,map(i->robot_ICs[i], 1:problem_spec.N))
-    model, job_shop_variables = formulate_schedule_milp(project_schedule,problem_spec;optimizer=optimizer,kwargs...)
+    model, job_shop_variables = formulate_schedule_milp(project_schedule,problem_spec;
+        cost_model=primary_objective,optimizer=optimizer,kwargs...)
 
     while solver.best_cost[1] > lower_bound_cost
         solver.num_assignment_iterations += 1
@@ -808,7 +812,8 @@ function high_level_search_mod!(solver::P, env_graph, project_spec, problem_spec
         ############## Route Planning ###############
         update_project_schedule!(project_schedule,problem_spec,assignment_matrix)
         # env, mapf = construct_search_env(project_spec, problem_spec, robot_ICs, assignments, env_graph);
-        env, mapf = construct_search_env(project_schedule, problem_spec, env_graph);
+        env, mapf = construct_search_env(project_schedule, problem_spec, env_graph;
+            primary_objective=primary_objective);
         pc_mapf = PC_MAPF(env,mapf);
         ##### Call CBS Search Routine (LEVEL 2) #####
         solution, cost = solve!(solver,pc_mapf);
