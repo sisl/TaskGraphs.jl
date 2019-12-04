@@ -526,7 +526,8 @@ function generate_path_spec(schedule::P,spec::T,a::GO) where {P<:ProjectSchedule
         path_id=get_next_path_id(schedule),
         dummy_id=r,
         agent_id=get(schedule.robot_id_map,r,-1),
-        tight=true
+        tight=true,
+        free = (s==-1) # if destination is -1, there is no goal location
         )
 end
 function generate_path_spec(schedule::P,spec::T,a::CARRY) where {P<:ProjectSchedule,T<:TaskGraphProblemSpec}
@@ -755,6 +756,64 @@ function add_single_robot_delivery_task!(
 
     action_id
 end
+function add_headless_delivery_task!(
+        schedule::S,
+        problem_spec::T,
+        # robot_id::Int,
+        object_id::Int,
+        operation_id::Int,
+        pickup_station_id::Int,
+        dropoff_station_id::Int
+        ) where {S<:ProjectSchedule,T<:TaskGraphProblemSpec}
+
+    # if robot_id != -1
+    #     # robot_pred = get_robot_ICs(schedule)[robot_id]
+    #     robot_pred = get_node_from_id(schedule,RobotID(robot_id))
+    #     robot_start_station_id = get_id(get_location_id(robot_pred))
+    # else
+    #     robot_start_station_id = -1
+    # end
+
+    # THIS NODE IS DETERMINED BY THE TASK ASSIGNMENT.
+    # TODO Enable "leave-it-blank" so that the incomplete project schedule
+    # can be used as an input to the MILP formulation and solver.
+    # action_id = ActionID(get_num_actions(schedule))
+    # action_id = ActionID(get_unique_action_id())
+    # add_to_schedule!(schedule, problem_spec, GO(robot_id, robot_start_station_id, pickup_station_id), action_id)
+    # add_edge!(schedule, RobotID(robot_id), action_id)
+    # END EMPTY GO NODE
+
+    robot_id = -1
+    # prev_action_id = action_id
+    action_id = ActionID(get_unique_action_id())
+    add_to_schedule!(schedule, problem_spec, COLLECT(robot_id, object_id, pickup_station_id), action_id)
+    # add_edge!(schedule, prev_action_id, action_id)
+    add_edge!(schedule, ObjectID(object_id), action_id)
+
+    prev_action_id = action_id
+    action_id = ActionID(get_unique_action_id())
+    add_to_schedule!(schedule, problem_spec, CARRY(robot_id, object_id, pickup_station_id, dropoff_station_id), action_id)
+    add_edge!(schedule, prev_action_id, action_id)
+
+    prev_action_id = action_id
+    action_id = ActionID(get_unique_action_id())
+    add_to_schedule!(schedule, problem_spec, DEPOSIT(robot_id, object_id, dropoff_station_id), action_id)
+    add_edge!(schedule, prev_action_id, action_id)
+    add_edge!(schedule, action_id, OperationID(operation_id))
+
+    prev_action_id = action_id
+    action_id = ActionID(get_unique_action_id())
+    add_to_schedule!(schedule, problem_spec, GO(robot_id, dropoff_station_id,-1), action_id)
+    add_edge!(schedule, prev_action_id, action_id)
+
+    # new_robot_id = object_id + problem_spec.N
+    # if get_vtx(schedule, RobotID(new_robot_id)) == -1
+    #     add_to_schedule!(schedule, problem_spec, ROBOT_AT(RobotID(new_robot_id),StationID(dropoff_station_id)), RobotID(new_robot_id))
+    # end
+    # add_edge!(schedule, action_id, RobotID(new_robot_id))
+
+    action_id
+end
 """
     `construct_project_schedule`
 
@@ -871,6 +930,10 @@ function construct_partial_project_schedule(
     end
     for pred in robot_ICs
        add_to_schedule!(project_schedule, problem_spec, pred, get_robot_id(pred))
+       action_id = ActionID(get_unique_action_id())
+       action = GO(r=get_robot_id(pred),x1=get_location_id(pred))
+       add_to_schedule!(project_schedule, problem_spec, action, action_id)
+       add_edge!(project_schedule, get_robot_id(pred), action_id)
     end
     for op in operations
        add_to_schedule!(project_schedule, problem_spec, op, get_operation_id(op))
@@ -893,11 +956,11 @@ function construct_partial_project_schedule(
             # TODO Handle collaborative tasks
             # if is_single_robot_task(project_spec, object_id)
             robot_id = -1
-            action_id = add_single_robot_delivery_task!(project_schedule,problem_spec,robot_id,
-                object_id,pickup_station_id,dropoff_station_id)
+            action_id = add_headless_delivery_task!(project_schedule,problem_spec,
+                object_id,get_id(operation_id),pickup_station_id,dropoff_station_id)
             # elseif is_collaborative_robot_task(project_spec, object_id)
             # end
-            add_edge!(project_schedule, action_id, operation_id)
+            # add_edge!(project_schedule, action_id, operation_id)
         end
         for object_id in get_output_ids(op)
             add_edge!(project_schedule, operation_id, ObjectID(object_id))
@@ -1122,6 +1185,7 @@ function formulate_schedule_milp(project_schedule::ProjectSchedule,problem_spec:
     @constraint(model, X' * ones(nv(G)) .<= n_eligible_predecessors);
     @constraint(model, X' * ones(nv(G)) .>= n_required_predecessors);
 
+    # Big M constraints
     for v in vertices(G)
         upstream_vertices = [v, map(e->e.dst,collect(edges(bfs_tree(G,v;dir=:in))))...]
         for v2 in upstream_vertices
@@ -1137,14 +1201,19 @@ function formulate_schedule_milp(project_schedule::ProjectSchedule,problem_spec:
                 end
                 potential_match = false
                 for (template2, val2) in missing_predecessors[v2]
-                    if matches_template(template2,typeof(node)) # possible to add and edge
+                    if matches_template(template2,typeof(node)) # possible to add an edge
                         potential_match = true
                         if !(val > 0 && val2 > 0)
                             continue
                         end
-                        new_node = align_with_predecessor(node2,node)
+                        # new_node = align_with_predecessor(node2,node)
+                        # dt_min = generate_path_spec(project_schedule,problem_spec,new_node).min_path_duration
+                        # @constraint(model, tF[v2] - (t0[v2] + dt_min) >= -Mm*(1 - X[v,v2]))
+                        # @constraint(model, t0[v2] - tF[v] >= -Mm*(1 - X[v,v2]))
+                        
+                        new_node = align_with_successor(node,node2)
                         dt_min = generate_path_spec(project_schedule,problem_spec,new_node).min_path_duration
-                        @constraint(model, tF[v2] - (t0[v2] + dt_min) >= -Mm*(1 - X[v,v2]))
+                        @constraint(model, tF[v] - (t0[v] + dt_min) >= -Mm*(1 - X[v,v2]))
                         @constraint(model, t0[v2] - tF[v] >= -Mm*(1 - X[v,v2]))
                     end
                 end
