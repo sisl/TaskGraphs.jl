@@ -7,9 +7,10 @@ using DataStructures
 using JuMP
 using Gurobi
 using TOML
+using CRCBS
 
 using ..PlanningPredicates
-
+# using ..TaskGraphsSolvers
 
 export
     EnvironmentState
@@ -41,11 +42,12 @@ export
     - to0_::Dict{Int,Float64} - object start times
     - root_nodes::Vector{Set{Int}} - identifies "project heads"
     - weights::Dict{Int,Float64} - stores weights associated with each project head
+    - cost_function::F - the optimization objective (default is SumOfMakeSpans)
     - s0::Vector{Int} - pickup stations for each task
     - sF::Vector{Int} - delivery station for each task
     - nR::Vector{Int} - num robots required for each task (>1 => collaborative task)
 """
-@with_kw struct TaskGraphProblemSpec{G}
+@with_kw struct TaskGraphProblemSpec{G,F}
     N::Int                  = 0 # num robots
     M::Int                  = 0 # num tasks
     graph::G                = DiGraph() # delivery graph
@@ -59,6 +61,7 @@ export
     to0_::Dict{Int,Float64} = Dict{Int,Float64}() # object start times
     root_nodes::Vector{Set{Int}} = [get_all_root_nodes(graph)]
     weights::Dict{Int,Float64} = Dict{Int,Float64}(v=>1.0 for v in 1:length(root_nodes))
+    cost_function::F        = SumOfMakeSpans
     s0::Vector{Int} = zeros(M) # pickup stations for each task
     sF::Vector{Int} = zeros(M) # delivery station for each task
     nR::Vector{Int} = ones(M) # num robots required for each task (>1 => collaborative task)
@@ -1107,7 +1110,7 @@ function formulate_schedule_milp(project_schedule::ProjectSchedule,problem_spec:
         OutputFlag=0,
         t0_ = Dict{AbstractID,Float64}(), # dictionary of initial times. Default is empty
         Mm = 10000, # for big M constraints
-        cost_model = :SumOfMakeSpans,
+        cost_model = SumOfMakeSpans,
     )
     G = get_graph(project_schedule);
     assignments = [];
@@ -1259,7 +1262,7 @@ function formulate_schedule_milp(project_schedule::ProjectSchedule,problem_spec:
     end
 
     # Formulate Objective
-    if cost_model == :SumOfMakeSpans
+    if cost_model == SumOfMakeSpans
         root_nodes = project_schedule.root_nodes
         @variable(model, T[1:length(root_nodes)])
         for (i,project_head) in enumerate(root_nodes)
@@ -1268,7 +1271,7 @@ function formulate_schedule_milp(project_schedule::ProjectSchedule,problem_spec:
             end
         end
         cost1 = @expression(model, sum(map(v->tF[v]*get(project_schedule.weights,v,0.0), root_nodes)))
-    elseif cost_model == :MakeSpan
+    elseif cost_model == MakeSpan
         @variable(model, T)
         @constraint(model, T .>= tF)
         cost1 = @expression(model, T)

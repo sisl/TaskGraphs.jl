@@ -156,8 +156,7 @@ export
     update_planning_cache!,
     repair_solution!,
     default_pc_tapf_solution,
-    plan_next_path!,
-    high_level_search!
+    plan_next_path!
 
 @with_kw struct PlanningCache
     closed_set::Set{Int}    = Set{Int}()    # nodes that are completed
@@ -273,7 +272,24 @@ function CRCBS.get_start(env::SearchEnv,v::Int)
     PCCBS.State(start_vtx,start_time)
 end
 
-function construct_search_env(schedule, problem_spec, env_graph;extra_T=50)
+function CRCBS.SumOfMakeSpans(schedule::S,cache::C) where {S<:ProjectSchedule,C<:PlanningCache}
+    SumOfMakeSpans(
+        cache.tF,
+        schedule.root_nodes,
+        map(k->schedule.weights[k], schedule.root_nodes),
+        cache.tF[schedule.root_nodes])
+end
+function CRCBS.MakeSpan(schedule::S,cache::C) where {S<:ProjectSchedule,C<:PlanningCache}
+    MakeSpan(
+        cache.tF,
+        schedule.root_nodes,
+        map(k->schedule.weights[k], schedule.root_nodes),
+        cache.tF[schedule.root_nodes])
+end
+
+function construct_search_env(schedule, problem_spec, env_graph;
+    primary_objective=SumOfMakeSpans,
+    extra_T=50)
     # schedule = construct_project_schedule(project_spec, problem_spec, robot_ICs, assignments)
     cache = initialize_planning_cache(schedule)
     # Paths stored as seperate chunks (will need to be concatenated before conflict checking)
@@ -288,7 +304,8 @@ function construct_search_env(schedule, problem_spec, env_graph;extra_T=50)
         push!(goals, PCCBS.State(vtx = final_vtx, t = cache.tF[v]))
     end
     cost_model = construct_composite_cost_model(
-        SumOfMakeSpans(cache.tF,schedule.root_nodes,map(k->schedule.weights[k],schedule.root_nodes),cache.tF[schedule.root_nodes]),
+        primary_objective(schedule,cache),
+        # FullDeadlineCost(DeadlineCost(0.0)),
         HardConflictCost(env_graph,maximum(cache.tF)+extra_T, N),
         SumOfTravelDistance(),
         FullCostModel(sum,NullCost()) # SumOfTravelTime(),
@@ -333,7 +350,7 @@ function default_pc_tapf_solution(N::Int)
 end
 
 update_cost_model!(model::C,env::S) where {C,S<:SearchEnv} = nothing
-function update_cost_model!(model::C,env::S) where {C<:SumOfMakeSpans,S<:SearchEnv}
+function update_cost_model!(model::C,env::S) where {C<:MultiDeadlineCost,S<:SearchEnv}
     model.tF .= env.cache.tF
 end
 function update_cost_model!(model::C,env::S) where {C<:CompositeCostModel,S<:SearchEnv}
@@ -342,6 +359,15 @@ function update_cost_model!(model::C,env::S) where {C<:CompositeCostModel,S<:Sea
     end
 end
 update_cost_model!(env::S) where {S<:SearchEnv} = update_cost_model!(env.cost_model,env)
+# function finalize_cost!(env::S,cost_model::M,cost::T) where {S<:SearchEnv,M<:AbstractCostModel,T}
+#     cost
+# end
+# function finalize_cost!(env::S,cost_model::M,cost::T) where {S<:SearchEnv,M<:CompositeCostModel,T}
+#     T(map(i->finalize_cost!(env,cost_model.models[i],cost[i]), 1:length(cost_model.models)))
+# end
+# function finalize_cost!(env::S,cost_model::M,cost::T) where {S<:SearchEnv,M<:SumOfMakeSpans,T}
+#     t0,tF,slack,local_slack = process_schedule(env.schedule;t0=env.cache.t0,tF=env.cache.tF)
+# end
 
 """
     `update_env!`
@@ -522,6 +548,8 @@ function CRCBS.low_level_search!(
         end
     end
     # aggregate_costs here?
+    # cost = get_cost(node.solution)
+    # finalized_cost =
     return true
 end
 
@@ -659,11 +687,83 @@ end
 ################################################################################
 ############################## Outer Loop Search ###############################
 ################################################################################
+export
+    high_level_search!,
+    high_level_search_mod!
 
 """
     `high_level_search!`
 """
 function high_level_search!(solver::P, env_graph, project_spec, problem_spec,
+        robot_ICs, optimizer;
+        primary_objective=SumOfMakeSpans,
+        kwargs...
+        ) where {P<:PC_TAPF_Solver}
+
+    enter_assignment!(solver)
+    log_info(0,solver,string("\nHIGH LEVEL SEARCH: beginning search ..."))
+
+    forbidden_solutions = Vector{Matrix{Int}}() # solutions to exclude from assignment module output
+    lower_bound_cost = 0.0
+    best_solution = default_pc_tapf_solution(problem_spec.N)
+    best_env    = SearchEnv()
+    best_assignment = Vector{Int}()
+    model = formulate_optimization_problem(problem_spec,optimizer;kwargs...);
+    #
+    # project_schedule = construct_partial_project_schedule(project_spec,problem_spec,map(i->robot_ICs[i], 1:problem_spec.N))
+    # model, job_shop_variables = formulate_schedule_milp(project_schedule,problem_spec;optimizer=optimizer,kwargs...)
+
+    while solver.best_cost[1] > lower_bound_cost
+        solver.num_assignment_iterations += 1
+        log_info(0,solver,string("HIGH LEVEL SEARCH: iteration ",solver.num_assignment_iterations,"..."))
+        ############## Task Assignment ###############
+        # add constraints to get next best solution
+        exclude_solutions!(model, problem_spec.M, forbidden_solutions)
+        optimize!(model)
+        optimal = (termination_status(model) == MathOptInterface.OPTIMAL);
+        if !optimal
+            log_info(0,solver,string(
+                "HIGH LEVEL SEARCH: Task Assignment failed. Returning best solution so far.\n",
+                " * optimality gap = ", solver.best_cost[1] - lower_bound_cost))
+            return best_solution, best_assignment, solver.best_cost, best_env
+        end
+        assignment_matrix = get_assignment_matrix(model);
+        # add this assignment to the list of assignments to forbid next iteration
+        push!(forbidden_solutions, assignment_matrix)
+        assignments = map(j->findfirst(assignment_matrix[:,j] .== 1),1:problem_spec.M);
+        optimal_TA_cost = Int(round(value(objective_function(model)))); # lower bound on cost (from task assignment module)
+        lower_bound_cost = max(lower_bound_cost, optimal_TA_cost)
+        log_info(0,solver,string("HIGH LEVEL SEARCH: Current assignment vector = ",assignments))
+        log_info(0,solver,string("HIGH LEVEL SEARCH: Current lower bound cost = ",lower_bound_cost))
+        if lower_bound_cost >= solver.best_cost[1] # TODO make sure that the operation duration is accounted for here
+            # log_info(-1,solver.verbosity,string("HIGH LEVEL SEARCH: optimality gap = ",solver.best_cost[1] - lower_bound_cost,". Returning best solution with cost ", solver.best_cost,"\n"))
+            break
+        end
+        ############## Route Planning ###############
+        # update_project_schedule!(project_schedule,problem_spec,assignment_matrix)
+        # env, mapf = construct_search_env(project_schedule, problem_spec, env_graph);
+        env, mapf = construct_search_env(project_spec, problem_spec, robot_ICs, assignments, env_graph;primary_objective=primary_objective);
+        pc_mapf = PC_MAPF(env,mapf);
+        ##### Call CBS Search Routine (LEVEL 2) #####
+        solution, cost = solve!(solver,pc_mapf);
+        # cost = tuple_cost[1]
+        if cost < solver.best_cost
+            best_solution = solution
+            best_assignment = assignments
+            solver.best_cost = cost # TODO make sure that the operation duration is accounted for here
+            best_env = env
+        end
+        log_info(0,solver,string("HIGH LEVEL SEARCH: Best cost so far = ", solver.best_cost[1]))
+    end
+    exit_assignment!(solver)
+    log_info(-1,solver.verbosity,string("HIGH LEVEL SEARCH: optimality gap = ",solver.best_cost[1] - lower_bound_cost,". Returning best solution with cost ", solver.best_cost,"\n"))
+    return best_solution, best_assignment, solver.best_cost, best_env
+end
+"""
+    This is the modified version of high-level search that uses the adjacency
+    matrix MILP formulation.
+"""
+function high_level_search_mod!(solver::P, env_graph, project_spec, problem_spec,
         robot_ICs, optimizer;kwargs...) where {P<:PC_TAPF_Solver}
 
     enter_assignment!(solver)

@@ -1,12 +1,13 @@
 # using Pkg
 # Pkg.activate("/home/kylebrown/.julia/dev/TaskGraphs")
-using Test
-using LightGraphs, MetaGraphs, GraphUtils
 using TaskGraphs
+using CRCBS
+using LightGraphs, MetaGraphs, GraphUtils
 using Gurobi
 using JuMP, MathOptInterface
 using TOML
 using Random
+using Test
 using Compose
 using GraphPlottingBFS
 
@@ -142,21 +143,22 @@ let
     let
 
         for (i, f) in enumerate([
-            # initialize_toy_problem_1,
-            # initialize_toy_problem_2,
-            # initialize_toy_problem_3,
+            initialize_toy_problem_1,
+            initialize_toy_problem_2,
+            initialize_toy_problem_3,
             initialize_toy_problem_4,
-            # initialize_toy_problem_5,
-            # initialize_toy_problem_6,
-            # initialize_toy_problem_7,
-            # initialize_toy_problem_8,
+            initialize_toy_problem_5,
+            initialize_toy_problem_6,
+            initialize_toy_problem_7,
+            initialize_toy_problem_8,
             ])
-            for cost_model in [:SumOfMakeSpans, :MakeSpan]
+            for cost_model in [SumOfMakeSpans, MakeSpan]
                 let
                     # Compare against old method
-                    # f = initialize_toy_problem_1
-                    # i = 1
-                    project_spec, problem_spec, robot_ICs, assignments, env_graph = f(;verbose=false);
+                    # f = initialize_toy_problem_8
+                    # i = 8
+                    # cost_model = MakeSpan
+                    project_spec, problem_spec, robot_ICs, assignments, env_graph = f(;cost_function=cost_model,verbose=false);
                     model1 = formulate_optimization_problem(problem_spec,Gurobi.Optimizer;cost_model=cost_model);
                     optimize!(model1)
                     @test termination_status(model1) == MathOptInterface.OPTIMAL
@@ -164,6 +166,14 @@ let
                     obj_val1 = Int(round(value(objective_function(model1))))
                     assignment_vector = map(j->findfirst(assignment_matrix[:,j] .== 1),1:problem_spec.M);
                     schedule1 = construct_project_schedule(project_spec, problem_spec, robot_ICs, assignment_vector)
+                    # verify that the first cost element of low_level_search! matches the milp cost
+                    solver = PC_TAPF_Solver(verbosity=0)
+                    env, mapf = construct_search_env(schedule1, problem_spec, env_graph;primary_objective=cost_model)
+                    pc_mapf = PC_MAPF(env,mapf)
+                    constraint_node = initialize_root_node(pc_mapf)
+                    low_level_search!(solver,pc_mapf,constraint_node)
+                    # @show i, f, obj_val1, constraint_node.cost
+                    @test constraint_node.cost[1] == obj_val1
 
                     # robot_ICs = map(i->robot_ICs[i], 1:problem_spec.N)
                     schedule2 = construct_partial_project_schedule(project_spec,problem_spec,map(i->robot_ICs[i], 1:problem_spec.N))
@@ -175,12 +185,12 @@ let
                     update_project_schedule!(schedule2,problem_spec,adj_matrix)
 
                     @test obj_val1 == obj_val2
-                    @show i, (obj_val1 == obj_val2), obj_val1, obj_val2
+                    # @show i, (obj_val1 == obj_val2), obj_val1, obj_val2
                     # @test schedule1 == schedule2
-                    # if !(obj_val1 == obj_val2)
+                    if !(obj_val1 == obj_val2)
                         print_project_schedule(schedule1,string("project_schedule1_",i))
                         print_project_schedule(schedule2,model2,string("project_schedule2_",i))
-                    # end
+                    end
                 end
             end
         end
@@ -239,7 +249,16 @@ let
     let
         project_spec, problem_spec, robot_ICs, assignments, env_graph = initialize_toy_problem_4(;verbose=false);
         solver = PC_TAPF_Solver(verbosity=1)
-
+        high_level_search!(solver, env_graph, project_spec, problem_spec, robot_ICs, Gurobi.Optimizer);
+    end
+    let
+        project_spec, problem_spec, robot_ICs, assignments, env_graph = initialize_toy_problem_4(;verbose=false);
+        solver = PC_TAPF_Solver(verbosity=1)
+        high_level_search_mod!(solver, env_graph, project_spec, problem_spec, robot_ICs, Gurobi.Optimizer);
+    end
+    let
+        project_spec, problem_spec, robot_ICs, assignments, env_graph = initialize_toy_problem_4(;verbose=false);
+        solver = PC_TAPF_Solver(verbosity=1)
         project_schedule = construct_partial_project_schedule(project_spec,problem_spec,map(i->robot_ICs[i], 1:problem_spec.N))
         model, job_shop_variables = formulate_schedule_milp(project_schedule,problem_spec)
         optimize!(model)
@@ -259,7 +278,8 @@ let
         plan_next_path!(solver,env,mapf,node;heuristic=get_heuristic_cost,path_finder=A_star)
         plan_next_path!(solver,env,mapf,node;heuristic=get_heuristic_cost,path_finder=A_star)
 
-        print_project_schedule(env.schedule,string("project_schedule4"))
+        # print_project_schedule(env.schedule,string("project_schedule4"))
+
 
         plan_next_path!(solver,env,mapf,node;heuristic=get_heuristic_cost,path_finder=A_star)
     end

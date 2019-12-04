@@ -48,8 +48,22 @@ function print_toy_problem_specs(prob_name,vtx_grid,r0,s0,sF,project_spec,delive
 #     print("\n\n")
 end
 
+function initialize_toy_problem(r0,s0,sF,dist_function)
+    N = length(r0)
+    M = length(s0)
+    object_ICs = Vector{OBJECT_AT}([OBJECT_AT(o,s0[o]) for o in 1:M]) # initial_conditions
+    object_FCs = Vector{OBJECT_AT}([OBJECT_AT(o,sF[o]) for o in 1:M]) # final conditions
+    robot_ICs = Dict{Int,ROBOT_AT}(r => ROBOT_AT(r,r0[r]) for r in 1:N)
+    for r in N+1:N+M
+        robot_ICs[r] = ROBOT_AT(r,sF[r-N])
+    end
+    Drs, Dss = cached_pickup_and_delivery_distances(r0,s0,sF,dist_function)
+    project_spec = ProjectSpec( M=M, initial_conditions=object_ICs, final_conditions=object_FCs)
+    project_spec, robot_ICs
+end
+
 # This is a place to put reusable problem initializers for testing
-function initialize_toy_problem_1(;verbose=false)
+function initialize_toy_problem_1(;cost_function=SumOfMakeSpans,verbose=false)
     N = 2                  # num robots
     M = 3                  # num delivery tasks
     vtx_grid = initialize_dense_vtx_grid(4,4)
@@ -59,20 +73,13 @@ function initialize_toy_problem_1(;verbose=false)
     s0 = [5,8,14]
     sF = [13,12,15]
 
-    object_ICs = Vector{OBJECT_AT}([OBJECT_AT(o,s0[o]) for o in 1:M]) # initial_conditions
-    object_FCs = Vector{OBJECT_AT}([OBJECT_AT(o,sF[o]) for o in 1:M]) # final conditions
-    robot_ICs = Dict{Int,ROBOT_AT}(r => ROBOT_AT(r,r0[r]) for r in 1:N)
-    for r in N+1:N+M
-        robot_ICs[r] = ROBOT_AT(r,sF[r-N])
-    end
-    Drs, Dss = cached_pickup_and_delivery_distances(r0,s0,sF,(v1,v2)->dist_matrix[v1,v2])
-    project_spec = ProjectSpec( M=M, initial_conditions=object_ICs, final_conditions=object_FCs )
+    project_spec, robot_ICs = initialize_toy_problem(r0,s0,sF,(v1,v2)->dist_matrix[v1,v2])
     add_operation!(project_spec,construct_operation(project_spec,-1,[1,2],[3],0))
     add_operation!(project_spec,construct_operation(project_spec,-1,[3],  [], 0))
     assignments = [1,2,3]
 
     project_spec, problem_spec, object_ICs, object_FCs, robot_ICs = construct_task_graphs_problem(
-        project_spec,r0,s0,sF,dist_matrix)
+        project_spec,r0,s0,sF,dist_matrix;cost_function=cost_function)
     if verbose
         problem_description = """
         #### TOY PROBLEM 1 ####
@@ -87,7 +94,7 @@ end
     robot 2 will do [4-8-32]. The key thing is that robot 1 will need to wait
     until robot 2 is finished before robot 1 can do its second task
 """
-function initialize_toy_problem_2(;verbose=false)
+function initialize_toy_problem_2(;cost_function=SumOfMakeSpans,verbose=false)
     N = 2                  # num robots
     M = 3                  # num delivery tasks
     vtx_grid = initialize_dense_vtx_grid(4,8)
@@ -114,7 +121,7 @@ function initialize_toy_problem_2(;verbose=false)
     assignments = [1,2,3]
 
     project_spec, problem_spec, object_ICs, object_FCs, robot_ICs = construct_task_graphs_problem(
-        project_spec,r0,s0,sF,dist_matrix)
+        project_spec,r0,s0,sF,dist_matrix;cost_function=cost_function)
     if verbose
         problem_description = """
             TOY PROBLEM 2
@@ -142,7 +149,7 @@ end
     Second operation:
         robot 1 does [8-12-16]
 """
-function initialize_toy_problem_3(;verbose=false,Δt_op=0,Δt_collect=[0,0,0],Δt_deliver=[0,0,0])
+function initialize_toy_problem_3(;cost_function=SumOfMakeSpans,verbose=false,Δt_op=0,Δt_collect=[0,0,0],Δt_deliver=[0,0,0])
     N = 2                  # num robots
     M = 3                  # num delivery tasks
     vtx_grid = initialize_dense_vtx_grid(4,8)
@@ -169,7 +176,7 @@ function initialize_toy_problem_3(;verbose=false,Δt_op=0,Δt_collect=[0,0,0],Δ
     assignments = [1,2,3]
 
     project_spec, problem_spec, object_ICs, object_FCs, robot_ICs = construct_task_graphs_problem(
-        project_spec,r0,s0,sF,dist_matrix,Δt_collect,Δt_deliver)
+        project_spec,r0,s0,sF,dist_matrix,Δt_collect,Δt_deliver;cost_function=cost_function)
     if verbose
         problem_description = """
 
@@ -199,7 +206,7 @@ end
         robot 1 does [2-2-8]
         robot 2 does [4-4-6]
 """
-function initialize_toy_problem_4(;verbose=false)
+function initialize_toy_problem_4(;cost_function=SumOfMakeSpans,verbose=false)
     N = 2                  # num robots
     M = 2                  # num delivery tasks
     vtx_grid = initialize_dense_vtx_grid(3,3)
@@ -223,7 +230,7 @@ function initialize_toy_problem_4(;verbose=false)
     add_operation!(project_spec,construct_operation(project_spec,-1,[1,2],[],0))
     assignments = [1,2]
 
-    project_spec, problem_spec, object_ICs, object_FCs, robot_ICs = construct_task_graphs_problem(project_spec,r0,s0,sF,dist_matrix)
+    project_spec, problem_spec, object_ICs, object_FCs, robot_ICs = construct_task_graphs_problem(project_spec,r0,s0,sF,dist_matrix;cost_function=cost_function)
     if verbose
         problem_description = """
 
@@ -253,7 +260,7 @@ end
         robot 1 does [3-11]
         robot 2 does [15-7]
 """
-function initialize_toy_problem_5(;verbose=false)
+function initialize_toy_problem_5(;cost_function=SumOfMakeSpans,verbose=false)
     N = 2                  # num robots
     M = 2                  # num delivery tasks
     vtx_grid = initialize_dense_vtx_grid(4,4)
@@ -278,7 +285,7 @@ function initialize_toy_problem_5(;verbose=false)
     add_operation!(project_spec,construct_operation(project_spec,-1,[1,2],[],0))
     assignments = [1,2]
 
-    project_spec, problem_spec, object_ICs, object_FCs, robot_ICs = construct_task_graphs_problem(project_spec,r0,s0,sF,dist_matrix)
+    project_spec, problem_spec, object_ICs, object_FCs, robot_ICs = construct_task_graphs_problem(project_spec,r0,s0,sF,dist_matrix;cost_function=cost_function)
     if verbose
         problem_description =
         """
@@ -304,7 +311,7 @@ end
     robot 2 will do [4-8-32]. The key thing is that robot 1 will need to wait
     until robot 2 is finished before robot 1 can do its second task
 """
-function initialize_toy_problem_6(;verbose=false,Δt_op=1,Δt_collect=[0,0,0],Δt_deliver=[0,0,0])
+function initialize_toy_problem_6(;cost_function=SumOfMakeSpans,verbose=false,Δt_op=1,Δt_collect=[0,0,0],Δt_deliver=[0,0,0])
     N = 2                  # num robots
     M = 3                  # num delivery tasks
     vtx_grid = initialize_dense_vtx_grid(4,8)
@@ -330,7 +337,7 @@ function initialize_toy_problem_6(;verbose=false,Δt_op=1,Δt_collect=[0,0,0],Δ
     add_operation!(project_spec,construct_operation(project_spec,-1,[3],  [], Δt_op))
     assignments = [1,2,3]
 
-    project_spec, problem_spec, object_ICs, object_FCs, robot_ICs = construct_task_graphs_problem(project_spec,r0,s0,sF,dist_matrix,Δt_collect,Δt_deliver)
+    project_spec, problem_spec, object_ICs, object_FCs, robot_ICs = construct_task_graphs_problem(project_spec,r0,s0,sF,dist_matrix,Δt_collect,Δt_deliver;cost_function=cost_function)
     if verbose
         print_toy_problem_specs("TOY PROBLEM 6",vtx_grid,r0,s0,sF,project_spec)
     end
@@ -342,7 +349,7 @@ end
     Robot 2 will have to sit and wait at the pickup station, meaning that robot 1 will have to go around
     if robot 2 is on the critical path
 """
-function initialize_toy_problem_7(;verbose=false,Δt_op=0,Δt_collect=[0,4,0],Δt_deliver=[0,0,0])
+function initialize_toy_problem_7(;cost_function=SumOfMakeSpans,verbose=false,Δt_op=0,Δt_collect=[0,4,0],Δt_deliver=[0,0,0])
     N = 2                  # num robots
     M = 3                  # num delivery tasks
     vtx_grid = initialize_dense_vtx_grid(4,4)
@@ -368,7 +375,7 @@ function initialize_toy_problem_7(;verbose=false,Δt_op=0,Δt_collect=[0,4,0],Δ
     add_operation!(project_spec,construct_operation(project_spec,-1,[3],  [], Δt_op))
     assignments = [1,2,3]
 
-    project_spec, problem_spec, object_ICs, object_FCs, robot_ICs = construct_task_graphs_problem(project_spec,r0,s0,sF,dist_matrix,Δt_collect,Δt_deliver)
+    project_spec, problem_spec, object_ICs, object_FCs, robot_ICs = construct_task_graphs_problem(project_spec,r0,s0,sF,dist_matrix,Δt_collect,Δt_deliver;cost_function=cost_function)
     if verbose
         print_toy_problem_specs("TOY PROBLEM 7",vtx_grid,r0,s0,sF,project_spec)
     end
@@ -379,7 +386,7 @@ end
     two-headed project. Robot 1 does the first half of the first head, and
     robot 2 handles the first half of the second head, and then they swap.
 """
-function initialize_toy_problem_8(;verbose=false,Δt_op=0,Δt_collect=[0,0,0,0],Δt_deliver=[0,0,0,0])
+function initialize_toy_problem_8(;cost_function=SumOfMakeSpans,verbose=false,Δt_op=0,Δt_collect=[0,0,0,0],Δt_deliver=[0,0,0,0])
     N = 2                  # num robots
     M = 4                  # num delivery tasks
     vtx_grid = initialize_dense_vtx_grid(4,8)
@@ -407,7 +414,7 @@ function initialize_toy_problem_8(;verbose=false,Δt_op=0,Δt_collect=[0,0,0,0],
     add_operation!(project_spec,construct_operation(project_spec,-1,[3],[],Δt_op))
     assignments = [1,2,3,4]
 
-    project_spec, problem_spec, object_ICs, object_FCs, robot_ICs = construct_task_graphs_problem(project_spec,r0,s0,sF,dist_matrix,Δt_collect,Δt_deliver)
+    project_spec, problem_spec, object_ICs, object_FCs, robot_ICs = construct_task_graphs_problem(project_spec,r0,s0,sF,dist_matrix,Δt_collect,Δt_deliver;cost_function=cost_function)
 
     if verbose
         print_toy_problem_specs("TOY PROBLEM 8",vtx_grid,r0,s0,sF,project_spec)
@@ -420,7 +427,7 @@ export
 """
     Project with station-sharing. Station 5 needs to accessed by both robots for picking up their objects.
 """
-function initialize_toy_problem_9(;verbose=false,Δt_op=0,Δt_collect=[0,0],Δt_deliver=[0,0])
+function initialize_toy_problem_9(;cost_function=SumOfMakeSpans,verbose=false,Δt_op=0,Δt_collect=[0,0],Δt_deliver=[0,0])
     N = 2                  # num robots
     M = 2                  # num delivery tasks
     vtx_grid = initialize_dense_vtx_grid(4,4)
@@ -444,7 +451,7 @@ function initialize_toy_problem_9(;verbose=false,Δt_op=0,Δt_collect=[0,0],Δt_
     project_spec = ProjectSpec( M=M, initial_conditions=object_ICs, final_conditions=object_FCs )
     add_operation!(project_spec,construct_operation(project_spec,-1,[1],[],Δt_op))
     add_operation!(project_spec,construct_operation(project_spec,-1,[2],[],Δt_op))
-    project_spec, problem_spec, object_ICs, object_FCs, robot_ICs = construct_task_graphs_problem(project_spec,r0,s0,sF,dist_matrix,Δt_collect,Δt_deliver)
+    project_spec, problem_spec, object_ICs, object_FCs, robot_ICs = construct_task_graphs_problem(project_spec,r0,s0,sF,dist_matrix,Δt_collect,Δt_deliver;cost_function=cost_function)
     assignments = [1,2]
 
     if verbose

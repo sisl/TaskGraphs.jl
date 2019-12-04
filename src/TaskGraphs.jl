@@ -25,6 +25,8 @@ global VIDEO_DIR        = joinpath(EXPERIMENT_DIR,"videos")
 include("pccbs.jl")
 include("factory_worlds.jl")
 include("planning_predicates.jl")
+# include("pc_tapf_solver.jl")
+# @reexport using TaskGraphs.TaskGraphsSolvers
 include("task_graphs_core.jl")
 @reexport using TaskGraphs.FactoryWorlds
 @reexport using TaskGraphs.PlanningPredicates

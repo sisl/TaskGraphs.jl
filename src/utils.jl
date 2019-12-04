@@ -8,6 +8,7 @@ using DataStructures
 using JuMP, Gurobi
 
 using ..TaskGraphs
+using CRCBS
 # using ..FactoryWorlds
 # using ..PlanningPredicates
 # using ..TaskGraphsCore
@@ -64,7 +65,7 @@ function formulate_optimization_problem(G,Drs,Dss,Δt,Δt_collect,Δt_deliver,to
     TimeLimit=100,
     OutputFlag=0,
     assignments=Dict{Int64,Int64}(),
-    cost_model=:MakeSpan
+    cost_model=MakeSpan
     )
 
     model = Model(with_optimizer(optimizer,
@@ -168,7 +169,7 @@ function formulate_optimization_problem(G,Drs,Dss,Δt,Δt_collect,Δt_deliver,to
         end
     end
     # cost depends only on root node(s)
-    if cost_model == :SumOfMakeSpans
+    if cost_model == SumOfMakeSpans
         @variable(model, T[1:length(root_nodes)])
         for (i,project_head) in enumerate(root_nodes)
             for v in project_head
@@ -177,7 +178,7 @@ function formulate_optimization_problem(G,Drs,Dss,Δt,Δt_collect,Δt_deliver,to
         end
         @objective(model, Min, sum(map(i->T[i]*get(weights,i,0.0), 1:length(root_nodes))))
         # @objective(model, Min, sum(map(v->tof[v]*get(weights,v,0.0), root_nodes)))
-    elseif cost_model == :MakeSpan
+    elseif cost_model == MakeSpan
         @variable(model, T)
         @constraint(model, T .>= tof .+ Δt)
         @objective(model, Min, T)
@@ -272,7 +273,8 @@ function construct_task_graphs_problem(
         sF::Vector{Int},
         dist_matrix,
         Δt_collect=zeros(length(s0)),
-        Δt_deliver=zeros(length(sF))
+        Δt_deliver=zeros(length(sF));
+        cost_function=SumOfMakeSpans
         ) where {P<:ProjectSpec}
     # select subset of pickup, dropoff and free locations to instantiate objects and robots
     # r0,s0,sF        = get_random_problem_instantiation(N,M,pickup_vtxs,dropoff_vtxs,free_vtxs)
@@ -309,6 +311,7 @@ function construct_task_graphs_problem(
     root_node_groups = map(v->get_input_ids(project_spec.operations[v]),collect(project_spec.root_nodes))
     problem_spec = TaskGraphProblemSpec(N=N,M=M,graph=G,D=dist_matrix,Drs=Drs,
         Dss=Dss,Δt=Δt,tr0_=tr0_,to0_=to0_,root_nodes=root_node_groups,
+        cost_function=cost_function,
         Δt_collect=Δt_collect,Δt_deliver=Δt_deliver,s0=s0,sF=sF)
     # @show problem_spec.root_nodes
     return project_spec, problem_spec, object_ICs, object_FCs, robot_ICs
@@ -321,7 +324,8 @@ function construct_task_graphs_problem(
         dist_function,
         Δt_collect=zeros(length(object_ICs)),
         Δt_deliver=zeros(length(object_ICs)),
-        Δt_process=zeros(length(operations))
+        Δt_process=zeros(length(operations));
+        cost_function=SumOfMakeSpans
         ) where {P<:ProjectSpec}
     # select subset of pickup, dropoff and free locations to instantiate objects and robots
     # r0,s0,sF        = get_random_problem_instantiation(N,M,pickup_vtxs,dropoff_vtxs,free_vtxs)
@@ -361,6 +365,7 @@ function construct_task_graphs_problem(
     root_node_groups = map(v->get_input_ids(project_spec.operations[v]),collect(project_spec.root_nodes))
     problem_spec = TaskGraphProblemSpec(N=N,M=M,graph=G,D=dist_matrix,Drs=Drs,
         Dss=Dss,Δt=Δt_process,tr0_=tr0_,to0_=to0_,root_nodes=root_node_groups,
+        cost_function=cost_function,
         Δt_collect=Δt_collect,Δt_deliver=Δt_deliver,s0=s0,sF=sF)
     # @show problem_spec.root_nodes
     return project_spec, problem_spec, object_ICs, object_FCs, robot_ICs
