@@ -23,10 +23,10 @@ end
 
 
 export
-    TaskGraphProblemSpec
+    ProblemSpec
 
 """
-    `TaskGraphProblemSpec{G}`
+    `ProblemSpec{G}`
 
     This containts all information necessary to formulate the Task Assignment
     problem as a MILP.
@@ -47,7 +47,7 @@ export
     - sF::Vector{Int} - delivery station for each task
     - nR::Vector{Int} - num robots required for each task (>1 => collaborative task)
 """
-@with_kw struct TaskGraphProblemSpec{G,F}
+@with_kw struct ProblemSpec{G,F}
     N::Int                  = 0 # num robots
     M::Int                  = 0 # num tasks
     graph::G                = DiGraph() # delivery graph
@@ -516,7 +516,7 @@ end
     PathSpec provides details about the path that corresponds to this node in
     the schedule
 """
-function generate_path_spec(schedule::P,spec::T,a::GO) where {P<:ProjectSchedule,T<:TaskGraphProblemSpec}
+function generate_path_spec(schedule::P,spec::T,a::GO) where {P<:ProjectSchedule,T<:ProblemSpec}
     s0 = get_id(get_initial_location_id(a))
     s = get_id(get_destination_location_id(a))
     r = get_id(get_robot_id(a))
@@ -524,8 +524,8 @@ function generate_path_spec(schedule::P,spec::T,a::GO) where {P<:ProjectSchedule
         node_type=Symbol(typeof(a)),
         start_vtx=s0,
         final_vtx=s,
-        # min_path_duration=get(spec.D,(s0,s),typemax(Int)), # TaskGraphProblemSpec distance matrix
-        min_path_duration=get(spec.D,(s0,s),0), # TaskGraphProblemSpec distance matrix
+        # min_path_duration=get(spec.D,(s0,s),typemax(Int)), # ProblemSpec distance matrix
+        min_path_duration=get(spec.D,(s0,s),0), # ProblemSpec distance matrix
         path_id=get_next_path_id(schedule),
         dummy_id=r,
         agent_id=get(schedule.robot_id_map,r,r),
@@ -533,7 +533,7 @@ function generate_path_spec(schedule::P,spec::T,a::GO) where {P<:ProjectSchedule
         free = (s==-1) # if destination is -1, there is no goal location
         )
 end
-function generate_path_spec(schedule::P,spec::T,a::CARRY) where {P<:ProjectSchedule,T<:TaskGraphProblemSpec}
+function generate_path_spec(schedule::P,spec::T,a::CARRY) where {P<:ProjectSchedule,T<:ProblemSpec}
     s0 = get_id(get_initial_location_id(a))
     s = get_id(get_destination_location_id(a))
     r = get_id(get_robot_id(a))
@@ -542,15 +542,15 @@ function generate_path_spec(schedule::P,spec::T,a::CARRY) where {P<:ProjectSched
         node_type=Symbol(typeof(a)),
         start_vtx=s0,
         final_vtx=s,
-        # min_path_duration=get(spec.D,(s0,s),typemax(Int)), # TaskGraphProblemSpec distance matrix
-        min_path_duration=get(spec.D,(s0,s),0), # TaskGraphProblemSpec distance matrix
+        # min_path_duration=get(spec.D,(s0,s),typemax(Int)), # ProblemSpec distance matrix
+        min_path_duration=get(spec.D,(s0,s),0), # ProblemSpec distance matrix
         path_id=get_next_path_id(schedule),
         dummy_id=r,
         agent_id=get(schedule.robot_id_map,r,r),
         object_id = o
         )
 end
-function generate_path_spec(schedule::P,spec::T,a::COLLECT) where {P<:ProjectSchedule,T<:TaskGraphProblemSpec}
+function generate_path_spec(schedule::P,spec::T,a::COLLECT) where {P<:ProjectSchedule,T<:ProblemSpec}
     s0 = get_id(get_initial_location_id(a))
     s = get_id(get_destination_location_id(a))
     r = get_id(get_robot_id(a))
@@ -568,7 +568,7 @@ function generate_path_spec(schedule::P,spec::T,a::COLLECT) where {P<:ProjectSch
         static=true
         )
 end
-function generate_path_spec(schedule::P,spec::T,a::DEPOSIT) where {P<:ProjectSchedule,T<:TaskGraphProblemSpec}
+function generate_path_spec(schedule::P,spec::T,a::DEPOSIT) where {P<:ProjectSchedule,T<:ProblemSpec}
     s0 = get_id(get_initial_location_id(a))
     s = get_id(get_destination_location_id(a))
     r = get_id(get_robot_id(a))
@@ -586,7 +586,7 @@ function generate_path_spec(schedule::P,spec::T,a::DEPOSIT) where {P<:ProjectSch
         static=true
         )
 end
-function generate_path_spec(schedule::P,spec::T,pred::OBJECT_AT) where {P<:ProjectSchedule,T<:TaskGraphProblemSpec}
+function generate_path_spec(schedule::P,spec::T,pred::OBJECT_AT) where {P<:ProjectSchedule,T<:ProblemSpec}
     path_spec = PathSpec(
         node_type=Symbol(typeof(pred)),
         start_vtx=get_id(get_location_id(pred)),
@@ -595,7 +595,7 @@ function generate_path_spec(schedule::P,spec::T,pred::OBJECT_AT) where {P<:Proje
         object_id = get_id(get_object_id(pred))
         )
 end
-function generate_path_spec(schedule::P,spec::T,pred::ROBOT_AT) where {P<:ProjectSchedule,T<:TaskGraphProblemSpec}
+function generate_path_spec(schedule::P,spec::T,pred::ROBOT_AT) where {P<:ProjectSchedule,T<:ProblemSpec}
     r = get_id(get_robot_id(pred))
     if !(r in collect(keys(schedule.robot_id_map)))
         # println("generate_path_spec: r = ",r," not in schedule.robot_id_map = ",schedule.robot_id_map)
@@ -611,7 +611,7 @@ function generate_path_spec(schedule::P,spec::T,pred::ROBOT_AT) where {P<:Projec
         free=true
         )
 end
-function generate_path_spec(schedule::P,spec::T,op::Operation) where {P<:ProjectSchedule,T<:TaskGraphProblemSpec}
+function generate_path_spec(schedule::P,spec::T,op::Operation) where {P<:ProjectSchedule,T<:ProblemSpec}
     path_spec = PathSpec(
         node_type=Symbol(typeof(op)),
         start_vtx = -1,
@@ -620,10 +620,10 @@ function generate_path_spec(schedule::P,spec::T,op::Operation) where {P<:Project
         )
 end
 function generate_path_spec(schedule::P,pred) where {P<:ProjectSchedule}
-    generate_path_spec(schedule,TaskGraphProblemSpec(),pred)
+    generate_path_spec(schedule,ProblemSpec(),pred)
 end
 
-function replace_in_schedule!(schedule::P,spec::T,pred,id::ID) where {P<:ProjectSchedule,T<:TaskGraphProblemSpec,ID<:AbstractID}
+function replace_in_schedule!(schedule::P,spec::T,pred,id::ID) where {P<:ProjectSchedule,T<:ProblemSpec,ID<:AbstractID}
     v = get_vtx(schedule, id)
     @assert v != -1
     set_vtx_map!(schedule,pred,id,v)
@@ -631,7 +631,7 @@ function replace_in_schedule!(schedule::P,spec::T,pred,id::ID) where {P<:Project
     set_path_spec!(schedule,v,path_spec)
     schedule
 end
-function add_to_schedule!(schedule::P,spec::T,pred,id::ID) where {P<:ProjectSchedule,T<:TaskGraphProblemSpec,ID<:AbstractID}
+function add_to_schedule!(schedule::P,spec::T,pred,id::ID) where {P<:ProjectSchedule,T<:ProblemSpec,ID<:AbstractID}
     @assert get_vtx(schedule, id) == -1
     add_vertex!(get_graph(schedule))
     insert_to_vtx_map!(schedule,pred,id,nv(get_graph(schedule)))
@@ -685,7 +685,7 @@ export
     Fills the schedule's dictionary mapping path_id (including dummy robots) to
     real agent id.
 """
-function populate_agent_ids!(robot_id_map::Dict{Int,Int},spec::T,assignments) where {T<:TaskGraphProblemSpec}
+function populate_agent_ids!(robot_id_map::Dict{Int,Int},spec::T,assignments) where {T<:ProblemSpec}
     N, M = spec.N, spec.M
     for agent_id in 1:N
         path_id = agent_id
@@ -702,7 +702,7 @@ function populate_agent_ids!(robot_id_map::Dict{Int,Int},spec::T,assignments) wh
     end
     schedule
 end
-function populate_agent_ids!(schedule::P,spec::T,assignments) where {P<:ProjectSchedule,T<:TaskGraphProblemSpec}
+function populate_agent_ids!(schedule::P,spec::T,assignments) where {P<:ProjectSchedule,T<:ProblemSpec}
     populate_agent_ids!(schedule.robot_id_map,spec,assignments)
 end
 
@@ -716,7 +716,7 @@ function add_single_robot_delivery_task!(
         object_id::Int,
         pickup_station_id::Int,
         dropoff_station_id::Int
-        ) where {S<:ProjectSchedule,T<:TaskGraphProblemSpec}
+        ) where {S<:ProjectSchedule,T<:ProblemSpec}
 
     if robot_id != -1
         # robot_pred = get_robot_ICs(schedule)[robot_id]
@@ -767,7 +767,7 @@ function add_headless_delivery_task!(
         operation_id::Int,
         pickup_station_id::Int,
         dropoff_station_id::Int
-        ) where {S<:ProjectSchedule,T<:TaskGraphProblemSpec}
+        ) where {S<:ProjectSchedule,T<:ProblemSpec}
 
     # if robot_id != -1
     #     # robot_pred = get_robot_ICs(schedule)[robot_id]
@@ -822,7 +822,7 @@ end
 
     Args:
     - `project_spec` - a ProjectSpec
-    - `problem_spec` - a TaskGraphProblemSpec
+    - `problem_spec` - a ProblemSpec
     - `object_ICs` - a list of initial object locations
     - `object_fCs` - a list of final object locations
     - `robot_ICs` - a list of initial robot locations
@@ -836,7 +836,7 @@ function construct_project_schedule(
         object_FCs::Vector{OBJECT_AT},
         robot_ICs::Dict{Int,ROBOT_AT},
         assignments::V=Dict{Int,Int}()
-        ) where {P<:ProjectSpec,T<:TaskGraphProblemSpec,V<:Union{Dict{Int,Int},Vector{Int}}}
+        ) where {P<:ProjectSpec,T<:ProblemSpec,V<:Union{Dict{Int,Int},Vector{Int}}}
     schedule = ProjectSchedule()
     populate_agent_ids!(schedule,problem_spec,assignments)
     graph = get_graph(schedule)
@@ -898,7 +898,7 @@ function construct_project_schedule(
     problem_spec::T,
     robot_ICs::Dict{Int,ROBOT_AT},
     assignments::V=Dict{Int,Int}()
-    ) where {P<:ProjectSpec,T<:TaskGraphProblemSpec,V<:Union{Dict{Int,Int},Vector{Int}}}
+    ) where {P<:ProjectSpec,T<:ProblemSpec,V<:Union{Dict{Int,Int},Vector{Int}}}
     construct_project_schedule(
         project_spec,
         problem_spec,
@@ -923,7 +923,7 @@ function construct_partial_project_schedule(
     robot_ICs::Vector{ROBOT_AT},
     operations::Vector{Operation},
     root_ops::Vector{OperationID},
-    problem_spec::TaskGraphProblemSpec
+    problem_spec::ProblemSpec
     )
 
     # Construct Partial Project Schedule
@@ -973,7 +973,7 @@ function construct_partial_project_schedule(
     end
     project_schedule
 end
-function construct_partial_project_schedule(spec::ProjectSpec,problem_spec::TaskGraphProblemSpec,robot_ICs=Vector{ROBOT_AT}())
+function construct_partial_project_schedule(spec::ProjectSpec,problem_spec::ProblemSpec,robot_ICs=Vector{ROBOT_AT}())
     construct_partial_project_schedule(
         spec.initial_conditions,
         spec.final_conditions,
@@ -1025,8 +1025,7 @@ end
 
 export
     get_collect_node,
-    get_deposit_node,
-    add_job_shop_constraints!
+    get_deposit_node
 
 function get_collect_node(schedule::P,id::ObjectID) where {P<:ProjectSchedule}
     current_id = id
@@ -1047,7 +1046,24 @@ function get_deposit_node(schedule::P,id::ObjectID) where {P<:ProjectSchedule}
     return current_id, node
 end
 
-function add_job_shop_constraints!(schedule::P,spec::T,model::JuMP.Model) where {P<:ProjectSchedule,T<:TaskGraphProblemSpec}
+################################################################################
+############################## New Functionality ###############################
+################################################################################
+
+export
+    add_job_shop_constraints!,
+    formulate_optimization_problem,
+    formulate_schedule_milp,
+    formulate_milp,
+    update_project_schedule!
+
+
+abstract type TaskGraphsMILP end
+struct AssignmentMILP <: TaskGraphsMILP end
+struct AdjacencyMILP <: TaskGraphsMILP end
+
+
+function add_job_shop_constraints!(schedule::P,spec::T,model::JuMP.Model) where {P<:ProjectSchedule,T<:ProblemSpec}
     M = spec.M
     s0 = spec.s0
     sF = spec.sF
@@ -1090,14 +1106,202 @@ function add_job_shop_constraints!(schedule::P,spec::T,model::JuMP.Model) where 
         end
     end
 end
+function add_job_shop_constraints!(milp_model::AssignmentMILP,schedule::ProjectSchedule,spec::ProblemSpec,model::JuMP.Model)
+    add_job_shop_constraints!(schedule,spec,model)
+end
 
-################################################################################
-############################## New Functionality ###############################
-################################################################################
+"""
+    Express the TaskGraphs assignment problem as a MILP using the JuMP optimization
+    framework.
 
-export
-    formulate_schedule_milp,
-    update_project_schedule!
+    `formulate_optimization_problem(G,Drs,Dss,Δt,to0_,tr0_,optimizer)`
+
+    Inputs:
+        `G` - graph with inverted tree structure that encodes dependencies
+            between tasks
+        `Drs` - Drs[i,j] is distance from initial robot position i to pickup
+            station j
+        `Dss` - Dss[j,j] is distance from start station j to final station j (we
+            only care about the diagonal)
+        `Δt` - Δt[j] is the duraction of time that must elapse after all prereqs
+            of task j have been satisfied before task j becomes available
+        `Δt_collect` - Δt_collect[j] is the time required for a robot to pick up
+            object j
+        `Δt_deliver` - Δt_deliver[j] is the time required for a robot to set
+            down object j
+        `to0_` - a `Dict`, where `to0_[j]` gives the start time for task j
+            (applies to leaf tasks only)
+        `tr0_` - a `Dict`, where `tr0_[i]` gives the start time for robot i
+            (applies to non-dummy robots only)
+        `root_nodes` - a vector of integers specfying the graph vertices that
+            are roots of the project
+        `weights` - a vector of weights that determines the contribution of each
+            root_node to the objective
+        `s0` - pickup stations for the tasks
+        `sF` - dropoff stations for the tasks
+        `optimizer` - a JuMP optimizer (e.g., Gurobi.optimizer)
+    Keyword Args:
+        `TimeLimit=100`
+        `OutputFlag=0`
+        `assignments=Dict{Int64,Int64}()` - maps robot id to assignment that must be
+            enforced
+        `cost_model=:MakeSpan` - optimization objective, either `:MakeSpan` or
+            `:SumOfMakeSpans`
+
+    Outputs:
+        `model` - the optimization model
+"""
+function formulate_optimization_problem(G,Drs,Dss,Δt,Δt_collect,Δt_deliver,to0_,tr0_,root_nodes,weights,s0,sF,nR,optimizer;
+    TimeLimit=100,
+    OutputFlag=0,
+    assignments=Dict{Int64,Int64}(),
+    cost_model=MakeSpan
+    )
+
+    model = Model(with_optimizer(optimizer,
+        TimeLimit=TimeLimit,
+        OutputFlag=OutputFlag
+        ))
+    M = size(Dss,1)
+    N = size(Drs,1)-M
+    @variable(model, to0[1:M] >= 0.0) # object availability time
+    @variable(model, tor[1:M] >= 0.0) # object robot arrival time
+    @variable(model, toc[1:M] >= 0.0) # object collection complete time
+    @variable(model, tod[1:M] >= 0.0) # object deliver begin time
+    @variable(model, tof[1:M] >= 0.0) # object termination time
+    @variable(model, tr0[1:N+M] >= 0.0) # robot availability time
+
+    # Assignment matrix x
+    @variable(model, X[1:N+M,1:M], binary = true) # X[i,j] ∈ {0,1}
+    @constraint(model, X * ones(M) .<= 1)         # each robot may have no more than 1 task
+    @constraint(model, X' * ones(N+M) .== nR)     # each task must have exactly 1 assignment
+    for (i,t) in tr0_
+        # start time for robot i
+        @constraint(model, tr0[i] == t)
+    end
+    for (j,t) in to0_
+        # start time for task j (applies only to tasks with no prereqs)
+        @constraint(model, to0[j] == t)
+    end
+    for (i,j) in assignments
+        # start time for task j (applies only to tasks with no prereqs)
+        @constraint(model, X[i,j] == 1)
+    end
+    # constraints
+    Mm = sum(Drs) + sum(Dss) # for big-M constraints
+    for j in 1:M
+        # constraint on task start time
+        if !is_root_node(G,j)
+            for v in inneighbors(G,j)
+                @constraint(model, to0[j] >= tof[v] + Δt[j])
+            end
+        end
+        # constraint on dummy robot start time (corresponds to moment of object delivery)
+        @constraint(model, tr0[j+N] == tof[j])
+        # dummy robots can't do upstream jobs
+        upstream_jobs = [j, map(e->e.dst,collect(edges(bfs_tree(G,j;dir=:in))))...]
+        for v in upstream_jobs
+            @constraint(model, X[j+N,v] == 0)
+        end
+        # lower bound on task completion time (task can't start until it's available).
+        # tof[j] = to0[j] + Dss[j,j] + slack[j]
+        @constraint(model, tor[j] >= to0[j])
+        # @constraint(model, tof[j] >= tor[j] + Dss[j,j] + Δt_collect[j] + Δt_deliver[j])
+        # bound on task completion time (assigned robot must first complete delivery)
+        # Big M constraint (thanks Oriana!): When X[i,j] == 1, this constrains the final time
+        # to be no less than the time it takes for the delivery to be completed by robot i.
+        # When X[i,j] == 0, this constrains the final time to be greater than a large negative
+        # number (meaning that this is a trivial constraint)
+        for i in 1:N+M
+            @constraint(model, tor[j] - (tr0[i] + Drs[i,j]) >= -Mm*(1 - X[i,j]))
+        end
+        @constraint(model, toc[j] == tor[j] + Δt_collect[j])
+        @constraint(model, tod[j] == toc[j] + Dss[j,j])
+        @constraint(model, tof[j] == tod[j] + Δt_deliver[j])
+        # "Job-shop" constraints specifying that no station may be double-booked. A station
+        # can only support a single COLLECT or DEPOSIT operation at a time, meaning that all
+        # the windows for these operations cannot overlap. In the constraints below, t1 and t2
+        # represent the intervals for the COLLECT or DEPOSIT operations of tasks j and j2,
+        # respectively. If eny of the operations for these two tasks require use of the same
+        # station, we introduce a 2D binary variable y. if y = [1,0], the operation for task
+        # j must occur before the operation for task j2. The opposite is true for y == [0,1].
+        # We use the big M method here as well to tightly enforce the binary constraints.
+        for j2 in j+1:M
+            if (s0[j] == s0[j2]) || (s0[j] == sF[j2]) || (sF[j] == s0[j2]) || (sF[j] == sF[j2])
+                # @show j, j2
+                if s0[j] == s0[j2]
+                    t1 = [tor[j], toc[j]]
+                    t2 = [tor[j2], toc[j2]]
+                elseif s0[j] == sF[j2]
+                    t1 = [tor[j], toc[j]]
+                    t2 = [tod[j2], tof[j2]]
+                elseif sF[j] == s0[j2]
+                    t1 = [tod[j], tof[j]]
+                    t2 = [tor[j2], toc[j2]]
+                elseif sF[j] == sF[j2]
+                    t1 = [tod, tof[j]]
+                    t2 = [tod, tof[j2]]
+                end
+                tmax = @variable(model)
+                tmin = @variable(model)
+                y = @variable(model, binary=true)
+                @constraint(model, tmax >= t1[1])
+                @constraint(model, tmax >= t2[1])
+                @constraint(model, tmin <= t1[2])
+                @constraint(model, tmin <= t2[2])
+
+                @constraint(model, tmax - t2[1] <= (1 - y)*Mm)
+                @constraint(model, tmax - t1[1] <= y*Mm)
+                @constraint(model, tmin - t1[2] >= (1 - y)*-Mm)
+                @constraint(model, tmin - t2[2] >= y*-Mm)
+                @constraint(model, tmin + 1 <= tmax)
+            end
+        end
+    end
+    # cost depends only on root node(s)
+    if cost_model == SumOfMakeSpans
+        @variable(model, T[1:length(root_nodes)])
+        for (i,project_head) in enumerate(root_nodes)
+            for v in project_head
+                @constraint(model, T[i] >= tof[v] + Δt[v])
+            end
+        end
+        @objective(model, Min, sum(map(i->T[i]*get(weights,i,0.0), 1:length(root_nodes))))
+        # @objective(model, Min, sum(map(v->tof[v]*get(weights,v,0.0), root_nodes)))
+    elseif cost_model == MakeSpan
+        @variable(model, T)
+        @constraint(model, T .>= tof .+ Δt)
+        @objective(model, Min, T)
+    end
+    model;
+end
+function formulate_optimization_problem(spec::T,optimizer;
+    kwargs...
+    ) where {T<:ProblemSpec}
+    formulate_optimization_problem(
+        spec.graph,
+        spec.Drs,
+        spec.Dss,
+        spec.Δt,
+        spec.Δt_collect,
+        spec.Δt_deliver,
+        spec.to0_,
+        spec.tr0_,
+        spec.root_nodes,
+        spec.weights,
+        spec.s0,
+        spec.sF,
+        spec.nR,
+        optimizer;
+        # cost_model=spec.cost_function,
+        kwargs...
+        )
+end
+function formulate_milp(milp_model::AssignmentMILP,project_schedule::ProjectSchedule,problem_spec::ProblemSpec;
+    optimizer=Gurobi.Optimizer,
+    kwargs...)
+    formulate_optimization_problem(problem_spec,optimizer;kwargs...)
+end
 
 """
     `formulate_schedule_milp`
@@ -1106,7 +1310,7 @@ export
     #TODO: I am not positive that the current version guarantees t0[v2] <= tF[v]
     for all (v,v2) in edges(project_schedule.graph) following optimization.
 """
-function formulate_schedule_milp(project_schedule::ProjectSchedule,problem_spec::TaskGraphProblemSpec;
+function formulate_schedule_milp(project_schedule::ProjectSchedule,problem_spec::ProblemSpec;
         optimizer = Gurobi.Optimizer,
         TimeLimit=100,
         OutputFlag=0,
@@ -1124,8 +1328,10 @@ function formulate_schedule_milp(project_schedule::ProjectSchedule,problem_spec:
         ));
     @variable(model, t0[1:nv(G)] >= 0.0); # initial times for all nodes
     @variable(model, tF[1:nv(G)] >= 0.0); # final times for all nodes
-    @variable(model, X[1:nv(G),1:nv(G)], binary = true); # Adjacency Matrix
-    @constraint(model, X .+ X' .<= 1) # no bidirectional or self edges
+
+    # Precedence relationships
+    @variable(model, Xa[1:nv(G),1:nv(G)], binary = true); # Precedence Adjacency Matrix
+    @constraint(model, Xa .+ Xa' .<= 1) # no bidirectional or self edges
     # set all initial times that are provided
     for (id,t) in t0_
         v = get_vtx(project_schedule, id)
@@ -1135,7 +1341,7 @@ function formulate_schedule_milp(project_schedule::ProjectSchedule,problem_spec:
     for v in vertices(G)
         @constraint(model, tF[v] >= t0[v] + Δt[v])
         for v2 in outneighbors(G,v)
-            @constraint(model, X[v,v2] == 1)
+            @constraint(model, Xa[v,v2] == 1)
             @constraint(model, t0[v2] >= tF[v])
         end
     end
@@ -1185,23 +1391,25 @@ function formulate_schedule_milp(project_schedule::ProjectSchedule,problem_spec:
     end
     @assert(!any(n_eligible_predecessors .< n_required_predecessors))
     @assert(!any(n_eligible_successors .< n_required_successors))
-    @constraint(model, X * ones(nv(G)) .<= n_eligible_successors);
-    @constraint(model, X * ones(nv(G)) .>= n_required_successors);
-    @constraint(model, X' * ones(nv(G)) .<= n_eligible_predecessors);
-    @constraint(model, X' * ones(nv(G)) .>= n_required_predecessors);
+    @constraint(model, Xa * ones(nv(G)) .<= n_eligible_successors);
+    @constraint(model, Xa * ones(nv(G)) .>= n_required_successors);
+    @constraint(model, Xa' * ones(nv(G)) .<= n_eligible_predecessors);
+    @constraint(model, Xa' * ones(nv(G)) .>= n_required_predecessors);
+
+    upstream_vertices = map(v->[v, map(e->e.dst,collect(edges(bfs_tree(G,v;dir=:in))))...], vertices(G))
 
     # Big M constraints
     for v in vertices(G)
-        upstream_vertices = [v, map(e->e.dst,collect(edges(bfs_tree(G,v;dir=:in))))...]
-        for v2 in upstream_vertices
-            @constraint(model, X[v,v2] == 0)
+        # upstream_vertices = [v, map(e->e.dst,collect(edges(bfs_tree(G,v;dir=:in))))...]
+        for v2 in upstream_vertices[v]
+            @constraint(model, Xa[v,v2] == 0)
         end
         node = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v))
         for (template, val) in missing_successors[v]
             for v2 in vertices(G)
                 node2 = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v2))
-                if (v2 in upstream_vertices) || !matches_template(template, typeof(node2))
-                    # @constraint(model, X[v,v2] == 0)
+                if (v2 in upstream_vertices[v]) || !matches_template(template, typeof(node2))
+                    # @constraint(model, Xa[v,v2] == 0)
                     continue
                 end
                 potential_match = false
@@ -1213,17 +1421,17 @@ function formulate_schedule_milp(project_schedule::ProjectSchedule,problem_spec:
                         end
                         # new_node = align_with_predecessor(node2,node)
                         # dt_min = generate_path_spec(project_schedule,problem_spec,new_node).min_path_duration
-                        # @constraint(model, tF[v2] - (t0[v2] + dt_min) >= -Mm*(1 - X[v,v2]))
-                        # @constraint(model, t0[v2] - tF[v] >= -Mm*(1 - X[v,v2]))
+                        # @constraint(model, tF[v2] - (t0[v2] + dt_min) >= -Mm*(1 - Xa[v,v2]))
+                        # @constraint(model, t0[v2] - tF[v] >= -Mm*(1 - Xa[v,v2]))
 
                         new_node = align_with_successor(node,node2)
                         dt_min = generate_path_spec(project_schedule,problem_spec,new_node).min_path_duration
-                        @constraint(model, tF[v] - (t0[v] + dt_min) >= -Mm*(1 - X[v,v2]))
-                        @constraint(model, t0[v2] - tF[v] >= -Mm*(1 - X[v,v2]))
+                        @constraint(model, tF[v] - (t0[v] + dt_min) >= -Mm*(1 - Xa[v,v2]))
+                        @constraint(model, t0[v2] - tF[v] >= -Mm*(1 - Xa[v,v2]))
                     end
                 end
                 if potential_match == false
-                    @constraint(model, X[v,v2] == 0)
+                    @constraint(model, Xa[v,v2] == 0)
                 end
             end
         end
@@ -1238,6 +1446,8 @@ function formulate_schedule_milp(project_schedule::ProjectSchedule,problem_spec:
     # j must occur before the operation for task j2. The opposite is true for y == [0,1].
     # We use the big M method here as well to tightly enforce the binary constraints.
     job_shop_variables = Dict{Tuple{Int,Int},JuMP.VariableRef}();
+    @variable(model, Xj[1:nv(G),1:nv(G)], binary = true); # job shop adjacency matrix
+    @constraint(model, Xj .+ Xj' .<= 1) # no bidirectional or self edges
     for v in 1:nv(G)
         node = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v))
         for v2 in v+1:nv(G)
@@ -1245,23 +1455,38 @@ function formulate_schedule_milp(project_schedule::ProjectSchedule,problem_spec:
             common_resources = intersect(resources_reserved(node),resources_reserved(node2))
             if length(common_resources) > 0
                 # @show common_resources
-                tmax = @variable(model)
-                tmin = @variable(model)
-                y = @variable(model, binary=true)
-                job_shop_variables[(v,v2)] = y
-                @constraint(model, tmax >= t0[v])
-                @constraint(model, tmax >= t0[v2])
-                @constraint(model, tmin <= tF[v])
-                @constraint(model, tmin <= tF[v2])
+                # tmax = @variable(model)
+                # tmin = @variable(model)
+                # y = @variable(model, binary=true)
+                # job_shop_variables[(v,v2)] = y
+                # @constraint(model, tmax >= t0[v])
+                # @constraint(model, tmax >= t0[v2])
+                # @constraint(model, tmin <= tF[v])
+                # @constraint(model, tmin <= tF[v2])
+                #
+                # @constraint(model, tmax - t0[v2] <= (1 - y)*Mm)
+                # @constraint(model, tmax - t0[v] <= y*Mm)
+                # @constraint(model, tmin - tF[v] >= (1 - y)*-Mm)
+                # @constraint(model, tmin - tF[v2] >= y*-Mm)
+                # @constraint(model, tmin + 1 <= tmax)
 
-                @constraint(model, tmax - t0[v2] <= (1 - y)*Mm)
-                @constraint(model, tmax - t0[v] <= y*Mm)
-                @constraint(model, tmin - tF[v] >= (1 - y)*-Mm)
-                @constraint(model, tmin - tF[v2] >= y*-Mm)
-                @constraint(model, tmin + 1 <= tmax)
+                # Big M constraints
+                if !(v2 in upstream_vertices[v])
+                    @constraint(model, t0[v2] - tF[v] >= -Mm*(1 - Xj[v,v2]))
+                end
+                if !(v in upstream_vertices[v2])
+                    @constraint(model, t0[v] - tF[v2] >= -Mm*(1 - Xj[v2,v]))
+                end
+            else
+                @constraint(model, Xj[v,v2] == 0)
+                @constraint(model, Xj[v2,v] == 0)
             end
         end
     end
+
+    # Full adjacency matrix
+    @variable(model, X[1:nv(G),1:nv(G)]); # Adjacency Matrix
+    @constraint(model, X .== Xa .+ Xj)
 
     # Formulate Objective
     if cost_model == SumOfMakeSpans
@@ -1278,10 +1503,15 @@ function formulate_schedule_milp(project_schedule::ProjectSchedule,problem_spec:
         @constraint(model, T .>= tF)
         cost1 = @expression(model, T)
     end
-    sparsity_cost = @expression(model, (0.5/(nv(G)^2))*sum(X)) # cost term to encourage sparse X. Otherwise the solver may add pointless edges
+    sparsity_cost = @expression(model, (0.5/(nv(G)^2))*sum(Xa)) # cost term to encourage sparse X. Otherwise the solver may add pointless edges
     @objective(model, Min, cost1 + sparsity_cost)
     # @objective(model, Min, cost1 )
     model, job_shop_variables
+end
+function formulate_milp(milp_model::AdjacencyMILP,project_schedule::ProjectSchedule,problem_spec::ProblemSpec;
+    optimizer=Gurobi.Optimizer,
+    kwargs...)
+    formulate_schedule_milp(project_schedule,problem_spec;optimizer=optimizer,kwargs...)
 end
 
 """
@@ -1296,12 +1526,12 @@ end
     reflect the appropriate valid IDs (e.g., `Action` nodes are populated with
     the correct `RobotID`s)
 """
-function update_project_schedule!(project_schedule::P,problem_spec::T,adj_matrix,DEBUG::Bool=false) where {P<:ProjectSchedule,T<:TaskGraphProblemSpec}
+function update_project_schedule!(project_schedule::P,problem_spec::T,adj_matrix,DEBUG::Bool=false) where {P<:ProjectSchedule,T<:ProblemSpec}
     # Add all new edges to project schedule
     G = get_graph(project_schedule)
     for v in vertices(G)
         for v2 in vertices(G)
-            if adj_matrix[v,v2] == 1
+            if adj_matrix[v,v2] >= 1
                 add_edge!(G,v,v2)
             end
         end
@@ -1319,7 +1549,6 @@ function update_project_schedule!(project_schedule::P,problem_spec::T,adj_matrix
             node = align_with_successor(node,get_node_from_vtx(project_schedule, v2))
         end
         replace_in_schedule!(project_schedule, problem_spec, node, node_id)
-
     end
     project_schedule
 end

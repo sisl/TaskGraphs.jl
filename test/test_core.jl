@@ -19,7 +19,7 @@ end
 #     spec = construct_random_project_spec(M,object_ICs,object_FCs;max_parents=3);
 #     operations = spec.operations;
 #     root_ops = map(op->op.id, spec.operations[collect(spec.root_nodes)])
-#     problem_spec = TaskGraphProblemSpec(N=N,M=M,D=dist_matrix);
+#     problem_spec = ProblemSpec(N=N,M=M,D=dist_matrix);
 #
 #     # Construct Partial Project Schedule
 #     project_schedule = ProjectSchedule();
@@ -71,7 +71,7 @@ end
 #         project_schedule::P,
 #         problem_spec::S,
 #         ;optimizer=Gurobi.Optimizer,TimeLimit=100,OutputFlag=0
-#         ) where {P<:ProjectSchedule,S<:TaskGraphProblemSpec}
+#         ) where {P<:ProjectSchedule,S<:ProblemSpec}
 #
 #         # Formulate MILP problem
 #         G = get_graph(project_schedule);
@@ -347,7 +347,7 @@ let
     end
 end
 let
-    problem_spec = TaskGraphProblemSpec()
+    problem_spec = ProblemSpec()
 end
 # Simple Hand Crafted Problem
 let

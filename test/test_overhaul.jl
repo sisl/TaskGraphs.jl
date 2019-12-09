@@ -62,7 +62,7 @@ let
     spec = construct_random_project_spec(M,object_ICs,object_FCs;max_parents=3);
     operations = spec.operations;
     root_ops = map(op->op.id, spec.operations[collect(spec.root_nodes)])
-    problem_spec = TaskGraphProblemSpec(N=N,M=M,D=dist_matrix);
+    problem_spec = ProblemSpec(N=N,M=M,D=dist_matrix);
 
     # Construct Partial Project Schedule
     project_schedule = construct_partial_project_schedule(spec,problem_spec,robot_ICs)
