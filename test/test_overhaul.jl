@@ -213,14 +213,14 @@ let
     let
 
         for (i, f) in enumerate([
-            initialize_toy_problem_1,
-            initialize_toy_problem_2,
+            # initialize_toy_problem_1,
+            # initialize_toy_problem_2,
             initialize_toy_problem_3,
-            initialize_toy_problem_4,
-            initialize_toy_problem_5,
-            initialize_toy_problem_6,
-            initialize_toy_problem_7,
-            initialize_toy_problem_8,
+            # initialize_toy_problem_4,
+            # initialize_toy_problem_5,
+            # initialize_toy_problem_6,
+            # initialize_toy_problem_7,
+            # initialize_toy_problem_8,
             ])
             for cost_model in [SumOfMakeSpans, MakeSpan]
                 let
@@ -238,25 +238,70 @@ let
                         );
 
                     # Adjacency method
-                    solver = PC_TAPF_Solver(verbosity=-1)
+                    solver = PC_TAPF_Solver(verbosity=1)
                     solution2, assignment2, cost2, env2 = high_level_search_mod!(
                         solver,
                         env_graph,
                         project_spec,
                         problem_spec,
-                        robot_ICs,
+                        map(i->robot_ICs[i], 1:problem_spec.N),
                         Gurobi.Optimizer;
                         primary_objective=cost_model
                         );
 
-                    # if cost2[1] != cost1[1]
+                    if cost2[1] != cost1[1]
                         @show f, cost_model, cost1, cost2
-                    # end
+                    end
                     @test cost2[1] == cost1[1]
 
                 end
             end
         end
+
+    end
+
+    let
+
+        f = initialize_toy_problem_3
+        cost_model = MakeSpan
+        project_spec, problem_spec, robot_ICs, assignments, env_graph = f(;verbose=false);
+
+        solver = PC_TAPF_Solver(verbosity=1)
+        solution, assignment, cost, env = high_level_search_mod!(
+            solver,
+            env_graph,
+            project_spec,
+            problem_spec,
+            map(i->robot_ICs[i], 1:problem_spec.N),
+            Gurobi.Optimizer;
+            primary_objective=cost_model
+            );
+
+        print_project_schedule(env.schedule,"project_schedule1")
+
+        for i in 1:5
+            solver = PC_TAPF_Solver(verbosity=1)
+            solution2, assignment2, cost2, env2 = high_level_search_mod!(
+                solver,
+                env_graph,
+                project_spec,
+                problem_spec,
+                map(i->robot_ICs[i], 1:problem_spec.N),
+                Gurobi.Optimizer;
+                primary_objective=cost_model
+                );
+
+            @test !any(adjacency_matrix(env.schedule.graph) .!= adjacency_matrix(env2.schedule.graph))
+            if cost[1] != cost2[1]
+                print_project_schedule(env2.schedule,"project_schedule2")
+            end
+            @test cost[1] == cost2[1]
+        end
+
+        # if cost2[1] != cost1[1]
+        #     @show f, cost_model, cost1, cost2
+        # end
+        # @test cost2[1] == cost1[1]
 
     end
 
