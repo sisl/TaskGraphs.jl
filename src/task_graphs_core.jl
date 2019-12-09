@@ -1397,42 +1397,38 @@ function formulate_schedule_milp(project_schedule::ProjectSchedule,problem_spec:
     @constraint(model, Xa' * ones(nv(G)) .>= n_required_predecessors);
 
     upstream_vertices = map(v->[v, map(e->e.dst,collect(edges(bfs_tree(G,v;dir=:in))))...], vertices(G))
-
-    # Big M constraints
     for v in vertices(G)
-        # upstream_vertices = [v, map(e->e.dst,collect(edges(bfs_tree(G,v;dir=:in))))...]
         for v2 in upstream_vertices[v]
             @constraint(model, Xa[v,v2] == 0)
         end
+    end
+    non_upstream_vertices = map(v->collect(setdiff(collect(vertices(G)),upstream_vertices[v])), vertices(G))
+    # Big M constraints
+    for v in vertices(G)
         node = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v))
-        for (template, val) in missing_successors[v]
-            for v2 in vertices(G)
-                node2 = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v2))
-                if (v2 in upstream_vertices[v]) || !matches_template(template, typeof(node2))
-                    # @constraint(model, Xa[v,v2] == 0)
+        for v2 in non_upstream_vertices[v] # for v2 in vertices(G)
+            node2 = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v2))
+            potential_match = false
+            for (template, val) in missing_successors[v]
+                if !matches_template(template, typeof(node2)) # possible to add an edge
                     continue
                 end
-                potential_match = false
                 for (template2, val2) in missing_predecessors[v2]
-                    if matches_template(template2,typeof(node)) # possible to add an edge
-                        potential_match = true
-                        if !(val > 0 && val2 > 0)
-                            continue
-                        end
-                        # new_node = align_with_predecessor(node2,node)
-                        # dt_min = generate_path_spec(project_schedule,problem_spec,new_node).min_path_duration
-                        # @constraint(model, tF[v2] - (t0[v2] + dt_min) >= -Mm*(1 - Xa[v,v2]))
-                        # @constraint(model, t0[v2] - tF[v] >= -Mm*(1 - Xa[v,v2]))
-
+                    if !matches_template(template2, typeof(node)) # possible to add an edge
+                        continue
+                    end
+                    potential_match = true # TODO: investigate why the solver fails when this is moved inside the following if statement
+                    if (val > 0 && val2 > 0)
                         new_node = align_with_successor(node,node2)
                         dt_min = generate_path_spec(project_schedule,problem_spec,new_node).min_path_duration
                         @constraint(model, tF[v] - (t0[v] + dt_min) >= -Mm*(1 - Xa[v,v2]))
                         @constraint(model, t0[v2] - tF[v] >= -Mm*(1 - Xa[v,v2]))
+                        break
                     end
                 end
-                if potential_match == false
-                    @constraint(model, Xa[v,v2] == 0)
-                end
+            end
+            if potential_match == false
+                @constraint(model, Xa[v,v2] == 0)
             end
         end
     end
@@ -1445,7 +1441,7 @@ function formulate_schedule_milp(project_schedule::ProjectSchedule,problem_spec:
     # station, we introduce a 2D binary variable y. if y = [1,0], the operation for task
     # j must occur before the operation for task j2. The opposite is true for y == [0,1].
     # We use the big M method here as well to tightly enforce the binary constraints.
-    job_shop_variables = Dict{Tuple{Int,Int},JuMP.VariableRef}();
+    # job_shop_variables = Dict{Tuple{Int,Int},JuMP.VariableRef}();
     @variable(model, Xj[1:nv(G),1:nv(G)], binary = true); # job shop adjacency matrix
     @constraint(model, Xj .+ Xj' .<= 1) # no bidirectional or self edges
     for v in 1:nv(G)
@@ -1471,6 +1467,7 @@ function formulate_schedule_milp(project_schedule::ProjectSchedule,problem_spec:
                 # @constraint(model, tmin + 1 <= tmax)
 
                 # Big M constraints
+                @constraint(model, Xj[v,v2] + Xj[v2,v] == 1)
                 if !(v2 in upstream_vertices[v])
                     @constraint(model, t0[v2] - tF[v] >= -Mm*(1 - Xj[v,v2]))
                 end
@@ -1503,10 +1500,11 @@ function formulate_schedule_milp(project_schedule::ProjectSchedule,problem_spec:
         @constraint(model, T .>= tF)
         cost1 = @expression(model, T)
     end
-    sparsity_cost = @expression(model, (0.5/(nv(G)^2))*sum(Xa)) # cost term to encourage sparse X. Otherwise the solver may add pointless edges
+    # sparsity_cost = @expression(model, (0.5/(nv(G)^2))*sum(Xa)) # cost term to encourage sparse X. Otherwise the solver may add pointless edges
+    sparsity_cost = @expression(model, (0.5/(nv(G)^2))*sum(X)) # cost term to encourage sparse X. Otherwise the solver may add pointless edges
     @objective(model, Min, cost1 + sparsity_cost)
     # @objective(model, Min, cost1 )
-    model, job_shop_variables
+    model #, job_shop_variables
 end
 function formulate_milp(milp_model::AdjacencyMILP,project_schedule::ProjectSchedule,problem_spec::ProblemSpec;
     optimizer=Gurobi.Optimizer,

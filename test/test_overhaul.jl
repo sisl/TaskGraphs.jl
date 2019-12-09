@@ -72,7 +72,7 @@ let
     # nodes, edge_list
 
     # Formulate MILP problem
-    model, job_shop_variables = formulate_schedule_milp(project_schedule,problem_spec)
+    model = formulate_schedule_milp(project_schedule,problem_spec)
 
     # Optimize!
     optimize!(model)
@@ -86,8 +86,6 @@ let
     update_project_schedule!(project_schedule,problem_spec,adj_matrix)
 
     print_project_schedule(project_schedule,"project_schedule2")
-
-    job_shop_variables
 
 end
 let
@@ -108,7 +106,7 @@ let
         project_spec, problem_spec, object_ICs, object_FCs, _ = construct_task_graphs_problem(project_spec, r0, s0, sF, dist_matrix)
 
         project_schedule = construct_partial_project_schedule(project_spec,problem_spec,robot_ICs)
-        model, job_shop_variables = formulate_schedule_milp(project_schedule,problem_spec)
+        model = formulate_schedule_milp(project_schedule,problem_spec)
         optimize!(model)
         @show status = termination_status(model)
         @show obj_val = Int(round(value(objective_function(model))))
@@ -126,7 +124,7 @@ let
         robot_ICs = map(i->robot_ICs[i], 1:problem_spec.N)
 
         project_schedule = construct_partial_project_schedule(project_spec,problem_spec,robot_ICs)
-        model, job_shop_variables = formulate_schedule_milp(project_schedule,problem_spec)
+        model = formulate_schedule_milp(project_schedule,problem_spec)
         optimize!(model)
         @show status = termination_status(model)
         @show obj_val = Int(round(value(objective_function(model))))
@@ -177,7 +175,7 @@ let
 
                     # robot_ICs = map(i->robot_ICs[i], 1:problem_spec.N)
                     schedule2 = construct_partial_project_schedule(project_spec,problem_spec,map(i->robot_ICs[i], 1:problem_spec.N))
-                    model2, job_shop_variables = formulate_schedule_milp(schedule2,problem_spec;cost_model=cost_model)
+                    model2 = formulate_schedule_milp(schedule2,problem_spec;cost_model=cost_model)
                     optimize!(model2)
                     @test termination_status(model2) == MathOptInterface.OPTIMAL
                     obj_val2 = Int(round(value(objective_function(model2))))
@@ -228,7 +226,7 @@ let
                 let
                     # Assignment method
                     project_spec, problem_spec, robot_ICs, assignments, env_graph = f(;verbose=false);
-                    solver = PC_TAPF_Solver(verbosity=1)
+                    solver = PC_TAPF_Solver(verbosity=-1)
                     solution1, assignment1, cost1, env1 = high_level_search!(
                         solver,
                         env_graph,
@@ -240,8 +238,8 @@ let
                         );
 
                     # Adjacency method
-                    solver = PC_TAPF_Solver(verbosity=1)
-                    solution2, assignment2, cost2, env2 = high_level_search!(
+                    solver = PC_TAPF_Solver(verbosity=-1)
+                    solution2, assignment2, cost2, env2 = high_level_search_mod!(
                         solver,
                         env_graph,
                         project_spec,
@@ -251,6 +249,9 @@ let
                         primary_objective=cost_model
                         );
 
+                    # if cost2[1] != cost1[1]
+                        @show f, cost_model, cost1, cost2
+                    # end
                     @test cost2[1] == cost1[1]
 
                 end

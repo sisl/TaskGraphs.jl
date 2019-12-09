@@ -395,7 +395,7 @@ function CRCBS.build_env(solver, env::E, mapf::M, node::N, agent_id::Int, path_i
     v = env.schedule.path_id_to_vtx_map[path_id]
     node_id = get_vtx_id(env.schedule, v)
     schedule_node = get_node_from_id(env.schedule, node_id)
-    @show v,node_id,schedule_node,agent_id
+    # @show v,node_id,schedule_node,agent_id
     goal_vtx = mapf.goals[path_id].vtx
     goal_time = env.cache.tF[v]                             # time after which goal can be satisfied
     deadline = env.cache.tF[v] .+ env.cache.slack[v]         # deadline for DeadlineCost
@@ -780,7 +780,7 @@ function high_level_search_mod!(solver::P, env_graph, project_spec, problem_spec
     # model = formulate_optimization_problem(problem_spec,optimizer;kwargs...);
     #
     project_schedule = construct_partial_project_schedule(project_spec,problem_spec,map(i->robot_ICs[i], 1:problem_spec.N))
-    model, job_shop_variables = formulate_schedule_milp(project_schedule,problem_spec;
+    model = formulate_schedule_milp(project_schedule,problem_spec;
         cost_model=primary_objective,optimizer=optimizer,kwargs...)
 
     while solver.best_cost[1] > lower_bound_cost

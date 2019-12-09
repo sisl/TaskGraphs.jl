@@ -13,7 +13,7 @@
     <path d="M0,0 L15,3.5 L0,7 z" stroke="context-stroke" fill="context-stroke"/>
   </marker>
 </defs>
-<g stroke="#000000" id="img-63d29637-1">
+<g stroke="#000000" id="img-d79bb688-1">
   <g transform="translate(100,70)">
     <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
   </g>
@@ -57,82 +57,82 @@
     <path fill="none" d="M-6.06,-1.52 L 6.06 1.52" class="primitive"/>
   </g>
 </g>
-<g fill="#00FFFF" id="img-63d29637-2">
+<g fill="#00FFFF" id="img-d79bb688-2">
   <g transform="translate(110,70)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#00FFFF" id="img-63d29637-3">
+<g fill="#00FFFF" id="img-d79bb688-3">
   <g transform="translate(90,70)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#00FFFF" id="img-63d29637-4">
+<g fill="#00FFFF" id="img-d79bb688-4">
   <g transform="translate(70,70)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#00FFFF" id="img-63d29637-5">
+<g fill="#00FFFF" id="img-d79bb688-5">
   <g transform="translate(50,70)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#00FFFF" id="img-63d29637-6">
+<g fill="#00FFFF" id="img-d79bb688-6">
   <g transform="translate(110,50)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#00FFFF" id="img-63d29637-7">
+<g fill="#00FFFF" id="img-d79bb688-7">
   <g transform="translate(90,50)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#00FFFF" id="img-63d29637-8">
+<g fill="#00FFFF" id="img-d79bb688-8">
   <g transform="translate(70,50)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#00FFFF" id="img-63d29637-9">
+<g fill="#00FFFF" id="img-d79bb688-9">
   <g transform="translate(50,50)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#00FFFF" id="img-63d29637-10">
+<g fill="#00FFFF" id="img-d79bb688-10">
   <g transform="translate(30,55)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#00FF00" id="img-63d29637-11">
+<g fill="#00FF00" id="img-d79bb688-11">
   <g transform="translate(10,55)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#00FFFF" id="img-63d29637-12">
+<g fill="#00FFFF" id="img-d79bb688-12">
   <g transform="translate(30,75)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#00FF00" id="img-63d29637-13">
+<g fill="#00FF00" id="img-d79bb688-13">
   <g transform="translate(10,75)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#FFA500" id="img-63d29637-14">
+<g fill="#FFA500" id="img-d79bb688-14">
   <g transform="translate(30,45)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#FFA500" id="img-63d29637-15">
+<g fill="#FFA500" id="img-d79bb688-15">
   <g transform="translate(30,65)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#FF0000" id="img-63d29637-16">
+<g fill="#FF0000" id="img-d79bb688-16">
   <g transform="translate(110,20)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g font-family="futura" font-size="3.53" stroke="#000000" id="img-63d29637-17">
+<g font-family="futura" font-size="3.53" stroke="#000000" id="img-d79bb688-17">
   <g transform="translate(110,70)">
     <g class="primitive">
       <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">1,8,-1</tspan><tspan x="0" dy="1.2em">2,2,</tspan></text>
