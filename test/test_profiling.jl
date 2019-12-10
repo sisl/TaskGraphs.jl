@@ -83,8 +83,8 @@ let
     # update_project_schedule!(project_schedule,problem_spec,assignment_matrix)
     # env, mapf = construct_search_env(project_schedule, problem_spec, env_graph);
     # pc_mapf = PC_MAPF(env,mapf);
-    # ##### Call CBS Search Routine (LEVEL 2) #####
-    # # solution, cost = solve!(solver,pc_mapf);
+    ##### Call CBS Search Routine (LEVEL 2) #####
+    # solution, cost = solve!(solver,pc_mapf);
     # root_node = initialize_root_node(pc_mapf)
     # vtx_lists = convert_to_vertex_lists(root_node.solution)
     # for (i,p) in enumerate(vtx_lists)

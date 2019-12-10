@@ -490,9 +490,9 @@ function plan_next_path!(solver::S, env::E, mapf::M, node::N;
                 log_info(-1, solver, string("# LOW LEVEL SEARCH: in schedule node ",v," of type ",
                     typeof(schedule_node),", cache.t0[v] - get_end_index(base_path) = ",cache.t0[v] - get_end_index(base_path),". Extending path to ",cache.t0[v]," ..."))
                 # log_info(-1, solver, string("# base path = ",convert_to_vertex_lists(base_path), ",  vache.t0[v] = ",cache.t0[v]))
-                log_info(-1, solver, base_path.s0)
-                log_info(-1, solver, string(convert_to_vertex_lists(base_path)))
-                log_info(-1, solver, get_final_state(base_path).vtx )
+                # log_info(-1, solver, base_path.s0)
+                # log_info(-1, solver, string(convert_to_vertex_lists(base_path)))
+                # log_info(-1, solver, get_final_state(base_path).vtx )
                 # log_info(-1, solver, cbs_env.cost_model.cost_models[2].model.table.CAT)
                 extend_path!(cbs_env,base_path,cache.t0[v])
             end
@@ -506,9 +506,12 @@ function plan_next_path!(solver::S, env::E, mapf::M, node::N;
                 solver.DEBUG ? validate(path,v) : nothing
             else
                 solver.DEBUG ? validate(base_path,v) : nothing
-                @show get_final_state(base_path).vtx
                 path, cost = path_finder(solver, cbs_env, base_path, heuristic;verbose=(solver.verbosity > 3))
-                @show convert_to_vertex_lists(base_path)
+                # if !CRCBS.is_valid(path, get_final_state(base_path), cbs_env.goal)
+                if cost == get_infeasible_cost(cbs_env)
+                    log_info(-1,solver,"# A*: returned infeasible path ... Exiting early")
+                    return false
+                end
                 solver.DEBUG ? validate(path,v,cbs_env) : nothing
             end
             log_info(2,solver,string("LOW LEVEL SEARCH: solver.num_A_star_iterations = ",solver.num_A_star_iterations))
