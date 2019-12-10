@@ -172,6 +172,8 @@ function CRCBS.convert_to_vertex_lists(path::Path{State,Action})
     vtx_list = [n.sp.vtx for n in path.path_nodes]
     if length(path) > 0
         vtx_list = [get_s(get_path_node(path,1)).vtx, vtx_list...]
+    else
+        vtx_list = [path.s0.vtx, vtx_list...]
     end
     vtx_list
 end

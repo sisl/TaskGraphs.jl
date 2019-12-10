@@ -1,0 +1,410 @@
+\documentclass{standalone}
+
+\usepackage{environ}
+\usepackage{verbatim}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{listings}
+\usepackage{lmodern}
+\usepackage{xcolor}
+\usepackage{tikz}
+\usepackage{pgfplots}
+\usepackage{pgfbaselayers}
+\usepackage{tabularx}
+\usepackage{url}
+\usepackage{varwidth}
+\urlstyle{same}
+\usetikzlibrary{arrows,decorations.pathmorphing,backgrounds,positioning,fit,petri,calc,shadows,shapes,snakes,automata,backgrounds,petri,calc,graphs,matrix}
+\pgfdeclarelayer{background}
+\pgfsetlayers{background,main}
+\usepgfplotslibrary{groupplots}
+\pgfplotsset{compat=newest}
+\usepgfplotslibrary{statistics}
+
+\begin{document}
+\begin{tikzpicture}[scale={0.7}]
+\centering
+
+\begin{groupplot}[group style={group name={myPlots}, group size={6 by 1}, xlabels at={edge bottom}, xticklabels at={edge bottom}, vertical sep={0pt}, horizontal sep={2pt}}, boxplot, boxplot/draw direction={y}, ymode={log}, footnotesize, width={3.25cm}, height={6cm}, xmin={0}, xmax={5}, ymin={0.345316851}, ymax={120}, xtick={10,20,30,40}, xticklabels={10,20,30,40}, tickpos={left}, ytick={0.1,1.0,10.0,100.0}, yticklabels={}, ylabel shift={0pt}, ytick align={outside}, xtick align={outside}]
+    \nextgroupplot[xlabel={$m=10$}, ylabel={time (s)}, yticklabels={0.1,1.0,10.0,100.0}, legend style={{draw=none,xshift=2pt}}, legend pos={north west}]
+    \addlegendentry[] {$n=10$}
+    \addlegendentry[] {$n=20$}
+    \addlegendentry[] {$n=30$}
+    \addlegendentry[] {$n=40$}
+    \addlegendimage{no markers,blue}
+    \addlegendimage{no markers,red}
+    \addlegendimage{no markers,brown}
+    \addlegendimage{no markers,black}
+
+    \addplot+[boxplot]
+        table[row sep={\\}, y index={0}]
+        {
+            data  \\
+            0.345316851  \\
+            0.532518546  \\
+            0.423593572  \\
+            0.531483037  \\
+            0.382058064  \\
+            0.514271523  \\
+            0.412117731  \\
+            0.461210111  \\
+            0.389632347  \\
+            0.373459391  \\
+            0.511202863  \\
+            0.495272333  \\
+            0.410024103  \\
+            0.505902327  \\
+            0.378391122  \\
+            0.543401895  \\
+        }
+        ;
+    \addplot+[boxplot]
+        table[row sep={\\}, y index={0}]
+        {
+            data  \\
+            0.971853599  \\
+            0.604060028  \\
+            0.980841039  \\
+            0.812045873  \\
+            0.846822833  \\
+            0.858837821  \\
+            0.841445734  \\
+            0.811745794  \\
+            0.879599616  \\
+            0.788004825  \\
+            0.838835828  \\
+            0.832490613  \\
+            0.850692303  \\
+            0.831288394  \\
+            0.874919218  \\
+            0.801230336  \\
+        }
+        ;
+    \addplot+[boxplot]
+        table[row sep={\\}, y index={0}]
+        {
+            data  \\
+            1.172666385  \\
+            1.262015874  \\
+            1.288369787  \\
+            1.143153915  \\
+            1.071995123  \\
+            1.290155848  \\
+            1.156725229  \\
+            1.269364081  \\
+            1.154021744  \\
+            1.104656392  \\
+            1.090175937  \\
+            1.120346354  \\
+            1.254926165  \\
+            1.144092844  \\
+            1.241657164  \\
+            1.210223481  \\
+        }
+        ;
+    \addplot+[boxplot]
+        table[row sep={\\}, y index={0}]
+        {
+            data  \\
+            1.67764012  \\
+            1.710797517  \\
+            1.657041941  \\
+            1.571407832  \\
+            1.733190089  \\
+            2.029452106  \\
+            2.100715259  \\
+            1.6606124  \\
+            1.515422648  \\
+            1.636808804  \\
+            1.591421207  \\
+            1.680811053  \\
+            1.664004602  \\
+            1.844269798  \\
+            1.673480659  \\
+            1.630864572  \\
+        }
+        ;
+    \nextgroupplot[xlabel={$m=20$}]
+    \addplot+[boxplot]
+        table[row sep={\\}, y index={0}]
+        {
+            data  \\
+            1.475640423  \\
+            1.50109727  \\
+            1.456296685  \\
+            1.447663647  \\
+            1.43220231  \\
+            1.40401289  \\
+            1.475994989  \\
+            1.260507425  \\
+            1.493391885  \\
+            1.49089423  \\
+            1.80549992  \\
+            1.570118396  \\
+            1.531519611  \\
+            1.366820207  \\
+            1.499091306  \\
+            1.621129936  \\
+        }
+        ;
+    \addplot+[boxplot]
+        table[row sep={\\}, y index={0}]
+        {
+            data  \\
+            2.253075007  \\
+            1.946985651  \\
+            2.047335515  \\
+            2.214256294  \\
+            1.921943172  \\
+            1.887257232  \\
+            2.110289646  \\
+            2.018530764  \\
+            1.847456413  \\
+            1.973722306  \\
+            2.295177981  \\
+            2.069273645  \\
+            1.988848039  \\
+            1.920565483  \\
+            1.866370276  \\
+            2.152272209  \\
+        }
+        ;
+    \addplot+[boxplot]
+        table[row sep={\\}, y index={0}]
+        {
+            data  \\
+            2.953708766  \\
+            2.821425887  \\
+            2.715840469  \\
+            2.740802188  \\
+            2.632142217  \\
+            2.8033501  \\
+            2.815086748  \\
+            3.156914397  \\
+            2.618605924  \\
+            2.870450672  \\
+            2.758458579  \\
+            2.660840232  \\
+            2.752639852  \\
+            2.683590873  \\
+            2.745435151  \\
+            2.674429533  \\
+        }
+        ;
+    \addplot+[boxplot]
+        table[row sep={\\}, y index={0}]
+        {
+            data  \\
+            3.519170497  \\
+            4.098133514  \\
+            3.795702112  \\
+            3.374846189  \\
+            3.724144271  \\
+            3.397094529  \\
+            3.75798487  \\
+            3.579110877  \\
+            6.126221719  \\
+            3.615402406  \\
+            3.827073948  \\
+            3.594956085  \\
+            3.502553461  \\
+            3.536430029  \\
+            3.613606477  \\
+            3.649051472  \\
+        }
+        ;
+    \nextgroupplot[xlabel={$m=30$}]
+    \addplot+[boxplot]
+        table[row sep={\\}, y index={0}]
+        {
+            data  \\
+            3.033684471  \\
+            3.321000976  \\
+            3.182441269  \\
+            3.586840336  \\
+            102.222480799  \\
+            5.213827568  \\
+            14.269652584  \\
+            32.825891895  \\
+            5.946856493  \\
+            30.93321251  \\
+            102.273970324  \\
+            5.183720021  \\
+            102.055761773  \\
+            3.701015896  \\
+            6.607421366  \\
+            11.734892611  \\
+        }
+        ;
+    \addplot+[boxplot]
+        table[row sep={\\}, y index={0}]
+        {
+            data  \\
+            4.250235804  \\
+            5.358406261  \\
+            4.028591471  \\
+            4.220599665  \\
+            3.893781658  \\
+            4.382692523  \\
+            4.365335339  \\
+            4.272119439  \\
+            4.564446271  \\
+            4.064587631  \\
+            3.821189246  \\
+            4.04084062  \\
+            3.88441705  \\
+            3.84744062  \\
+            4.068231655  \\
+            3.839296265  \\
+        }
+        ;
+    \addplot+[boxplot]
+        table[row sep={\\}, y index={0}]
+        {
+            data  \\
+            5.440121403  \\
+            5.42533618  \\
+            4.769716261  \\
+            5.313257859  \\
+            5.360380819  \\
+            5.513742354  \\
+            5.365608592  \\
+            5.230329037  \\
+            5.281259618  \\
+            5.261419807  \\
+            4.66122542  \\
+            5.44964543  \\
+            5.176810731  \\
+            6.122745915  \\
+            5.820225423  \\
+            5.518199864  \\
+        }
+        ;
+    \addplot+[boxplot]
+        table[row sep={\\}, y index={0}]
+        {
+            data  \\
+            6.93267534  \\
+            7.835139845  \\
+            6.761200555  \\
+            7.567215876  \\
+            6.483583315  \\
+            6.639579351  \\
+            7.470438853  \\
+            7.091137877  \\
+            6.84956977  \\
+            6.742743468  \\
+            6.821278427  \\
+            6.619826723  \\
+            6.502966378  \\
+            6.627045523  \\
+            7.042323639  \\
+            6.519008688  \\
+        }
+        ;
+    \nextgroupplot[xlabel={$m=40$}]
+    \addplot+[boxplot]
+        table[row sep={\\}, y index={0}]
+        {
+            data  \\
+            13.831724973  \\
+            104.624059355  \\
+            11.922491027  \\
+            8.14422183  \\
+            104.596831302  \\
+            105.248187849  \\
+            105.013813111  \\
+            105.031086922  \\
+            104.731751272  \\
+            104.7769048  \\
+            104.684661381  \\
+            105.083102177  \\
+            104.48996366  \\
+            104.695251358  \\
+            104.612238044  \\
+            105.089442761  \\
+        }
+        ;
+    \addplot+[boxplot]
+        table[row sep={\\}, y index={0}]
+        {
+            data  \\
+            7.18221262  \\
+            7.67235657  \\
+            7.515769214  \\
+            7.500356982  \\
+            7.407538457  \\
+            7.652360642  \\
+            7.41322606  \\
+            7.293138025  \\
+            7.35222929  \\
+            8.625974343  \\
+        }
+        ;
+    \addplot+[boxplot]
+        table[row sep={\\}, y index={0}]
+        {
+            data  \\
+        }
+        ;
+    \addplot+[boxplot]
+        table[row sep={\\}, y index={0}]
+        {
+            data  \\
+        }
+        ;
+    \nextgroupplot[xlabel={$m=50$}]
+    \addplot+[boxplot]
+        table[row sep={\\}, y index={0}]
+        {
+            data  \\
+        }
+        ;
+    \addplot+[boxplot]
+        table[row sep={\\}, y index={0}]
+        {
+            data  \\
+        }
+        ;
+    \addplot+[boxplot]
+        table[row sep={\\}, y index={0}]
+        {
+            data  \\
+        }
+        ;
+    \addplot+[boxplot]
+        table[row sep={\\}, y index={0}]
+        {
+            data  \\
+        }
+        ;
+    \nextgroupplot[xlabel={$m=60$}]
+    \addplot+[boxplot]
+        table[row sep={\\}, y index={0}]
+        {
+            data  \\
+        }
+        ;
+    \addplot+[boxplot]
+        table[row sep={\\}, y index={0}]
+        {
+            data  \\
+        }
+        ;
+    \addplot+[boxplot]
+        table[row sep={\\}, y index={0}]
+        {
+            data  \\
+        }
+        ;
+    \addplot+[boxplot]
+        table[row sep={\\}, y index={0}]
+        {
+            data  \\
+        }
+        ;
+\end{groupplot}
+\node (title) at ($(myPlots c1r1.center)!0.5!(myPlots c2r1.center)+(3.3cm,2.55cm)$) {\textbf{Experimental Results (Runtime)}};
+
+\end{tikzpicture}
+\end{document}

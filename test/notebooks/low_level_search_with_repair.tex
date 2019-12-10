@@ -1,0 +1,165 @@
+\begin{tikzpicture}[scale={0.7}]
+\centering
+
+\begin{groupplot}[group style={group name={myPlots}, group size={6 by 1}, xlabels at={edge bottom}, xticklabels at={edge bottom}, vertical sep={0pt}, horizontal sep={2pt}}, boxplot, boxplot/draw direction={y}, ymode={log}, footnotesize, width={3.25cm}, height={6cm}, xmin={0}, xmax={5}, ymin={0.345316851}, ymax={120}, xtick={10,20,30,40}, xticklabels={10,20,30,40}, tickpos={left}, ytick={0.1,1.0,10.0,100.0}, yticklabels={}, ylabel shift={0pt}, ytick align={outside}, xtick align={outside}]
+    \nextgroupplot[xlabel={$m=10$}, ylabel={time (s)}, yticklabels={0.1,1.0,10.0,100.0}, legend style={{draw=none,xshift=2pt}}, legend pos={north west}]
+    \addlegendentry[] {$n=10$}
+    \addlegendentry[] {$n=20$}
+    \addlegendentry[] {$n=30$}
+    \addlegendentry[] {$n=40$}
+    \addlegendimage{no markers,blue}
+    \addlegendimage{no markers,red}
+    \addlegendimage{no markers,brown}
+    \addlegendimage{no markers,black}
+
+    \addplot+[boxplot]
+        table[row sep={\\}, y index={0}]
+        {
+            data  \\
+        }
+        ;
+    \addplot+[boxplot]
+        table[row sep={\\}, y index={0}]
+        {
+            data  \\
+        }
+        ;
+    \addplot+[boxplot]
+        table[row sep={\\}, y index={0}]
+        {
+            data  \\
+        }
+        ;
+    \addplot+[boxplot]
+        table[row sep={\\}, y index={0}]
+        {
+            data  \\
+        }
+        ;
+    \nextgroupplot[xlabel={$m=20$}]
+    \addplot+[boxplot]
+        table[row sep={\\}, y index={0}]
+        {
+            data  \\
+        }
+        ;
+    \addplot+[boxplot]
+        table[row sep={\\}, y index={0}]
+        {
+            data  \\
+        }
+        ;
+    \addplot+[boxplot]
+        table[row sep={\\}, y index={0}]
+        {
+            data  \\
+        }
+        ;
+    \addplot+[boxplot]
+        table[row sep={\\}, y index={0}]
+        {
+            data  \\
+        }
+        ;
+    \nextgroupplot[xlabel={$m=30$}]
+    \addplot+[boxplot]
+        table[row sep={\\}, y index={0}]
+        {
+            data  \\
+        }
+        ;
+    \addplot+[boxplot]
+        table[row sep={\\}, y index={0}]
+        {
+            data  \\
+        }
+        ;
+    \addplot+[boxplot]
+        table[row sep={\\}, y index={0}]
+        {
+            data  \\
+        }
+        ;
+    \addplot+[boxplot]
+        table[row sep={\\}, y index={0}]
+        {
+            data  \\
+        }
+        ;
+    \nextgroupplot[xlabel={$m=40$}]
+    \addplot+[boxplot]
+        table[row sep={\\}, y index={0}]
+        {
+            data  \\
+        }
+        ;
+    \addplot+[boxplot]
+        table[row sep={\\}, y index={0}]
+        {
+            data  \\
+        }
+        ;
+    \addplot+[boxplot]
+        table[row sep={\\}, y index={0}]
+        {
+            data  \\
+        }
+        ;
+    \addplot+[boxplot]
+        table[row sep={\\}, y index={0}]
+        {
+            data  \\
+        }
+        ;
+    \nextgroupplot[xlabel={$m=50$}]
+    \addplot+[boxplot]
+        table[row sep={\\}, y index={0}]
+        {
+            data  \\
+        }
+        ;
+    \addplot+[boxplot]
+        table[row sep={\\}, y index={0}]
+        {
+            data  \\
+        }
+        ;
+    \addplot+[boxplot]
+        table[row sep={\\}, y index={0}]
+        {
+            data  \\
+        }
+        ;
+    \addplot+[boxplot]
+        table[row sep={\\}, y index={0}]
+        {
+            data  \\
+        }
+        ;
+    \nextgroupplot[xlabel={$m=60$}]
+    \addplot+[boxplot]
+        table[row sep={\\}, y index={0}]
+        {
+            data  \\
+        }
+        ;
+    \addplot+[boxplot]
+        table[row sep={\\}, y index={0}]
+        {
+            data  \\
+        }
+        ;
+    \addplot+[boxplot]
+        table[row sep={\\}, y index={0}]
+        {
+            data  \\
+        }
+        ;
+    \addplot+[boxplot]
+        table[row sep={\\}, y index={0}]
+        {
+            data  \\
+        }
+        ;
+\end{groupplot}
+\end{tikzpicture}

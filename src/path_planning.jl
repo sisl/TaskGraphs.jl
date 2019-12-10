@@ -41,6 +41,7 @@ export
     l2_verbosity                ::Int = 0
     l3_verbosity                ::Int = 0
     l4_verbosity                ::Int = 0
+    DEBUG                       ::Bool = false
 end
 function reset_solver!(solver::S) where {S<:PC_TAPF_Solver}
     solver.num_assignment_iterations = 0
@@ -107,6 +108,7 @@ function TOML.parse(solver::S) where {S<:PC_TAPF_Solver}
     toml_dict["l2_verbosity"] = solver.l2_verbosity
     toml_dict["l3_verbosity"] = solver.l3_verbosity
     toml_dict["l4_verbosity"] = solver.l4_verbosity
+    toml_dict["DEBUG"]        = solver.DEBUG
 
     toml_dict
 end
@@ -132,7 +134,8 @@ function read_solver(toml_dict::Dict)
         l1_verbosity = toml_dict["l1_verbosity"],
         l2_verbosity = toml_dict["l2_verbosity"],
         l3_verbosity = toml_dict["l3_verbosity"],
-        l4_verbosity = toml_dict["l4_verbosity"]
+        l4_verbosity = toml_dict["l4_verbosity"],
+        DEBUG = toml_dict["DEBUG"]
     )
 end
 function read_solver(io)
@@ -140,13 +143,13 @@ function read_solver(io)
 end
 
 # Helpers for printing
-function log_info(limit::Int,verbosity::Int,msg::String)
+function log_info(limit::Int,verbosity::Int,msg...)
     if verbosity > limit
-        println(msg)
+        println(msg...)
     end
 end
-function log_info(limit::Int,solver::S,msg::String) where {S<:PC_TAPF_Solver}
-    log_info(limit,solver.verbosity,msg)
+function log_info(limit::Int,solver::S,msg...) where {S<:PC_TAPF_Solver}
+    log_info(limit,solver.verbosity,msg...)
 end
 
 export
@@ -289,7 +292,7 @@ end
 
 function construct_search_env(schedule, problem_spec, env_graph;
     primary_objective=SumOfMakeSpans,
-    extra_T=50)
+    extra_T=100)
     # schedule = construct_project_schedule(project_spec, problem_spec, robot_ICs, assignments)
     cache = initialize_planning_cache(schedule)
     # Paths stored as seperate chunks (will need to be concatenated before conflict checking)
@@ -300,6 +303,7 @@ function construct_search_env(schedule, problem_spec, env_graph;
         v = schedule.path_id_to_vtx_map[path_id]
         start_vtx = get_path_spec(schedule,v).start_vtx
         final_vtx = get_path_spec(schedule,v).final_vtx
+        @assert (start_vtx != -1) string("v = ",v,", start_vtx = ",start_vtx,", path_id = ",path_id)
         push!(starts, PCCBS.State(vtx = start_vtx, t = cache.t0[v]))
         push!(goals, PCCBS.State(vtx = final_vtx, t = cache.tF[v]))
     end
@@ -333,7 +337,7 @@ function construct_search_env(project_spec, problem_spec, robot_ICs, assignments
     construct_search_env(schedule, problem_spec, env_graph;kwargs...)
 end
 
-function default_pc_tapf_solution(N::Int)
+function default_pc_tapf_solution(N::Int;extra_T=100)
     c0 = (0.0, 0.0, 0.0, 0.0)
     LowLevelSolution(
         paths=map(i->Path{State,Action,typeof(c0)}(s0=State(),cost=c0),1:N),
@@ -342,7 +346,7 @@ function default_pc_tapf_solution(N::Int)
         cost_model = construct_composite_cost_model(
                 SumOfMakeSpans(Float64[0],Int64[1],Float64[1],Float64[0]),
                 # FullDeadlineCost(DeadlineCost(0.0)),
-                HardConflictCost(DiGraph(10), 10, N),
+                HardConflictCost(DiGraph(10), 10+extra_T, N),
                 SumOfTravelDistance(),
                 FullCostModel(sum,NullCost())
             )
@@ -484,8 +488,12 @@ function plan_next_path!(solver::S, env::E, mapf::M, node::N;
                 node_id = get_vtx_id(schedule,v)
                 schedule_node = get_node_from_id(schedule,node_id)
                 log_info(-1, solver, string("# LOW LEVEL SEARCH: in schedule node ",v," of type ",
-                    typeof(schedule_node),", cache.t0[v] - get_end_index(base_path) = ",cache.t0[v] - get_end_index(base_path),". Extending path ..."))
+                    typeof(schedule_node),", cache.t0[v] - get_end_index(base_path) = ",cache.t0[v] - get_end_index(base_path),". Extending path to ",cache.t0[v]," ..."))
                 # log_info(-1, solver, string("# base path = ",convert_to_vertex_lists(base_path), ",  vache.t0[v] = ",cache.t0[v]))
+                log_info(-1, solver, base_path.s0)
+                log_info(-1, solver, string(convert_to_vertex_lists(base_path)))
+                log_info(-1, solver, get_final_state(base_path).vtx )
+                # log_info(-1, solver, cbs_env.cost_model.cost_models[2].model.table.CAT)
                 extend_path!(cbs_env,base_path,cache.t0[v])
             end
             # Solve!
@@ -495,8 +503,13 @@ function plan_next_path!(solver::S, env::E, mapf::M, node::N;
                 path = base_path
                 extend_path!(cbs_env,path,cache.tF[v])
                 cost = get_cost(path)
+                solver.DEBUG ? validate(path,v) : nothing
             else
+                solver.DEBUG ? validate(base_path,v) : nothing
+                @show get_final_state(base_path).vtx
                 path, cost = path_finder(solver, cbs_env, base_path, heuristic;verbose=(solver.verbosity > 3))
+                @show convert_to_vertex_lists(base_path)
+                solver.DEBUG ? validate(path,v,cbs_env) : nothing
             end
             log_info(2,solver,string("LOW LEVEL SEARCH: solver.num_A_star_iterations = ",solver.num_A_star_iterations))
             # Make sure every robot sticks around for the entire time horizon
@@ -504,6 +517,7 @@ function plan_next_path!(solver::S, env::E, mapf::M, node::N;
                 log_info(2,solver,string("LOW LEVEL SEARCH: Extending terminal node",
                 " (SHOULD NEVER HAPPEN IF THINGS ARE WORKING CORRECTLY)"))
                 extend_path!(cbs_env,path,maximum(cache.tF))
+                solver.DEBUG ? validate(path,v) : nothing
             end
             # add to solution
             set_solution_path!(node.solution, path, agent_id)
@@ -513,7 +527,7 @@ function plan_next_path!(solver::S, env::E, mapf::M, node::N;
             # TODO incorporate multi-headed cost
             node.solution.cost = aggregate_costs(get_cost_model(env.env),get_path_costs(node.solution))
             node.cost = get_cost(node.solution)
-            # Print for debugging
+            # Print for DEBUGging
             log_info(3,solver,string("agent_path = ", convert_to_vertex_lists(path)))
             log_info(3,solver,string("cost = ", get_cost(path)))
             if node.cost >= solver.best_cost
@@ -524,9 +538,9 @@ function plan_next_path!(solver::S, env::E, mapf::M, node::N;
             # Debugging
             # vtx_lists = convert_to_vertex_lists(node.solution)
             # for (i,p) in enumerate(vtx_lists)
-            #     log_info(3,solver,string("path_",i," = ",p))
+            #     log_info(-1,solver,string("path_",i," = ",p))
             # end
-            # log_info(3,solver,"\n\n")
+            # log_info(-1,solver,"\n\n")
 
         else
             # TODO parameterize env so that I don't have to hard-code the types here
@@ -554,14 +568,18 @@ function CRCBS.low_level_search!(
         path_finder=A_star
         ) where {S<:PC_TAPF_Solver,E<:SearchEnv,M<:AbstractMAPF,N<:ConstraintTreeNode}
 
+    # log_info(-1,solver,"low_level_search!")
+    # vtx_lists = convert_to_vertex_lists(node.solution)
+    # for (i,p) in enumerate(vtx_lists)
+    #     log_info(-1,solver,string("path_",i," = ",p))
+    # end
+    # log_info(-1,solver,"\n\n")
+
     while length(env.cache.node_queue) > 0
         if !(plan_next_path!(solver,env,mapf,node;heuristic=heuristic,path_finder=path_finder))
             return false
         end
     end
-    # aggregate_costs here?
-    # cost = get_cost(node.solution)
-    # finalized_cost =
     return true
 end
 
@@ -605,7 +623,9 @@ CRCBS.get_cost_model(env::E) where {E<:SearchEnv}   = get_cost_model(env.env)
 CRCBS.get_cost_type(env::E) where {E<:SearchEnv}    = get_cost_type(env.env)
 function CRCBS.initialize_root_node(pc_mapf::P) where {P<:PC_MAPF}
     N = pc_mapf.env.num_agents
-    initialize_root_node(MAPF(pc_mapf.mapf.env,map(i->PCCBS.State(),1:N),map(i->PCCBS.State(),1:N)))
+    initialize_root_node(MAPF(pc_mapf.mapf.env, pc_mapf.mapf.starts, pc_mapf.mapf.goals))
+    # initialize_root_node(pc_mapf.mapf)
+    # initialize_root_node(MAPF(pc_mapf.mapf.env,map(i->PCCBS.State(),1:N),map(i->PCCBS.State(),1:N)))
 end
 CRCBS.default_solution(pc_mapf::M) where {M<:PC_MAPF} = default_solution(pc_mapf.mapf)
 
@@ -742,7 +762,8 @@ function high_level_search!(solver::P, env_graph, project_spec, problem_spec,
         assignment_matrix = get_assignment_matrix(model);
         # add this assignment to the list of assignments to forbid next iteration
         push!(forbidden_solutions, assignment_matrix)
-        assignments = map(j->findfirst(assignment_matrix[:,j] .== 1),1:problem_spec.M);
+        # assignments = map(j->findfirst(assignment_matrix[:,j] .== 1),1:problem_spec.M);
+        assignments = get_assignment_vector(assignment_matrix,problem_spec.M)
         optimal_TA_cost = Int(round(value(objective_function(model)))); # lower bound on cost (from task assignment module)
         lower_bound_cost = max(lower_bound_cost, optimal_TA_cost)
         log_info(0,solver,string("HIGH LEVEL SEARCH: Current assignment vector = ",assignments))
@@ -812,7 +833,8 @@ function high_level_search_mod!(solver::P, env_graph, project_spec, problem_spec
         assignment_matrix = get_assignment_matrix(model);
         # add this assignment to the list of assignments to forbid next iteration
         push!(forbidden_solutions, assignment_matrix)
-        assignments = map(j->findfirst(assignment_matrix[:,j] .== 1),1:problem_spec.M);
+        # assignments = map(j->findfirst(assignment_matrix[:,j] .== 1),1:problem_spec.M);
+        assignments = get_assignment_vector(assignment_matrix,problem_spec.M)
         optimal_TA_cost = Int(round(value(objective_function(model)))); # lower bound on cost (from task assignment module)
         lower_bound_cost = max(lower_bound_cost, optimal_TA_cost)
         # log_info(0,solver,string("HIGH LEVEL SEARCH: Current assignment vector = ",assignments))
@@ -825,6 +847,7 @@ function high_level_search_mod!(solver::P, env_graph, project_spec, problem_spec
         # env, mapf = construct_search_env(project_spec, problem_spec, robot_ICs, assignments, env_graph);
         env, mapf = construct_search_env(project_schedule, problem_spec, env_graph;
             primary_objective=primary_objective);
+        # log_info(-1,solver,"mapf starts", [s.vtx for s in mapf.starts])
         pc_mapf = PC_MAPF(env,mapf);
         ##### Call CBS Search Routine (LEVEL 2) #####
         solution, cost = solve!(solver,pc_mapf);

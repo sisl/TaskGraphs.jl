@@ -15,14 +15,51 @@ using CRCBS
 
 export
     get_assignment_matrix,
+    get_assignment_vector,
+    validate,
     exclude_solutions!,
     cached_pickup_and_delivery_distances,
     construct_task_graphs_problem
 
 function get_assignment_matrix(model::M) where {M<:JuMP.Model}
-    Matrix{Int}(value.(model[:X]))
+    Matrix{Int}(round.(value.(model[:X])))
+end
+function get_assignment_vector(assignment_matrix,M)
+    assignments = -ones(Int,M)
+    for j in 1:M
+        r = findfirst(assignment_matrix[:,j] .== 1)
+        if r != nothing
+            assignments[j] = r
+        end
+    end
+    assignments
 end
 # function get_station_precedence_dict(model::M) where {M<:JuMP.Model} end
+function validate(path::Path, msg::String)
+    @assert( !any(convert_to_vertex_lists(path) .== -1), msg )
+    return true
+end
+function validate(path::Path, v::Int)
+    validate(path, string("invalid path with -1 vtxs: v = ",v,", path = ",convert_to_vertex_lists(path)))
+end
+function validate(path::Path, v::Int, cbs_env)
+    validate(path, string("v = ",v,", path = ",convert_to_vertex_lists(path),", goal: ",cbs_env.goal))
+end
+function validate(project_schedule::ProjectSchedule)
+    sorted_path_ids = sort(collect(keys(project_schedule.path_id_to_vtx_map)))
+    for (i,path_id) in enumerate(sorted_path_ids)
+        @assert(
+            i == path_id,
+            string("i = ",i,", path_id = ",path_id," ... they should be the same")
+            )
+    end
+    for (id,node) in project_schedule.planning_nodes
+        if typeof(node) <: COLLECT
+            @assert(node.x != -1, string("node.x == ",node.x))
+        end
+    end
+    return true
+end
 
 export
     exclude_solutions!

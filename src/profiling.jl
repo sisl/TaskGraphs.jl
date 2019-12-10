@@ -182,8 +182,10 @@ function profile_task_assignment(problem_def::SimpleProblemDef,env_graph,dist_ma
     retval, elapsed_time, byte_ct, gc_time, mem_ct = @timed optimize!(model)
 
     optimal = (termination_status(model) == MathOptInterface.OPTIMAL);
-    assignment_matrix = Matrix{Int}(round.(value.(model[:x])));
-    cost = maximum(Int.(round.(value.(model[:tof]))));
+    # assignment_matrix = Matrix{Int}(round.(value.(model[:x])));
+    assignment_matrix = get_assignment_matrix(model)
+    cost = Int(round(value(objective_function(model))))
+    # cost = maximum(Int.(round.(value.(model[:tof]))));
     assignments = map(j->findfirst(assignment_matrix[:,j] .== 1),1:problem_spec.M);
 
     results_dict = Dict()
@@ -237,14 +239,19 @@ function profile_low_level_search(problem_def::SimpleProblemDef,env_graph,dist_m
     results_dict["num_conflicts"] = count_conflicts(detect_conflicts(node.solution))
     results_dict
 end
-function profile_full_solver(problem_def::SimpleProblemDef,env_graph,dist_matrix;kwargs...)
+function profile_full_solver(problem_def::SimpleProblemDef,env_graph,dist_matrix;solver_mode=:adjacency,kwargs...)
     project_spec, r0, s0, sF = problem_def.project_spec,problem_def.r0,problem_def.s0,problem_def.sF
     project_spec, problem_spec, object_ICs, object_FCs, robot_ICs = construct_task_graphs_problem(
             project_spec, r0, s0, sF, dist_matrix);
     # Solve the problem
     solver = PC_TAPF_Solver(verbosity=0,LIMIT_A_star_iterations=5*nv(env_graph));
-    (solution, assignment, cost, search_env), elapsed_time, byte_ct, gc_time, mem_ct = @timed high_level_search!(
-        solver, env_graph, project_spec, problem_spec, robot_ICs, Gurobi.Optimizer;kwargs...);
+    if solver_mode == :adjacency
+        (solution, assignment, cost, search_env), elapsed_time, byte_ct, gc_time, mem_ct = @timed high_level_search_mod!(
+            solver, env_graph, project_spec, problem_spec, robot_ICs, Gurobi.Optimizer;kwargs...);
+    else
+        (solution, assignment, cost, search_env), elapsed_time, byte_ct, gc_time, mem_ct = @timed high_level_search!(
+            solver, env_graph, project_spec, problem_spec, robot_ICs, Gurobi.Optimizer;kwargs...);
+    end
 
     robot_paths = convert_to_vertex_lists(solution)
     object_paths = get_object_paths(solution,search_env)
@@ -282,7 +289,8 @@ function run_profiling(MODE=:nothing;
     problem_dir = PROBLEM_DIR,
     results_dir = RESULTS_DIR,
     TimeLimit=50,
-    OutputFlag=0
+    OutputFlag=0,
+    solver_mode=:assignment
     )
     # solver profiling
     env_filename = string(ENVIRONMENT_DIR,"/env_",env_id,".toml")
@@ -357,7 +365,7 @@ function run_profiling(MODE=:nothing;
                                 results_dict = profile_low_level_search_and_repair(problem_def,env_graph,dist_matrix,assignments)
                             end
                             if MODE == :full_solver
-                                results_dict = profile_full_solver(problem_def,env_graph,dist_matrix;TimeLimit=TimeLimit,OutputFlag=OutputFlag)
+                                results_dict = profile_full_solver(problem_def,env_graph,dist_matrix;solver_mode=solver_mode,TimeLimit=TimeLimit,OutputFlag=OutputFlag)
                             end
                             println("Solved problem ",problem_id," in ",results_dict["time"]," seconds! MODE = ",string(MODE))
                             # print the results

@@ -416,7 +416,7 @@ function get_object_paths(solution,env)
     cache = env.cache
     robot_paths = convert_to_vertex_lists(solution)
     tF = maximum(map(length, robot_paths))
-    object_paths = map(j->Vector{Int}(),1:length(env.schedule.object_ICs))
+    object_paths = map(j->Vector{Int}(),1:length(get_object_ICs(env.schedule)))
     for v in vertices(schedule.graph)
         node = get_node_from_id(schedule,get_vtx_id(schedule,v))
         if typeof(node) <: CARRY

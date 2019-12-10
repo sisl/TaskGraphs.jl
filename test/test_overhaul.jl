@@ -11,6 +11,8 @@ using Test
 using Compose
 using GraphPlottingBFS
 
+
+
 function show_times(sched,v)
     arr = process_schedule(sched)
     return string(map(a->string(a[v],","), arr[1:2])...)
@@ -45,13 +47,6 @@ function print_project_schedule(project_schedule,model,filename;mode=:root_align
     ) |> Compose.SVG(string(filename,".svg"))
     # `inkscape -z project_schedule1.svg -e project_schedule1.png`
     # OR: `for f in *.svg; do inkscape -z $f -e $f.png; done`
-end
-
-function validate_project_schedule(project_schedule)
-    sorted_path_ids = sort(collect(keys(project_schedule.path_id_to_vtx_map)))
-    for (i,path_id) in enumerate(sorted_path_ids)
-        @test i == path_id
-    end
 end
 
 let
@@ -91,10 +86,9 @@ let
 
     # Update Project Graph by adding all edges encoded by the optimized adjacency graph
     update_project_schedule!(project_schedule,problem_spec,adj_matrix)
-    validate_project_schedule(project_schedule)
-
     print_project_schedule(project_schedule,"project_schedule2")
 
+    @test validate(project_schedule)
 end
 let
 
@@ -120,11 +114,11 @@ let
         @show obj_val = Int(round(value(objective_function(model))))
         adj_matrix = Int.(round.(value.(model[:X])))
 
-        print_project_schedule(project_schedule,"project_schedule1")
+        # print_project_schedule(project_schedule,"project_schedule1")
         update_project_schedule!(project_schedule,problem_spec,adj_matrix)
-        validate_project_schedule(project_schedule)
-        print_project_schedule(project_schedule,"project_schedule2")
+        # print_project_schedule(project_schedule,"project_schedule2")
 
+        @test validate(project_schedule)
     end
     let
 
@@ -139,10 +133,10 @@ let
         @show obj_val = Int(round(value(objective_function(model))))
         adj_matrix = Int.(round.(value.(model[:X])))
 
-        print_project_schedule(project_schedule,"project_schedule1")
+        # print_project_schedule(project_schedule,"project_schedule1")
         update_project_schedule!(project_schedule,problem_spec,adj_matrix)
-        validate_project_schedule(project_schedule)
-        print_project_schedule(project_schedule,"project_schedule2")
+        # print_project_schedule(project_schedule,"project_schedule2")
+        @test validate(project_schedule)
 
     end
 
@@ -182,7 +176,7 @@ let
                     low_level_search!(solver,pc_mapf,constraint_node)
                     # @show i, f, obj_val1, constraint_node.cost
                     @test constraint_node.cost[1] == obj_val1
-                    validate_project_schedule(env.schedule)
+                    @test validate(env.schedule)
 
                     # robot_ICs = map(i->robot_ICs[i], 1:problem_spec.N)
                     schedule2 = construct_partial_project_schedule(project_spec,problem_spec,map(i->robot_ICs[i], 1:problem_spec.N))
@@ -192,7 +186,7 @@ let
                     obj_val2 = Int(round(value(objective_function(model2))))
                     adj_matrix = Int.(round.(value.(model2[:X])))
                     update_project_schedule!(schedule2,problem_spec,adj_matrix)
-                    validate_project_schedule(schedule2)
+                    @test validate(schedule2)
 
                     @test obj_val1 == obj_val2
                     # @show i, (obj_val1 == obj_val2), obj_val1, obj_val2
@@ -261,8 +255,8 @@ let
                         primary_objective=cost_model
                         );
 
-                    validate_project_schedule(env1.schedule)
-                    validate_project_schedule(env2.schedule)
+                    @test validate(env1.schedule)
+                    @test validate(env2.schedule)
 
                     if cost2[1] != cost1[1]
                         @show f, cost_model, cost1, cost2
@@ -307,6 +301,8 @@ let
                         primary_objective=cost_model
                         );
 
+                    @test validate(env.schedule)
+
                     for i in 1:10
                         let
                             solver = PC_TAPF_Solver(verbosity=0)
@@ -326,6 +322,7 @@ let
                                 @test spec1 == spec2
                             end
                             @test cost[1] == cost2[1]
+                            @test validate(env2.schedule)
                         end
                     end
                 end

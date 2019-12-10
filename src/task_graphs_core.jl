@@ -1318,6 +1318,7 @@ function formulate_schedule_milp(project_schedule::ProjectSchedule,problem_spec:
         optimizer = Gurobi.Optimizer,
         TimeLimit=100,
         OutputFlag=0,
+        Presolve=2, # 2 is the highest level of pre-solve
         t0_ = Dict{AbstractID,Float64}(), # dictionary of initial times. Default is empty
         Mm = 10000, # for big M constraints
         cost_model = SumOfMakeSpans,
@@ -1328,7 +1329,8 @@ function formulate_schedule_milp(project_schedule::ProjectSchedule,problem_spec:
 
     model = Model(with_optimizer(optimizer,
         TimeLimit=TimeLimit,
-        OutputFlag=OutputFlag
+        OutputFlag=OutputFlag,
+        Presolve=Presolve
         ));
     @variable(model, t0[1:nv(G)] >= 0.0); # initial times for all nodes
     @variable(model, tF[1:nv(G)] >= 0.0); # final times for all nodes
@@ -1538,7 +1540,7 @@ function update_project_schedule!(project_schedule::P,problem_spec::T,adj_matrix
             end
         end
     end
-    # DEBUG ? @assert(is_cyclic(G) == false) : nothing
+    DEBUG ? @assert(is_cyclic(G) == false) : nothing
     @assert(is_cyclic(G) == false)
     # Propagate valid IDs through the schedule
     for v in topological_sort(G)
@@ -1554,6 +1556,10 @@ function update_project_schedule!(project_schedule::P,problem_spec::T,adj_matrix
     end
     project_schedule
 end
-
+function update_project_schedule!(milp_model::AdjacencyMILP,project_schedule::P,problem_spec::T,adj_matrix,DEBUG::Bool=false) where {P<:ProjectSchedule,T<:ProblemSpec}
+    update_project_schedule!(project_schedule,problem_spec,adj_matrix,DEBUG)
+end
+function update_project_schedule!(milp_model::AssignmentMILP,project_schedule::P,problem_spec::T,adj_matrix,DEBUG::Bool=false) where {P<:ProjectSchedule,T<:ProblemSpec}
+end
 
 end # module TaskGraphCore
