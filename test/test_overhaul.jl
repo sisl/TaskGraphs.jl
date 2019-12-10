@@ -279,10 +279,11 @@ let
             primary_objective=cost_model
             );
 
-        # @show convert_to_vertex_lists(solution)
-        print_project_schedule(env.schedule,"project_schedule1")
+        global env2 = nothing
 
-        for i in 1:1
+        # @show convert_to_vertex_lists(solution)
+        # print_project_schedule(env.schedule,"project_schedule1")
+        for i in 1:10
             solver = PC_TAPF_Solver(verbosity=0)
             # solution2, assignment2, cost2, env2 = high_level_search_mod!(
             solution2, assignment2, cost2, env2 = high_level_search_mod!(
@@ -296,13 +297,27 @@ let
                 primary_objective=cost_model
                 );
 
+            # global env2 = env2
+
             @test !any(adjacency_matrix(env.schedule.graph) .!= adjacency_matrix(env2.schedule.graph))
+            for v in vertices(env.schedule.graph)
+                @show v
+                spec1 = get_path_spec(env.schedule, v)
+                spec2 = get_path_spec(env2.schedule, v)
+                @test spec1.start_vtx == spec2.start_vtx
+                @test spec1.final_vtx == spec2.final_vtx
+                @test spec1.agent_id == spec2.agent_id
+                @test spec1.object_id == spec2.object_id
+                @test spec1.path_id == spec2.path_id
+            end
             if cost[1] != cost2[1]
                 @show convert_to_vertex_lists(solution)
                 @show convert_to_vertex_lists(solution2)
+                print_project_schedule(env.schedule,"project_schedule1")
                 print_project_schedule(env2.schedule,"project_schedule2")
+                @test cost[1] == cost2[1]
+                break
             end
-            @test cost[1] == cost2[1]
         end
 
         # if cost2[1] != cost1[1]
