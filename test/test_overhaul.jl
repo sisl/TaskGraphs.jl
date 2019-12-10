@@ -260,6 +260,7 @@ let
 
     end
 
+    # Adjacency matrix MILP tests
     let
 
         f = initialize_toy_problem_3
@@ -267,12 +268,13 @@ let
         project_spec, problem_spec, robot_ICs, assignments, env_graph = f(;verbose=false);
 
         solver = PC_TAPF_Solver(verbosity=1)
-        solution, assignment, cost, env = high_level_search_mod!(
+        solution, assignment, cost, env = high_level_search!(
             solver,
             env_graph,
             project_spec,
             problem_spec,
-            map(i->robot_ICs[i], 1:problem_spec.N),
+            robot_ICs,
+            # map(i->robot_ICs[i], 1:problem_spec.N),
             Gurobi.Optimizer;
             primary_objective=cost_model
             );
@@ -281,12 +283,14 @@ let
 
         for i in 1:5
             solver = PC_TAPF_Solver(verbosity=1)
-            solution2, assignment2, cost2, env2 = high_level_search_mod!(
+            # solution2, assignment2, cost2, env2 = high_level_search_mod!(
+            solution2, assignment2, cost2, env2 = high_level_search!(
                 solver,
                 env_graph,
                 project_spec,
                 problem_spec,
-                map(i->robot_ICs[i], 1:problem_spec.N),
+                robot_ICs,
+                # map(i->robot_ICs[i], 1:problem_spec.N),
                 Gurobi.Optimizer;
                 primary_objective=cost_model
                 );
