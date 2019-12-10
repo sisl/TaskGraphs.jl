@@ -47,6 +47,13 @@ function print_project_schedule(project_schedule,model,filename;mode=:root_align
     # OR: `for f in *.svg; do inkscape -z $f -e $f.png; done`
 end
 
+function validate_project_schedule(project_schedule)
+    sorted_path_ids = sort(collect(keys(project_schedule.path_id_to_vtx_map)))
+    for (i,path_id) in enumerate(sorted_path_ids)
+        @test i == path_id
+    end
+end
+
 let
 
     Random.seed!(0);
@@ -84,6 +91,7 @@ let
 
     # Update Project Graph by adding all edges encoded by the optimized adjacency graph
     update_project_schedule!(project_schedule,problem_spec,adj_matrix)
+    validate_project_schedule(project_schedule)
 
     print_project_schedule(project_schedule,"project_schedule2")
 
@@ -114,6 +122,7 @@ let
 
         print_project_schedule(project_schedule,"project_schedule1")
         update_project_schedule!(project_schedule,problem_spec,adj_matrix)
+        validate_project_schedule(project_schedule)
         print_project_schedule(project_schedule,"project_schedule2")
 
     end
@@ -132,6 +141,7 @@ let
 
         print_project_schedule(project_schedule,"project_schedule1")
         update_project_schedule!(project_schedule,problem_spec,adj_matrix)
+        validate_project_schedule(project_schedule)
         print_project_schedule(project_schedule,"project_schedule2")
 
     end
@@ -172,6 +182,7 @@ let
                     low_level_search!(solver,pc_mapf,constraint_node)
                     # @show i, f, obj_val1, constraint_node.cost
                     @test constraint_node.cost[1] == obj_val1
+                    validate_project_schedule(env.schedule)
 
                     # robot_ICs = map(i->robot_ICs[i], 1:problem_spec.N)
                     schedule2 = construct_partial_project_schedule(project_spec,problem_spec,map(i->robot_ICs[i], 1:problem_spec.N))
@@ -181,6 +192,7 @@ let
                     obj_val2 = Int(round(value(objective_function(model2))))
                     adj_matrix = Int.(round.(value.(model2[:X])))
                     update_project_schedule!(schedule2,problem_spec,adj_matrix)
+                    validate_project_schedule(schedule2)
 
                     @test obj_val1 == obj_val2
                     # @show i, (obj_val1 == obj_val2), obj_val1, obj_val2
@@ -249,9 +261,8 @@ let
                         primary_objective=cost_model
                         );
 
-                    sorted_path_ids = sort(collect(keys(env2.schedule.path_id_to_vtx_map)))
-                    @test sorted_path_ids[1] == 1
-                    @test sorted_path_ids[end] == length(env2.schedule.path_id_to_vtx_map)
+                    validate_project_schedule(env1.schedule)
+                    validate_project_schedule(env2.schedule)
 
                     if cost2[1] != cost1[1]
                         @show f, cost_model, cost1, cost2
@@ -269,7 +280,7 @@ let
 
     end
 
-    # Adjacency matrix MILP tests
+    # Verify deterministic behavior of AdjacencyMILP formulation
     let
 
         for (i, f) in enumerate([
