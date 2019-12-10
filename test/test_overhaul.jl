@@ -267,8 +267,8 @@ let
         cost_model = MakeSpan
         project_spec, problem_spec, robot_ICs, assignments, env_graph = f(;verbose=false);
 
-        solver = PC_TAPF_Solver(verbosity=1)
-        solution, assignment, cost, env = high_level_search!(
+        solver = PC_TAPF_Solver(verbosity=0)
+        solution, assignment, cost, env = high_level_search_mod!(
             solver,
             env_graph,
             project_spec,
@@ -279,12 +279,13 @@ let
             primary_objective=cost_model
             );
 
+        # @show convert_to_vertex_lists(solution)
         print_project_schedule(env.schedule,"project_schedule1")
 
-        for i in 1:5
-            solver = PC_TAPF_Solver(verbosity=1)
+        for i in 1:1
+            solver = PC_TAPF_Solver(verbosity=0)
             # solution2, assignment2, cost2, env2 = high_level_search_mod!(
-            solution2, assignment2, cost2, env2 = high_level_search!(
+            solution2, assignment2, cost2, env2 = high_level_search_mod!(
                 solver,
                 env_graph,
                 project_spec,
@@ -297,6 +298,8 @@ let
 
             @test !any(adjacency_matrix(env.schedule.graph) .!= adjacency_matrix(env2.schedule.graph))
             if cost[1] != cost2[1]
+                @show convert_to_vertex_lists(solution)
+                @show convert_to_vertex_lists(solution2)
                 print_project_schedule(env2.schedule,"project_schedule2")
             end
             @test cost[1] == cost2[1]

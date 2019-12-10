@@ -244,7 +244,7 @@ function update_planning_cache!(solver::M,cache::C,schedule::S,v::Int,path::P) w
             push!(active_set, v2)               # add to active set
         end
     end
-    log_info(2,solver,log_msg)
+    log_info(2,solver,log_msg * string(") to active set"))
     # update priority queue
     for v2 in active_set
         node_queue[v2] = minimum(cache.slack[v2])
@@ -395,6 +395,7 @@ function CRCBS.build_env(solver, env::E, mapf::M, node::N, agent_id::Int, path_i
     v = env.schedule.path_id_to_vtx_map[path_id]
     node_id = get_vtx_id(env.schedule, v)
     schedule_node = get_node_from_id(env.schedule, node_id)
+    # log_info(-1,solver,string("v= ",v,", path_id= ", path_id, ", agent_id= ",agent_id,", nodetype=",typeof(schedule_node)))
     # @show v,node_id,schedule_node,agent_id
     goal_vtx = mapf.goals[path_id].vtx
     goal_time = env.cache.tF[v]                             # time after which goal can be satisfied
@@ -434,14 +435,16 @@ function CRCBS.build_env(solver, env::E, mapf::M, node::N, agent_id::Int, path_i
     set_deadline!(get_cost_model(cbs_env),deadline)
     # retrieve base_path
     if !is_root_node(get_graph(env.schedule),v) # && agent_id != -1
+        log_info(0,solver,string("retrieving base path for node ",v," of type ",typeof(schedule_node)))
         base_path = get_paths(node.solution)[agent_id]
     else
+        log_info(0,solver,string("initializing base path for node ",v," of type ",typeof(schedule_node)))
         base_path = Path{PCCBS.State,PCCBS.Action,get_cost_type(cbs_env)}(
             s0=get_start(env,v), cost=get_initial_cost(cbs_env))
     end
     # base_path = get(get_paths(node.solution), agent_id, Path{PCCBS.State,PCCBS.Action,get_cost_type(cbs_env)}(
     #     s0=get_start(env,v), cost=get_initial_cost(cbs_env)))
-    log_info(2,solver,
+    log_info(-1,solver,
     """
     agent_id = $(agent_id)
     path_id = $(path_id)
@@ -480,8 +483,9 @@ function plan_next_path!(solver::S, env::E, mapf::M, node::N;
             if get_end_index(base_path) < cache.t0[v]
                 node_id = get_vtx_id(schedule,v)
                 schedule_node = get_node_from_id(schedule,node_id)
-                println("# LOW LEVEL SEARCH: in schedule node of type ",
-                    typeof(schedule_node),", cache.t0[v] - get_end_index(base_path) = ",cache.t0[v] - get_end_index(base_path),". Extending path ...")
+                log_info(-1, solver, string("# LOW LEVEL SEARCH: in schedule node ",v," of type ",
+                    typeof(schedule_node),", cache.t0[v] - get_end_index(base_path) = ",cache.t0[v] - get_end_index(base_path),". Extending path ..."))
+                # log_info(-1, solver, string("# base path = ",convert_to_vertex_lists(base_path), ",  vache.t0[v] = ",cache.t0[v]))
                 extend_path!(cbs_env,base_path,cache.t0[v])
             end
             # Solve!
@@ -516,6 +520,15 @@ function plan_next_path!(solver::S, env::E, mapf::M, node::N;
                 log_info(0,solver,"# LOW LEVEL SEARCH: node.cost >= solver.best_cost ... Exiting early")
                 return false
             end
+
+            # Debugging
+            vtx_lists = convert_to_vertex_lists(node.solution)
+            # log_info(-1,solver,string("node type=", typeof(schedule_node)))
+            for (i,p) in enumerate(vtx_lists)
+                log_info(-1,solver,string("path_i = ",p))
+            end
+                log_info(-1,solver,"\n\n")
+
         else
             # TODO parameterize env so that I don't have to hard-code the types here
             path = Path{PCCBS.State,PCCBS.Action,get_cost_type(mapf.env)}(
@@ -803,10 +816,9 @@ function high_level_search_mod!(solver::P, env_graph, project_spec, problem_spec
         assignments = map(j->findfirst(assignment_matrix[:,j] .== 1),1:problem_spec.M);
         optimal_TA_cost = Int(round(value(objective_function(model)))); # lower bound on cost (from task assignment module)
         lower_bound_cost = max(lower_bound_cost, optimal_TA_cost)
-        log_info(0,solver,string("HIGH LEVEL SEARCH: Current assignment vector = ",assignments))
+        # log_info(0,solver,string("HIGH LEVEL SEARCH: Current assignment vector = ",assignments))
         log_info(0,solver,string("HIGH LEVEL SEARCH: Current lower bound cost = ",lower_bound_cost))
-        if lower_bound_cost >= solver.best_cost[1] # TODO make sure that the operation duration is accounted for here
-            # log_info(-1,solver.verbosity,string("HIGH LEVEL SEARCH: optimality gap = ",solver.best_cost[1] - lower_bound_cost,". Returning best solution with cost ", solver.best_cost,"\n"))
+        if lower_bound_cost >= solver.best_cost[1]
             break
         end
         ############## Route Planning ###############
