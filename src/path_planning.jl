@@ -444,7 +444,7 @@ function CRCBS.build_env(solver, env::E, mapf::M, node::N, agent_id::Int, path_i
     end
     # base_path = get(get_paths(node.solution), agent_id, Path{PCCBS.State,PCCBS.Action,get_cost_type(cbs_env)}(
     #     s0=get_start(env,v), cost=get_initial_cost(cbs_env)))
-    log_info(-1,solver,
+    log_info(2,solver,
     """
     agent_id = $(agent_id)
     path_id = $(path_id)
@@ -522,12 +522,11 @@ function plan_next_path!(solver::S, env::E, mapf::M, node::N;
             end
 
             # Debugging
-            vtx_lists = convert_to_vertex_lists(node.solution)
-            # log_info(-1,solver,string("node type=", typeof(schedule_node)))
-            for (i,p) in enumerate(vtx_lists)
-                log_info(-1,solver,string("path_i = ",p))
-            end
-                log_info(-1,solver,"\n\n")
+            # vtx_lists = convert_to_vertex_lists(node.solution)
+            # for (i,p) in enumerate(vtx_lists)
+            #     log_info(3,solver,string("path_",i," = ",p))
+            # end
+            # log_info(3,solver,"\n\n")
 
         else
             # TODO parameterize env so that I don't have to hard-code the types here

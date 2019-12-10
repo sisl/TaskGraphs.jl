@@ -503,13 +503,17 @@ export
 get_path_spec(schedule::P,v::Int) where {P<:ProjectSchedule} = schedule.path_specs[v]
 function set_path_spec!(schedule::P,v::Int,spec::S) where {P<:ProjectSchedule,S<:PathSpec}
     schedule.path_specs[v] = spec
-    schedule.path_id_to_vtx_map[spec.path_id] = v
+    if spec.path_id != -1
+        schedule.path_id_to_vtx_map[spec.path_id] = v
+    end
 end
 function add_path_spec!(schedule::P,spec::S) where {P<:ProjectSchedule,S<:PathSpec}
     push!(schedule.path_specs, spec)
-    if spec.path_id != -1
-        schedule.path_id_to_vtx_map[spec.path_id] = nv(get_graph(schedule))
-    end
+    set_path_spec!(schedule, nv(schedule.graph), spec)
+    # @assert spec.path_id != -1
+    # if spec.path_id != -1
+    #     schedule.path_id_to_vtx_map[spec.path_id] = nv(get_graph(schedule))
+    # end
 end
 
 """
