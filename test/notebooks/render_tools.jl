@@ -14,7 +14,7 @@ interpolate(a,b,t) = (1 - t)*a + t*b
 """
     `visualize_env`
 
-    Displays the current agent and object locations as well as the current 
+    Displays the current agent and object locations as well as the current
     planned path segment of each agent.
 """
 function visualize_env(search_env::S,vtxs,pickup_vtxs,dropoff_vtxs,t=0;
@@ -30,7 +30,7 @@ function visualize_env(search_env::S,vtxs,pickup_vtxs,dropoff_vtxs,t=0;
         osize=3pt,
         cell_width=1.0,
         line_width=2pt) where {S<:SearchEnv}
-    
+
     cache = search_env.cache
     project_schedule = search_env.schedule
 
@@ -47,7 +47,7 @@ function visualize_env(search_env::S,vtxs,pickup_vtxs,dropoff_vtxs,t=0;
         vtx_id = get_vtx_id(project_schedule, v)
         if typeof(vtx_id) <: ActionID
             node = get_node_from_id(project_schedule,vtx_id)
-#             if typeof(node) <: Union{GO,CARRY}
+            # if typeof(node) <: Union{GO,CARRY}
             if (cache.t0[v] <= t) && (cache.tF[v] >= t)
                 spec = get_path_spec(project_schedule, v)
                 agent_id = spec.agent_id
@@ -66,7 +66,7 @@ function visualize_env(search_env::S,vtxs,pickup_vtxs,dropoff_vtxs,t=0;
                     )
                 end
             end
-#             end
+            # end
         end
     end
     robot_layers = []
@@ -308,7 +308,7 @@ render_both(t,paths1,paths2) = hstack(render_paths(t,paths1),render_paths(t,path
 
 
 function get_runtime_box_plot(df;obj=:time,m_range=10:10:60,n_range=10:10:40,ymin=0.007,title="",nsym="n",msym="m",)
-    @pgf gp = GroupPlot({group_style = { 
+    @pgf gp = GroupPlot({group_style = {
                 "group name"="myPlots",
                 "group size"="6 by 1",
                 "xlabels at"="edge bottom",
@@ -324,7 +324,7 @@ function get_runtime_box_plot(df;obj=:time,m_range=10:10:60,n_range=10:10:40,ymi
             footnotesize,
             width="3.25cm",
             height="6cm",
-            xmin=0, 
+            xmin=0,
             xmax=5,
             ymin=ymin,
             ymax=120,
@@ -339,7 +339,7 @@ function get_runtime_box_plot(df;obj=:time,m_range=10:10:60,n_range=10:10:40,ymi
 
     @pgf for (i,m) in enumerate(m_range)
         if i == 1
-            push!(gp, 
+            push!(gp,
                 {xlabel=@sprintf("\$%s=%i\$",msym,m),
                 ylabel="time (s)",
                 yticklabels=[0.1,1,10,100],
@@ -356,7 +356,7 @@ function get_runtime_box_plot(df;obj=:time,m_range=10:10:60,n_range=10:10:40,ymi
                             {"y index"=0},
                             [:data=>df[(df.M .== m) .& (df.N .== n),obj]])),n_range)...)
         else
-            push!(gp, {xlabel=@sprintf("\$%s=%i\$",msym,m)}, 
+            push!(gp, {xlabel=@sprintf("\$%s=%i\$",msym,m)},
                 map(n->PGFPlotsX.PlotInc({boxplot},Table(
                             {"y index"=0},
                             [:data=>df[(df.M .== m) .& (df.N .== n),obj]])),n_range)...)

@@ -70,6 +70,9 @@ let
     solver = PC_TAPF_Solver(DEBUG=true,verbosity=0,LIMIT_A_star_iterations=5*nv(env_graph));
     (solution, assignment, cost, search_env), elapsed_time, byte_ct, gc_time, mem_ct = @timed high_level_search_mod!(
         solver, env_graph, project_spec, problem_spec, robot_ICs, Gurobi.Optimizer);
+
+    (solution, assignment, cost, search_env), elapsed_time, byte_ct, gc_time, mem_ct = @timed high_level_search!(
+        solver, env_graph, project_spec, problem_spec, robot_ICs, Gurobi.Optimizer);
     # TODO: the problem is that one of the COLLECT nodes has a -1 for the collection vertex
     # project_schedule = construct_partial_project_schedule(project_spec,problem_spec,map(i->robot_ICs[i], 1:problem_spec.N))
     # @test validate(project_schedule)
