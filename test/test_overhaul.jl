@@ -11,7 +11,8 @@ using Test
 using Compose
 using GraphPlottingBFS
 
-
+# load rendering tools
+include(joinpath(pathof(TaskGraphs),"../..","test/notebooks/render_tools.jl"))
 
 function show_times(sched,v)
     arr = process_schedule(sched)
@@ -99,7 +100,6 @@ let
     dist_matrix = get_dist_matrix(env_graph)
 
     let
-
         filename = joinpath(PROBLEM_DIR,"problem2.toml")
         problem_def = read_problem_def(filename)
 
@@ -121,7 +121,6 @@ let
         @test validate(project_schedule)
     end
     let
-
         project_spec, problem_spec, robot_ICs, assignments, env_graph = initialize_toy_problem_4(;
             verbose=false);
         robot_ICs = map(i->robot_ICs[i], 1:problem_spec.N)
@@ -137,7 +136,6 @@ let
         update_project_schedule!(project_schedule,problem_spec,adj_matrix)
         # print_project_schedule(project_schedule,"project_schedule2")
         @test validate(project_schedule)
-
     end
 
     # Verify that old method (assignment milp) and new method (adjacency matrix
@@ -198,21 +196,20 @@ let
                 end
             end
         end
-
     end
 
     # Test the adjacency matrix solver as a part of the full pipeline
     let
         project_spec, problem_spec, robot_ICs, assignments, env_graph = initialize_toy_problem_4(;verbose=false);
         solver = PC_TAPF_Solver(verbosity=1)
-        high_level_search!(solver, env_graph, project_spec, problem_spec, robot_ICs, Gurobi.Optimizer);
-        high_level_search!(solver, env_graph, project_spec, problem_spec, robot_ICs, Gurobi.Optimizer;primary_objective=MakeSpan);
+        solution, assignment, cost, env = high_level_search!(solver, env_graph, project_spec, problem_spec, robot_ICs, Gurobi.Optimizer)
+        solution, assignment, cost, env = high_level_search!(solver, env_graph, project_spec, problem_spec, robot_ICs, Gurobi.Optimizer;primary_objective=MakeSpan)
     end
     let
         project_spec, problem_spec, robot_ICs, assignments, env_graph = initialize_toy_problem_4(;verbose=false);
         solver = PC_TAPF_Solver(verbosity=1)
-        high_level_search_mod!(solver, env_graph, project_spec, problem_spec, robot_ICs, Gurobi.Optimizer);
-        high_level_search_mod!(solver, env_graph, project_spec, problem_spec, robot_ICs, Gurobi.Optimizer;primary_objective=MakeSpan);
+        solution, assignment, cost, env = high_level_search_mod!(solver, env_graph, project_spec, problem_spec, robot_ICs, Gurobi.Optimizer)
+        solution, assignment, cost, env = high_level_search_mod!(solver, env_graph, project_spec, problem_spec, robot_ICs, Gurobi.Optimizer;primary_objective=MakeSpan)
     end
 
     # Test that the full planning stack works with the new model and returns the same final cost
@@ -241,7 +238,10 @@ let
                         robot_ICs,
                         Gurobi.Optimizer;
                         primary_objective=cost_model
-                        );
+                        )
+
+                    @test cost1[1] != Inf
+                    @test validate(env1.schedule)
 
                     # Adjacency method
                     solver = PC_TAPF_Solver(verbosity=0)
@@ -255,8 +255,8 @@ let
                         primary_objective=cost_model
                         );
 
-                    @test validate(env1.schedule)
                     @test validate(env2.schedule)
+                    @test cost2[1] != Inf
 
                     if cost2[1] != cost1[1]
                         @show f, cost_model, cost1, cost2
@@ -271,7 +271,6 @@ let
                 end
             end
         end
-
     end
 
     # Verify deterministic behavior of AdjacencyMILP formulation
@@ -328,7 +327,74 @@ let
                 end
             end
         end
-
     end
-
 end
+
+# DEBUGGING
+let
+    #--------- Run the following lines ---------#
+    solver = PC_TAPF_Solver(DEBUG=true,verbosity=2,LIMIT_A_star_iterations=10000);
+    primary_objective = SumOfMakeSpans
+    optimizer = Gurobi.Optimizer
+
+    env_id = 2
+    env_filename = string(ENVIRONMENT_DIR,"/env_",env_id,".toml")
+    factory_env = read_env(env_filename)
+    env_graph = factory_env.graph
+    dist_matrix = get_dist_matrix(env_graph)
+
+    problem_def = read_problem_def(joinpath(PROBLEM_DIR,"problem4.toml"))
+    project_spec, r0, s0, sF = problem_def.project_spec,problem_def.r0,problem_def.s0,problem_def.sF
+    project_spec, problem_spec, object_ICs, object_FCs, robot_ICs = construct_task_graphs_problem(project_spec, r0, s0, sF, dist_matrix);
+
+    # (solution, assignment, cost, search_env), elapsed_time, byte_ct, gc_time, mem_ct = @timed high_level_search_mod!(solver, env_graph, project_spec, problem_spec, robot_ICs, optimizer);
+
+    project_schedule = construct_partial_project_schedule(project_spec,problem_spec,map(i->robot_ICs[i], 1:problem_spec.N))
+    model = formulate_schedule_milp(project_schedule,problem_spec;cost_model=primary_objective,optimizer=optimizer)
+    optimize!(model)
+    @test (termination_status(model) == MathOptInterface.OPTIMAL);
+    assignment_matrix = get_assignment_matrix(model);
+    ## Route Planning
+    update_project_schedule!(project_schedule,problem_spec,assignment_matrix)
+    env, mapf = construct_search_env(project_schedule, problem_spec, env_graph;primary_objective=primary_objective);
+    pc_mapf = PC_MAPF(env,mapf);
+    #--------------- Stop here ---------------#
+    # ----------- run in debugger ------------#
+    # solution, cost = solve!(solver,pc_mapf); #CBS
+    node = initialize_root_node(pc_mapf)
+    valid_flag = low_level_search!(solver,pc_mapf,node)
+
+
+    robot_paths = convert_to_vertex_lists(node.solution)
+    object_paths = get_object_paths(node.solution,pc_mapf.env)
+
+    # BSON
+    @save "solution.bson" robot_paths
+
+    visualize_env(env,factory_env;robot_paths=robot_paths,object_paths=object_paths)
+end
+
+
+function my_test()
+    env_id = 2
+    env_filename = string(ENVIRONMENT_DIR,"/env_",env_id,".toml")
+    factory_env = read_env(env_filename)
+    env_graph = factory_env.graph
+    dist_matrix = get_dist_matrix(env_graph)
+
+    problem_def = read_problem_def(joinpath(PROBLEM_DIR,"problem4.toml"))
+    project_spec, r0, s0, sF = problem_def.project_spec,problem_def.r0,problem_def.s0,problem_def.sF
+    project_spec, problem_spec, object_ICs, object_FCs, robot_ICs = construct_task_graphs_problem(
+            project_spec, r0, s0, sF, dist_matrix);
+    # Solve the problem
+    solver = PC_TAPF_Solver(DEBUG=true,verbosity=2,LIMIT_A_star_iterations=5*nv(env_graph));
+
+    (solution, assignment, cost, search_env), elapsed_time, byte_ct, gc_time, mem_ct = @timed high_level_search_mod!(solver, env_graph, project_spec, problem_spec, robot_ICs, Gurobi.Optimizer);
+end
+
+
+function my_test(solver, env_graph, project_spec, problem_spec, robot_ICs)
+    (solution, assignment, cost, search_env), elapsed_time, byte_ct, gc_time, mem_ct = @timed high_level_search_mod!(solver, env_graph, project_spec, problem_spec, robot_ICs, Gurobi.Optimizer);
+end
+
+# Juno.@enter split("hello, world", isspace)

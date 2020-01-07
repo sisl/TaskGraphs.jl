@@ -439,10 +439,10 @@ function CRCBS.build_env(solver, env::E, mapf::M, node::N, agent_id::Int, path_i
     set_deadline!(get_cost_model(cbs_env),deadline)
     # retrieve base_path
     if !is_root_node(get_graph(env.schedule),v) # && agent_id != -1
-        log_info(0,solver,string("retrieving base path for node ",v," of type ",typeof(schedule_node)))
+        # log_info(0,solver,string("retrieving base path for node ",v," of type ",typeof(schedule_node)))
         base_path = get_paths(node.solution)[agent_id]
     else
-        log_info(0,solver,string("initializing base path for node ",v," of type ",typeof(schedule_node)))
+        # log_info(0,solver,string("initializing base path for node ",v," of type ",typeof(schedule_node)))
         base_path = Path{PCCBS.State,PCCBS.Action,get_cost_type(cbs_env)}(
             s0=get_start(env,v), cost=get_initial_cost(cbs_env))
     end

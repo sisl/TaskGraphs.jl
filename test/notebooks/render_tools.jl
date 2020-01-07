@@ -11,6 +11,19 @@ using Printf
 
 interpolate(a,b,t) = (1 - t)*a + t*b
 
+
+function get_grid_world_layer(vtxs,color,cw)
+    if length(vtxs) > 0
+        return layer(
+            xmin=map(vec->vec[1], vtxs) .- cw,
+            ymin=map(vec->vec[2], vtxs) .- cw,
+            xmax=map(vec->vec[1], vtxs) .+ cw,
+            ymax=map(vec->vec[2], vtxs) .+ cw,
+            Geom.rect, Theme(default_color=color) )
+    else
+        return layer(x=[],y=[])
+    end
+end
 """
     `visualize_env`
 
@@ -29,6 +42,9 @@ function visualize_env(search_env::S,vtxs,pickup_vtxs,dropoff_vtxs,t=0;
         rsize=5pt,
         osize=3pt,
         cell_width=1.0,
+        floor_color = "light gray",
+        pickup_color= "light blue",
+        dropoff_color="pink",
         line_width=2pt) where {S<:SearchEnv}
 
     cache = search_env.cache
@@ -117,24 +133,9 @@ function visualize_env(search_env::S,vtxs,pickup_vtxs,dropoff_vtxs,t=0;
         robot_layers...,
         path_layers...,
         # search_pattern_layers...,
-        layer(
-            xmin=map(vec->vec[1], pickup_vtxs) .- cw,
-            ymin=map(vec->vec[2], pickup_vtxs) .- cw,
-            xmax=map(vec->vec[1], pickup_vtxs) .+ cw,
-            ymax=map(vec->vec[2], pickup_vtxs) .+ cw,
-            Geom.rect, Theme(default_color="light blue") ),
-        layer(
-            xmin=map(vec->vec[1], dropoff_vtxs) .- cw,
-            ymin=map(vec->vec[2], dropoff_vtxs) .- cw,
-            xmax=map(vec->vec[1], dropoff_vtxs) .+ cw,
-            ymax=map(vec->vec[2], dropoff_vtxs) .+ cw,
-            Geom.rect, Theme(default_color="pink") ),
-        layer(
-            xmin=collect(xpts .- cw),
-            xmax=collect(xpts .+ cw),
-            ymin=collect(ypts .- cw),
-            ymax=collect(ypts .+ cw),
-            Geom.rect, Theme(default_color="light gray") ),
+        get_grid_world_layer(pickup_vtxs,pickup_color,cw),
+        get_grid_world_layer(dropoff_vtxs,dropoff_color,cw),
+        get_grid_world_layer(vtxs,floor_color,cw),
         Coord.cartesian(fixed=true,
             xmin=minimum(xpts) - cell_width/2,
             ymin=minimum(ypts) - cell_width/2,
@@ -247,24 +248,9 @@ function visualize_env(vtxs,pickup_vtxs,dropoff_vtxs,t=0;
         robot_layers...,
         path_layers...,
         search_pattern_layers...,
-        layer(
-            xmin=map(vec->vec[1], pickup_vtxs) .- cw,
-            ymin=map(vec->vec[2], pickup_vtxs) .- cw,
-            xmax=map(vec->vec[1], pickup_vtxs) .+ cw,
-            ymax=map(vec->vec[2], pickup_vtxs) .+ cw,
-            Geom.rect, Theme(default_color=pickup_color) ),
-        layer(
-            xmin=map(vec->vec[1], dropoff_vtxs) .- cw,
-            ymin=map(vec->vec[2], dropoff_vtxs) .- cw,
-            xmax=map(vec->vec[1], dropoff_vtxs) .+ cw,
-            ymax=map(vec->vec[2], dropoff_vtxs) .+ cw,
-            Geom.rect, Theme(default_color=dropoff_color) ),
-        layer(
-            xmin=collect(xpts .- cw),
-            xmax=collect(xpts .+ cw),
-            ymin=collect(ypts .- cw),
-            ymax=collect(ypts .+ cw),
-            Geom.rect, Theme(default_color=floor_color) ),
+        get_grid_world_layer(pickup_vtxs,pickup_color,cw),
+        get_grid_world_layer(dropoff_vtxs,dropoff_color,cw),
+        get_grid_world_layer(vtxs,floor_color,cw),
         Coord.cartesian(fixed=true,
             xmin=minimum(xpts) - cell_width/2,
             ymin=minimum(ypts) - cell_width/2,
