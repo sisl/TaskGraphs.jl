@@ -61,6 +61,28 @@ let
     env_graph = factory_env.graph
     dist_matrix = get_dist_matrix(env_graph)
 
+    problem_def = read_problem_def(joinpath(PROBLEM_DIR,"problem1.toml"))
+    project_spec, r0, s0, sF = problem_def.project_spec,problem_def.r0,problem_def.s0,problem_def.sF
+    project_spec, problem_spec, object_ICs, object_FCs, robot_ICs = construct_task_graphs_problem(
+            project_spec, r0, s0, sF, dist_matrix);
+    # Solve the problem
+    solver = PC_TAPF_Solver(DEBUG=true,verbosity=0,LIMIT_A_star_iterations=5*nv(env_graph));
+    (solution, assignment, cost, search_env), elapsed_time, byte_ct, gc_time, mem_ct = @timed high_level_search_mod!(
+        solver, env_graph, project_spec, problem_spec, robot_ICs, Gurobi.Optimizer);
+
+    robot_paths = convert_to_vertex_lists(solution)
+    object_paths = get_object_paths(solution,search_env)
+
+    visualize_env(search_env,factory_env;robot_paths=robot_paths,object_paths=object_paths)
+end
+let
+
+    env_id = 2
+    env_filename = string(ENVIRONMENT_DIR,"/env_",env_id,".toml")
+    factory_env = read_env(env_filename)
+    env_graph = factory_env.graph
+    dist_matrix = get_dist_matrix(env_graph)
+
     # problem_def = read_problem_def(joinpath(PROBLEM_DIR,"problem223.toml"))
     problem_def = read_problem_def(joinpath(PROBLEM_DIR,"problem254.toml"))
     project_spec, r0, s0, sF = problem_def.project_spec,problem_def.r0,problem_def.s0,problem_def.sF
