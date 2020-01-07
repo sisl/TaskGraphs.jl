@@ -95,7 +95,7 @@ let
 
     env_id = 2
     env_file = joinpath(ENVIRONMENT_DIR,string("env_",env_id,".toml"))
-    factory_env = read_env(env_file)
+    global factory_env = read_env(env_file)
     env_graph = factory_env.graph
     dist_matrix = get_dist_matrix(env_graph)
 
@@ -110,8 +110,8 @@ let
         project_schedule = construct_partial_project_schedule(project_spec,problem_spec,robot_ICs)
         model = formulate_schedule_milp(project_schedule,problem_spec)
         optimize!(model)
-        @show status = termination_status(model)
-        @show obj_val = Int(round(value(objective_function(model))))
+        @test termination_status(model) == MOI.OPTIMAL
+        obj_val = Int(round(value(objective_function(model))))
         adj_matrix = Int.(round.(value.(model[:X])))
 
         # print_project_schedule(project_schedule,"project_schedule1")
@@ -128,8 +128,8 @@ let
         project_schedule = construct_partial_project_schedule(project_spec,problem_spec,robot_ICs)
         model = formulate_schedule_milp(project_schedule,problem_spec)
         optimize!(model)
-        @show status = termination_status(model)
-        @show obj_val = Int(round(value(objective_function(model))))
+        @test termination_status(model) == MOI.OPTIMAL
+        obj_val = Int(round(value(objective_function(model))))
         adj_matrix = Int.(round.(value.(model[:X])))
 
         # print_project_schedule(project_schedule,"project_schedule1")
@@ -161,7 +161,7 @@ let
                     project_spec, problem_spec, robot_ICs, assignments, env_graph = f(;verbose=false);
                     model1 = formulate_optimization_problem(problem_spec,Gurobi.Optimizer;cost_model=cost_model);
                     optimize!(model1)
-                    @test termination_status(model1) == MathOptInterface.OPTIMAL
+                    @test termination_status(model1) == MOI.OPTIMAL
                     assignment_matrix = Int.(round.(value.(model1[:X])))
                     obj_val1 = Int(round(value(objective_function(model1))))
                     assignment_vector = map(j->findfirst(assignment_matrix[:,j] .== 1),1:problem_spec.M);
@@ -180,7 +180,7 @@ let
                     schedule2 = construct_partial_project_schedule(project_spec,problem_spec,map(i->robot_ICs[i], 1:problem_spec.N))
                     model2 = formulate_schedule_milp(schedule2,problem_spec;cost_model=cost_model)
                     optimize!(model2)
-                    @test termination_status(model2) == MathOptInterface.OPTIMAL
+                    @test termination_status(model2) == MOI.OPTIMAL
                     obj_val2 = Int(round(value(objective_function(model2))))
                     adj_matrix = Int.(round.(value.(model2[:X])))
                     update_project_schedule!(schedule2,problem_spec,adj_matrix)
@@ -214,6 +214,8 @@ let
 
     # Test that the full planning stack works with the new model and returns the same final cost
     let
+        cost_model = SumOfMakeSpans
+        f = initialize_toy_problem_1
 
         for (i, f) in enumerate([
             initialize_toy_problem_1,
