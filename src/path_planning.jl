@@ -624,8 +624,7 @@ CRCBS.get_cost_model(env::E) where {E<:SearchEnv}   = get_cost_model(env.env)
 CRCBS.get_cost_type(env::E) where {E<:SearchEnv}    = get_cost_type(env.env)
 function CRCBS.initialize_root_node(pc_mapf::P) where {P<:PC_MAPF}
     N = pc_mapf.env.num_agents
-    # initialize_root_node(MAPF(pc_mapf.mapf.env, pc_mapf.mapf.starts, pc_mapf.mapf.goals)) #TODO we only want `num_agents` (not `num_schedule_nodes`) paths. This lines currently initializes `num_schedule_nodes`
-    # initialize_root_node(pc_mapf.mapf)
+    # It is important to only have N starts! Does not matter if they are invalid states.
     initialize_root_node(MAPF(pc_mapf.mapf.env,map(i->PCCBS.State(),1:N),map(i->PCCBS.State(),1:N)))
 end
 CRCBS.default_solution(pc_mapf::M) where {M<:PC_MAPF} = default_solution(pc_mapf.mapf)
