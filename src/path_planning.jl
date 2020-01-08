@@ -537,14 +537,12 @@ function plan_next_path!(solver::S, env::E, mapf::M, node::N;
                 log_info(0,solver,"# LOW LEVEL SEARCH: node.cost >= solver.best_cost ... Exiting early")
                 return false
             end
-
             # Debugging
             # vtx_lists = convert_to_vertex_lists(node.solution)
             # for (i,p) in enumerate(vtx_lists)
             #     log_info(-1,solver,string("path_",i," = ",p))
             # end
             # log_info(-1,solver,"\n\n")
-
         else
             # TODO parameterize env so that I don't have to hard-code the types here
             path = Path{PCCBS.State,PCCBS.Action,get_cost_type(mapf.env)}(
@@ -626,9 +624,9 @@ CRCBS.get_cost_model(env::E) where {E<:SearchEnv}   = get_cost_model(env.env)
 CRCBS.get_cost_type(env::E) where {E<:SearchEnv}    = get_cost_type(env.env)
 function CRCBS.initialize_root_node(pc_mapf::P) where {P<:PC_MAPF}
     N = pc_mapf.env.num_agents
-    initialize_root_node(MAPF(pc_mapf.mapf.env, pc_mapf.mapf.starts, pc_mapf.mapf.goals))
+    # initialize_root_node(MAPF(pc_mapf.mapf.env, pc_mapf.mapf.starts, pc_mapf.mapf.goals)) #TODO we only want `num_agents` (not `num_schedule_nodes`) paths. This lines currently initializes `num_schedule_nodes`
     # initialize_root_node(pc_mapf.mapf)
-    # initialize_root_node(MAPF(pc_mapf.mapf.env,map(i->PCCBS.State(),1:N),map(i->PCCBS.State(),1:N)))
+    initialize_root_node(MAPF(pc_mapf.mapf.env,map(i->PCCBS.State(),1:N),map(i->PCCBS.State(),1:N)))
 end
 CRCBS.default_solution(pc_mapf::M) where {M<:PC_MAPF} = default_solution(pc_mapf.mapf)
 
@@ -674,7 +672,7 @@ function CRCBS.solve!(
     root_node = initialize_root_node(mapf)
     valid_flag = low_level_search!(solver,mapf,root_node;path_finder=path_finder)
     detect_conflicts!(root_node.conflict_table,root_node.solution)
-    if valid_flag && CRCBS.is_valid(root_node.solution,mapf)
+    if valid_flag
         enqueue!(priority_queue, root_node => root_node.cost)
     end
 
@@ -687,13 +685,13 @@ function CRCBS.solve!(
             log_info(-1,solver,string("CBS: Optimal Solution Found! Cost = ",node.cost))
             return node.solution, node.cost
         end
-        log_info(1,solver,string(
-            "CBS: ",conflict_type(conflict),
-            ": agent1=",agent1_id(conflict),
-            ", agent2=", agent2_id(conflict),
-            ", v1=(",get_s(node1(conflict)).vtx,",",get_sp(node1(conflict)).vtx,")",
-            ", v2=(",get_s(node2(conflict)).vtx,",",get_sp(node2(conflict)).vtx,")",
-            ", t=",get_s(node1(conflict)).t))
+        log_info(1,solver,string("CBS: ", string(conflict)))
+            # "CBS: ",conflict_type(conflict),
+            # ": agent1=",agent1_id(conflict),
+            # ", agent2=", agent2_id(conflict),
+            # ", v1=(",get_s(node1(conflict)).vtx,",",get_sp(node1(conflict)).vtx,")",
+            # ", v2=(",get_s(node2(conflict)).vtx,",",get_sp(node2(conflict)).vtx,")",
+            # ", t=",get_s(node1(conflict)).t))
         # otherwise, create constraints and branch
         constraints = generate_constraints_from_conflict(conflict)
         for constraint in constraints
