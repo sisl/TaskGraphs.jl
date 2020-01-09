@@ -24,6 +24,7 @@ export
 function get_assignment_matrix(model::M) where {M<:JuMP.Model}
     Matrix{Int}(round.(value.(model[:X])))
 end
+get_assignment_matrix(model::TaskGraphsMILP) = get_assignment_matrix(model.model)
 function get_assignment_vector(assignment_matrix,M)
     assignments = -ones(Int,M)
     for j in 1:M
@@ -72,9 +73,11 @@ export
 """
 function exclude_solutions!(model::JuMP.Model,M::Int,forbidden_solutions::Vector{Matrix{Int}})
     for Xf in forbidden_solutions
+        M = sum(Xf)
         @constraint(model, sum(model[:X] .* Xf) <= M-1)
     end
 end
+exclude_solutions!(model::TaskGraphsMILP,M,forbidden_solutions) = exclude_solutions!(model.model, M, forbidden_solutions)
 
 """
     `cached_pickup_and_delivery_distances(r₀,oₒ,sₒ,dist=(x1,x2)->norm(x2-x1,1))`

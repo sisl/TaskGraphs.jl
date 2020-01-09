@@ -741,9 +741,6 @@ function high_level_search!(solver::P, env_graph, project_spec, problem_spec,
     best_env    = SearchEnv()
     best_assignment = Vector{Int}()
     model = formulate_optimization_problem(problem_spec,optimizer;cost_model=primary_objective,kwargs...);
-    #
-    # project_schedule = construct_partial_project_schedule(project_spec,problem_spec,map(i->robot_ICs[i], 1:problem_spec.N))
-    # model, job_shop_variables = formulate_schedule_milp(project_schedule,problem_spec;optimizer=optimizer,kwargs...)
 
     while solver.best_cost[1] > lower_bound_cost
         solver.num_assignment_iterations += 1
@@ -810,8 +807,6 @@ function high_level_search_mod!(solver::P, env_graph, project_spec, problem_spec
     best_solution = default_pc_tapf_solution(problem_spec.N)
     best_env    = SearchEnv()
     best_assignment = Vector{Int}()
-    # model = formulate_optimization_problem(problem_spec,optimizer;kwargs...);
-    #
     project_schedule = construct_partial_project_schedule(project_spec,problem_spec,map(i->robot_ICs[i], 1:problem_spec.N))
     model = formulate_schedule_milp(project_schedule,problem_spec;
         cost_model=primary_objective,optimizer=optimizer,kwargs...)

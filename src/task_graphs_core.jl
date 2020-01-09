@@ -8,6 +8,7 @@ using JuMP
 using Gurobi
 using TOML
 using CRCBS
+using SparseArrays
 
 using ..PlanningPredicates
 # using ..TaskGraphsSolvers
@@ -1055,6 +1056,10 @@ end
 ################################################################################
 
 export
+    TaskGraphsMILP,
+    AssignmentMILP,
+    AdjacencyMILP,
+    SparseAdjacencyMILP,
     add_job_shop_constraints!,
     formulate_optimization_problem,
     formulate_schedule_milp,
@@ -1063,9 +1068,25 @@ export
 
 
 abstract type TaskGraphsMILP end
-struct AssignmentMILP <: TaskGraphsMILP end
-struct AdjacencyMILP <: TaskGraphsMILP end
-
+@with_kw struct AssignmentMILP <: TaskGraphsMILP
+    model::JuMP.Model = Model()
+end
+@with_kw struct AdjacencyMILP <: TaskGraphsMILP
+    model::JuMP.Model = Model()
+end
+@with_kw struct SparseAdjacencyMILP <: TaskGraphsMILP
+    model::JuMP.Model = Model()
+    Xa::SparseMatrixCSC{VariableRef,Int} = SparseMatrixCSC{VariableRef,Int}(0,0,ones(Int,1),Int[],VariableRef[]) # assignment adjacency matrix
+    Xj::SparseMatrixCSC{VariableRef,Int} = SparseMatrixCSC{VariableRef,Int}(0,0,ones(Int,1),Int[],VariableRef[]) # job shop adjacency matrix
+end
+JuMP.optimize!(model::M) where {M<:TaskGraphsMILP}          = optimize!(model.model)
+JuMP.termination_status(model::M) where {M<:TaskGraphsMILP} = termination_status(model.model)
+JuMP.objective_function(model::M) where {M<:TaskGraphsMILP} = objective_function(model.model)
+# for op = (:optimize!, :termination_status, :objective_function)
+#     eval(quote
+#         JuMP.$op(model::M,args...) where {M<:TaskGraphsMILP} = $op(model.model,args...)
+#     end)
+# end
 
 function add_job_shop_constraints!(schedule::P,spec::T,model::JuMP.Model) where {P<:ProjectSchedule,T<:ProblemSpec}
     M = spec.M
@@ -1336,7 +1357,7 @@ function formulate_schedule_milp(project_schedule::ProjectSchedule,problem_spec:
     @variable(model, tF[1:nv(G)] >= 0.0); # final times for all nodes
 
     # Precedence relationships
-    @variable(model, Xa[1:nv(G),1:nv(G)], binary = true); # Precedence Adjacency Matrix
+    @variable(model, Xa[1:nv(G),1:nv(G)], binary = true); # Precedence Adjacency Matrix TODO make sparse
     @constraint(model, Xa .+ Xa' .<= 1) # no bidirectional or self edges
     # set all initial times that are provided
     for (id,t) in t0_
@@ -1405,7 +1426,7 @@ function formulate_schedule_milp(project_schedule::ProjectSchedule,problem_spec:
     upstream_vertices = map(v->[v, map(e->e.dst,collect(edges(bfs_tree(G,v;dir=:in))))...], vertices(G))
     for v in vertices(G)
         for v2 in upstream_vertices[v]
-            @constraint(model, Xa[v,v2] == 0)
+            @constraint(model, Xa[v,v2] == 0) #TODO this variable is not needed
         end
     end
     non_upstream_vertices = map(v->collect(setdiff(collect(vertices(G)),upstream_vertices[v])), vertices(G))
@@ -1434,7 +1455,7 @@ function formulate_schedule_milp(project_schedule::ProjectSchedule,problem_spec:
                 end
             end
             if potential_match == false
-                @constraint(model, Xa[v,v2] == 0)
+                @constraint(model, Xa[v,v2] == 0) #TODO this variable is not needed
             end
         end
     end
@@ -1516,6 +1537,215 @@ function formulate_milp(milp_model::AdjacencyMILP,project_schedule::ProjectSched
     optimizer=Gurobi.Optimizer,
     kwargs...)
     formulate_schedule_milp(project_schedule,problem_spec;optimizer=optimizer,kwargs...)
+end
+
+"""
+    Formulation for sparse adjacency MILP
+"""
+function formulate_milp(milp_model::SparseAdjacencyMILP,project_schedule::ProjectSchedule,problem_spec::ProblemSpec;
+        optimizer = Gurobi.Optimizer,
+        TimeLimit=100,
+        OutputFlag=0,
+        Presolve=2, # 2 is the highest level of pre-solve
+        t0_ = Dict{AbstractID,Float64}(), # dictionary of initial times. Default is empty
+        Mm = 10000, # for big M constraints
+        cost_model = SumOfMakeSpans,
+    )
+    G = get_graph(project_schedule);
+    assignments = [];
+    Δt = map(v->get_path_spec(project_schedule, v).min_path_duration, vertices(G))
+
+    model = Model(with_optimizer(optimizer,
+        TimeLimit=TimeLimit,
+        OutputFlag=OutputFlag,
+        Presolve=Presolve
+        ));
+    @variable(model, t0[1:nv(G)] >= 0.0); # initial times for all nodes
+    @variable(model, tF[1:nv(G)] >= 0.0); # final times for all nodes
+
+    # Precedence relationships
+    Xa = SparseMatrixCSC{VariableRef,Int}(nv(G),nv(G),ones(Int,nv(G)+1),Int[],VariableRef[])
+    # @variable(model, Xa[1:nv(G),1:nv(G)], binary = true); # Precedence Adjacency Matrix TODO make sparse
+    # @constraint(model, Xa .+ Xa' .<= 1) # no bidirectional or self edges
+    # set all initial times that are provided
+    for (id,t) in t0_
+        v = get_vtx(project_schedule, id)
+        @constraint(model, t0[v] == t)
+    end
+    # Precedence constraints and duration constraints for existing nodes and edges
+    for v in vertices(G)
+        @constraint(model, tF[v] >= t0[v] + Δt[v])
+        for v2 in outneighbors(G,v)
+            # @constraint(model, Xa[v,v2] == 1) #TODO this edge already exists--no reason to encode it as a decision variable
+            @constraint(model, t0[v2] >= tF[v])
+        end
+    end
+    # Identify required and eligible edges
+    missing_successors      = Dict{Int,Dict}()
+    missing_predecessors    = Dict{Int,Dict}()
+    n_eligible_successors   = zeros(Int,nv(G))
+    n_eligible_predecessors = zeros(Int,nv(G))
+    n_required_successors   = zeros(Int,nv(G))
+    n_required_predecessors = zeros(Int,nv(G))
+    for v in vertices(G)
+        node = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v))
+        for (key,val) in required_successors(node)
+            n_required_successors[v] += val
+        end
+        for (key,val) in required_predecessors(node)
+            n_required_predecessors[v] += val
+        end
+        for (key,val) in eligible_successors(node)
+            n_eligible_successors[v] += val
+        end
+        for (key,val) in eligible_predecessors(node)
+            n_eligible_predecessors[v] += val
+        end
+        missing_successors[v] = eligible_successors(node)
+        for v2 in outneighbors(G,v)
+            id2 = get_vtx_id(project_schedule, v2)
+            node2 = get_node_from_id(project_schedule, id2)
+            for key in collect(keys(missing_successors[v]))
+                if matches_template(key,typeof(node2))
+                    missing_successors[v][key] -= 1
+                    break
+                end
+            end
+        end
+        missing_predecessors[v] = eligible_predecessors(node)
+        for v2 in inneighbors(G,v)
+            id2 = get_vtx_id(project_schedule, v2)
+            node2 = get_node_from_id(project_schedule, id2)
+            for key in collect(keys(missing_predecessors[v]))
+                if matches_template(key,typeof(node2))
+                    missing_predecessors[v][key] -= 1
+                    break
+                end
+            end
+        end
+    end
+    @assert(!any(n_eligible_predecessors .< n_required_predecessors))
+    @assert(!any(n_eligible_successors .< n_required_successors))
+
+    upstream_vertices = map(v->[v, map(e->e.dst,collect(edges(bfs_tree(G,v;dir=:in))))...], vertices(G))
+    for v in vertices(G)
+        for v2 in upstream_vertices[v]
+            # @constraint(model, Xa[v,v2] == 0) #TODO this variable is not needed
+        end
+    end
+    non_upstream_vertices = map(v->collect(setdiff(collect(vertices(G)),upstream_vertices[v])), vertices(G))
+    # Big M constraints
+    for v in vertices(G)
+        node = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v))
+        for v2 in non_upstream_vertices[v] # for v2 in vertices(G)
+            node2 = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v2))
+            potential_match = false
+            for (template, val) in missing_successors[v]
+                if !matches_template(template, typeof(node2)) # possible to add an edge
+                    continue
+                end
+                for (template2, val2) in missing_predecessors[v2]
+                    if !matches_template(template2, typeof(node)) # possible to add an edge
+                        continue
+                    end
+                    potential_match = true # TODO: investigate why the solver fails when this is moved inside the following if statement
+                    if (val > 0 && val2 > 0)
+                        new_node = align_with_successor(node,node2)
+                        dt_min = generate_path_spec(project_schedule,problem_spec,new_node).min_path_duration
+                        Xa[v,v2] = @variable(model, binary=true) # initialize a new binary variable in the sparse adjacency matrix
+                        @constraint(model, tF[v] - (t0[v] + dt_min) >= -Mm*(1 - Xa[v,v2]))
+                        @constraint(model, t0[v2] - tF[v] >= -Mm*(1 - Xa[v,v2]))
+                        break
+                    end
+                end
+            end
+            if potential_match == false
+                # @constraint(model, Xa[v,v2] == 0) #TODO this variable is not needed
+            end
+        end
+    end
+
+    # In the sparse implementation, these constraints must come after all possible edges are defined by a VariableRef
+    @constraint(model, Xa * ones(nv(G)) .<= n_eligible_successors);
+    @constraint(model, Xa * ones(nv(G)) .>= n_required_successors);
+    @constraint(model, Xa' * ones(nv(G)) .<= n_eligible_predecessors);
+    @constraint(model, Xa' * ones(nv(G)) .>= n_required_predecessors);
+    for i in 1:nv(G)
+        for j in i:nv(G)
+            # prevent self-edges and cycles
+            @constraint(model, Xa[i,j] + Xa[j,i] <= 1)
+        end
+    end
+
+    # "Job-shop" constraints specifying that no station may be double-booked. A station
+    # can only support a single COLLECT or DEPOSIT operation at a time, meaning that all
+    # the windows for these operations cannot overlap. In the constraints below, t1 and t2
+    # represent the intervals for the COLLECT or DEPOSIT operations of tasks j and j2,
+    # respectively. If eny of the operations for these two tasks require use of the same
+    # station, we introduce a 2D binary variable y. if y = [1,0], the operation for task
+    # j must occur before the operation for task j2. The opposite is true for y == [0,1].
+    # We use the big M method here as well to tightly enforce the binary constraints.
+    # job_shop_variables = Dict{Tuple{Int,Int},JuMP.VariableRef}();
+
+    Xj = SparseMatrixCSC{VariableRef,Int}(nv(G),nv(G),ones(Int,nv(G)+1),Int[],VariableRef[])
+    # @variable(model, Xj[1:nv(G),1:nv(G)], binary = true); # job shop adjacency matrix
+    # @constraint(model, Xj .+ Xj' .<= 1) # no bidirectional or self edges
+    for v in 1:nv(G)
+        node = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v))
+        for v2 in v+1:nv(G)
+            node2 = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v2))
+            common_resources = intersect(resources_reserved(node),resources_reserved(node2))
+            if length(common_resources) > 0
+                # @show common_resources
+                # tmax = @variable(model)
+                # tmin = @variable(model)
+                # Big M constraints
+                Xj[v,v2] = @variable(model, binary=true)
+                Xj[v2,v] = @variable(model, binary=true)
+                @constraint(model, Xj[v,v2] + Xj[v2,v] == 1)
+                if !(v2 in upstream_vertices[v])
+                    @constraint(model, t0[v2] - tF[v] >= -Mm*(1 - Xj[v,v2]))
+                end
+                if !(v in upstream_vertices[v2])
+                    @constraint(model, t0[v] - tF[v2] >= -Mm*(1 - Xj[v2,v]))
+                end
+            # else
+            #     @constraint(model, Xj[v,v2] == 0)
+            #     @constraint(model, Xj[v2,v] == 0)
+            end
+        end
+    end
+    for i in 1:nv(G)
+        for j in i:nv(G)
+            # prevent self-edges and cycles
+            @constraint(model, Xj[i,j] + Xj[j,i] <= 1)
+        end
+    end
+
+    # Full adjacency matrix
+    @variable(model, X[1:nv(G),1:nv(G)]); # Adjacency Matrix
+    @constraint(model, X .== Xa .+ Xj)
+
+    # Formulate Objective
+    if cost_model == SumOfMakeSpans
+        root_nodes = project_schedule.root_nodes
+        @variable(model, T[1:length(root_nodes)])
+        for (i,project_head) in enumerate(root_nodes)
+            for v in project_head
+                @constraint(model, T[i] >= tF[v])
+            end
+        end
+        cost1 = @expression(model, sum(map(v->tF[v]*get(project_schedule.weights,v,0.0), root_nodes)))
+    elseif cost_model == MakeSpan
+        @variable(model, T)
+        @constraint(model, T .>= tF)
+        cost1 = @expression(model, T)
+    end
+    # sparsity_cost = @expression(model, (0.5/(nv(G)^2))*sum(Xa)) # cost term to encourage sparse X. Otherwise the solver may add pointless edges
+    sparsity_cost = @expression(model, (0.5/(nv(G)^2))*sum(X)) # cost term to encourage sparse X. Otherwise the solver may add pointless edges
+    # @objective(model, Min, cost1 + sparsity_cost)
+    @objective(model, Min, cost1)
+    SparseAdjacencyMILP(model,Xa,Xj) #, job_shop_variables
 end
 
 """
