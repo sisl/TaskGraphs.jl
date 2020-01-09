@@ -196,7 +196,7 @@ let
 
                     # robot_ICs = map(i->robot_ICs[i], 1:problem_spec.N)
                     schedule2 = construct_partial_project_schedule(project_spec,problem_spec,map(i->robot_ICs[i], 1:problem_spec.N))
-                    model2 = formulate_schedule_milp(schedule2,problem_spec;cost_model=cost_model)
+                    model2 = formulate_milp(AdjacencyMILP(),schedule2,problem_spec;cost_model=cost_model)
                     optimize!(model2)
                     @test termination_status(model2) == MOI.OPTIMAL
                     obj_val2 = Int(round(value(objective_function(model2))))
@@ -285,22 +285,33 @@ let
                         problem_spec,
                         robot_ICs,
                         Gurobi.Optimizer;
+                        milp_model=AdjacencyMILP(),
                         primary_objective=cost_model
                         );
 
                     @test validate(env2.schedule)
                     @test cost2[1] != Inf
 
+                    # Sparse Adjacency method
+                    solution3, assignment3, cost3, env3 = high_level_search_mod!(
+                        solver,
+                        env_graph,
+                        project_spec,
+                        problem_spec,
+                        robot_ICs,
+                        Gurobi.Optimizer;
+                        milp_model=SparseAdjacencyMILP(),
+                        primary_objective=cost_model
+                        );
+
+                    @test validate(env3.schedule)
+                    @test cost3[1] != Inf
+
                     if cost2[1] != cost1[1]
                         @show f, cost_model, cost1, cost2
-                        # paths_1 = convert_to_vertex_lists(solution1)
-                        # paths_2 = convert_to_vertex_lists(solution2)
-                        # for (p1,p2) in zip(paths_1, paths_2)
-                        #     @show p1
-                        #     @show p2
-                        # end
                     end
                     @test cost2[1] == cost1[1]
+                    @test cost3[1] == cost1[1]
                 end
             end
         end
@@ -362,4 +373,135 @@ let
             end
         end
     end
+end
+
+# Debug: what is causing the cyclic graph?
+let
+
+    env_id = 2
+    env_filename = string(ENVIRONMENT_DIR,"/env_",env_id,".toml")
+    factory_env = read_env(env_filename)
+    env_graph = factory_env.graph
+    dist_matrix = get_dist_matrix(env_graph)
+
+    # problem_def = read_problem_def(joinpath(PROBLEM_DIR,"problem223.toml"))
+    problem_id = 75
+    problem_def = read_problem_def(joinpath(PROBLEM_DIR,string("problem",problem_id,".toml")))
+    project_spec, r0, s0, sF = problem_def.project_spec,problem_def.r0,problem_def.s0,problem_def.sF
+    project_spec, problem_spec, object_ICs, object_FCs, robot_ICs = construct_task_graphs_problem(
+            project_spec, r0, s0, sF, dist_matrix);
+    # Solve the problem
+    solver = PC_TAPF_Solver(DEBUG=true,verbosity=0,LIMIT_A_star_iterations=5*nv(env_graph));
+    (solution, assignment, cost, search_env), elapsed_time, byte_ct, gc_time, mem_ct = @timed high_level_search!(
+        SparseAdjacencyMILP(), solver, env_graph, project_spec, problem_spec, robot_ICs, Gurobi.Optimizer;)
+
+
+
+    # project_schedule = construct_partial_project_schedule(project_spec,problem_spec,map(i->robot_ICs[i], 1:problem_spec.N))
+    # @test validate(project_schedule)
+    # model = formulate_schedule_milp(project_schedule,problem_spec;Presolve=1)
+    # # optimize!(model)
+    # retval, elapsed_time, byte_ct, gc_time, mem_ct = @timed optimize!(model)
+    # @show elapsed_time
+    # @test termination_status(model) == MathOptInterface.OPTIMAL
+    # assignment_matrix = get_assignment_matrix(model);
+    # ############## Route Planning ###############
+    # update_project_schedule!(project_schedule,problem_spec,assignment_matrix)
+    # env, mapf = construct_search_env(project_schedule, problem_spec, env_graph);
+    # pc_mapf = PC_MAPF(env,mapf);
+    ##### Call CBS Search Routine (LEVEL 2) #####
+    # solution, cost = solve!(solver,pc_mapf);
+    # root_node = initialize_root_node(pc_mapf)
+    # vtx_lists = convert_to_vertex_lists(root_node.solution)
+    # for (i,p) in enumerate(vtx_lists)
+    #     @show p
+    # end
+
+    # valid_flag = low_level_search!(solver,pc_mapf,root_node)
+    #
+    # v = 130
+    # path_id = get_path_spec(project_schedule, v).path_id
+    # agent_id = get_path_spec(project_schedule, v).agent_id
+    # cbs_env, base_path = build_env(solver, pc_mapf.env, pc_mapf.mapf, root_node, agent_id, path_id)
+    # extend_path!(cbs_env, base_path, 216)
+    # extend_path!(cbs_env, base_path, 217)
+    # extend_path!(cbs_env, base_path, 218)
+    # schedule_node = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v))
+
+
+    # for i in 1:nv(project_schedule.graph)
+    #     @show i
+    #     plan_next_path!(solver,pc_mapf.env,pc_mapf.mapf,root_node;heuristic=get_heuristic_cost)
+    # end
+    # plan_next_path!(solver,pc_mapf.env,pc_mapf.mapf,root_node;heuristic=get_heuristic_cost)
+
+
+    # solution, assignment, cost, search_env = high_level_search_mod!(
+    #     solver, env_graph, project_spec, problem_spec, robot_ICs, Gurobi.Optimizer;);
+
+end
+let
+    env_id = 2
+    env_filename = string(ENVIRONMENT_DIR,"/env_",env_id,".toml")
+    factory_env = read_env(env_filename)
+    env_graph = factory_env.graph
+    dist_matrix = get_dist_matrix(env_graph)
+    logfile = "log.txt"
+
+    TimeLimit = 40
+    OutputFlag = 0
+    problem_dir = PROBLEM_DIR
+
+    problematic_ids = [
+        43, # one of the solvers gets stuck after A* returns an infeasible path (twice)
+        146, # A* infeasible, again.
+        197
+        ]
+
+    ##
+    for problem_id in problematic_ids[end]+1:384
+        problem_filename = joinpath(problem_dir,string("problem",problem_id,".toml"))
+        problem_def = read_problem_def(problem_filename)
+        project_spec, r0, s0, sF = problem_def.project_spec,problem_def.r0,problem_def.s0,problem_def.sF
+        project_spec, problem_spec, object_ICs, object_FCs, robot_ICs = construct_task_graphs_problem(project_spec, r0, s0, sF, dist_matrix)
+        println("PROBLEM ID: ", problem_id)
+        for cost_model in [SumOfMakeSpans, MakeSpan]
+            costs = Float64[]
+            for milp_model in [AdjacencyMILP(),SparseAdjacencyMILP()]
+                try
+                    solver = PC_TAPF_Solver(verbosity=0)
+                    solution, assignment, cost, env = high_level_search!(
+                        milp_model,
+                        solver,
+                        env_graph,
+                        project_spec,
+                        problem_spec,
+                        robot_ICs,
+                        Gurobi.Optimizer;
+                        primary_objective=cost_model,
+                        TimeLimit=TimeLimit
+                        )
+                    push!(costs, cost[1])
+                    @assert validate(env.schedule)
+                    @assert cost[1] != Inf
+                catch e
+                    open(logfile, "a") do io
+                        write(io, string("PROBLEM ", problem_id, " - ",
+                            "cost model: ", cost_model, " - ",
+                            typeof(milp_model), " - ", e.msg, "\n"))
+                    end
+                end
+            end
+            try
+                @assert all(costs .== costs[1])
+            catch e
+                open(logfile, "a") do io
+                    write(io, string("PROBLEM ", problem_id, " - ",
+                        "cost model: ", cost_model, " - ",
+                         e.msg, " costs: ", costs, "\n"))
+                end
+            end
+        end
+    end
+    ##
 end

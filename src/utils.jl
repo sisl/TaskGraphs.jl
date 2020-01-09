@@ -5,7 +5,7 @@ using LightGraphs, MetaGraphs
 using GraphUtils
 using LinearAlgebra
 using DataStructures
-using JuMP, Gurobi
+using JuMP, MathOptInterface, Gurobi
 
 using ..TaskGraphs
 using CRCBS
@@ -22,7 +22,7 @@ export
     construct_task_graphs_problem
 
 function get_assignment_matrix(model::M) where {M<:JuMP.Model}
-    Matrix{Int}(round.(value.(model[:X])))
+    Matrix{Int}(min.(1, round.(value.(model[:X])))) # guarantees binary matrix
 end
 get_assignment_matrix(model::TaskGraphsMILP) = get_assignment_matrix(model.model)
 function get_assignment_vector(assignment_matrix,M)
@@ -63,21 +63,33 @@ function validate(project_schedule::ProjectSchedule)
 end
 
 export
-    exclude_solutions!
+    exclude_solutions!,
+    exclude_current_solution!
 
 """
     `exclude_solutions!(model::JuMP.Model,forbidden_solutions::Vector{Matrix{Int}})`
 
     This is the key utility for finding the next best solution to the MILP
-    problem. It simply excludes every specific solution passed to it.
+    problem. It simply excludes every specific solution passed to it. It requires
+    that X be a binary matrix.
 """
+function exclude_solutions!(model::JuMP.Model,X::Matrix{Int})
+    @assert !any((X .< 0) .| (X .> 1))
+    @constraint(model, sum(model[:X] .* X) <= sum(model[:X])-1)
+end
+exclude_solutions!(model::TaskGraphsMILP,args...) = exclude_solutions!(model.model, args...)
 function exclude_solutions!(model::JuMP.Model,M::Int,forbidden_solutions::Vector{Matrix{Int}})
-    for Xf in forbidden_solutions
-        M = sum(Xf)
-        @constraint(model, sum(model[:X] .* Xf) <= M-1)
+    for X in forbidden_solutions
+        exclude_solutions!(model,X)
     end
 end
-exclude_solutions!(model::TaskGraphsMILP,M,forbidden_solutions) = exclude_solutions!(model.model, M, forbidden_solutions)
+function exclude_solutions!(model::JuMP.Model)
+    if termination_status(model) != MOI.OPTIMIZE_NOT_CALLED
+        X = get_assignment_matrix(model)
+        exclude_solutions!(model,X)
+    end
+end
+exclude_current_solution!(args...) = exclude_solutions!(args...) 
 
 """
     `cached_pickup_and_delivery_distances(r₀,oₒ,sₒ,dist=(x1,x2)->norm(x2-x1,1))`

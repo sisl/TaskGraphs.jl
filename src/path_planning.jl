@@ -735,59 +735,51 @@ function high_level_search!(solver::P, env_graph, project_spec, problem_spec,
     enter_assignment!(solver)
     log_info(0,solver,string("\nHIGH LEVEL SEARCH: beginning search ..."))
 
-    forbidden_solutions = Vector{Matrix{Int}}() # solutions to exclude from assignment module output
-    lower_bound_cost = 0.0
+    # forbidden_solutions = Vector{Matrix{Int}}() # solutions to exclude from assignment module output
+    lower_bound = 0.0
     best_solution = default_pc_tapf_solution(problem_spec.N)
     best_env    = SearchEnv()
     best_assignment = Vector{Int}()
     model = formulate_optimization_problem(problem_spec,optimizer;cost_model=primary_objective,kwargs...);
 
-    while solver.best_cost[1] > lower_bound_cost
+    while solver.best_cost[1] > lower_bound
         solver.num_assignment_iterations += 1
         log_info(0,solver,string("HIGH LEVEL SEARCH: iteration ",solver.num_assignment_iterations,"..."))
         ############## Task Assignment ###############
         # add constraints to get next best solution
-        exclude_solutions!(model, problem_spec.M, forbidden_solutions)
+        exclude_solutions!(model) #, problem_spec.M, forbidden_solutions)
         optimize!(model)
         optimal = (termination_status(model) == MathOptInterface.OPTIMAL);
         if !optimal
             log_info(0,solver,string(
                 "HIGH LEVEL SEARCH: Task Assignment failed. Returning best solution so far.\n",
-                " * optimality gap = ", solver.best_cost[1] - lower_bound_cost))
+                " * optimality gap = ", solver.best_cost[1] - lower_bound))
             return best_solution, best_assignment, solver.best_cost, best_env
         end
-        assignment_matrix = get_assignment_matrix(model);
-        # add this assignment to the list of assignments to forbid next iteration
-        push!(forbidden_solutions, assignment_matrix)
-        # assignments = map(j->findfirst(assignment_matrix[:,j] .== 1),1:problem_spec.M);
-        assignments = get_assignment_vector(assignment_matrix,problem_spec.M)
         optimal_TA_cost = Int(round(value(objective_function(model)))); # lower bound on cost (from task assignment module)
-        lower_bound_cost = max(lower_bound_cost, optimal_TA_cost)
+        lower_bound = max(lower_bound, optimal_TA_cost)
+        log_info(0,solver,string("HIGH LEVEL SEARCH: Current lower bound cost = ",lower_bound))
+        assignment_matrix = get_assignment_matrix(model);
+        assignments = get_assignment_vector(assignment_matrix,problem_spec.M)
         log_info(0,solver,string("HIGH LEVEL SEARCH: Current assignment vector = ",assignments))
-        log_info(0,solver,string("HIGH LEVEL SEARCH: Current lower bound cost = ",lower_bound_cost))
-        if lower_bound_cost >= solver.best_cost[1] # TODO make sure that the operation duration is accounted for here
-            # log_info(-1,solver.verbosity,string("HIGH LEVEL SEARCH: optimality gap = ",solver.best_cost[1] - lower_bound_cost,". Returning best solution with cost ", solver.best_cost,"\n"))
-            break
+        if lower_bound < solver.best_cost[1] # TODO make sure that the operation duration is accounted for here
+            ############## Route Planning ###############
+            env, mapf = construct_search_env(project_spec, problem_spec, robot_ICs, assignments, env_graph;
+                primary_objective=primary_objective);
+            pc_mapf = PC_MAPF(env,mapf);
+            ##### Call CBS Search Routine (LEVEL 2) #####
+            solution, cost = solve!(solver,pc_mapf);
+            if cost < solver.best_cost
+                best_solution = solution
+                best_assignment = assignments
+                solver.best_cost = cost # TODO make sure that the operation duration is accounted for here
+                best_env = env
+            end
+            log_info(0,solver,string("HIGH LEVEL SEARCH: Best cost so far = ", solver.best_cost[1]))
         end
-        ############## Route Planning ###############
-        # update_project_schedule!(project_schedule,problem_spec,assignment_matrix)
-        # env, mapf = construct_search_env(project_schedule, problem_spec, env_graph);
-        env, mapf = construct_search_env(project_spec, problem_spec, robot_ICs, assignments, env_graph;
-            primary_objective=primary_objective);
-        pc_mapf = PC_MAPF(env,mapf);
-        ##### Call CBS Search Routine (LEVEL 2) #####
-        solution, cost = solve!(solver,pc_mapf);
-        # cost = tuple_cost[1]
-        if cost < solver.best_cost
-            best_solution = solution
-            best_assignment = assignments
-            solver.best_cost = cost # TODO make sure that the operation duration is accounted for here
-            best_env = env
-        end
-        log_info(0,solver,string("HIGH LEVEL SEARCH: Best cost so far = ", solver.best_cost[1]))
     end
     exit_assignment!(solver)
-    log_info(-1,solver.verbosity,string("HIGH LEVEL SEARCH: optimality gap = ",solver.best_cost[1] - lower_bound_cost,". Returning best solution with cost ", solver.best_cost,"\n"))
+    log_info(-1,solver.verbosity,string("HIGH LEVEL SEARCH: optimality gap = ",solver.best_cost[1] - lower_bound,". Returning best solution with cost ", solver.best_cost,"\n"))
     return best_solution, best_assignment, solver.best_cost, best_env
 end
 """
@@ -796,69 +788,63 @@ end
 """
 function high_level_search_mod!(solver::P, env_graph, project_spec, problem_spec,
         robot_ICs, optimizer;
+        milp_model=AdjacencyMILP(),
         primary_objective=SumOfMakeSpans,
         kwargs...) where {P<:PC_TAPF_Solver}
 
     enter_assignment!(solver)
     log_info(0,solver,string("\nHIGH LEVEL SEARCH: beginning search ..."))
 
-    forbidden_solutions = Vector{Matrix{Int}}() # solutions to exclude from assignment module output
-    lower_bound_cost = 0.0
+    lower_bound = 0.0
     best_solution = default_pc_tapf_solution(problem_spec.N)
     best_env    = SearchEnv()
     best_assignment = Vector{Int}()
     project_schedule = construct_partial_project_schedule(project_spec,problem_spec,map(i->robot_ICs[i], 1:problem_spec.N))
-    model = formulate_schedule_milp(project_schedule,problem_spec;
+    model = formulate_milp(milp_model,project_schedule,problem_spec;
         cost_model=primary_objective,optimizer=optimizer,kwargs...)
 
-    while solver.best_cost[1] > lower_bound_cost
+    while solver.best_cost[1] > lower_bound
         solver.num_assignment_iterations += 1
         log_info(0,solver,string("HIGH LEVEL SEARCH: iteration ",solver.num_assignment_iterations,"..."))
         ############## Task Assignment ###############
-        # add constraints to get next best solution
-        exclude_solutions!(model, problem_spec.M, forbidden_solutions)
+        exclude_solutions!(model) # exclude most recent solution in order to get next best solution
         optimize!(model)
         optimal = (termination_status(model) == MathOptInterface.OPTIMAL);
         if !optimal
-            log_info(0,solver,string(
-                "HIGH LEVEL SEARCH: Task Assignment failed. Returning best solution so far.\n",
-                " * optimality gap = ", solver.best_cost[1] - lower_bound_cost))
+            log_info(0,solver,string("HIGH LEVEL SEARCH: Task assignment failed. Returning best solution so far.\n",
+                " * optimality gap = ", solver.best_cost[1] - lower_bound))
             return best_solution, best_assignment, solver.best_cost, best_env
         end
-        assignment_matrix = get_assignment_matrix(model);
-        # add this assignment to the list of assignments to forbid next iteration
-        push!(forbidden_solutions, assignment_matrix)
-        # assignments = map(j->findfirst(assignment_matrix[:,j] .== 1),1:problem_spec.M);
-        assignments = get_assignment_vector(assignment_matrix,problem_spec.M)
         optimal_TA_cost = Int(round(value(objective_function(model)))); # lower bound on cost (from task assignment module)
-        lower_bound_cost = max(lower_bound_cost, optimal_TA_cost)
-        # log_info(0,solver,string("HIGH LEVEL SEARCH: Current assignment vector = ",assignments))
-        log_info(0,solver,string("HIGH LEVEL SEARCH: Current lower bound cost = ",lower_bound_cost))
-        if lower_bound_cost >= solver.best_cost[1]
-            break
+        lower_bound = max(lower_bound, optimal_TA_cost)
+        log_info(0,solver,string("HIGH LEVEL SEARCH: Current lower bound cost = ",lower_bound))
+        assignment_matrix = get_assignment_matrix(model);
+        assignments = get_assignment_vector(assignment_matrix,problem_spec.M)
+        if lower_bound < solver.best_cost[1]
+            ############## Route Planning ###############
+            update_project_schedule!(project_schedule,problem_spec,assignment_matrix)
+            env, mapf = construct_search_env(project_schedule, problem_spec, env_graph;
+                primary_objective=primary_objective);
+            pc_mapf = PC_MAPF(env,mapf);
+            ##### Call CBS Search Routine (LEVEL 2) #####
+            solution, cost = solve!(solver,pc_mapf);
+            if cost < solver.best_cost
+                best_solution = solution
+                best_assignment = assignments
+                solver.best_cost = cost # TODO make sure that the operation duration is accounted for here
+                best_env = env
+            end
+            log_info(0,solver,string("HIGH LEVEL SEARCH: Best cost so far = ", solver.best_cost[1]))
         end
-        ############## Route Planning ###############
-        update_project_schedule!(project_schedule,problem_spec,assignment_matrix)
-        # env, mapf = construct_search_env(project_spec, problem_spec, robot_ICs, assignments, env_graph);
-        env, mapf = construct_search_env(project_schedule, problem_spec, env_graph;
-            primary_objective=primary_objective);
-        # log_info(-1,solver,"mapf starts", [s.vtx for s in mapf.starts])
-        pc_mapf = PC_MAPF(env,mapf);
-        ##### Call CBS Search Routine (LEVEL 2) #####
-        solution, cost = solve!(solver,pc_mapf);
-        # cost = tuple_cost[1]
-        if cost < solver.best_cost
-            best_solution = solution
-            best_assignment = assignments
-            solver.best_cost = cost # TODO make sure that the operation duration is accounted for here
-            best_env = env
-        end
-        log_info(0,solver,string("HIGH LEVEL SEARCH: Best cost so far = ", solver.best_cost[1]))
     end
     exit_assignment!(solver)
-    log_info(-1,solver.verbosity,string("HIGH LEVEL SEARCH: optimality gap = ",solver.best_cost[1] - lower_bound_cost,". Returning best solution with cost ", solver.best_cost,"\n"))
+    log_info(-1,solver.verbosity,string("HIGH LEVEL SEARCH: optimality gap = ",solver.best_cost[1] - lower_bound,". Returning best solution with cost ", solver.best_cost,"\n"))
     return best_solution, best_assignment, solver.best_cost, best_env
 end
+
+high_level_search!(milp_model::AssignmentMILP, args...;kwargs...) = high_level_search!(args...;kwargs...)
+high_level_search!(milp_model::AdjacencyMILP, args...;kwargs...) = high_level_search_mod!(args...;milp_model=milp_model,kwargs...)
+high_level_search!(milp_model::SparseAdjacencyMILP, args...;kwargs...) = high_level_search_mod!(args...;milp_model=milp_model,kwargs...)
 
 export
     freeze_assignments!,

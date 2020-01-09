@@ -247,7 +247,12 @@ function profile_full_solver(problem_def::SimpleProblemDef,env_graph,dist_matrix
     solver = PC_TAPF_Solver(verbosity=0,LIMIT_A_star_iterations=5*nv(env_graph));
     if solver_mode == :adjacency
         (solution, assignment, cost, search_env), elapsed_time, byte_ct, gc_time, mem_ct = @timed high_level_search_mod!(
-            solver, env_graph, project_spec, problem_spec, robot_ICs, Gurobi.Optimizer;kwargs...);
+            solver, env_graph, project_spec, problem_spec, robot_ICs, Gurobi.Optimizer;
+            milp_model=AdjacencyMILP(),kwargs...);
+    elseif solver_mode == :sparse_adjacency
+        (solution, assignment, cost, search_env), elapsed_time, byte_ct, gc_time, mem_ct = @timed high_level_search_mod!(
+            solver, env_graph, project_spec, problem_spec, robot_ICs, Gurobi.Optimizer;
+            milp_model=SparseAdjacencyMILP(),kwargs...);
     else
         (solution, assignment, cost, search_env), elapsed_time, byte_ct, gc_time, mem_ct = @timed high_level_search!(
             solver, env_graph, project_spec, problem_spec, robot_ICs, Gurobi.Optimizer;kwargs...);

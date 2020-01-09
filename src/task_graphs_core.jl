@@ -404,30 +404,10 @@ export
     weights             ::Dict{Int,Float64}     = Dict{Int,Float64}() # weights corresponding to project heads
     path_id_to_vtx_map  ::Dict{Int,Int}         = Dict{Int,Int}() # maps path_id to vertex
 
-    # object_ICs          ::Dict{Int,OBJECT_AT} = Dict{Int,OBJECT_AT}()
-    # robot_ICs           ::Dict{Int,ROBOT_AT}  = Dict{Int,ROBOT_AT}()
-    # robot_FCs           ::Dict{Int,TERMINAL_ROBOT_AT}  = Dict{Int,TERMINAL_ROBOT_AT}()
-    # actions             ::Dict{Int,AbstractRobotAction} = Dict{Int,AbstractRobotAction}()
-    # operations          ::Dict{Int,Operation} = Dict{Int,Operation}()
-    #
     robot_id_map        ::Dict{Int,Int}   = Dict{Int,Int}() # maps dummy id to true id
-    # object_vtx_map      ::Dict{Int,Int}   = Dict{Int,Int}()
-    # robot_vtx_map       ::Dict{Int,Int}   = Dict{Int,Int}()
-    # operation_vtx_map   ::Dict{Int,Int}   = Dict{Int,Int}()
-    # action_vtx_map      ::Dict{Int,Int}   = Dict{Int,Int}()
 end
 get_graph(schedule::P) where {P<:ProjectSchedule}       = schedule.graph
-get_nodes_of_type(schedule::P,T) where {P<:ProjectSchedule} = Dict(get_id(id)=>schedule.planning_nodes[id] for id in schedule.vtx_ids if typeof(id)<:T)
-get_object_ICs(schedule::P) where {P<:ProjectSchedule}  = get_nodes_of_type(schedule,ObjectID)
-get_robot_ICs(schedule::P) where {P<:ProjectSchedule}   = get_nodes_of_type(schedule,RobotID)
-get_robot_FCs(schedule::P) where {P<:ProjectSchedule}   = get_nodes_of_type(schedule,TerminalRobotID)
-get_actions(schedule::P) where {P<:ProjectSchedule}     = get_nodes_of_type(schedule,ActionID)
-get_operations(schedule::P) where {P<:ProjectSchedule}  = get_nodes_of_type(schedule,OperationID)
-# get_object_ICs(schedule::P) where {P<:ProjectSchedule}  = schedule.object_ICs
-# get_robot_ICs(schedule::P) where {P<:ProjectSchedule}   = schedule.robot_ICs
-# get_robot_FCs(schedule::P) where {P<:ProjectSchedule}   = schedule.robot_FCs
-# get_actions(schedule::P) where {P<:ProjectSchedule}     = schedule.actions
-# get_operations(schedule::P) where {P<:ProjectSchedule}  = schedule.operations
+
 get_vtx_ids(schedule::P) where {P<:ProjectSchedule}     = schedule.vtx_ids
 get_root_nodes(schedule::P) where {P<:ProjectSchedule}  = schedule.root_nodes
 get_root_node_weights(schedule::P) where {P<:ProjectSchedule}  = schedule.weights
@@ -437,15 +417,12 @@ get_vtx(schedule::P,id::A) where {P<:ProjectSchedule,A<:AbstractID}         = ge
 get_vtx_id(schedule::P,v::Int) where {P<:ProjectSchedule}                   = schedule.vtx_ids[v]
 get_node_from_vtx(schedule::P,v::Int) where {P<:ProjectSchedule}= schedule.planning_nodes[schedule.vtx_ids[v]]
 
-# get_node_from_id(schedule::P,id::ActionID) where {P<:ProjectSchedule}       = get_actions(schedule)[get_id(id)]
-# get_node_from_id(schedule::P,id::OperationID) where {P<:ProjectSchedule}    = get_operations(schedule)[get_id(id)]
-# get_node_from_id(schedule::P,id::ObjectID) where {P<:ProjectSchedule}       = get_object_ICs(schedule)[get_id(id)]
-# get_node_from_id(schedule::P,id::RobotID) where {P<:ProjectSchedule}        = get_robot_ICs(schedule)[get_id(id)]
-
-# get_vtx(schedule::ProjectSchedule,i::ObjectID)      = get(schedule.object_vtx_map,      get_id(i), -1)
-# get_vtx(schedule::ProjectSchedule,i::RobotID)       = get(schedule.robot_vtx_map,       get_id(i), -1)
-# get_vtx(schedule::ProjectSchedule,i::ActionID)      = get(schedule.action_vtx_map,      get_id(i), -1)
-# get_vtx(schedule::ProjectSchedule,i::OperationID)   = get(schedule.operation_vtx_map,   get_id(i), -1)
+get_nodes_of_type(schedule::P,T) where {P<:ProjectSchedule} = Dict(get_id(id)=>schedule.planning_nodes[id] for id in schedule.vtx_ids if typeof(id)<:T)
+get_object_ICs(schedule::P) where {P<:ProjectSchedule}  = get_nodes_of_type(schedule,ObjectID)
+get_robot_ICs(schedule::P) where {P<:ProjectSchedule}   = get_nodes_of_type(schedule,RobotID)
+get_robot_FCs(schedule::P) where {P<:ProjectSchedule}   = get_nodes_of_type(schedule,TerminalRobotID)
+get_actions(schedule::P) where {P<:ProjectSchedule}     = get_nodes_of_type(schedule,ActionID)
+get_operations(schedule::P) where {P<:ProjectSchedule}  = get_nodes_of_type(schedule,OperationID)
 
 get_num_actions(schedule::P) where {P<:ProjectSchedule}     = length(get_actions(schedule))
 get_num_operations(schedule::P) where {P<:ProjectSchedule}  = length(get_operations(schedule))
@@ -455,16 +432,6 @@ get_num_vtxs(schedule::P) where {P<:ProjectSchedule}        = nv(get_graph(sched
 get_num_paths(schedule::P) where {P<:ProjectSchedule}       = get_num_actions(schedule) + get_num_robot_ICs(schedule)
 
 get_next_path_id(schedule::P) where {P<:ProjectSchedule}    = length(schedule.path_id_to_vtx_map) + 1
-
-# Overhaul methods:
-# get_node_from_id
-# get_vtx
-# get_vtx_id
-# get_node_from_vtx
-#
-# set_vtx_map!
-# insert_to_vtx_map!
-# set_path_spec!
 
 export
     set_vtx_map!,
@@ -478,23 +445,6 @@ function insert_to_vtx_map!(schedule::P,pred,id::ID,idx::Int) where {P<:ProjectS
     push!(schedule.vtx_ids, id)
     set_vtx_map!(schedule,pred,id,idx)
 end
-
-# function set_vtx_map!(schedule::P,pred::OBJECT_AT,id::ObjectID,idx::Int) where {P<:ProjectSchedule}
-#     get_object_ICs(schedule)[get_id(id)] = pred
-#     schedule.object_vtx_map[get_id(id)] = idx
-# end
-# function set_vtx_map!(schedule::P,pred::ROBOT_AT,id::RobotID,idx::Int) where {P<:ProjectSchedule}
-#     get_robot_ICs(schedule)[get_id(id)] = pred
-#     schedule.robot_vtx_map[get_id(id)] = idx
-# end
-# function set_vtx_map!(schedule::P,op::Operation,id::OperationID,idx::Int) where {P<:ProjectSchedule}
-#     get_operations(schedule)[get_id(id)] = op
-#     schedule.operation_vtx_map[get_id(id)] = idx
-# end
-# function set_vtx_map!(schedule::P,a::A,id::ActionID,idx::Int) where {P<:ProjectSchedule,A<:AbstractRobotAction}
-#     get_actions(schedule)[get_id(id)] = a
-#     schedule.action_vtx_map[get_id(id)] = idx
-# end
 
 export
     get_path_spec,
@@ -1772,8 +1722,8 @@ function update_project_schedule!(project_schedule::P,problem_spec::T,adj_matrix
             end
         end
     end
-    DEBUG ? @assert(is_cyclic(G) == false) : nothing
-    @assert(is_cyclic(G) == false)
+    # DEBUG ? @assert(is_cyclic(G) == false) : nothing
+    @assert (is_cyclic(G) == false) # string(sparse(adj_matrix))
     # Propagate valid IDs through the schedule
     for v in topological_sort(G)
         node_id = get_vtx_id(project_schedule, v)
@@ -1798,5 +1748,9 @@ function update_project_schedule!(milp_model::M,
 end
 # function update_project_schedule!(milp_model::AssignmentMILP,project_schedule::P,problem_spec::T,adj_matrix,DEBUG::Bool=false) where {P<:ProjectSchedule,T<:ProblemSpec}
 # end
+
+function prune_project_schedule(schedule::ProjectSchedule,completed_vtxs::Vector{Int})
+
+end
 
 end # module TaskGraphCore
