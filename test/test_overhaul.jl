@@ -144,13 +144,13 @@ let
         robot_ICs = map(i->robot_ICs[i], 1:problem_spec.N)
 
         project_schedule = construct_partial_project_schedule(project_spec,problem_spec,robot_ICs)
-        print_project_schedule(project_schedule,"project_schedule1")
         model = formulate_milp(SparseAdjacencyMILP(),project_schedule,problem_spec)
         optimize!(model)
         @test termination_status(model) == MOI.OPTIMAL
         obj_val = Int(round(value(objective_function(model))))
         adj_matrix = Int.(round.(value.(model[:X])))
 
+        # print_project_schedule(project_schedule,"project_schedule1")
         update_project_schedule!(project_schedule,problem_spec,adj_matrix)
         # print_project_schedule(project_schedule,"project_schedule2")
         @test validate(project_schedule)

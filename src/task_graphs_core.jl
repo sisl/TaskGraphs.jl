@@ -1576,7 +1576,8 @@ function formulate_milp(milp_model::SparseAdjacencyMILP,project_schedule::Projec
     for v in vertices(G)
         @constraint(model, tF[v] >= t0[v] + Δt[v])
         for v2 in outneighbors(G,v)
-            # @constraint(model, Xa[v,v2] == 1) #TODO this edge already exists--no reason to encode it as a decision variable
+            Xa[v,v2] = @variable(model, binary=true) # TODO remove this (MUST UPDATE n_eligible_successors, etc. accordingly)
+            @constraint(model, Xa[v,v2] == 1) #TODO this edge already exists--no reason to encode it as a decision variable
             @constraint(model, t0[v2] >= tF[v])
         end
     end
@@ -1666,10 +1667,10 @@ function formulate_milp(milp_model::SparseAdjacencyMILP,project_schedule::Projec
     end
 
     # In the sparse implementation, these constraints must come after all possible edges are defined by a VariableRef
-    # @constraint(model, Xa * ones(nv(G)) .<= n_eligible_successors);
-    # @constraint(model, Xa * ones(nv(G)) .>= n_required_successors);
-    # @constraint(model, Xa' * ones(nv(G)) .<= n_eligible_predecessors);
-    # @constraint(model, Xa' * ones(nv(G)) .>= n_required_predecessors);
+    @constraint(model, Xa * ones(nv(G)) .<= n_eligible_successors);
+    @constraint(model, Xa * ones(nv(G)) .>= n_required_successors);
+    @constraint(model, Xa' * ones(nv(G)) .<= n_eligible_predecessors);
+    @constraint(model, Xa' * ones(nv(G)) .>= n_required_predecessors);
     for i in 1:nv(G)
         for j in i:nv(G)
             # prevent self-edges and cycles
