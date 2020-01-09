@@ -1666,10 +1666,10 @@ function formulate_milp(milp_model::SparseAdjacencyMILP,project_schedule::Projec
     end
 
     # In the sparse implementation, these constraints must come after all possible edges are defined by a VariableRef
-    @constraint(model, Xa * ones(nv(G)) .<= n_eligible_successors);
-    @constraint(model, Xa * ones(nv(G)) .>= n_required_successors);
-    @constraint(model, Xa' * ones(nv(G)) .<= n_eligible_predecessors);
-    @constraint(model, Xa' * ones(nv(G)) .>= n_required_predecessors);
+    # @constraint(model, Xa * ones(nv(G)) .<= n_eligible_successors);
+    # @constraint(model, Xa * ones(nv(G)) .>= n_required_successors);
+    # @constraint(model, Xa' * ones(nv(G)) .<= n_eligible_predecessors);
+    # @constraint(model, Xa' * ones(nv(G)) .>= n_required_predecessors);
     for i in 1:nv(G)
         for j in i:nv(G)
             # prevent self-edges and cycles
@@ -1723,8 +1723,8 @@ function formulate_milp(milp_model::SparseAdjacencyMILP,project_schedule::Projec
     end
 
     # Full adjacency matrix
-    @variable(model, X[1:nv(G),1:nv(G)]); # Adjacency Matrix
-    @constraint(model, X .== Xa .+ Xj)
+    # @variable(model, X[1:nv(G),1:nv(G)]); # Adjacency Matrix
+    # @constraint(model, X .== Xa .+ Xj)
 
     # Formulate Objective
     if cost_model == SumOfMakeSpans
@@ -1742,7 +1742,7 @@ function formulate_milp(milp_model::SparseAdjacencyMILP,project_schedule::Projec
         cost1 = @expression(model, T)
     end
     # sparsity_cost = @expression(model, (0.5/(nv(G)^2))*sum(Xa)) # cost term to encourage sparse X. Otherwise the solver may add pointless edges
-    sparsity_cost = @expression(model, (0.5/(nv(G)^2))*sum(X)) # cost term to encourage sparse X. Otherwise the solver may add pointless edges
+    # sparsity_cost = @expression(model, (0.5/(nv(G)^2))*sum(X)) # cost term to encourage sparse X. Otherwise the solver may add pointless edges
     # @objective(model, Min, cost1 + sparsity_cost)
     @objective(model, Min, cost1)
     SparseAdjacencyMILP(model,Xa,Xj) #, job_shop_variables
