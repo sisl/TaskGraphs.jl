@@ -1726,6 +1726,7 @@ function formulate_milp(milp_model::SparseAdjacencyMILP,project_schedule::Projec
     # Full adjacency matrix
     # @variable(model, X[1:nv(G),1:nv(G)]); # Adjacency Matrix
     # @constraint(model, X .== Xa .+ Xj)
+    @expression(model, X, Xa .+ Xj) # Make X an expression rather than a variable
 
     # Formulate Objective
     if cost_model == SumOfMakeSpans
@@ -1787,10 +1788,15 @@ function update_project_schedule!(project_schedule::P,problem_spec::T,adj_matrix
     end
     project_schedule
 end
-function update_project_schedule!(milp_model::AdjacencyMILP,project_schedule::P,problem_spec::T,adj_matrix,DEBUG::Bool=false) where {P<:ProjectSchedule,T<:ProblemSpec}
+function update_project_schedule!(milp_model::M,
+        project_schedule::P,
+        problem_spec::T,
+        adj_matrix,
+        DEBUG::Bool=false
+    ) where {M<:TaskGraphsMILP,P<:ProjectSchedule,T<:ProblemSpec}
     update_project_schedule!(project_schedule,problem_spec,adj_matrix,DEBUG)
 end
-function update_project_schedule!(milp_model::AssignmentMILP,project_schedule::P,problem_spec::T,adj_matrix,DEBUG::Bool=false) where {P<:ProjectSchedule,T<:ProblemSpec}
-end
+# function update_project_schedule!(milp_model::AssignmentMILP,project_schedule::P,problem_spec::T,adj_matrix,DEBUG::Bool=false) where {P<:ProjectSchedule,T<:ProblemSpec}
+# end
 
 end # module TaskGraphCore

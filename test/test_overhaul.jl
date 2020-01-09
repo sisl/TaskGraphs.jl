@@ -95,7 +95,7 @@ let
 
     env_id = 2
     env_file = joinpath(ENVIRONMENT_DIR,string("env_",env_id,".toml"))
-    global factory_env = read_env(env_file)
+    factory_env = read_env(env_file)
     env_graph = factory_env.graph
     dist_matrix = get_dist_matrix(env_graph)
 
@@ -148,7 +148,7 @@ let
         optimize!(model)
         @test termination_status(model) == MOI.OPTIMAL
         obj_val = Int(round(value(objective_function(model))))
-        adj_matrix = Int.(round.(value.(model[:X])))
+        adj_matrix = get_assignment_matrix(model)
 
         # print_project_schedule(project_schedule,"project_schedule1")
         update_project_schedule!(project_schedule,problem_spec,adj_matrix)
@@ -204,12 +204,27 @@ let
                     update_project_schedule!(schedule2,problem_spec,adj_matrix)
                     @test validate(schedule2)
 
+                    # test sparse adjacency matrix formulation
+                    schedule3 = construct_partial_project_schedule(project_spec,problem_spec,map(i->robot_ICs[i], 1:problem_spec.N))
+                    model3 = formulate_milp(SparseAdjacencyMILP(),schedule2,problem_spec;cost_model=cost_model)
+                    optimize!(model3)
+                    @test termination_status(model3) == MOI.OPTIMAL
+                    obj_val3 = Int(round(value(objective_function(model2))))
+                    adj_matrix = get_assignment_matrix(model3)
+                    update_project_schedule!(schedule2,problem_spec,adj_matrix)
+                    @test validate(schedule2)
+
                     @test obj_val1 == obj_val2
+                    @test obj_val1 == obj_val3
                     # @show i, (obj_val1 == obj_val2), obj_val1, obj_val2
                     # @test schedule1 == schedule2
                     if !(obj_val1 == obj_val2)
                         print_project_schedule(schedule1,string("project_schedule1_",i))
                         print_project_schedule(schedule2,model2,string("project_schedule2_",i))
+                    end
+                    if !(obj_val1 == obj_val3)
+                        print_project_schedule(schedule1,string("project_schedule1_",i))
+                        print_project_schedule(schedule3,model3,string("project_schedule3_",i))
                     end
                 end
             end
