@@ -344,8 +344,10 @@ export
 
     agent_id            ::Int           = -1
     dummy_id            ::Int           = -1
-    path_id             ::Int           = -1
+
     object_id           ::Int           = -1
+    # flag indicating that a path must be planned
+    plan_path           ::Bool          = true
     # tight==true => planning goal time must be tight to beginning of successors
     # (local slack == 0). E.g., GO nodes must not end before COLLECT can begin,
     # because then we have empty time between planning phases
@@ -376,7 +378,6 @@ export
     get_num_robot_ICs,
     get_num_vtxs,
     get_num_paths,
-    get_next_path_id,
     get_completion_time,
     get_duration,
     get_vtx,
@@ -386,11 +387,6 @@ export
     construct_project_schedule,
     process_schedule
 
-# abstract type AbstractProjectSchedule end
-# struct CompositeProjectSchedule <: AbstractProjectSchedule
-#     schedules::Vector{ProjectSchedule}
-#     weights::Vector{Float64}
-# end
 """
     `ProjectSchedule`
 """
@@ -402,7 +398,6 @@ export
     path_specs          ::Vector{PathSpec}      = Vector{PathSpec}()
     root_nodes          ::Vector{Int}           = Vector{Int}() # list of "project heads"
     weights             ::Dict{Int,Float64}     = Dict{Int,Float64}() # weights corresponding to project heads
-    path_id_to_vtx_map  ::Dict{Int,Int}         = Dict{Int,Int}() # maps path_id to vertex
 
     robot_id_map        ::Dict{Int,Int}   = Dict{Int,Int}() # maps dummy id to true id
 end
@@ -431,8 +426,6 @@ get_num_robot_ICs(schedule::P) where {P<:ProjectSchedule}   = length(get_robot_I
 get_num_vtxs(schedule::P) where {P<:ProjectSchedule}        = nv(get_graph(schedule))
 get_num_paths(schedule::P) where {P<:ProjectSchedule}       = get_num_actions(schedule) + get_num_robot_ICs(schedule)
 
-get_next_path_id(schedule::P) where {P<:ProjectSchedule}    = length(schedule.path_id_to_vtx_map) + 1
-
 export
     set_vtx_map!,
     insert_to_vtx_map!
@@ -454,24 +447,17 @@ export
 get_path_spec(schedule::P,v::Int) where {P<:ProjectSchedule} = schedule.path_specs[v]
 function set_path_spec!(schedule::P,v::Int,spec::S) where {P<:ProjectSchedule,S<:PathSpec}
     schedule.path_specs[v] = spec
-    if spec.path_id != -1
-        schedule.path_id_to_vtx_map[spec.path_id] = v
-    end
 end
 function add_path_spec!(schedule::P,spec::S) where {P<:ProjectSchedule,S<:PathSpec}
     push!(schedule.path_specs, spec)
     set_path_spec!(schedule, nv(schedule.graph), spec)
-    # @assert spec.path_id != -1
-    # if spec.path_id != -1
-    #     schedule.path_id_to_vtx_map[spec.path_id] = nv(get_graph(schedule))
-    # end
 end
 
 """
     PathSpec provides details about the path that corresponds to this node in
     the schedule
 """
-function generate_path_spec(schedule::P,spec::T,a::GO,path_id=get_next_path_id(schedule)) where {P<:ProjectSchedule,T<:ProblemSpec}
+function generate_path_spec(schedule::P,spec::T,a::GO) where {P<:ProjectSchedule,T<:ProblemSpec}
     s0 = get_id(get_initial_location_id(a))
     s = get_id(get_destination_location_id(a))
     r = get_id(get_robot_id(a))
@@ -481,14 +467,13 @@ function generate_path_spec(schedule::P,spec::T,a::GO,path_id=get_next_path_id(s
         final_vtx=s,
         # min_path_duration=get(spec.D,(s0,s),typemax(Int)), # ProblemSpec distance matrix
         min_path_duration=get(spec.D,(s0,s),0), # ProblemSpec distance matrix
-        path_id=path_id,
         dummy_id=r,
         agent_id=get(schedule.robot_id_map,r,r),
         tight=true,
         free = (s==-1) # if destination is -1, there is no goal location
         )
 end
-function generate_path_spec(schedule::P,spec::T,a::CARRY,path_id=get_next_path_id(schedule)) where {P<:ProjectSchedule,T<:ProblemSpec}
+function generate_path_spec(schedule::P,spec::T,a::CARRY) where {P<:ProjectSchedule,T<:ProblemSpec}
     s0 = get_id(get_initial_location_id(a))
     s = get_id(get_destination_location_id(a))
     r = get_id(get_robot_id(a))
@@ -499,13 +484,12 @@ function generate_path_spec(schedule::P,spec::T,a::CARRY,path_id=get_next_path_i
         final_vtx=s,
         # min_path_duration=get(spec.D,(s0,s),typemax(Int)), # ProblemSpec distance matrix
         min_path_duration=get(spec.D,(s0,s),0), # ProblemSpec distance matrix
-        path_id=path_id,
         dummy_id=r,
         agent_id=get(schedule.robot_id_map,r,r),
         object_id = o
         )
 end
-function generate_path_spec(schedule::P,spec::T,a::COLLECT,path_id=get_next_path_id(schedule)) where {P<:ProjectSchedule,T<:ProblemSpec}
+function generate_path_spec(schedule::P,spec::T,a::COLLECT) where {P<:ProjectSchedule,T<:ProblemSpec}
     s0 = get_id(get_initial_location_id(a))
     s = get_id(get_destination_location_id(a))
     r = get_id(get_robot_id(a))
@@ -516,14 +500,13 @@ function generate_path_spec(schedule::P,spec::T,a::COLLECT,path_id=get_next_path
         final_vtx=s,
         # min_path_duration=get(spec.Δt_collect,o,typemax(Int)),
         min_path_duration=get(spec.Δt_collect,o,0),
-        path_id=path_id,
         dummy_id=r,
         agent_id=get(schedule.robot_id_map,r,r),
         object_id = o,
         static=true
         )
 end
-function generate_path_spec(schedule::P,spec::T,a::DEPOSIT,path_id=get_next_path_id(schedule)) where {P<:ProjectSchedule,T<:ProblemSpec}
+function generate_path_spec(schedule::P,spec::T,a::DEPOSIT) where {P<:ProjectSchedule,T<:ProblemSpec}
     s0 = get_id(get_initial_location_id(a))
     s = get_id(get_destination_location_id(a))
     r = get_id(get_robot_id(a))
@@ -534,23 +517,23 @@ function generate_path_spec(schedule::P,spec::T,a::DEPOSIT,path_id=get_next_path
         final_vtx=s,
         # min_path_duration=get(spec.Δt_deliver,o,typemax(Int)),
         min_path_duration=get(spec.Δt_deliver,o,0),
-        path_id=path_id,
         dummy_id=r,
         agent_id=get(schedule.robot_id_map,r,r),
         object_id = o,
         static=true
         )
 end
-function generate_path_spec(schedule::P,spec::T,pred::OBJECT_AT,path_id=get_next_path_id(schedule)) where {P<:ProjectSchedule,T<:ProblemSpec}
+function generate_path_spec(schedule::P,spec::T,pred::OBJECT_AT) where {P<:ProjectSchedule,T<:ProblemSpec}
     path_spec = PathSpec(
         node_type=Symbol(typeof(pred)),
         start_vtx=get_id(get_location_id(pred)),
         final_vtx=get_id(get_location_id(pred)),
         min_path_duration=0,
+        plan_path = false,
         object_id = get_id(get_object_id(pred))
         )
 end
-function generate_path_spec(schedule::P,spec::T,pred::ROBOT_AT,path_id=get_next_path_id(schedule)) where {P<:ProjectSchedule,T<:ProblemSpec}
+function generate_path_spec(schedule::P,spec::T,pred::ROBOT_AT) where {P<:ProjectSchedule,T<:ProblemSpec}
     r = get_id(get_robot_id(pred))
     if !(r in collect(keys(schedule.robot_id_map)))
         # println("generate_path_spec: r = ",r," not in schedule.robot_id_map = ",schedule.robot_id_map)
@@ -560,21 +543,21 @@ function generate_path_spec(schedule::P,spec::T,pred::ROBOT_AT,path_id=get_next_
         start_vtx=get_id(get_location_id(pred)),
         final_vtx=get_id(get_location_id(pred)),
         min_path_duration=0,
-        path_id=path_id,
         dummy_id=r,
         agent_id=get(schedule.robot_id_map,r,r),
         free=true
         )
 end
-function generate_path_spec(schedule::P,spec::T,op::Operation,path_id=get_next_path_id(schedule)) where {P<:ProjectSchedule,T<:ProblemSpec}
+function generate_path_spec(schedule::P,spec::T,op::Operation) where {P<:ProjectSchedule,T<:ProblemSpec}
     path_spec = PathSpec(
         node_type=Symbol(typeof(op)),
         start_vtx = -1,
         final_vtx = -1,
+        plan_path = false,
         min_path_duration=duration(op)
         )
 end
-function generate_path_spec(schedule::P,pred,path_id=get_next_path_id(schedule)) where {P<:ProjectSchedule}
+function generate_path_spec(schedule::P,pred) where {P<:ProjectSchedule}
     generate_path_spec(schedule,ProblemSpec(),pred)
 end
 
@@ -582,7 +565,7 @@ function replace_in_schedule!(schedule::P,spec::T,pred,id::ID) where {P<:Project
     v = get_vtx(schedule, id)
     @assert v != -1
     set_vtx_map!(schedule,pred,id,v)
-    path_spec = generate_path_spec(schedule,spec,pred,get_path_spec(schedule,v).path_id)
+    path_spec = generate_path_spec(schedule,spec,pred)
     set_path_spec!(schedule,v,path_spec)
     schedule
 end
@@ -637,25 +620,24 @@ export
 """
     `populate_agent_ids!`
 
-    Fills the schedule's dictionary mapping path_id (including dummy robots) to
-    real agent id.
+    Fills the schedule's dictionary mapping dummy ids to real agent id.
 """
 function populate_agent_ids!(robot_id_map::Dict{Int,Int},spec::T,assignments) where {T<:ProblemSpec}
     N, M = spec.N, spec.M
     for agent_id in 1:N
-        path_id = agent_id
-        robot_id_map[path_id] = agent_id
+        dummy_id = agent_id
+        robot_id_map[dummy_id] = agent_id
         j = 1
         while j <= M
-            if get(assignments,j,-1) == path_id
-                path_id = j + N
-                robot_id_map[path_id] = agent_id
+            if get(assignments,j,-1) == dummy_id
+                dummy_id = j + N
+                robot_id_map[dummy_id] = agent_id
                 j = 0
             end
             j += 1
         end
     end
-    schedule
+    robot_id_map
 end
 function populate_agent_ids!(schedule::P,spec::T,assignments) where {P<:ProjectSchedule,T<:ProblemSpec}
     populate_agent_ids!(schedule.robot_id_map,spec,assignments)

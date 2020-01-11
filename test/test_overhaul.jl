@@ -260,58 +260,25 @@ let
             ])
             for cost_model in [SumOfMakeSpans, MakeSpan]
                 let
-                    # Assignment method
+                    costs = Float64[]
                     project_spec, problem_spec, robot_ICs, assignments, env_graph = f(;verbose=false);
-                    solver = PC_TAPF_Solver(verbosity=0)
-                    solution1, assignment1, cost1, env1 = high_level_search!(
-                        solver,
-                        env_graph,
-                        project_spec,
-                        problem_spec,
-                        robot_ICs,
-                        Gurobi.Optimizer;
-                        primary_objective=cost_model
-                        )
-
-                    @test cost1[1] != Inf
-                    @test validate(env1.schedule)
-
-                    # Adjacency method
-                    solver = PC_TAPF_Solver(verbosity=0)
-                    solution2, assignment2, cost2, env2 = high_level_search_mod!(
-                        solver,
-                        env_graph,
-                        project_spec,
-                        problem_spec,
-                        robot_ICs,
-                        Gurobi.Optimizer;
-                        milp_model=AdjacencyMILP(),
-                        primary_objective=cost_model
-                        );
-
-                    @test validate(env2.schedule)
-                    @test cost2[1] != Inf
-
-                    # Sparse Adjacency method
-                    solution3, assignment3, cost3, env3 = high_level_search_mod!(
-                        solver,
-                        env_graph,
-                        project_spec,
-                        problem_spec,
-                        robot_ICs,
-                        Gurobi.Optimizer;
-                        milp_model=SparseAdjacencyMILP(),
-                        primary_objective=cost_model
-                        );
-
-                    @test validate(env3.schedule)
-                    @test cost3[1] != Inf
-
-                    if cost2[1] != cost1[1]
-                        @show f, cost_model, cost1, cost2
+                    for milp_model in [AssignmentMILP(),AdjacencyMILP(),SparseAdjacencyMILP()]
+                        solver = PC_TAPF_Solver(verbosity=0)
+                        solution, assignment, cost, env = high_level_search!(
+                            milp_model,
+                            solver,
+                            env_graph,
+                            project_spec,
+                            problem_spec,
+                            robot_ICs,
+                            Gurobi.Optimizer;
+                            primary_objective=cost_model,
+                            )
+                        push!(costs, cost[1])
+                        @test validate(env.schedule)
+                        @test cost[1] != Inf
                     end
-                    @test cost2[1] == cost1[1]
-                    @test cost3[1] == cost1[1]
+                    @test all(costs .== costs[1])
                 end
             end
         end
@@ -455,11 +422,14 @@ let
     problematic_ids = [
         43, # one of the solvers gets stuck after A* returns an infeasible path (twice)
         146, # A* infeasible, again.
-        197
+        197, # can't remember why I put this on here
+        255, # more A* infeasible. These always seem to terminate with "bounds error"
+        267, # just pausing here--nothing necessarily wrong.
         ]
 
     ##
-    for problem_id in problematic_ids[end]+1:384
+    # for problem_id in problematic_ids[end]+1:384
+    for problem_id in 1:384
         problem_filename = joinpath(problem_dir,string("problem",problem_id,".toml"))
         problem_def = read_problem_def(problem_filename)
         project_spec, r0, s0, sF = problem_def.project_spec,problem_def.r0,problem_def.s0,problem_def.sF

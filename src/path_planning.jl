@@ -297,19 +297,20 @@ function construct_search_env(schedule, problem_spec, env_graph;
     cache = initialize_planning_cache(schedule)
     # Paths stored as seperate chunks (will need to be concatenated before conflict checking)
     N = problem_spec.N                                          # number of robots
-    starts = Vector{PCCBS.State}()
-    goals = Vector{PCCBS.State}()
-    for path_id in sort(collect(keys(schedule.path_id_to_vtx_map)))
-        v = schedule.path_id_to_vtx_map[path_id]
-        start_vtx = get_path_spec(schedule,v).start_vtx
-        final_vtx = get_path_spec(schedule,v).final_vtx
-        @assert (start_vtx != -1) string("v = ",v,", start_vtx = ",start_vtx,", path_id = ",path_id)
-        push!(starts, PCCBS.State(vtx = start_vtx, t = cache.t0[v]))
-        push!(goals, PCCBS.State(vtx = final_vtx, t = cache.tF[v]))
-    end
+    starts = Vector{PCCBS.State}() # no need to fill because we pull each goal directly from the path_spec
+    goals = Vector{PCCBS.State}() # no need to fill because we pull each goal directly from the path_spec
+    # for v in vertices(get_graph(schedule))
+    #     if get_path_spec(schedule,v).plan_path == false
+    #         continue
+    #     end
+    #     start_vtx = get_path_spec(schedule,v).start_vtx
+    #     final_vtx = get_path_spec(schedule,v).final_vtx
+    #     @assert (start_vtx != -1) string("v = ",v,", start_vtx = ",start_vtx)
+    #     push!(starts, PCCBS.State(vtx = start_vtx, t = cache.t0[v])) # TODO I don't believe these are necessary anymore ()
+    #     push!(goals, PCCBS.State(vtx = final_vtx, t = cache.tF[v])) # TODO I don't believe these are necessary either
+    # end
     cost_model = construct_composite_cost_model(
         primary_objective(schedule,cache),
-        # FullDeadlineCost(DeadlineCost(0.0)),
         HardConflictCost(env_graph,maximum(cache.tF)+extra_T, N),
         SumOfTravelDistance(),
         FullCostModel(sum,NullCost()) # SumOfTravelTime(),
@@ -320,14 +321,12 @@ function construct_search_env(schedule, problem_spec, env_graph;
         DefaultPerfectHeuristic(PerfectHeuristic(env_graph,map(s->s.vtx,starts),map(s->s.vtx,goals))),
         DefaultPerfectHeuristic(PerfectHeuristic(env_graph,map(s->s.vtx,starts),map(s->s.vtx,goals)))
     )
-    # This mapf stores the starts and goals for the actual stages (indexed by path_id)
+    # TODO should we remove this MAPF completely?
     mapf = MAPF(PCCBS.LowLevelEnv(
         graph=env_graph,
         cost_model=cost_model,
         heuristic=heuristic_model
         ),starts,goals)
-    # This search node maintains the full path for each agent (indexed by agent_id)
-    # node = initialize_root_node(MAPF(mapf.env,map(i->PCCBS.State(),1:N),map(i->PCCBS.State(),1:N)))
 
     env = SearchEnv(schedule=schedule, cache=cache, env=mapf.env, num_agents=N)
     return env, mapf #, node
@@ -395,13 +394,12 @@ function update_env!(solver::S,env::E,v::Int,path::P) where {S<:PC_TAPF_Solver,E
     env
 end
 
-function CRCBS.build_env(solver, env::E, mapf::M, node::N, agent_id::Int, path_id::Int,dt=0) where {E<:SearchEnv,M<:AbstractMAPF,N<:ConstraintTreeNode}
-    v = env.schedule.path_id_to_vtx_map[path_id]
+function CRCBS.build_env(solver, env::E, mapf::M, node::N, v::Int,dt=0) where {E<:SearchEnv,M<:AbstractMAPF,N<:ConstraintTreeNode}
+    agent_id = get_path_spec(env.schedule, v).agent_id
     node_id = get_vtx_id(env.schedule, v)
     schedule_node = get_node_from_id(env.schedule, node_id)
-    # log_info(-1,solver,string("v= ",v,", path_id= ", path_id, ", agent_id= ",agent_id,", nodetype=",typeof(schedule_node)))
-    # @show v,node_id,schedule_node,agent_id
-    goal_vtx = mapf.goals[path_id].vtx
+
+    goal_vtx = get_path_spec(env.schedule,v).final_vtx
     goal_time = env.cache.tF[v]                             # time after which goal can be satisfied
     deadline = env.cache.tF[v] .+ env.cache.slack[v]         # deadline for DeadlineCost
     # Adjust deadlines if necessary:
@@ -451,7 +449,6 @@ function CRCBS.build_env(solver, env::E, mapf::M, node::N, agent_id::Int, path_i
     log_info(2,solver,
     """
     agent_id = $(agent_id)
-    path_id = $(path_id)
     node_type = $(typeof(schedule_node))
     v = $(v)
     deadline = $(deadline)
@@ -479,10 +476,8 @@ function plan_next_path!(solver::S, env::E, mapf::M, node::N;
 
     if length(cache.node_queue) > 0
         v = dequeue!(cache.node_queue)
-        path_id = get_path_spec(schedule, v).path_id
-        if path_id != -1
-            agent_id = get_path_spec(schedule, v).agent_id
-            cbs_env, base_path = build_env(solver, env, mapf, node, agent_id, path_id)
+        if get_path_spec(schedule, v).plan_path == true
+            cbs_env, base_path = build_env(solver, env, mapf, node, v)
             # make sure base_path hits t0 constraint
             if get_end_index(base_path) < cache.t0[v]
                 node_id = get_vtx_id(schedule,v)
@@ -523,6 +518,7 @@ function plan_next_path!(solver::S, env::E, mapf::M, node::N;
                 solver.DEBUG ? validate(path,v) : nothing
             end
             # add to solution
+            agent_id = get_path_spec(schedule, v).agent_id
             set_solution_path!(node.solution, path, agent_id)
             set_path_cost!(node.solution, cost, agent_id)
             # update
@@ -560,8 +556,6 @@ end
 """
     Computes all paths specified by the project schedule and updates the
     solution in the ConstraintTreeNode::node accordingly.
-    `invalidated_id` is the path_id corresponding to a path that has been
-    invalidated by a constraint.
 """
 function CRCBS.low_level_search!(
         solver::S, env::E, mapf::M, node::N;
@@ -654,11 +648,6 @@ function CRCBS.low_level_search!(
     return valid_flag
 end
 
-function CRCBS.is_valid(solution::S,pc_mapf::P) where {S<:LowLevelSolution,P<:PC_MAPF}
-    # TODO actually implement this
-    return true
-end
-
 function CRCBS.solve!(
         solver::PC_TAPF_Solver,
         mapf::M where {M<:PC_MAPF},
@@ -700,7 +689,7 @@ function CRCBS.solve!(
                 log_info(1,solver,string("CBS: constraint on agent id = ",get_agent_id(constraint),", time index = ",get_time_of(constraint)))
                 valid_flag = low_level_search!(solver, mapf, new_node, [get_agent_id(constraint)]; path_finder=path_finder)
                 detect_conflicts!(new_node.conflict_table,new_node.solution,[get_agent_id(constraint)]) # update conflicts related to this agent
-                if valid_flag && CRCBS.is_valid(new_node.solution, mapf)
+                if valid_flag
                     # TODO update env (i.e. update heuristic, etc.)
                     enqueue!(priority_queue, new_node => new_node.cost)
                 end

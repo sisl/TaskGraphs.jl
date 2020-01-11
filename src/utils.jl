@@ -47,13 +47,6 @@ function validate(path::Path, v::Int, cbs_env)
     validate(path, string("v = ",v,", path = ",convert_to_vertex_lists(path),", goal: ",cbs_env.goal))
 end
 function validate(project_schedule::ProjectSchedule)
-    sorted_path_ids = sort(collect(keys(project_schedule.path_id_to_vtx_map)))
-    for (i,path_id) in enumerate(sorted_path_ids)
-        @assert(
-            i == path_id,
-            string("i = ",i,", path_id = ",path_id," ... they should be the same")
-            )
-    end
     for (id,node) in project_schedule.planning_nodes
         if typeof(node) <: COLLECT
             @assert(node.x != -1, string("node.x == ",node.x))
@@ -89,7 +82,7 @@ function exclude_solutions!(model::JuMP.Model)
         exclude_solutions!(model,X)
     end
 end
-exclude_current_solution!(args...) = exclude_solutions!(args...) 
+exclude_current_solution!(args...) = exclude_solutions!(args...)
 
 """
     `cached_pickup_and_delivery_distances(r₀,oₒ,sₒ,dist=(x1,x2)->norm(x2-x1,1))`
