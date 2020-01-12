@@ -642,6 +642,8 @@ end
 function populate_agent_ids!(schedule::P,spec::T,assignments) where {P<:ProjectSchedule,T<:ProblemSpec}
     populate_agent_ids!(schedule.robot_id_map,spec,assignments)
 end
+function get_assignment_dict()
+end
 
 export
     add_single_robot_delivery_task!
@@ -649,6 +651,7 @@ export
 function add_single_robot_delivery_task!(
         schedule::S,
         problem_spec::T,
+        pred_id::AbstractID,
         robot_id::Int,
         object_id::Int,
         pickup_station_id::Int,
@@ -656,7 +659,6 @@ function add_single_robot_delivery_task!(
         ) where {S<:ProjectSchedule,T<:ProblemSpec}
 
     if robot_id != -1
-        # robot_pred = get_robot_ICs(schedule)[robot_id]
         robot_pred = get_node_from_id(schedule,RobotID(robot_id))
         robot_start_station_id = get_id(get_location_id(robot_pred))
     else
@@ -664,13 +666,9 @@ function add_single_robot_delivery_task!(
     end
 
     # THIS NODE IS DETERMINED BY THE TASK ASSIGNMENT.
-    # TODO Enable "leave-it-blank" so that the incomplete project schedule
-    # can be used as an input to the MILP formulation and solver.
-    # action_id = ActionID(get_num_actions(schedule))
     action_id = ActionID(get_unique_action_id())
     add_to_schedule!(schedule, problem_spec, GO(robot_id, robot_start_station_id, pickup_station_id), action_id)
-    add_edge!(schedule, RobotID(robot_id), action_id)
-    # END EMPTY GO NODE
+    add_edge!(schedule, pred_id, action_id)
 
     prev_action_id = action_id
     action_id = ActionID(get_unique_action_id())
@@ -687,12 +685,6 @@ function add_single_robot_delivery_task!(
     action_id = ActionID(get_unique_action_id())
     add_to_schedule!(schedule, problem_spec, DEPOSIT(robot_id, object_id, dropoff_station_id), action_id)
     add_edge!(schedule, prev_action_id, action_id)
-
-    # new_robot_id = object_id + problem_spec.N
-    # if get_vtx(schedule, RobotID(new_robot_id)) == -1
-    #     add_to_schedule!(schedule, problem_spec, ROBOT_AT(RobotID(new_robot_id),StationID(dropoff_station_id)), RobotID(new_robot_id))
-    # end
-    # add_edge!(schedule, action_id, RobotID(new_robot_id))
 
     action_id
 end
@@ -776,23 +768,21 @@ function construct_project_schedule(
         ) where {P<:ProjectSpec,T<:ProblemSpec,V<:Union{Dict{Int,Int},Vector{Int}}}
     schedule = ProjectSchedule()
     populate_agent_ids!(schedule,problem_spec,assignments)
+    # robot_pred_tips = Vector{AbstractID}()
     graph = get_graph(schedule)
-    # add object ICs to graph
     for pred in object_ICs
         add_to_schedule!(schedule, problem_spec, pred, get_object_id(pred))
     end
-    # add robot ICs to graph
     for (id,pred) in robot_ICs
-        # if (id in assignments)
+    # for pred in map(i->robot_ICs[i], 1:problem_spec.N)
         add_to_schedule!(schedule, problem_spec, pred, get_robot_id(pred))
-        # end
+        # push!(robot_pred_tips, get_robot_id(pred))
     end
     M = length(object_ICs) # number of objects
     N = length(robot_ICs) - M # number of robots
     # add operations to graph
     for op_vtx in topological_sort(project_spec.graph)
         op = project_spec.operations[op_vtx]
-        # operation_id = OperationID(get_num_operations(schedule) + 1)
         operation_id = OperationID(get_id(op))
         add_to_schedule!(schedule, problem_spec, op, operation_id)
         v = nv(get_graph(schedule))
@@ -808,12 +798,10 @@ function construct_project_schedule(
             dropoff_station_id  = get_id(get_location_id(object_fc))
 
             # TODO Handle collaborative tasks
-            # if is_single_robot_task(project_spec, object_id)
             robot_id = get(assignments, object_id, -1)
-            action_id = add_single_robot_delivery_task!(schedule,problem_spec,robot_id,
+            pred_id = RobotID(robot_id)
+            action_id = add_single_robot_delivery_task!(schedule,problem_spec,pred_id,robot_id,
                 object_id,pickup_station_id,dropoff_station_id)
-            # elseif is_collaborative_robot_task(project_spec, object_id)
-            # end
 
             add_edge!(schedule, action_id, operation_id)
 
@@ -844,6 +832,18 @@ function construct_project_schedule(
         robot_ICs,
         assignments
     )
+    # TODO just repair a partial schedule by incorporating the assignments: much more straightforward!
+    # project_schedule = construct_partial_project_schedule(
+    #     project_spec,
+    #     problem_spec,
+    #     map(i->robot_ICs[i], 1:problem_spec.N)
+    # )
+    # tip_type = GO
+    # for (robot_id,task_list) in assignment_dict
+    #     v = get_vtx(project_schedule, RobotID(robot_id))
+    #     node = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v))
+    #     while !(typeof(node) <: tip_type)
+    # end
 end
 
 export
@@ -1682,6 +1682,24 @@ function formulate_milp(milp_model::SparseAdjacencyMILP,project_schedule::Projec
     SparseAdjacencyMILP(model,Xa,Xj) #, job_shop_variables
 end
 
+function propagate_valid_ids!(project_schedule::ProjectSchedule,problem_spec::ProblemSpec)
+    G = get_graph(project_schedule)
+    @assert (is_cyclic(G) == false) # string(sparse(adj_matrix))
+    # Propagate valid IDs through the schedule
+    for v in topological_sort(G)
+        node_id = get_vtx_id(project_schedule, v)
+        node = get_node_from_id(project_schedule, node_id)
+        for v2 in inneighbors(G,v)
+            node = align_with_predecessor(node,get_node_from_vtx(project_schedule, v2))
+        end
+        for v2 in outneighbors(G,v)
+            node = align_with_successor(node,get_node_from_vtx(project_schedule, v2))
+        end
+        replace_in_schedule!(project_schedule, problem_spec, node, node_id)
+    end
+    project_schedule
+end
+
 """
     `update_project_schedule!`
 
@@ -1705,20 +1723,7 @@ function update_project_schedule!(project_schedule::P,problem_spec::T,adj_matrix
         end
     end
     # DEBUG ? @assert(is_cyclic(G) == false) : nothing
-    @assert (is_cyclic(G) == false) # string(sparse(adj_matrix))
-    # Propagate valid IDs through the schedule
-    for v in topological_sort(G)
-        node_id = get_vtx_id(project_schedule, v)
-        node = get_node_from_id(project_schedule, node_id)
-        for v2 in inneighbors(G,v)
-            node = align_with_predecessor(node,get_node_from_vtx(project_schedule, v2))
-        end
-        for v2 in outneighbors(G,v)
-            node = align_with_successor(node,get_node_from_vtx(project_schedule, v2))
-        end
-        replace_in_schedule!(project_schedule, problem_spec, node, node_id)
-    end
-    project_schedule
+    propagate_valid_ids!(project_schedule,problem_spec)
 end
 function update_project_schedule!(milp_model::M,
         project_schedule::P,

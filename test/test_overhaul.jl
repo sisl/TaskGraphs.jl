@@ -108,17 +108,22 @@ let
         project_spec, problem_spec, object_ICs, object_FCs, _ = construct_task_graphs_problem(project_spec, r0, s0, sF, dist_matrix)
 
         project_schedule = construct_partial_project_schedule(project_spec,problem_spec,robot_ICs)
-        model = formulate_schedule_milp(project_schedule,problem_spec)
+        model = formulate_milp(AssignmentMILP(),project_schedule,problem_spec)
         optimize!(model)
         @test termination_status(model) == MOI.OPTIMAL
         obj_val = Int(round(value(objective_function(model))))
-        adj_matrix = Int.(round.(value.(model[:X])))
+        assignment_matrix = get_assignment_matrix(model);
+        assignments = get_assignment_vector(assignment_matrix,problem_spec.M)
 
-        # print_project_schedule(project_schedule,"project_schedule1")
-        update_project_schedule!(project_schedule,problem_spec,adj_matrix)
-        # print_project_schedule(project_schedule,"project_schedule2")
-
-        @test validate(project_schedule)
+        env, mapf = construct_search_env(project_spec, problem_spec, robot_ICs, assignments, env_graph;
+            primary_objective=primary_objective);
+        pc_mapf = PC_MAPF(env,mapf);
+        
+        # adj_matrix = Int.(round.(value.(model[:X])))
+        # # print_project_schedule(project_schedule,"project_schedule1")
+        # update_project_schedule!(project_schedule,problem_spec,adj_matrix)
+        # # print_project_schedule(project_schedule,"project_schedule2")
+        # @test validate(project_schedule)
     end
     let
         project_spec, problem_spec, robot_ICs, assignments, env_graph = initialize_toy_problem_4(;

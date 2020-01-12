@@ -243,12 +243,12 @@ COLLECT(r::Int,o::Int,x::Int) = COLLECT(RobotID(r),ObjectID(o),StationID(x))
 end
 DEPOSIT(r::Int,o::Int,x::Int) = DEPOSIT(RobotID(r),ObjectID(o),StationID(x))
 
-get_initial_location_id(a::A) where {A<:Union{GO,CARRY}}        	= a.x1
-get_destination_location_id(a::A) where {A<:Union{GO,CARRY}}    	= a.x2
-get_location_id(a::A) where {A<:Union{COLLECT,DEPOSIT}}             = a.x
-get_initial_location_id(a::A) where {A<:Union{COLLECT,DEPOSIT}}     = a.x
-get_destination_location_id(a::A) where {A<:Union{COLLECT,DEPOSIT}} = a.x
-get_object_id(a::A) where {A<:Union{CARRY,COLLECT,DEPOSIT}}         = a.o
+get_initial_location_id(a::A) where {A<:Union{GO,CARRY}}        						= a.x1
+get_destination_location_id(a::A) where {A<:Union{GO,CARRY}}    						= a.x2
+get_location_id(a::A) where {A<:Union{COLLECT,DEPOSIT}}             					= a.x
+get_initial_location_id(a::A) where {A<:Union{COLLECT,DEPOSIT,ROBOT_AT,OBJECT_AT}}     	= a.x
+get_destination_location_id(a::A) where {A<:Union{COLLECT,DEPOSIT,ROBOT_AT,OBJECT_AT}} 	= a.x
+get_object_id(a::A) where {A<:Union{CARRY,COLLECT,DEPOSIT}}         					= a.o
 
 export
     eligible_successors,

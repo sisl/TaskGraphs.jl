@@ -35,6 +35,33 @@ function get_assignment_vector(assignment_matrix,M)
     end
     assignments
 end
+
+"""
+    Returns dictionary of the "joint mission", mapping each robot id to a
+    sequence of tasks.
+"""
+function get_assignment_dict(assignment_matrix,N,M)
+    assignment_dict = Dict{Int,Vector{Int}}()
+    for i in 1:N
+        vec = get!(assignment_dict,i,Int[])
+        k = i
+        j = 1
+        while j <= M
+            if assignment_matrix[k,j] == 1
+                push!(vec,j)
+                k = j + problem_spec.N
+                j = 0
+            end
+            j += 1
+        end
+    end
+    assignments = zeros(Int,problem_spec.M)
+    for (robot_id, task_list) in assignment_dict
+        for task_id in task_list
+            assignments[task_id] = robot_id
+        end
+    end
+end
 # function get_station_precedence_dict(model::M) where {M<:JuMP.Model} end
 function validate(path::Path, msg::String)
     @assert( !any(convert_to_vertex_lists(path) .== -1), msg )
