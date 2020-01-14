@@ -1731,7 +1731,8 @@ function propagate_valid_ids!(project_schedule::ProjectSchedule,problem_spec::Pr
         end
         replace_in_schedule!(project_schedule, problem_spec, node, node_id)
     end
-    project_schedule
+    # project_schedule
+    return true
 end
 
 """
@@ -1745,6 +1746,7 @@ end
     Adds all required edges to the project graph and modifies all nodes to
     reflect the appropriate valid IDs (e.g., `Action` nodes are populated with
     the correct `RobotID`s)
+    Returns `false` if the new edges cause cycles in the project graph.
 """
 function update_project_schedule!(project_schedule::P,problem_spec::T,adj_matrix,DEBUG::Bool=false) where {P<:ProjectSchedule,T<:ProblemSpec}
     # Add all new edges to project schedule
@@ -1757,6 +1759,9 @@ function update_project_schedule!(project_schedule::P,problem_spec::T,adj_matrix
         end
     end
     # DEBUG ? @assert(is_cyclic(G) == false) : nothing
+    if is_cyclic(G)
+        return false
+    end
     propagate_valid_ids!(project_schedule,problem_spec)
 end
 function update_project_schedule!(milp_model::M,
@@ -1767,6 +1772,7 @@ function update_project_schedule!(milp_model::M,
     ) where {M<:TaskGraphsMILP,P<:ProjectSchedule,T<:ProblemSpec}
     update_project_schedule!(project_schedule,problem_spec,adj_matrix,DEBUG)
 end
+
 # function update_project_schedule!(milp_model::AssignmentMILP,project_schedule::P,problem_spec::T,adj_matrix,DEBUG::Bool=false) where {P<:ProjectSchedule,T<:ProblemSpec}
 # end
 

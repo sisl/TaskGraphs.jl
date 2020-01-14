@@ -77,17 +77,26 @@ function validate(path::Path, v::Int, cbs_env)
     validate(path, string("v = ",v,", path = ",convert_to_vertex_lists(path),", goal: ",cbs_env.goal))
 end
 function validate(project_schedule::ProjectSchedule)
-    for (id,node) in project_schedule.planning_nodes
-        if typeof(node) <: COLLECT
-            @assert(node.x != -1, string("node.x == ",node.x))
-        end
-    end
     G = get_graph(project_schedule)
-    for v in vertices(G)
-        node = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v))
-        if outdegree(G,v) < sum([0, values(required_successors(node))...]) || indegree(G,v) < sum([0, values(required_predecessors(node))...])
-            return false
+    try
+        @assert !is_cyclic(G) "is_cyclic(G)"
+        for (id,node) in project_schedule.planning_nodes
+            if typeof(node) <: COLLECT
+                @assert(get_location_id(node) != -1, string("get_location_id(node) != -1 for node id ", id))
+            end
         end
+        for v in vertices(G)
+            node = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v))
+            @assert( outdegree(G,v) >= sum([0, values(required_successors(node))...]) )
+            @assert( indegree(G,v) >= sum([0, values(required_predecessors(node))...]) )
+        end
+    catch e
+        if typeof(e) <: AssertionError
+            print(e.msg)
+        else
+            throw(e)
+        end
+        return false
     end
     return true
 end

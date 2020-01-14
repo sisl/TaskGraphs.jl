@@ -300,14 +300,14 @@ function construct_search_env(schedule, problem_spec, env_graph;
     starts = Vector{PCCBS.State}() # no need to fill because we pull each goal directly from the path_spec
     goals = Vector{PCCBS.State}() # no need to fill because we pull each goal directly from the path_spec
     # for v in vertices(get_graph(schedule))
-    #     if get_path_spec(schedule,v).plan_path == false
-    #         continue
+    #     if get_path_spec(schedule,v).plan_path == true
+    #         start_vtx = get_path_spec(schedule,v).start_vtx
+    #         final_vtx = get_path_spec(schedule,v).final_vtx
+    #         # @assert (start_vtx != -1) string("v = ",v,", start_vtx = ",start_vtx)
+    #         # @assert (final_vtx != -1) string("v = ",v,", final_vtx = ",final_vtx)
+    #         push!(starts, PCCBS.State(vtx = start_vtx, t = cache.t0[v])) # TODO I don't believe these are necessary anymore ()
+    #         push!(goals, PCCBS.State(vtx = final_vtx, t = cache.tF[v])) # TODO I don't believe these are necessary either
     #     end
-    #     start_vtx = get_path_spec(schedule,v).start_vtx
-    #     final_vtx = get_path_spec(schedule,v).final_vtx
-    #     @assert (start_vtx != -1) string("v = ",v,", start_vtx = ",start_vtx)
-    #     push!(starts, PCCBS.State(vtx = start_vtx, t = cache.t0[v])) # TODO I don't believe these are necessary anymore ()
-    #     push!(goals, PCCBS.State(vtx = final_vtx, t = cache.tF[v])) # TODO I don't believe these are necessary either
     # end
     cost_model = construct_composite_cost_model(
         primary_objective(schedule,cache),
@@ -315,11 +315,12 @@ function construct_search_env(schedule, problem_spec, env_graph;
         SumOfTravelDistance(),
         FullCostModel(sum,NullCost()) # SumOfTravelTime(),
     )
+    ph = DefaultPerfectHeuristic(PerfectHeuristic(get_dist_matrix(env_graph)))
     heuristic_model = construct_composite_heuristic(
-        DefaultPerfectHeuristic(PerfectHeuristic(env_graph,map(s->s.vtx,starts),map(s->s.vtx,goals))),
+        ph, # DefaultPerfectHeuristic(PerfectHeuristic(env_graph,map(s->s.vtx,starts),map(s->s.vtx,goals))),
         NullHeuristic(),
-        DefaultPerfectHeuristic(PerfectHeuristic(env_graph,map(s->s.vtx,starts),map(s->s.vtx,goals))),
-        DefaultPerfectHeuristic(PerfectHeuristic(env_graph,map(s->s.vtx,starts),map(s->s.vtx,goals)))
+        ph, # DefaultPerfectHeuristic(PerfectHeuristic(env_graph,map(s->s.vtx,starts),map(s->s.vtx,goals))),
+        ph  # DefaultPerfectHeuristic(PerfectHeuristic(env_graph,map(s->s.vtx,starts),map(s->s.vtx,goals)))
     )
     # TODO should we remove this MAPF completely?
     mapf = MAPF(PCCBS.LowLevelEnv(
@@ -803,28 +804,34 @@ function high_level_search_mod!(solver::P, env_graph, project_spec, problem_spec
         if !optimal
             log_info(0,solver,string("HIGH LEVEL SEARCH: Task assignment failed. Returning best solution so far.\n",
                 " * optimality gap = ", solver.best_cost[1] - lower_bound))
-            return best_solution, best_assignment, solver.best_cost, best_env
+            break
+        elseif solver.num_assignment_iterations > solver.LIMIT_assignment_iterations
+            log_info(0,solver,string("HIGH LEVEL SEARCH: MILP iterations exceeded limit of ",
+            solver.LIMIT_assignment_iterations,". Returning best solution so far.\n",
+                " * optimality gap = ", solver.best_cost[1] - lower_bound))
+            break
         end
         optimal_TA_cost = Int(round(value(objective_function(model)))); # lower bound on cost (from task assignment module)
         lower_bound = max(lower_bound, optimal_TA_cost)
         log_info(0,solver,string("HIGH LEVEL SEARCH: Current lower bound cost = ",lower_bound))
         assignment_matrix = get_assignment_matrix(model);
-        assignments = get_assignment_vector(assignment_matrix,problem_spec.M)
+        # assignments = get_assignment_vector(assignment_matrix,problem_spec.M)
         if lower_bound < solver.best_cost[1]
             ############## Route Planning ###############
-            update_project_schedule!(project_schedule,problem_spec,assignment_matrix)
-            env, mapf = construct_search_env(project_schedule, problem_spec, env_graph;
-                primary_objective=primary_objective);
-            pc_mapf = PC_MAPF(env,mapf);
-            ##### Call CBS Search Routine (LEVEL 2) #####
-            solution, cost = solve!(solver,pc_mapf);
-            if cost < solver.best_cost
-                best_solution = solution
-                best_assignment = assignments
-                solver.best_cost = cost # TODO make sure that the operation duration is accounted for here
-                best_env = env
+            if update_project_schedule!(project_schedule,problem_spec,assignment_matrix)
+                env, mapf = construct_search_env(project_schedule, problem_spec, env_graph;
+                    primary_objective=primary_objective);
+                pc_mapf = PC_MAPF(env,mapf);
+                ##### Call CBS Search Routine (LEVEL 2) #####
+                solution, cost = solve!(solver,pc_mapf);
+                if cost < solver.best_cost
+                    best_solution = solution
+                    # best_assignment = assignments
+                    solver.best_cost = cost # TODO make sure that the operation duration is accounted for here
+                    best_env = env
+                end
+                log_info(0,solver,string("HIGH LEVEL SEARCH: Best cost so far = ", solver.best_cost[1]))
             end
-            log_info(0,solver,string("HIGH LEVEL SEARCH: Best cost so far = ", solver.best_cost[1]))
         end
     end
     exit_assignment!(solver)
