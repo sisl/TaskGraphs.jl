@@ -411,7 +411,7 @@ let
     project_spec, problem_spec, object_ICs, object_FCs, robot_ICs = construct_task_graphs_problem(
             project_spec, r0, s0, sF, dist_matrix);
     # Solve the problem
-    solver = PC_TAPF_Solver(DEBUG=true,verbosity=0,LIMIT_A_star_iterations=5*nv(env_graph));
+    solver = PC_TAPF_Solver(DEBUG=true,verbosity=1,LIMIT_A_star_iterations=5*nv(env_graph));
     (solution, assignment, cost, search_env), elapsed_time, byte_ct, gc_time, mem_ct = @timed high_level_search!(
         SparseAdjacencyMILP(), solver, env_graph, project_spec, problem_spec, robot_ICs, Gurobi.Optimizer;)
 
@@ -423,13 +423,21 @@ let
     project_schedule = construct_partial_project_schedule(project_spec,problem_spec,map(i->robot_ICs[i], 1:problem_spec.N))
     model = formulate_schedule_milp(project_schedule,problem_spec;Presolve=1)
     # optimize!(model)
+    exclude_solutions!(model)
     retval, elapsed_time, byte_ct, gc_time, mem_ct = @timed optimize!(model)
     @show elapsed_time
     @test termination_status(model) == MathOptInterface.OPTIMAL
     assignment_matrix = get_assignment_matrix(model);
+    # @assert !is_cyclic(DiGraph(assignment_matrix))
     # ############## Route Planning ###############
+    for e in collect(edges(get_graph(project_schedule)))
+        rem_edge!(get_graph(project_schedule), e)
+    end
     update_project_schedule!(project_schedule,problem_spec,assignment_matrix)
     @test validate(project_schedule)
+    project_schedule.graph == DiGraph(assignment_matrix)
+    # ne(project_schedule.graph), ne(DiGraph(assignment_matrix))
+
     print_project_schedule(project_schedule,"project_schedule")
     env, mapf = construct_search_env(project_schedule, problem_spec, env_graph);
     pc_mapf = PC_MAPF(env,mapf);

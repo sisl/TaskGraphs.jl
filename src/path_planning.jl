@@ -799,6 +799,7 @@ function high_level_search_mod!(solver::P, env_graph, project_spec, problem_spec
         log_info(0,solver,string("HIGH LEVEL SEARCH: iteration ",solver.num_assignment_iterations,"..."))
         ############## Task Assignment ###############
         exclude_solutions!(model) # exclude most recent solution in order to get next best solution
+        # remove all current edges from project
         optimize!(model)
         optimal = (termination_status(model) == MathOptInterface.OPTIMAL);
         if !optimal

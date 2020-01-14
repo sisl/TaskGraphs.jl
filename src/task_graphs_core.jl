@@ -391,7 +391,7 @@ export
     `ProjectSchedule`
 """
 @with_kw struct ProjectSchedule{G<:AbstractGraph}# <: AbstractProjectSchedule
-    graph               ::G                     = MetaDiGraph()
+    graph               ::G                     = DiGraph()
     planning_nodes      ::Dict{AbstractID,AbstractPlanningPredicate}    = Dict{AbstractID,AbstractPlanningPredicate}()
     vtx_map             ::Dict{AbstractID,Int}  = Dict{AbstractID,Int}()
     vtx_ids             ::Vector{AbstractID}    = Vector{AbstractID}() # maps vertex to actual graph node
@@ -1751,6 +1751,11 @@ end
 function update_project_schedule!(project_schedule::P,problem_spec::T,adj_matrix,DEBUG::Bool=false) where {P<:ProjectSchedule,T<:ProblemSpec}
     # Add all new edges to project schedule
     G = get_graph(project_schedule)
+    # remove existing edges first, so that there is no carryover between consecutive MILP iterations
+    for e in collect(edges(G))
+        rem_edge!(G, e)
+    end
+    # add all edges encoded by adjacency matrix
     for v in vertices(G)
         for v2 in vertices(G)
             if adj_matrix[v,v2] >= 1
