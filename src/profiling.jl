@@ -311,71 +311,78 @@ function run_profiling(MODE=:nothing;
             for max_parents in max_parent_settings
                 for depth_bias in depth_biases
                     for trial in 1:num_trials
-                        problem_id += 1 # moved this to the beginning so it doesn't get skipped
-                        problem_filename = joinpath(problem_dir,string("problem",problem_id,".toml"))
-                        config_filename = joinpath(problem_dir,string("config",problem_id,".toml"))
-                        if MODE == :write
-                            # initialize a random problem
-                            if !isdir(problem_dir)
-                                mkdir(problem_dir)
-                            end
-                            if isfile(problem_filename)
-                                println("file ",problem_filename," already exists. Skipping ...")
-                                continue # don't overwrite existing files
-                            end
-                            Δt_min=0
-                            Δt_max=0
-                            r0,s0,sF = get_random_problem_instantiation(N,M,get_pickup_zones(factory_env),get_dropoff_zones(factory_env),
-                                    get_free_zones(factory_env))
-                            project_spec = construct_random_project_spec(M,s0,sF;max_parents=max_parents,depth_bias=depth_bias,Δt_min=0,Δt_max=0)
-                            problem_def = SimpleProblemDef(project_spec,r0,s0,sF)
-                            # Save the problem
-                            open(problem_filename, "w") do io
-                                TOML.print(io, TOML.parse(problem_def))
-                            end
-                            open(config_filename, "w") do io
-                                TOML.print(io, Dict(
-                                    "N"=>N,
-                                    "M"=>M,
-                                    "max_parents"=>max_parents,
-                                    "depth_bias"=>depth_bias,
-                                    "min_process_time"=>Δt_min,
-                                    "max_process_time"=>Δt_max,
-                                    "env_id"=>env_id
+                        try
+                            problem_id += 1 # moved this to the beginning so it doesn't get skipped
+                            problem_filename = joinpath(problem_dir,string("problem",problem_id,".toml"))
+                            config_filename = joinpath(problem_dir,string("config",problem_id,".toml"))
+                            if MODE == :write
+                                # initialize a random problem
+                                if !isdir(problem_dir)
+                                    mkdir(problem_dir)
+                                end
+                                if isfile(problem_filename)
+                                    println("file ",problem_filename," already exists. Skipping ...")
+                                    continue # don't overwrite existing files
+                                end
+                                Δt_min=0
+                                Δt_max=0
+                                r0,s0,sF = get_random_problem_instantiation(N,M,get_pickup_zones(factory_env),get_dropoff_zones(factory_env),
+                                        get_free_zones(factory_env))
+                                project_spec = construct_random_project_spec(M,s0,sF;max_parents=max_parents,depth_bias=depth_bias,Δt_min=0,Δt_max=0)
+                                problem_def = SimpleProblemDef(project_spec,r0,s0,sF)
+                                # Save the problem
+                                open(problem_filename, "w") do io
+                                    TOML.print(io, TOML.parse(problem_def))
+                                end
+                                open(config_filename, "w") do io
+                                    TOML.print(io, Dict(
+                                        "N"=>N,
+                                        "M"=>M,
+                                        "max_parents"=>max_parents,
+                                        "depth_bias"=>depth_bias,
+                                        "min_process_time"=>Δt_min,
+                                        "max_process_time"=>Δt_max,
+                                        "env_id"=>env_id
+                                        )
                                     )
-                                )
+                                end
+                            elseif MODE != :nothing
+                                subdir = joinpath(results_dir,string(MODE))
+                                results_filename = joinpath(subdir,string("results",problem_id,".toml"))
+                                if !isdir(subdir)
+                                    mkpath(subdir)
+                                end
+                                if isfile(results_filename)
+                                    println("file ",results_filename," already exists. Skipping ...")
+                                    continue # don't overwrite existing files
+                                end
+                                assignment_filename = joinpath(results_dir,string(:assignment_only),string("results",problem_id,".toml"))
+                                # Load the problem
+                                problem_def = read_problem_def(problem_filename)
+                                if MODE == :assignment_only
+                                    results_dict = profile_task_assignment(problem_def,env_graph,dist_matrix;TimeLimit=TimeLimit,OutputFlag=OutputFlag)
+                                end
+                                if MODE == :low_level_search_without_repair
+                                    assignments = read_assignment(assignment_filename)
+                                    results_dict = profile_low_level_search(problem_def,env_graph,dist_matrix,assignments)
+                                end
+                                if MODE == :low_level_search_with_repair
+                                    assignments = read_assignment(assignment_filename)
+                                    results_dict = profile_low_level_search_and_repair(problem_def,env_graph,dist_matrix,assignments)
+                                end
+                                if MODE == :full_solver
+                                    results_dict = profile_full_solver(problem_def,env_graph,dist_matrix;solver_mode=solver_mode,TimeLimit=TimeLimit,OutputFlag=OutputFlag)
+                                end
+                                println("Solved problem ",problem_id," in ",results_dict["time"]," seconds! MODE = ",string(MODE))
+                                # print the results
+                                open(results_filename, "w") do io
+                                    TOML.print(io, results_dict)
+                                end
                             end
-                        elseif MODE != :nothing
-                            subdir = joinpath(results_dir,string(MODE))
-                            results_filename = joinpath(subdir,string("results",problem_id,".toml"))
-                            if !isdir(subdir)
-                                mkpath(subdir)
-                            end
-                            if isfile(results_filename)
-                                println("file ",results_filename," already exists. Skipping ...")
-                                continue # don't overwrite existing files
-                            end
-                            assignment_filename = joinpath(results_dir,string(:assignment_only),string("results",problem_id,".toml"))
-                            # Load the problem
-                            problem_def = read_problem_def(problem_filename)
-                            if MODE == :assignment_only
-                                results_dict = profile_task_assignment(problem_def,env_graph,dist_matrix;TimeLimit=TimeLimit,OutputFlag=OutputFlag)
-                            end
-                            if MODE == :low_level_search_without_repair
-                                assignments = read_assignment(assignment_filename)
-                                results_dict = profile_low_level_search(problem_def,env_graph,dist_matrix,assignments)
-                            end
-                            if MODE == :low_level_search_with_repair
-                                assignments = read_assignment(assignment_filename)
-                                results_dict = profile_low_level_search_and_repair(problem_def,env_graph,dist_matrix,assignments)
-                            end
-                            if MODE == :full_solver
-                                results_dict = profile_full_solver(problem_def,env_graph,dist_matrix;solver_mode=solver_mode,TimeLimit=TimeLimit,OutputFlag=OutputFlag)
-                            end
-                            println("Solved problem ",problem_id," in ",results_dict["time"]," seconds! MODE = ",string(MODE))
-                            # print the results
-                            open(results_filename, "w") do io
-                                TOML.print(io, results_dict)
+                        catch e
+                            if typeof(e) <: AssertionError
+                                println(e.msg)
+                            else
                             end
                         end
                     end

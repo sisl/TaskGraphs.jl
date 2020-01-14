@@ -1541,7 +1541,7 @@ function formulate_milp(milp_model::SparseAdjacencyMILP,project_schedule::Projec
         for v2 in outneighbors(G,v)
             Xa[v,v2] = @variable(model, binary=true) # TODO remove this (MUST UPDATE n_eligible_successors, etc. accordingly)
             @constraint(model, Xa[v,v2] == 1) #TODO this edge already exists--no reason to encode it as a decision variable
-            @constraint(model, t0[v2] >= tF[v])
+            @constraint(model, t0[v2] >= tF[v]) # TODO make this an equality constraint. May speed up the solver. 
         end
     end
     # Identify required and eligible edges

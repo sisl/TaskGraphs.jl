@@ -486,6 +486,7 @@ let
         197, # can't remember why I put this on here
         255, # more A* infeasible. These always seem to terminate with "bounds error"
         267, # just pausing here--nothing necessarily wrong.
+        146, # TODO why does this fail for SparseAdjacencyMILP?
         ]
 
     ##

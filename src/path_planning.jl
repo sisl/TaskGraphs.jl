@@ -854,6 +854,33 @@ export
     freeze_assignments!,
     freeze!
 
+abstract type FreezeModel end
+struct FreezeByTime
+    dt::Float64
+end
+
+"""
+    `drop_edges()`
+
+    Choose which edges, from a list of eligible edges, to drop. This particular
+    function freezes all vertices that begin before time `current_time + dt`,
+    then drops all eligible edges (the edges of subgraph) that come afterward.
+"""
+function drop_edges(freeze_model::FreezeByTime,project_schedule::ProjectSchedule,cache::PlanningCache,subgraph,t)
+    t_freeze = t + freeze_model.dt
+    G = get_graph(project_schedule)
+    vtxs = [v for v in vertices(G) if cache.t0[v] > t_freeze] # vertices eligible to be frozen
+    for v in vtxs
+        # if cache.t0[v] > t_freeze
+        for v2 in outneighbors(G,v)
+            if has_edge(subgraph,v,v2)
+                rem_edge!(G,v,v2)
+            end
+        end
+        # end
+    end
+end
+
 """
     freeze_assignments!
 """
