@@ -16,6 +16,7 @@ using CRCBS
 export
     get_assignment_matrix,
     get_assignment_vector,
+    get_assignment_dict,
     validate,
     exclude_solutions!,
     cached_pickup_and_delivery_distances,
@@ -49,18 +50,20 @@ function get_assignment_dict(assignment_matrix,N,M)
         while j <= M
             if assignment_matrix[k,j] == 1
                 push!(vec,j)
-                k = j + problem_spec.N
+                k = j + N
                 j = 0
             end
             j += 1
         end
     end
-    assignments = zeros(Int,problem_spec.M)
+    assignment_dict
+    assignments = zeros(Int,M)
     for (robot_id, task_list) in assignment_dict
         for task_id in task_list
             assignments[task_id] = robot_id
         end
     end
+    assignment_dict, assignments
 end
 # function get_station_precedence_dict(model::M) where {M<:JuMP.Model} end
 function validate(path::Path, msg::String)
@@ -77,6 +80,13 @@ function validate(project_schedule::ProjectSchedule)
     for (id,node) in project_schedule.planning_nodes
         if typeof(node) <: COLLECT
             @assert(node.x != -1, string("node.x == ",node.x))
+        end
+    end
+    G = get_graph(project_schedule)
+    for v in vertices(G)
+        node = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v))
+        if outdegree(G,v) < sum([0, values(required_successors(node))...]) || indegree(G,v) < sum([0, values(required_predecessors(node))...])
+            return false
         end
     end
     return true

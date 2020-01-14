@@ -749,7 +749,8 @@ function high_level_search!(solver::P, env_graph, project_spec, problem_spec,
         lower_bound = max(lower_bound, optimal_TA_cost)
         log_info(0,solver,string("HIGH LEVEL SEARCH: Current lower bound cost = ",lower_bound))
         assignment_matrix = get_assignment_matrix(model);
-        assignments = get_assignment_vector(assignment_matrix,problem_spec.M)
+        # assignments = get_assignment_vector(assignment_matrix,problem_spec.M)
+        assignment_dict, assignments = get_assignment_dict(assignment_matrix,problem_spec.N,problem_spec.M)
         log_info(0,solver,string("HIGH LEVEL SEARCH: Current assignment vector = ",assignments))
         if lower_bound < solver.best_cost[1] # TODO make sure that the operation duration is accounted for here
             ############## Route Planning ###############
