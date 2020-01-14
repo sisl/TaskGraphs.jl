@@ -405,7 +405,7 @@ let
     dist_matrix = get_dist_matrix(env_graph)
 
     # problem_def = read_problem_def(joinpath(PROBLEM_DIR,"problem223.toml"))
-    problem_id = 74
+    problem_id = 75
     problem_def = read_problem_def(joinpath(PROBLEM_DIR,string("problem",problem_id,".toml")))
     project_spec, r0, s0, sF = problem_def.project_spec,problem_def.r0,problem_def.s0,problem_def.sF
     project_spec, problem_spec, object_ICs, object_FCs, robot_ICs = construct_task_graphs_problem(
@@ -413,7 +413,7 @@ let
     # Solve the problem
     solver = PC_TAPF_Solver(DEBUG=true,verbosity=0,LIMIT_A_star_iterations=5*nv(env_graph));
     (solution, assignment, cost, search_env), elapsed_time, byte_ct, gc_time, mem_ct = @timed high_level_search!(
-        AdjacencyMILP(), solver, env_graph, project_spec, problem_spec, robot_ICs, Gurobi.Optimizer;)
+        SparseAdjacencyMILP(), solver, env_graph, project_spec, problem_spec, robot_ICs, Gurobi.Optimizer;)
 
     # Note: the milp solver is called 15 times on problem 75. It must be
     # returning an invalid "optimal" solution on the final call. The behavior

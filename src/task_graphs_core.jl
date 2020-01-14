@@ -1759,7 +1759,14 @@ function update_project_schedule!(project_schedule::P,problem_spec::T,adj_matrix
         end
     end
     # DEBUG ? @assert(is_cyclic(G) == false) : nothing
-    if is_cyclic(G)
+    try
+        @assert !is_cyclic(G) "update_project_schedule!() -------> is_cyclic(G)"
+    catch e
+        if typeof(e) <: AssertionError
+            println(e.msg)
+        else
+            throw(e)
+        end
         return false
     end
     propagate_valid_ids!(project_schedule,problem_spec)
