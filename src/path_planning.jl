@@ -781,6 +781,7 @@ function high_level_search_mod!(solver::P, env_graph, project_spec, problem_spec
         robot_ICs, optimizer;
         milp_model=AdjacencyMILP(),
         primary_objective=SumOfMakeSpans,
+        TimeLimit=200,
         kwargs...) where {P<:PC_TAPF_Solver}
 
     enter_assignment!(solver)
@@ -794,6 +795,7 @@ function high_level_search_mod!(solver::P, env_graph, project_spec, problem_spec
     model = formulate_milp(milp_model,project_schedule,problem_spec;
         cost_model=primary_objective,optimizer=optimizer,kwargs...)
 
+    start_time = time()
     while solver.best_cost[1] > lower_bound
         solver.num_assignment_iterations += 1
         log_info(0,solver,string("HIGH LEVEL SEARCH: iteration ",solver.num_assignment_iterations,"..."))
@@ -833,6 +835,10 @@ function high_level_search_mod!(solver::P, env_graph, project_spec, problem_spec
                 end
                 log_info(0,solver,string("HIGH LEVEL SEARCH: Best cost so far = ", solver.best_cost[1]))
             end
+        end
+        if time() - start_time > TimeLimit
+            log_info(0,solver,string("Overall time limit of ",TimeLimit," seconds exceeded."))
+            break
         end
     end
     exit_assignment!(solver)
