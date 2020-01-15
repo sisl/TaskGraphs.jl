@@ -866,19 +866,64 @@ end
     function freezes all vertices that begin before time `current_time + dt`,
     then drops all eligible edges (the edges of subgraph) that come afterward.
 """
-function drop_edges(freeze_model::FreezeByTime,project_schedule::ProjectSchedule,cache::PlanningCache,subgraph,t)
+function drop_edges!(freeze_model::FreezeByTime,project_schedule::ProjectSchedule,cache::PlanningCache,subgraph,t)
     t_freeze = t + freeze_model.dt
     G = get_graph(project_schedule)
-    vtxs = [v for v in vertices(G) if cache.t0[v] > t_freeze] # vertices eligible to be frozen
     for v in vtxs
-        # if cache.t0[v] > t_freeze
-        for v2 in outneighbors(G,v)
-            if has_edge(subgraph,v,v2)
-                rem_edge!(G,v,v2)
+        if cache.t0[v] > t_freeze
+            for v2 in outneighbors(G,v) # vertices whose edges may be eligible to be dropped
+                if has_edge(subgraph,v,v2)
+                    rem_edge!(G,v,v2)
+                end
             end
         end
-        # end
     end
+    project_schedule
+end
+
+"""
+    `prune_project_schedule`
+
+    Remove all vertices that have already been completed.
+"""
+function prune_project_schedule(schedule::ProjectSchedule,completed_vtxs::Vector{Int})
+
+end
+function prune_project_schedule(project_schedule::ProjectSchedule,cache::PlanningCache,t)
+    G = get_graph(project_schedule)
+    new_schedule = ProjectSchedule()
+    remove_set = Set{Int}(collect(vertices(G)))
+    op_list = OperationID[]
+    for v in vertices(G)
+        if cache.tF[v] <= t # test if vertex is eligible to be dropped
+            node_id = get_vtx_id(project_schedule,v)
+            node = get_node_from_id(project_schedule, node_id)
+            if typeof(node) <: Operation
+                push!(remove_set, v)
+                for e in edges(bfs_tree(G,v,:in))
+                    push!(e.dst, remove_set)
+                end
+            end
+            # cut off at object
+            # cut off below COLLECT and replace DEPOSIT/ROBOT_AT with ROBOT_AT
+        # else
+        #     add_to_schedule!(new_schedule,get_path_spec(project_schedule,v),node,node_id)
+        end
+    end
+    keep_vtxs = setdiff(Set{Int}(collect(vertices(G))), remove_set)
+    for v in keep_vtxs
+        node_id = get_vtx_id(project_schedule,v)
+        node = get_node_from_id(project_schedule, node_id)
+        add_to_schedule!(new_schedule,get_path_spec(project_schedule,v),node,node_id)
+    end
+    for v in vertices(get_graph(new_schedule))
+        node_id = get_vtx_id(project_schedule,v)
+        node = get_node_from_id(project_schedule, node_id)
+        if typeof(node) <: GO && indegree(get_graph(new_schedule),v) == 0
+            add_to_schedule!(new_schedule,ROBOT_AT(get_robot_id(node),get_initial_location_id(node)),get_robot_id(node))
+        end
+    end
+    new_schedule
 end
 
 """

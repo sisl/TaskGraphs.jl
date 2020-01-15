@@ -569,21 +569,24 @@ function replace_in_schedule!(schedule::P,spec::T,pred,id::ID) where {P<:Project
     set_path_spec!(schedule,v,path_spec)
     schedule
 end
-function add_to_schedule!(schedule::P,spec::T,pred,id::ID) where {P<:ProjectSchedule,T<:ProblemSpec,ID<:AbstractID}
+function add_to_schedule!(schedule::P,path_spec::T,pred,id::ID) where {P<:ProjectSchedule,T<:PathSpec,ID<:AbstractID}
     @assert get_vtx(schedule, id) == -1
     add_vertex!(get_graph(schedule))
     insert_to_vtx_map!(schedule,pred,id,nv(get_graph(schedule)))
-    path_spec = generate_path_spec(schedule,spec,pred)
     add_path_spec!(schedule,path_spec)
     schedule
 end
+function add_to_schedule!(schedule::P,spec::T,pred,id::ID) where {P<:ProjectSchedule,T<:ProblemSpec,ID<:AbstractID}
+    add_to_schedule!(schedule,generate_path_spec(schedule,spec,pred),pred,id)
+end
 function add_to_schedule!(schedule::P,pred,id::ID) where {P<:ProjectSchedule,ID<:AbstractID}
-    @assert get_vtx(schedule, id) == -1
-    add_vertex!(get_graph(schedule))
-    insert_to_vtx_map!(schedule,pred,id,nv(get_graph(schedule)))
-    path_spec = generate_path_spec(schedule,pred)
-    add_path_spec!(schedule,path_spec)
-    schedule
+    add_to_schedule!(schedule,ProblemSpec(),pred,id)
+    # @assert get_vtx(schedule, id) == -1
+    # add_vertex!(get_graph(schedule))
+    # insert_to_vtx_map!(schedule,pred,id,nv(get_graph(schedule)))
+    # path_spec = generate_path_spec(schedule,pred)
+    # add_path_spec!(schedule,path_spec)
+    # schedule
 end
 
 function LightGraphs.add_edge!(schedule::P,id1::A,id2::B) where {P<:ProjectSchedule,A<:AbstractID,B<:AbstractID}
@@ -1541,7 +1544,7 @@ function formulate_milp(milp_model::SparseAdjacencyMILP,project_schedule::Projec
         for v2 in outneighbors(G,v)
             Xa[v,v2] = @variable(model, binary=true) # TODO remove this (MUST UPDATE n_eligible_successors, etc. accordingly)
             @constraint(model, Xa[v,v2] == 1) #TODO this edge already exists--no reason to encode it as a decision variable
-            @constraint(model, t0[v2] >= tF[v]) # TODO make this an equality constraint. May speed up the solver. 
+            @constraint(model, t0[v2] == tF[v]) # TODO make this an equality constraint. May speed up the solver.
         end
     end
     # Identify required and eligible edges
@@ -1788,8 +1791,5 @@ end
 # function update_project_schedule!(milp_model::AssignmentMILP,project_schedule::P,problem_spec::T,adj_matrix,DEBUG::Bool=false) where {P<:ProjectSchedule,T<:ProblemSpec}
 # end
 
-function prune_project_schedule(schedule::ProjectSchedule,completed_vtxs::Vector{Int})
-
-end
 
 end # module TaskGraphCore

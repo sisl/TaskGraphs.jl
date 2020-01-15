@@ -30,8 +30,7 @@ let
     println("RUNNING PROFILING TESTS")
 
     modes = [
-        # :write,
-        # :assignment_only,
+        :assignment_only,
         # :low_level_search_without_repair,
         # :low_level_search_with_repair,
         :full_solver
