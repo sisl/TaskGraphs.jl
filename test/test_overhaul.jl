@@ -491,7 +491,7 @@ let
 
     ##
     # for problem_id in problematic_ids[end]+1:384
-    for problem_id in 1:384
+    for problem_id in 1:10
         problem_filename = joinpath(problem_dir,string("problem",problem_id,".toml"))
         problem_def = read_problem_def(problem_filename)
         project_spec, r0, s0, sF = problem_def.project_spec,problem_def.r0,problem_def.s0,problem_def.sF

@@ -31,8 +31,8 @@ let
 
     modes = [
         :assignment_only,
-        # :low_level_search_without_repair,
-        # :low_level_search_with_repair,
+        :low_level_search_without_repair,
+        :low_level_search_with_repair,
         :full_solver
         ]
     for mode in modes
