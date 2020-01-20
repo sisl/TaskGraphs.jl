@@ -371,6 +371,7 @@ export
     get_operations,
     get_vtx_ids,
     get_node_from_id,
+    get_node_from_vtx,
     get_num_actions,
     get_num_operations,
     get_num_object_ICs,
@@ -394,13 +395,12 @@ export
     planning_nodes      ::Dict{AbstractID,AbstractPlanningPredicate}    = Dict{AbstractID,AbstractPlanningPredicate}()
     vtx_map             ::Dict{AbstractID,Int}  = Dict{AbstractID,Int}()
     # TODO add UID vector so that vertex deletion can be constant time
-    vtx_ids             ::Vector{AbstractID}    = Vector{AbstractID}() # maps vertex to actual graph node
+    vtx_ids             ::Vector{AbstractID}    = Vector{AbstractID}() # maps vertex uid to actual graph node
     path_specs          ::Vector{PathSpec}      = Vector{PathSpec}()
     root_nodes          ::Vector{Int}           = Vector{Int}() # list of "project heads"
     weights             ::Dict{Int,Float64}     = Dict{Int,Float64}() # weights corresponding to project heads
 end
 get_graph(schedule::P) where {P<:ProjectSchedule}       = schedule.graph
-
 get_vtx_ids(schedule::P) where {P<:ProjectSchedule}     = schedule.vtx_ids
 get_root_nodes(schedule::P) where {P<:ProjectSchedule}  = schedule.root_nodes
 get_root_node_weights(schedule::P) where {P<:ProjectSchedule}  = schedule.weights
@@ -410,7 +410,7 @@ get_vtx(schedule::P,id::A) where {P<:ProjectSchedule,A<:AbstractID}         = ge
 get_vtx_id(schedule::P,v::Int) where {P<:ProjectSchedule}                   = schedule.vtx_ids[v]
 get_node_from_vtx(schedule::P,v::Int) where {P<:ProjectSchedule}= schedule.planning_nodes[schedule.vtx_ids[v]]
 
-get_nodes_of_type(schedule::P,T) where {P<:ProjectSchedule} = Dict(get_id(id)=>schedule.planning_nodes[id] for id in schedule.vtx_ids if typeof(id)<:T)
+get_nodes_of_type(schedule::P,T) where {P<:ProjectSchedule} = Dict(get_id(id)=>get_node_from_id(schedule, id) for id in schedule.vtx_ids if typeof(id)<:T)
 get_object_ICs(schedule::P) where {P<:ProjectSchedule}  = get_nodes_of_type(schedule,ObjectID)
 get_robot_ICs(schedule::P) where {P<:ProjectSchedule}   = get_nodes_of_type(schedule,RobotID)
 get_robot_FCs(schedule::P) where {P<:ProjectSchedule}   = get_nodes_of_type(schedule,TerminalRobotID)
@@ -463,7 +463,6 @@ function generate_path_spec(schedule::P,spec::T,a::GO) where {P<:ProjectSchedule
         node_type=Symbol(typeof(a)),
         start_vtx=s0,
         final_vtx=s,
-        # min_path_duration=get(spec.D,(s0,s),typemax(Int)), # ProblemSpec distance matrix
         min_path_duration=get(spec.D,(s0,s),0), # ProblemSpec distance matrix
         agent_id=r,
         tight=true,
@@ -479,7 +478,6 @@ function generate_path_spec(schedule::P,spec::T,a::CARRY) where {P<:ProjectSched
         node_type=Symbol(typeof(a)),
         start_vtx=s0,
         final_vtx=s,
-        # min_path_duration=get(spec.D,(s0,s),typemax(Int)), # ProblemSpec distance matrix
         min_path_duration=get(spec.D,(s0,s),0), # ProblemSpec distance matrix
         agent_id=r,
         object_id = o
@@ -494,7 +492,6 @@ function generate_path_spec(schedule::P,spec::T,a::COLLECT) where {P<:ProjectSch
         node_type=Symbol(typeof(a)),
         start_vtx=s0,
         final_vtx=s,
-        # min_path_duration=get(spec.Δt_collect,o,typemax(Int)),
         min_path_duration=get(spec.Δt_collect,o,0),
         agent_id=r,
         object_id = o,
@@ -510,7 +507,6 @@ function generate_path_spec(schedule::P,spec::T,a::DEPOSIT) where {P<:ProjectSch
         node_type=Symbol(typeof(a)),
         start_vtx=s0,
         final_vtx=s,
-        # min_path_duration=get(spec.Δt_deliver,o,typemax(Int)),
         min_path_duration=get(spec.Δt_deliver,o,0),
         agent_id=r,
         object_id = o,
@@ -551,13 +547,18 @@ function generate_path_spec(schedule::P,pred) where {P<:ProjectSchedule}
     generate_path_spec(schedule,ProblemSpec(),pred)
 end
 
-function replace_in_schedule!(schedule::P,spec::T,pred,id::ID) where {P<:ProjectSchedule,T<:ProblemSpec,ID<:AbstractID}
+function replace_in_schedule!(schedule::P,path_spec::T,pred,id::ID) where {P<:ProjectSchedule,T<:PathSpec,ID<:AbstractID}
     v = get_vtx(schedule, id)
     @assert v != -1
     set_vtx_map!(schedule,pred,id,v)
-    path_spec = generate_path_spec(schedule,spec,pred)
     set_path_spec!(schedule,v,path_spec)
     schedule
+end
+function replace_in_schedule!(schedule::P,spec::T,pred,id::ID) where {P<:ProjectSchedule,T<:ProblemSpec,ID<:AbstractID}
+    replace_in_schedule!(schedule,generate_path_spec(schedule,spec,pred),pred,id)
+end
+function replace_in_schedule!(schedule::P,pred,id::ID) where {P<:ProjectSchedule,ID<:AbstractID}
+    replace_in_schedule!(schedule,ProblemSpec(),pred,id)
 end
 function add_to_schedule!(schedule::P,path_spec::T,pred,id::ID) where {P<:ProjectSchedule,T<:PathSpec,ID<:AbstractID}
     @assert get_vtx(schedule, id) == -1
@@ -575,7 +576,64 @@ end
 
 function LightGraphs.add_edge!(schedule::P,id1::A,id2::B) where {P<:ProjectSchedule,A<:AbstractID,B<:AbstractID}
     success = add_edge!(get_graph(schedule), get_vtx(schedule,id1), get_vtx(schedule,id2))
-    # @show success, get_vtx(schedule,id1), get_vtx(schedule,id2)
+    schedule
+end
+function LightGraphs.rem_edge!(schedule::P,id1::A,id2::B) where {P<:ProjectSchedule,A<:AbstractID,B<:AbstractID}
+    success = rem_edge!(get_graph(schedule), get_vtx(schedule,id1), get_vtx(schedule,id2))
+    schedule
+end
+
+export
+    get_leaf_operation_nodes,
+    set_leaf_operation_nodes!,
+    delete_node!,
+    delete_nodes!
+
+function get_leaf_operation_nodes(schedule::ProjectSchedule)
+    G = get_graph(schedule)
+    root_vtxs = Int[]
+    for v in vertices(G)
+        if is_terminal_node(G,v)
+            if typeof(get_node_from_id(schedule, get_vtx_id(schedule,v))) == Operation
+                push!(root_vtxs,v)
+            end
+        end
+    end
+    return root_vtxs
+end
+function set_leaf_operation_nodes!(schedule::ProjectSchedule)
+    empty!(get_root_nodes(schedule))
+    empty!(get_root_node_weights(schedule))
+    for vtx in  get_leaf_operation_nodes(schedule)
+        push!(get_root_nodes(schedule),vtx)
+        get_root_node_weights(schedule)[vtx] = 1.0
+    end
+    schedule
+end
+
+"""
+    delete_node!
+
+    removes a node (by id) from schedule.
+"""
+function delete_node!(schedule::ProjectSchedule, id::AbstractID)
+    v = get_vtx(schedule, id)
+    delete!(schedule.vtx_map, id)
+    delete!(schedule.planning_nodes, id)
+    rem_vertex!(get_graph(schedule), v)
+    deleteat!(schedule.vtx_ids, v)
+    deleteat!(schedule.path_specs, v)
+    for vtx in v:nv(get_graph(schedule))
+        node_id = schedule.vtx_ids[vtx]
+        schedule.vtx_map[node_id] = vtx
+    end
+    schedule
+end
+function delete_nodes!(schedule::ProjectSchedule, vtxs::Union{Int,Vector{Int}})
+    node_ids = map(v->get_vtx_id(schedule,v), vtxs)
+    for id in node_ids
+        delete_node!(schedule,id)
+    end
     schedule
 end
 
@@ -694,12 +752,6 @@ function add_headless_delivery_task!(
     add_to_schedule!(schedule, problem_spec, GO(robot_id, dropoff_station_id,-1), action_id)
     add_edge!(schedule, prev_action_id, action_id)
 
-    # new_robot_id = object_id + problem_spec.N
-    # if get_vtx(schedule, RobotID(new_robot_id)) == -1
-    #     add_to_schedule!(schedule, problem_spec, ROBOT_AT(RobotID(new_robot_id),StationID(dropoff_station_id)), RobotID(new_robot_id))
-    # end
-    # add_edge!(schedule, action_id, RobotID(new_robot_id))
-
     action_id
 end
 """
@@ -772,11 +824,6 @@ function construct_project_schedule(
         operation_id = object_ops[ObjectID(object_id)]
         add_edge!(schedule, action_id, operation_id)
 
-        # new_robot_id = object_id + problem_spec.N
-        # if get_vtx(schedule, RobotID(new_robot_id)) == -1
-        #     add_to_schedule!(schedule, problem_spec, ROBOT_AT(RobotID(new_robot_id),StationID(dropoff_station_id)), RobotID(new_robot_id))
-        # end
-        # add_edge!(schedule, action_id, RobotID(new_robot_id))
     end
     # end
     # add final GO to all robot/deposit nodes

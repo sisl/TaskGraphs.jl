@@ -421,7 +421,7 @@ let
 
 
     project_schedule = construct_partial_project_schedule(project_spec,problem_spec,map(i->robot_ICs[i], 1:problem_spec.N))
-    model = formulate_schedule_milp(project_schedule,problem_spec;Presolve=1)
+    model = formulate_milp(SparseAdjacencyMILP(),project_schedule,problem_spec;Presolve=1)
     # optimize!(model)
     exclude_solutions!(model)
     retval, elapsed_time, byte_ct, gc_time, mem_ct = @timed optimize!(model)

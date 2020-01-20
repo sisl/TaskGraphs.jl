@@ -851,34 +851,15 @@ high_level_search!(milp_model::AdjacencyMILP, args...;kwargs...) = high_level_se
 high_level_search!(milp_model::SparseAdjacencyMILP, args...;kwargs...) = high_level_search_mod!(args...;milp_model=milp_model,kwargs...)
 
 export
-    freeze_assignments!,
-    freeze!
+    get_env_snapshot,
+    prune_project_schedule
 
-abstract type FreezeModel end
-struct FreezeByTime
-    dt::Float64
-end
 
 """
-    `drop_edges()`
-
-    Choose which edges, from a list of eligible edges, to drop. This particular
-    function freezes all vertices that begin before time `current_time + dt`,
-    then drops all eligible edges (the edges of subgraph) that come afterward.
+    get_env_snapshot
 """
-function drop_edges!(freeze_model::FreezeByTime,project_schedule::ProjectSchedule,cache::PlanningCache,subgraph,t)
-    t_freeze = t + freeze_model.dt
-    G = get_graph(project_schedule)
-    for v in vtxs
-        if cache.t0[v] > t_freeze
-            for v2 in outneighbors(G,v) # vertices whose edges may be eligible to be dropped
-                if has_edge(subgraph,v,v2)
-                    rem_edge!(G,v,v2)
-                end
-            end
-        end
-    end
-    project_schedule
+function get_env_snapshot(solution::S,t) where {S<:LowLevelSolution}
+    Dict(RobotID(i)=>ROBOT_AT(i, get_s(get_path_node(path,t)).vtx) for (i,path) in enumerate(get_paths(solution)))
 end
 
 """
@@ -886,28 +867,25 @@ end
 
     Remove all vertices that have already been completed.
 """
-function prune_project_schedule(schedule::ProjectSchedule,completed_vtxs::Vector{Int})
-
-end
-function prune_project_schedule(project_schedule::ProjectSchedule,cache::PlanningCache,t)
+function prune_project_schedule(project_schedule::ProjectSchedule,cache::PlanningCache,t;
+    robot_positions::Dict{RobotID,ROBOT_AT}=Dict{RobotID,ROBOT_AT}()
+    )
     G = get_graph(project_schedule)
     new_schedule = ProjectSchedule()
-    remove_set = Set{Int}(collect(vertices(G)))
-    op_list = OperationID[]
+    remove_set = Set{Int}()
     for v in vertices(G)
         if cache.tF[v] <= t # test if vertex is eligible to be dropped
             node_id = get_vtx_id(project_schedule,v)
             node = get_node_from_id(project_schedule, node_id)
             if typeof(node) <: Operation
+                @show node_id
                 push!(remove_set, v)
-                for e in edges(bfs_tree(G,v,:in))
-                    push!(e.dst, remove_set)
+                for e in edges(bfs_tree(G,v;dir=:in))
+                    if !(typeof(get_vtx_id(project_schedule, e.dst)) <: RobotID)
+                        push!(remove_set, e.dst)
+                    end
                 end
             end
-            # cut off at object
-            # cut off below COLLECT and replace DEPOSIT/ROBOT_AT with ROBOT_AT
-        # else
-        #     add_to_schedule!(new_schedule,get_path_spec(project_schedule,v),node,node_id)
         end
     end
     keep_vtxs = setdiff(Set{Int}(collect(vertices(G))), remove_set)
@@ -916,83 +894,25 @@ function prune_project_schedule(project_schedule::ProjectSchedule,cache::Plannin
         node = get_node_from_id(project_schedule, node_id)
         add_to_schedule!(new_schedule,get_path_spec(project_schedule,v),node,node_id)
     end
+    for e in edges(get_graph(project_schedule))
+        id1 = get_vtx_id(project_schedule, e.src)
+        id2 = get_vtx_id(project_schedule, e.dst)
+        add_edge!(new_schedule, id1, id2)
+    end
     for v in vertices(get_graph(new_schedule))
-        node_id = get_vtx_id(project_schedule,v)
-        node = get_node_from_id(project_schedule, node_id)
+        node_id = get_vtx_id(new_schedule,v)
+        node = get_node_from_id(new_schedule, node_id)
         if typeof(node) <: GO && indegree(get_graph(new_schedule),v) == 0
-            add_to_schedule!(new_schedule,ROBOT_AT(get_robot_id(node),get_initial_location_id(node)),get_robot_id(node))
+            robot_id = get_robot_id(node)
+            if haskey(robot_positions, robot_id)
+                replace_in_schedule!(new_schedule, robot_positions[robot_id], robot_id)
+            end
+            add_edge!(new_schedule, robot_id, node_id)
         end
     end
     new_schedule
 end
 
-"""
-    freeze_assignments!
-"""
-function freeze_assignments!(schedule::P,cache::C,t) where {P<:ProjectSchedule,C<:PlanningCache}
-    assignments = Set{Int}()
-    for v in topological_sort_by_dfs(get_graph(schedule))
-        node = get_node_from_id(schedule, get_vtx_id(schedule, v))
-        if cache.t0[v] <= t
-            if typeof(node) <: COLLECT
-                # if !(typeof(node) <: GO)
-                    # assignments[get_id(get_robot_id(node))] = get_id(get_object_id(node))
-                push!(assignments, get_id(get_object_id(node)))
-                # end
-            end
-        end
-    end
-    assignments
-end
 
-"""
-    get_env_snapshot
-"""
-function get_env_snapshot(solution::S,t) where {S<:LowLevelSolution}
-    r0 = map(path->get_vtx(get_s(get_path_node(path,t))), get_paths(solution))
-end
-
-"""
-    `freeze!`
-
-    Prepares a search environment for replanning.
-
-    Args:
-    - `solution` - must be a VALID solution
-    - `schedule::ProjectSchedule`
-    - `Ta::Int` - assignment freeze deadline. All delivery tasks that will have
-        begun by time `Ta` (i.e., the COLLECT action begins before then) must be
-        completed by the same robot.
-    - `Tr::Int` - routing freeze deadline. All route plans must be frozen up to
-        time `Tr`.
-"""
-function freeze!(solution::S,env::E,Ta::Int,Tr::Int) where {S<:LowLevelSolution,E<:SearchEnv}
-    frozen_assignments = freeze_assignments() # set of object (delivery task) ids
-    active_nodes = Set{Int}() #  set of project schedule node ids
-    frozen_routes = default_solution(length(get_paths(solution)))
-
-    schedule = env.schedule
-    cache = env.cache
-
-    for v in topological_sort_by_dfs(get_graph(schedule))
-        node = get_node_from_id(schedule, get_vtx_id(schedule, v))
-        if cache.t0[v] <= Ta
-            if typeof(node) <: COLLECT
-                push!(assignments, get_id(get_object_id(node)))
-            end
-            if Ta <= cache.tF[v]
-                push!(active_nodes, v)
-            end
-        end
-    end
-
-    for v in active_nodes
-        node = get_node_from_id(schedule, get_vtx_id(schedule, v))
-        if typeof(node) <: AbstractRobotAction
-            agent_id = get_path_spec(schedule, v).agent_id
-            path = get_paths(solution)[v]
-        end
-    end
-end
 
 end # PathPlanning module
