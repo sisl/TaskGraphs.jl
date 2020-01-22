@@ -335,15 +335,12 @@ export
     generate_path_spec
 
 @with_kw struct PathSpec
-    # element             ::T             = nothing
-    # op_duration         ::Int           = 0 # time between end of predecessor and start of current
     node_type           ::Symbol        = :EMPTY
     start_vtx           ::Int           = -1
     final_vtx           ::Int           = -1
     min_path_duration   ::Int           =  0 # duration
 
     agent_id            ::Int           = -1
-
     object_id           ::Int           = -1
     # flag indicating that a path must be planned
     plan_path           ::Bool          = true
@@ -357,8 +354,38 @@ export
     # (free==true) && is_terminal_node => the planning goal_time must go on until
     # all non-free nodes are completed
     free                ::Bool          = false
-    # slack               ::Int           = 0.0
-    # deadline            ::Int           = 0.0
+    # fixed==true => do not plan path because it is already fixed. Instead,
+    # retrieve the portion of the path directly from the pre-existing solution.
+    fixed               ::Bool          = false
+end
+function PathSpec(
+        spec::PathSpec,
+        node_type=spec.node_type,
+        start_vtx=spec.start_vtx,
+        final_vtx=spec.final_vtx,
+        min_path_duration=spec.min_path_duration,
+        agent_id=spec.agent_id,
+        object_id=spec.object_id,
+        plan_path=spec.plan_path,
+        tight=spec.tight,
+        static=spec.static,
+        free=spec.free,
+        fixed=spec.fixed,
+    )
+
+    PathSpec(
+        node_type,
+        start_vtx,
+        final_vtx,
+        min_path_duration,
+        agent_id,
+        object_id,
+        plan_path,
+        tight,
+        static,
+        free,
+        fixed,
+    )
 end
 
 export

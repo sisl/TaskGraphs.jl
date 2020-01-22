@@ -537,3 +537,85 @@ let
     end
     ##
 end
+
+# Pruning projects
+let
+    env_id = 2
+    env_filename = string(ENVIRONMENT_DIR,"/env_",env_id,".toml")
+    factory_env = read_env(env_filename)
+    env_graph = factory_env.graph
+    dist_matrix = get_dist_matrix(env_graph)
+
+    # problem_def = read_problem_def(joinpath(PROBLEM_DIR,"problem223.toml"))
+    problem_id = 75
+    problem_def = read_problem_def(joinpath(PROBLEM_DIR,string("problem",problem_id,".toml")))
+    project_spec, r0, s0, sF = problem_def.project_spec,problem_def.r0,problem_def.s0,problem_def.sF
+    project_spec, problem_spec, object_ICs, object_FCs, robot_ICs = construct_task_graphs_problem(
+            project_spec, r0, s0, sF, dist_matrix);
+
+    solver = PC_TAPF_Solver(DEBUG=true,verbosity=1,LIMIT_A_star_iterations=5*nv(env_graph));
+    (solution, assignment, cost, search_env), elapsed_time, byte_ct, gc_time, mem_ct = @timed high_level_search!(
+        SparseAdjacencyMILP(), solver, env_graph, project_spec, problem_spec, robot_ICs, Gurobi.Optimizer;)
+
+    # project_schedule = construct_partial_project_schedule(project_spec,problem_spec,map(i->robot_ICs[i], 1:problem_spec.N))
+    # model = formulate_milp(SparseAdjacencyMILP(),project_schedule,problem_spec;Presolve=1)
+    # exclude_solutions!(model)
+    # retval, elapsed_time, byte_ct, gc_time, mem_ct = @timed optimize!(model)
+    # @show elapsed_time
+    # @test termination_status(model) == MathOptInterface.OPTIMAL
+    # assignment_matrix = get_assignment_matrix(model);
+    # update_project_schedule!(project_schedule,problem_spec,assignment_matrix)
+    # @test validate(project_schedule)
+    # @test project_schedule.graph == DiGraph(assignment_matrix)
+    # cache = initialize_planning_cache(project_schedule)
+
+    # env, mapf = construct_search_env(project_schedule, problem_spec, env_graph);
+    # pc_mapf = PC_MAPF(env,mapf);
+
+    project_schedule = search_env.schedule
+    cache = search_env.cache
+    @test validate(project_schedule)
+
+
+    t = 30
+    trimmed_solution = trim_solution(search_env.env, solution, t)
+    @test all([length(p) == get_cost(p)[1] for p in get_paths(trimmed_solution)])
+
+    new_schedule = prune_project_schedule(project_schedule, cache, t; robot_positions=get_env_snapshot(solution,t))
+    set_leaf_operation_nodes!(new_schedule)
+    G = get_graph(new_schedule)
+    # init planning cache with the existing solution
+    t0 = map(v->cache.t0[get_vtx(project_schedule, get_vtx_id(new_schedule, v))], vertices(G))
+    new_cache = initialize_planning_cache(new_schedule;t0=t0)
+    # identify active nodes
+    active_vtxs = Set{Int}()
+    fixed_vtxs = Set{Int}()
+    for v in vertices(G)
+        if new_cache.t0[v] <= t <= new_cache.tF[v] # test if vertex is eligible to be dropped
+            node_id = get_vtx_id(new_schedule,v)
+            push!(active_vtxs, v)
+            for e in edges(bfs_tree(G,v;dir=:in))
+                push!(fixed_vtxs, e.dst)
+                set_path_spec!(new_schedule,e.dst,PathSpec(get_path_spec(new_schedule,e.dst), plan_path=false, fixed=true))
+            end
+        end
+    end
+    map(v->new_cache.t0[v], collect(fixed_vtxs))
+    map(v->new_cache.t0[v], collect(active_vtxs))
+    map(v->new_cache.t0[v], collect(setdiff(collect(vertices(G)),union(fixed_vtxs,active_vtxs))))
+
+    # sp = get_next_state(env,s,a)
+    # new_path = cat(path, PathNode(s, a, sp))
+    # new_path.cost = accumulate_cost(env, get_cost(path), get_transition_cost(env,s,a,sp))
+
+    t0 = zeros(Int, nv(get_graph(new_schedule)))
+    for v in vertices(get_graph(new_schedule))
+        v_old = get_vtx(project_schedule, get_vtx_id(new_schedule, v))
+        t0[v] = cache.t0[v_old]
+    end
+    new_cache = initialize_planning_cache(new_schedule;t0=t0) # TODO make sure t) is set correctly in this call
+
+    print_project_schedule(project_schedule,"dummy_schedule";mode=:leaf_aligned)
+
+
+end

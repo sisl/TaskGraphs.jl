@@ -171,8 +171,8 @@ export
     local_slack::Vector{Vector{Float64}} = Vector{Vector{Float64}}()
 end
 
-function initialize_planning_cache(schedule::ProjectSchedule)
-    t0,tF,slack,local_slack = process_schedule(schedule);
+function initialize_planning_cache(schedule::ProjectSchedule;kwargs...)
+    t0,tF,slack,local_slack = process_schedule(schedule;kwargs...);
     cache = PlanningCache(t0=t0,tF=tF,slack=slack,local_slack=local_slack)
     for v in vertices(get_graph(schedule))
         if is_root_node(get_graph(schedule),v)
@@ -196,15 +196,9 @@ function reset_cache!(cache::PlanningCache,schedule::ProjectSchedule)
     cache.tF            .= tF
     cache.slack         .= slack
     cache.local_slack   .= local_slack
-    while length(cache.closed_set) > 0
-        pop!(cache.closed_set)
-    end
-    while length(cache.active_set) > 0
-        pop!(cache.active_set)
-    end
-    while length(cache.node_queue) > 0
-        dequeue!(cache.node_queue)
-    end
+    empty!(cache.closed_set)
+    empty!(cache.active_set)
+    empty!(cache.node_queue)
     for v in vertices(get_graph(schedule))
         if is_root_node(get_graph(schedule),v)
             push!(cache.active_set,v)
@@ -266,6 +260,7 @@ const Action = PCCBS.Action
     schedule::ProjectSchedule   = ProjectSchedule()
     cache::PlanningCache        = PlanningCache()
     env::E                      = PCCBS.LowLevelEnv()
+    # solution::S                 = LowLevelSolution{}
     cost_model::C               = get_cost_model(env)
     num_agents::Int             = -1
 end
@@ -291,24 +286,15 @@ function CRCBS.MakeSpan(schedule::S,cache::C) where {S<:ProjectSchedule,C<:Plann
 end
 
 function construct_search_env(schedule, problem_spec, env_graph;
-    primary_objective=SumOfMakeSpans,
-    extra_T=100)
+        primary_objective=SumOfMakeSpans,
+        extra_T=100
+    )
     # schedule = construct_project_schedule(project_spec, problem_spec, robot_ICs, assignments)
     cache = initialize_planning_cache(schedule)
     # Paths stored as seperate chunks (will need to be concatenated before conflict checking)
     N = problem_spec.N                                          # number of robots
-    starts = Vector{PCCBS.State}() # no need to fill because we pull each goal directly from the path_spec
-    goals = Vector{PCCBS.State}() # no need to fill because we pull each goal directly from the path_spec
-    # for v in vertices(get_graph(schedule))
-    #     if get_path_spec(schedule,v).plan_path == true
-    #         start_vtx = get_path_spec(schedule,v).start_vtx
-    #         final_vtx = get_path_spec(schedule,v).final_vtx
-    #         # @assert (start_vtx != -1) string("v = ",v,", start_vtx = ",start_vtx)
-    #         # @assert (final_vtx != -1) string("v = ",v,", final_vtx = ",final_vtx)
-    #         push!(starts, PCCBS.State(vtx = start_vtx, t = cache.t0[v])) # TODO I don't believe these are necessary anymore ()
-    #         push!(goals, PCCBS.State(vtx = final_vtx, t = cache.tF[v])) # TODO I don't believe these are necessary either
-    #     end
-    # end
+    starts = map(i->PCCBS.State(),1:N) # no need to fill because we pull each goal directly from the path_spec
+    goals = map(i->PCCBS.State(),1:N) # no need to fill because we pull each goal directly from the path_spec
     cost_model = construct_composite_cost_model(
         primary_objective(schedule,cache),
         HardConflictCost(env_graph,maximum(cache.tF)+extra_T, N),
@@ -328,6 +314,7 @@ function construct_search_env(schedule, problem_spec, env_graph;
         cost_model=cost_model,
         heuristic=heuristic_model
         ),starts,goals)
+    # solution = get_initial_solution(mapf) # TODO
 
     env = SearchEnv(schedule=schedule, cache=cache, env=mapf.env, num_agents=N)
     return env, mapf #, node
@@ -341,15 +328,15 @@ function default_pc_tapf_solution(N::Int;extra_T=100)
     c0 = (0.0, 0.0, 0.0, 0.0)
     LowLevelSolution(
         paths=map(i->Path{State,Action,typeof(c0)}(s0=State(),cost=c0),1:N),
-        costs=map(i->c0,1:N),
-        cost=c0,
         cost_model = construct_composite_cost_model(
                 SumOfMakeSpans(Float64[0],Int64[1],Float64[1],Float64[0]),
                 # FullDeadlineCost(DeadlineCost(0.0)),
                 HardConflictCost(DiGraph(10), 10+extra_T, N),
                 SumOfTravelDistance(),
                 FullCostModel(sum,NullCost())
-            )
+            ),
+        costs=map(i->c0,1:N),
+        cost=c0,
     )
 end
 
@@ -442,8 +429,11 @@ function CRCBS.build_env(solver, env::E, mapf::M, node::N, v::Int,dt=0) where {E
         base_path = get_paths(node.solution)[agent_id]
     else
         # log_info(0,solver,string("initializing base path for node ",v," of type ",typeof(schedule_node)))
+        start_vtx = get_path_spec(env.schedule,v).start_vtx
         base_path = Path{PCCBS.State,PCCBS.Action,get_cost_type(cbs_env)}(
-            s0=get_start(env,v), cost=get_initial_cost(cbs_env))
+            s0=PCCBS.State(start_vtx, 0), # TODO fix start time
+            cost=get_initial_cost(cbs_env)
+            )
     end
     # base_path = get(get_paths(node.solution), agent_id, Path{PCCBS.State,PCCBS.Action,get_cost_type(cbs_env)}(
     #     s0=get_start(env,v), cost=get_initial_cost(cbs_env)))
@@ -541,13 +531,13 @@ function plan_next_path!(solver::S, env::E, mapf::M, node::N;
             # end
             # log_info(-1,solver,"\n\n")
         else
-            # TODO parameterize env so that I don't have to hard-code the types here
+            # dummy path
             path = Path{PCCBS.State,PCCBS.Action,get_cost_type(mapf.env)}(
-                s0=get_start(env,v),
+                s0=PCCBS.State(-1, -1), # NOTE because start time = 0, this have no effect in update_env!()
                 cost=get_initial_cost(mapf.env)
                 )
-            # update
-            update_env!(solver,env,v,path)
+            # update planning cache only
+            update_planning_cache!(solver,env.cache,env.schedule,v,path) # NOTE I think this is all we need, since there is no actual path to update
         end
     end
     exit_a_star!(solver)
@@ -579,24 +569,6 @@ function CRCBS.low_level_search!(
     return true
 end
 
-"""
-    `repair_solution!(solver, env, mapf, node, invalidated_id;
-        heuristic=heuristic, path_finder=path_finder)`
-
-    Resets env.cache and runs low_level_search!() again so that conflicts can be
-    repaired before CBS has to branch.
-"""
-function repair_solution!(
-        solver::S, env::E, mapf::M, node::N;
-        heuristic=get_heuristic_cost,
-        path_finder=A_star
-        ) where {S<:PC_TAPF_Solver,E<:SearchEnv,M<:AbstractMAPF,N<:ConstraintTreeNode}
-
-    reset_cache!(env.cache,env.schedule)
-    low_level_search!(solver, env, mapf, node;
-        heuristic=heuristic, path_finder=path_finder)
-end
-
 
 ################################################################################
 ############################## CBS Wrapper Stuff ###############################
@@ -620,7 +592,9 @@ CRCBS.get_cost_type(env::E) where {E<:SearchEnv}    = get_cost_type(env.env)
 function CRCBS.initialize_root_node(pc_mapf::P) where {P<:PC_MAPF}
     N = pc_mapf.env.num_agents
     # It is important to only have N starts! Does not matter if they are invalid states.
-    initialize_root_node(MAPF(pc_mapf.mapf.env,map(i->PCCBS.State(),1:N),map(i->PCCBS.State(),1:N)))
+    dummy_mapf = MAPF(pc_mapf.mapf.env,map(i->PCCBS.State(),1:N),map(i->PCCBS.State(),1:N))
+    initialize_root_node(dummy_mapf)
+    # TODO add all pre-existing static
 end
 CRCBS.default_solution(pc_mapf::M) where {M<:PC_MAPF} = default_solution(pc_mapf.mapf)
 
@@ -641,10 +615,11 @@ function CRCBS.low_level_search!(
     enter_low_level!(solver)
     reset_cache!(pc_mapf.env.cache, pc_mapf.env.schedule)
     valid_flag = low_level_search!(solver, pc_mapf.env, pc_mapf.mapf, node)
-    if !valid_flag # return early
-        return valid_flag
-    end
-    valid_flag = repair_solution!(solver, pc_mapf.env, pc_mapf.mapf, node)
+    if valid_flag
+        # repair solution: call low_level_search with conflict table already populated
+        reset_cache!(pc_mapf.env.cache, pc_mapf.env.schedule)
+        valid_flag = low_level_search!(solver, pc_mapf.env, pc_mapf.mapf, node)
+    end # else return
     exit_low_level!(solver)
     return valid_flag
 end
@@ -658,9 +633,10 @@ function CRCBS.solve!(
 
     priority_queue = PriorityQueue{ConstraintTreeNode,get_cost_type(mapf.env)}()
 
-    root_node = initialize_root_node(mapf)
+    root_node = initialize_root_node(mapf) #TODO initialize with a partial solution when replanning
     valid_flag = low_level_search!(solver,mapf,root_node;path_finder=path_finder)
-    detect_conflicts!(root_node.conflict_table,root_node.solution)
+    t0 = max(minimum(mapf.env.cache.t0), 1)
+    detect_conflicts!(root_node.conflict_table,root_node.solution,t0)
     if valid_flag
         enqueue!(priority_queue, root_node => root_node.cost)
     end
@@ -790,10 +766,10 @@ function high_level_search_mod!(solver::P, env_graph, project_spec, problem_spec
     lower_bound = 0.0
     best_solution = default_pc_tapf_solution(problem_spec.N)
     best_env    = SearchEnv()
-    best_assignment = Vector{Int}()
+    best_assignment = Vector{Int}() # meaningless
     project_schedule = construct_partial_project_schedule(project_spec,problem_spec,map(i->robot_ICs[i], 1:problem_spec.N))
     model = formulate_milp(milp_model,project_schedule,problem_spec;
-        cost_model=primary_objective,optimizer=optimizer,kwargs...)
+        cost_model=primary_objective,optimizer=optimizer,kwargs...) #TODO pass t0_ in replanning mode
 
     start_time = time()
     while solver.best_cost[1] > lower_bound
@@ -801,7 +777,6 @@ function high_level_search_mod!(solver::P, env_graph, project_spec, problem_spec
         log_info(0,solver,string("HIGH LEVEL SEARCH: iteration ",solver.num_assignment_iterations,"..."))
         ############## Task Assignment ###############
         exclude_solutions!(model) # exclude most recent solution in order to get next best solution
-        # remove all current edges from project
         optimize!(model)
         optimal = (termination_status(model) == MathOptInterface.OPTIMAL);
         if !optimal
@@ -814,14 +789,12 @@ function high_level_search_mod!(solver::P, env_graph, project_spec, problem_spec
                 " * optimality gap = ", solver.best_cost[1] - lower_bound))
             break
         end
-        optimal_TA_cost = Int(round(value(objective_function(model)))); # lower bound on cost (from task assignment module)
-        lower_bound = max(lower_bound, optimal_TA_cost)
+        lower_bound = max(lower_bound, Int(round(value(objective_function(model)))) )
         log_info(0,solver,string("HIGH LEVEL SEARCH: Current lower bound cost = ",lower_bound))
-        assignment_matrix = get_assignment_matrix(model);
-        # assignments = get_assignment_vector(assignment_matrix,problem_spec.M)
+        adjacency_matrix = get_assignment_matrix(model);
         if lower_bound < solver.best_cost[1]
             ############## Route Planning ###############
-            if update_project_schedule!(project_schedule,problem_spec,assignment_matrix)
+            if update_project_schedule!(project_schedule,problem_spec,adjacency_matrix)
                 env, mapf = construct_search_env(project_schedule, problem_spec, env_graph;
                     primary_objective=primary_objective);
                 pc_mapf = PC_MAPF(env,mapf);
@@ -829,7 +802,6 @@ function high_level_search_mod!(solver::P, env_graph, project_spec, problem_spec
                 solution, cost = solve!(solver,pc_mapf);
                 if cost < solver.best_cost
                     best_solution = solution
-                    # best_assignment = assignments
                     solver.best_cost = cost # TODO make sure that the operation duration is accounted for here
                     best_env = env
                 end
@@ -852,7 +824,8 @@ high_level_search!(milp_model::SparseAdjacencyMILP, args...;kwargs...) = high_le
 
 export
     get_env_snapshot,
-    prune_project_schedule
+    prune_project_schedule,
+    trim_solution
 
 
 """
@@ -865,7 +838,10 @@ end
 """
     `prune_project_schedule`
 
-    Remove all vertices that have already been completed.
+    Remove all vertices that have already been completed. The idea is to identify
+    all `Operation`s that are completed before `t`, remove all nodes upstream of
+    them (except for ROBOT_AT nodes), and create new edges between the ROBOT_AT
+    nodes and their first GO assignments.
 """
 function prune_project_schedule(project_schedule::ProjectSchedule,cache::PlanningCache,t;
     robot_positions::Dict{RobotID,ROBOT_AT}=Dict{RobotID,ROBOT_AT}()
@@ -889,16 +865,19 @@ function prune_project_schedule(project_schedule::ProjectSchedule,cache::Plannin
         end
     end
     keep_vtxs = setdiff(Set{Int}(collect(vertices(G))), remove_set)
+    # add all non-deleted nodes to new project schedule
     for v in keep_vtxs
         node_id = get_vtx_id(project_schedule,v)
         node = get_node_from_id(project_schedule, node_id)
         add_to_schedule!(new_schedule,get_path_spec(project_schedule,v),node,node_id)
     end
+    # add all edges between nodes that still exist
     for e in edges(get_graph(project_schedule))
         id1 = get_vtx_id(project_schedule, e.src)
         id2 = get_vtx_id(project_schedule, e.dst)
         add_edge!(new_schedule, id1, id2)
     end
+    # draw new ROBOT_AT -> GO edges where necessary
     for v in vertices(get_graph(new_schedule))
         node_id = get_vtx_id(new_schedule,v)
         node = get_node_from_id(new_schedule, node_id)
@@ -913,6 +892,33 @@ function prune_project_schedule(project_schedule::ProjectSchedule,cache::Plannin
     new_schedule
 end
 
+"""
+    `trim_solution`
+
+    construct a trimmed solution that stops at a certain time step
+"""
+function trim_solution(env, solution, T)
+    N = length(get_paths(solution))
+    trimmed_solution = get_initial_solution(MAPF(env, map(i->PCCBS.State(),1:N),map(i->PCCBS.State(),1:N)))
+    for agent_id in 1:N
+        cbs_env = typeof(env)(
+            graph = env.graph,
+            agent_idx = agent_id,
+            cost_model = get_cost_model(env),
+            heuristic = get_heuristic_model(env)
+        )
+        old_path = get_paths(solution)[agent_id]
+        new_path = get_paths(trimmed_solution)[agent_id]
+        for t in 1:min(T, length(old_path))
+            p = get_path_node(old_path,t)
+            push!(new_path, p)
+            new_path.cost = accumulate_cost(cbs_env, get_cost(new_path), get_transition_cost(cbs_env, p.s, p.a, p.sp))
+            set_path_cost!(trimmed_solution, new_path.cost, agent_id)
+        end
+    end
+    # NOTE: the solution cost is not yet set (requires an updated cost model to do it effectively)
+    trimmed_solution
+end
 
 
 end # PathPlanning module
