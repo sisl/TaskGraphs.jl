@@ -557,11 +557,11 @@ let
     (solution, assignment, cost, search_env), elapsed_time, byte_ct, gc_time, mem_ct = @timed high_level_search!(
         SparseAdjacencyMILP(), solver, env_graph, project_spec, problem_spec, robot_ICs, Gurobi.Optimizer;)
 
-    # project_schedule = construct_partial_project_schedule(project_spec,problem_spec,map(i->robot_ICs[i], 1:problem_spec.N))
-    # model = formulate_milp(SparseAdjacencyMILP(),project_schedule,problem_spec;Presolve=1)
-    # exclude_solutions!(model)
-    # retval, elapsed_time, byte_ct, gc_time, mem_ct = @timed optimize!(model)
-    # @show elapsed_time
+    project_schedule = construct_partial_project_schedule(project_spec,problem_spec,map(i->robot_ICs[i], 1:problem_spec.N))
+    model = formulate_milp(SparseAdjacencyMILP(),project_schedule,problem_spec;Presolve=1,TimeLimit=0.5)
+    exclude_solutions!(model)
+    retval, elapsed_time, byte_ct, gc_time, mem_ct = @timed optimize!(model)
+    @show elapsed_time
     # @test termination_status(model) == MathOptInterface.OPTIMAL
     # assignment_matrix = get_assignment_matrix(model);
     # update_project_schedule!(project_schedule,problem_spec,assignment_matrix)
@@ -587,7 +587,7 @@ let
     # init planning cache with the existing solution
     t0 = map(v->cache.t0[get_vtx(project_schedule, get_vtx_id(new_schedule, v))], vertices(G))
     new_cache = initialize_planning_cache(new_schedule;t0=t0)
-    # identify active nodes
+    # identify active and fixed nodes
     active_vtxs = Set{Int}()
     fixed_vtxs = Set{Int}()
     for v in vertices(G)
