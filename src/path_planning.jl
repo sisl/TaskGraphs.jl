@@ -475,31 +475,27 @@ function plan_next_path!(solver::S, env::E, mapf::M, node::N;
                 schedule_node = get_node_from_id(schedule,node_id)
                 log_info(-1, solver, string("# LOW LEVEL SEARCH: in schedule node ",v," of type ",
                     typeof(schedule_node),", cache.t0[v] - get_end_index(base_path) = ",cache.t0[v] - get_end_index(base_path),". Extending path to ",cache.t0[v]," ..."))
-                # log_info(-1, solver, string("# base path = ",convert_to_vertex_lists(base_path), ",  vache.t0[v] = ",cache.t0[v]))
-                # log_info(-1, solver, base_path.s0)
-                # log_info(-1, solver, string(convert_to_vertex_lists(base_path)))
-                # log_info(-1, solver, get_final_state(base_path).vtx )
-                # log_info(-1, solver, cbs_env.cost_model.cost_models[2].model.table.CAT)
                 extend_path!(cbs_env,base_path,cache.t0[v])
             end
             # Solve!
             node_id = get_vtx_id(schedule,v)
             schedule_node = get_node_from_id(schedule,node_id)
+            ### PATH PLANNING ###
             if typeof(schedule_node) <: Union{COLLECT,DEPOSIT} # Must sit and wait the whole time
                 path = base_path
-                extend_path!(cbs_env,path,cache.tF[v])
+                extend_path!(cbs_env,path,cache.tF[v]) # NOTE looks like this might work out of the box for replanning. No need for node surgery
                 cost = get_cost(path)
                 solver.DEBUG ? validate(path,v) : nothing
             else
                 solver.DEBUG ? validate(base_path,v) : nothing
                 path, cost = path_finder(solver, cbs_env, base_path, heuristic;verbose=(solver.verbosity > 3))
-                # if !CRCBS.is_valid(path, get_final_state(base_path), cbs_env.goal)
                 if cost == get_infeasible_cost(cbs_env)
                     log_info(-1,solver,"# A*: returned infeasible path ... Exiting early")
                     return false
                 end
                 solver.DEBUG ? validate(path,v,cbs_env) : nothing
             end
+            #####################
             log_info(2,solver,string("LOW LEVEL SEARCH: solver.num_A_star_iterations = ",solver.num_A_star_iterations))
             # Make sure every robot sticks around for the entire time horizon
             if is_terminal_node(get_graph(schedule),v)
@@ -779,6 +775,7 @@ function high_level_search_mod!(solver::P, env_graph, project_spec, problem_spec
         exclude_solutions!(model) # exclude most recent solution in order to get next best solution
         optimize!(model)
         optimal = (termination_status(model) == MathOptInterface.OPTIMAL);
+        # feasible = (primal_status(modele) == MOI.FEASIBLE_POINT)
         if !optimal
             log_info(0,solver,string("HIGH LEVEL SEARCH: Task assignment failed. Returning best solution so far.\n",
                 " * optimality gap = ", solver.best_cost[1] - lower_bound))

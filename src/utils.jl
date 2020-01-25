@@ -102,6 +102,38 @@ function validate(project_schedule::ProjectSchedule)
 end
 
 export
+    remap_object_id,
+    remap_object_ids!
+    
+# utilities for remappingg object ids
+remap_object_id(x,args...) = x
+remap_object_id(id::ObjectID,max_obj_id) = ObjectID(get_id(id) + max_obj_id)
+remap_object_id(node::OBJECT_AT,args...) = OBJECT_AT(remap_object_id(get_object_id(node),args...), get_initial_location_id(node))
+function remap_object_ids!(node::Operation,args...)
+    new_pre = Set([remap_object_id(o,args...) for o in node.pre])
+    empty!(node.pre)
+    union!(node.pre, new_pre)
+    new_post = Set([remap_object_id(o,args...) for o in node.post])
+    empty!(node.post)
+    union!(node.post, new_post)
+    node
+end
+function remap_object_ids!(project_schedule::ProjectSchedule,args...)
+    for i in 1:length(project_schedule.vtx_ids)
+        project_schedule.vtx_ids[i] = remap_object_id(project_schedule.vtx_ids[i],args...)
+    end
+    for dict in (project_schedule.vtx_map, project_schedule.planning_nodes)
+        for k in collect(keys(dict))
+            if typeof(k) <: ObjectID
+                dict[remap_object_id(k,args...)] = remap_object_id(dict[k],args...)
+                delete!(dict, k)
+            end
+        end
+    end
+    project_schedule
+end
+
+export
     exclude_solutions!,
     exclude_current_solution!
 

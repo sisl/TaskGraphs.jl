@@ -1073,6 +1073,9 @@ end
 JuMP.optimize!(model::M) where {M<:TaskGraphsMILP}          = optimize!(model.model)
 JuMP.termination_status(model::M) where {M<:TaskGraphsMILP} = termination_status(model.model)
 JuMP.objective_function(model::M) where {M<:TaskGraphsMILP} = objective_function(model.model)
+JuMP.objective_bound(model::M) where {M<:TaskGraphsMILP}    = objective_bound(model.model)
+JuMP.primal_status(model::M) where {M<:TaskGraphsMILP}      = primal_status(model.model)
+JuMP.dual_status(model::M) where {M<:TaskGraphsMILP}        = dual_status(model.model)
 # for op = (:optimize!, :termination_status, :objective_function)
 #     eval(quote
 #         JuMP.$op(model::M,args...) where {M<:TaskGraphsMILP} = $op(model.model,args...)
@@ -1561,7 +1564,7 @@ function formulate_milp(milp_model::SparseAdjacencyMILP,project_schedule::Projec
     # set all initial times that are provided
     for (id,t) in t0_
         v = get_vtx(project_schedule, id)
-        @constraint(model, t0[v] == t)
+        @constraint(model, t0[v] >= t)
     end
     # Precedence constraints and duration constraints for existing nodes and edges
     for v in vertices(G)

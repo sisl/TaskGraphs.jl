@@ -547,8 +547,9 @@ let
     dist_matrix = get_dist_matrix(env_graph)
 
     # problem_def = read_problem_def(joinpath(PROBLEM_DIR,"problem223.toml"))
-    problem_id = 75
+    problem_id = 25
     problem_def = read_problem_def(joinpath(PROBLEM_DIR,string("problem",problem_id,".toml")))
+    # length(problem_def.r0), length(problem_def.s0)
     project_spec, r0, s0, sF = problem_def.project_spec,problem_def.r0,problem_def.s0,problem_def.sF
     project_spec, problem_spec, object_ICs, object_FCs, robot_ICs = construct_task_graphs_problem(
             project_spec, r0, s0, sF, dist_matrix);
@@ -557,11 +558,14 @@ let
     (solution, assignment, cost, search_env), elapsed_time, byte_ct, gc_time, mem_ct = @timed high_level_search!(
         SparseAdjacencyMILP(), solver, env_graph, project_spec, problem_spec, robot_ICs, Gurobi.Optimizer;)
 
-    project_schedule = construct_partial_project_schedule(project_spec,problem_spec,map(i->robot_ICs[i], 1:problem_spec.N))
-    model = formulate_milp(SparseAdjacencyMILP(),project_schedule,problem_spec;Presolve=1,TimeLimit=0.5)
-    exclude_solutions!(model)
-    retval, elapsed_time, byte_ct, gc_time, mem_ct = @timed optimize!(model)
-    @show elapsed_time
+    # project_schedule = construct_partial_project_schedule(project_spec,problem_spec,map(i->robot_ICs[i], 1:problem_spec.N))
+    # model = formulate_milp(SparseAdjacencyMILP(),project_schedule,problem_spec;Presolve=1,TimeLimit=0.5)
+    # exclude_solutions!(model)
+    # retval, elapsed_time, byte_ct, gc_time, mem_ct = @timed optimize!(model)
+    # @show elapsed_time
+    # @show primal_status(model)
+    # @show dual_status(model)
+    # @show objective_bound(model), value(objective_function(model))
     # @test termination_status(model) == MathOptInterface.OPTIMAL
     # assignment_matrix = get_assignment_matrix(model);
     # update_project_schedule!(project_schedule,problem_spec,assignment_matrix)
@@ -576,7 +580,6 @@ let
     cache = search_env.cache
     @test validate(project_schedule)
 
-
     t = 30
     trimmed_solution = trim_solution(search_env.env, solution, t)
     @test all([length(p) == get_cost(p)[1] for p in get_paths(trimmed_solution)])
@@ -585,37 +588,86 @@ let
     set_leaf_operation_nodes!(new_schedule)
     G = get_graph(new_schedule)
     # init planning cache with the existing solution
-    t0 = map(v->cache.t0[get_vtx(project_schedule, get_vtx_id(new_schedule, v))], vertices(G))
+    t0 = map(v->get(cache.t0, get_vtx(project_schedule, get_vtx_id(new_schedule, v)), 0.0), vertices(G))
     new_cache = initialize_planning_cache(new_schedule;t0=t0)
     # identify active and fixed nodes
     active_vtxs = Set{Int}()
     fixed_vtxs = Set{Int}()
     for v in vertices(G)
-        if new_cache.t0[v] <= t <= new_cache.tF[v] # test if vertex is eligible to be dropped
+        if new_cache.tF[v] < t
+            push!(fixed_vtxs, v)
+        elseif new_cache.t0[v] <= t <= new_cache.tF[v] # test if vertex is eligible to be dropped
             node_id = get_vtx_id(new_schedule,v)
             push!(active_vtxs, v)
             for e in edges(bfs_tree(G,v;dir=:in))
                 push!(fixed_vtxs, e.dst)
-                set_path_spec!(new_schedule,e.dst,PathSpec(get_path_spec(new_schedule,e.dst), plan_path=false, fixed=true))
             end
         end
     end
-    map(v->new_cache.t0[v], collect(fixed_vtxs))
-    map(v->new_cache.t0[v], collect(active_vtxs))
-    map(v->new_cache.t0[v], collect(setdiff(collect(vertices(G)),union(fixed_vtxs,active_vtxs))))
-
-    # sp = get_next_state(env,s,a)
-    # new_path = cat(path, PathNode(s, a, sp))
-    # new_path.cost = accumulate_cost(env, get_cost(path), get_transition_cost(env,s,a,sp))
-
-    t0 = zeros(Int, nv(get_graph(new_schedule)))
-    for v in vertices(get_graph(new_schedule))
-        v_old = get_vtx(project_schedule, get_vtx_id(new_schedule, v))
-        t0[v] = cache.t0[v_old]
+    # set all fixed_vtxs to plan_path=false
+    for v in fixed_vtxs
+        set_path_spec!(new_schedule,v,PathSpec(get_path_spec(new_schedule,v), plan_path=false, fixed=true))
     end
-    new_cache = initialize_planning_cache(new_schedule;t0=t0) # TODO make sure t) is set correctly in this call
+    # verify that all vertices following active_vtxs have a start time > 0
+    let
+        s1 = map(v->new_cache.t0[v], collect(fixed_vtxs))
+        s2 = map(v->new_cache.t0[v], collect(active_vtxs))
+        s3 = map(v->new_cache.t0[v], collect(setdiff(collect(vertices(G)),union(fixed_vtxs,active_vtxs))))
+        @test all(s3 .> 0)
+    end
 
-    print_project_schedule(project_schedule,"dummy_schedule";mode=:leaf_aligned)
+
+    #### New Project schedule to splice in:
+    problem_id2 = problem_id + 1
+    def2 = read_problem_def(joinpath(PROBLEM_DIR,string("problem",problem_id2,".toml")))
+    project_spec2, problem_spec2, _, _, _ = construct_task_graphs_problem(def2.project_spec, def2.r0, def2.s0, def2.sF, dist_matrix);
+    next_schedule = construct_partial_project_schedule(project_spec2,problem_spec2)
+
+    # remap object ids
+    max_obj_id = maximum([get_id(id) for id in get_vtx_ids(project_schedule) if typeof(id) <: ObjectID])
+    remap_object_ids!(next_schedule,max_obj_id)
+
+    let
+        s1 = Set{AbstractID}(new_schedule.vtx_ids)
+        s2 = Set{AbstractID}(next_schedule.vtx_ids)
+        @test length(s1) + length(s2) == length(union(s1,s2))
+    end
+
+    # splice projects together!
+    for v in vertices(get_graph(next_schedule))
+        node_id = get_vtx_id(next_schedule, v)
+        add_to_schedule!(new_schedule, get_node_from_id(next_schedule, node_id), node_id)
+    end
+    for e in edges(get_graph(next_schedule))
+        node_id1 = get_vtx_id(next_schedule, e.src)
+        node_id2 = get_vtx_id(next_schedule, e.dst)
+        add_edge!(new_schedule, node_id1, node_id2)
+    end
+    set_leaf_operation_nodes!(new_schedule)
+    # do this again because now we have more nodes
+    t0 = map(v->get(new_cache.t0, v, 0.0), vertices(G))
+    new_cache = initialize_planning_cache(new_schedule;t0=t0)
+
+    # Replan!
+    model = formulate_milp(SparseAdjacencyMILP(),new_schedule,problem_spec;
+        Presolve=1,
+        TimeLimit=20,
+        t0_ = Dict{AbstractID,Int}(get_vtx_id(new_schedule, v)=>t0 for (v,t0) in enumerate(new_cache.t0)) # TODO figure out a better way to do this
+        )
+    exclude_solutions!(model) # NOTE this is a high object-to-robot ratio. Consider changing that for the demo
+    retval, elapsed_time, byte_ct, gc_time, mem_ct = @timed optimize!(model)
+    @show elapsed_time
+    @show primal_status(model)
+    @show dual_status(model)
+    @show objective_bound(model), value(objective_function(model))
+    @show termination_status(model)
+    # @test termination_status(model) == MathOptInterface.OPTIMAL
+
+    assignment_matrix = get_assignment_matrix(model);
+    update_project_schedule!(new_schedule,problem_spec,assignment_matrix)
+    @test validate(new_schedule)
+
+    # print_project_schedule(new_schedule,"dummy_schedule";mode=:leaf_aligned)
 
 
 end
