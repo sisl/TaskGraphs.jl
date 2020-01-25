@@ -749,8 +749,7 @@ end
     This is the modified version of high-level search that uses the adjacency
     matrix MILP formulation.
 """
-function high_level_search_mod!(solver::P, env_graph, project_spec, problem_spec,
-        robot_ICs, optimizer;
+function high_level_search!(solver::P, env_graph, project_schedule::ProjectSchedule, problem_spec,  optimizer;
         milp_model=AdjacencyMILP(),
         primary_objective=SumOfMakeSpans,
         TimeLimit=200,
@@ -763,7 +762,6 @@ function high_level_search_mod!(solver::P, env_graph, project_spec, problem_spec
     best_solution = default_pc_tapf_solution(problem_spec.N)
     best_env    = SearchEnv()
     best_assignment = Vector{Int}() # meaningless
-    project_schedule = construct_partial_project_schedule(project_spec,problem_spec,map(i->robot_ICs[i], 1:problem_spec.N))
     model = formulate_milp(milp_model,project_schedule,problem_spec;
         cost_model=primary_objective,optimizer=optimizer,kwargs...) #TODO pass t0_ in replanning mode
 
@@ -793,7 +791,7 @@ function high_level_search_mod!(solver::P, env_graph, project_spec, problem_spec
             ############## Route Planning ###############
             if update_project_schedule!(project_schedule,problem_spec,adjacency_matrix)
                 env, mapf = construct_search_env(project_schedule, problem_spec, env_graph;
-                    primary_objective=primary_objective);
+                    primary_objective=primary_objective); # TODO pass in t0_ here (maybe get it straight from model?)
                 pc_mapf = PC_MAPF(env,mapf);
                 ##### Call CBS Search Routine (LEVEL 2) #####
                 solution, cost = solve!(solver,pc_mapf);
@@ -813,6 +811,22 @@ function high_level_search_mod!(solver::P, env_graph, project_spec, problem_spec
     exit_assignment!(solver)
     log_info(-1,solver.verbosity,string("HIGH LEVEL SEARCH: optimality gap = ",solver.best_cost[1] - lower_bound,". Returning best solution with cost ", solver.best_cost,"\n"))
     return best_solution, best_assignment, solver.best_cost, best_env
+end
+function high_level_search_mod!(solver::P, env_graph, project_spec::ProjectSpec, problem_spec,
+        robot_ICs, optimizer;
+        milp_model=AdjacencyMILP(),
+        primary_objective=SumOfMakeSpans,
+        TimeLimit=200,
+        kwargs...) where {P<:PC_TAPF_Solver}
+
+    project_schedule = construct_partial_project_schedule(project_spec,problem_spec,map(i->robot_ICs[i], 1:problem_spec.N))
+
+    high_level_search!(solver, env_graph, project_schedule, problem_spec, optimizer;
+        milp_model=milp_model,
+        primary_objective=primary_objective,
+        TimeLimit=TimeLimit,
+        kwargs...
+    )
 end
 
 high_level_search!(milp_model::AssignmentMILP, args...;kwargs...) = high_level_search!(args...;kwargs...)
