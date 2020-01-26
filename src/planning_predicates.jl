@@ -250,6 +250,34 @@ get_initial_location_id(a::A) where {A<:Union{COLLECT,DEPOSIT,ROBOT_AT,OBJECT_AT
 get_destination_location_id(a::A) where {A<:Union{COLLECT,DEPOSIT,ROBOT_AT,OBJECT_AT}} 	= a.x
 get_object_id(a::A) where {A<:Union{CARRY,COLLECT,DEPOSIT}}         					= a.o
 
+"""
+    For collaborative tasks
+
+    TODO: 
+    - in the project schedule, multiple GO nodes should point to a TEAM_GO node. 
+    - Add a preprocessing step (on the project schedule) where the incoming GO nodes 
+        either become "remain in place" (might cause some problems with the default 
+        path_spec.free/static/etc--be sure to check) or get deleted so the TEAM_GO node 
+        can take care of getting the robots there all at once.
+    - [ROBOT_AT, ...] -> TEAM_GO -> TEAM_CARRY -> TEAM_DEPOSIT -> [GO, ...]
+    - implement a custom flow, meta-agent, or other model to move the full team of robots to 
+        the goal configuration (for TEAM_GO node) simultaneously. Meta-agent path planning 
+        might require positive CBS constraints so that paths of different start lengths can 
+        go into the search.
+    - TEAM_CARRY must be done on a different graph, but with the ability to check constraints 
+        between them. Maybe simplest if actions can actually be indexed by :NORTH, :SOUTH, etc. 
+    - there should be a way to prove that the milp assignment (if each robot is actually 
+        assigned to a particular spot in the configuration) can be realized if all conflicts
+        (except between collaborating team members) are ignored for a TEAM_GO task. This is 
+        because of the "push-and-rotate" thing once they reach the goal vertices.
+"""
+@with_kw TEAM_ACTION{A<:AbstractRobotAction}
+    n::Int = 2 # number of robots
+    instructions::Vector{A} = Vector{GO}()
+    # config::Matrix{Int} = ones(n) # defines configuration of agents relative to each other during collaborative task
+end
+
+
 export
     eligible_successors,
     eligible_predecessors,
