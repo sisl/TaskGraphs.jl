@@ -250,33 +250,36 @@ get_initial_location_id(a::A) where {A<:Union{COLLECT,DEPOSIT,ROBOT_AT,OBJECT_AT
 get_destination_location_id(a::A) where {A<:Union{COLLECT,DEPOSIT,ROBOT_AT,OBJECT_AT}} 	= a.x
 get_object_id(a::A) where {A<:Union{CARRY,COLLECT,DEPOSIT}}         					= a.o
 
+
+export
+	TEAM_ACTION
+
 """
     For collaborative tasks
 
-    TODO: 
-    - in the project schedule, multiple GO nodes should point to a TEAM_GO node. 
-    - Add a preprocessing step (on the project schedule) where the incoming GO nodes 
-        either become "remain in place" (might cause some problems with the default 
-        path_spec.free/static/etc--be sure to check) or get deleted so the TEAM_GO node 
+    TODO:
+    - in the project schedule, multiple GO nodes should point to a TEAM_GO node.
+    - Add a preprocessing step (on the project schedule) where the incoming GO nodes
+        either become "remain in place" (might cause some problems with the default
+        path_spec.free/static/etc--be sure to check) or get deleted so the TEAM_GO node
         can take care of getting the robots there all at once.
     - [ROBOT_AT, ...] -> TEAM_GO -> TEAM_CARRY -> TEAM_DEPOSIT -> [GO, ...]
-    - implement a custom flow, meta-agent, or other model to move the full team of robots to 
-        the goal configuration (for TEAM_GO node) simultaneously. Meta-agent path planning 
-        might require positive CBS constraints so that paths of different start lengths can 
+    - implement a custom flow, meta-agent, or other model to move the full team of robots to
+        the goal configuration (for TEAM_GO node) simultaneously. Meta-agent path planning
+        might require positive CBS constraints so that paths of different start lengths can
         go into the search.
-    - TEAM_CARRY must be done on a different graph, but with the ability to check constraints 
-        between them. Maybe simplest if actions can actually be indexed by :NORTH, :SOUTH, etc. 
-    - there should be a way to prove that the milp assignment (if each robot is actually 
+    - TEAM_CARRY must be done on a different graph, but with the ability to check constraints
+        between them. Maybe simplest if actions can actually be indexed by :NORTH, :SOUTH, etc.
+    - there should be a way to prove that the milp assignment (if each robot is actually
         assigned to a particular spot in the configuration) can be realized if all conflicts
-        (except between collaborating team members) are ignored for a TEAM_GO task. This is 
+        (except between collaborating team members) are ignored for a TEAM_GO task. This is
         because of the "push-and-rotate" thing once they reach the goal vertices.
 """
-@with_kw TEAM_ACTION{A<:AbstractRobotAction}
+@with_kw struct TEAM_ACTION{A<:AbstractRobotAction} <: AbstractRobotAction
     n::Int = 2 # number of robots
     instructions::Vector{A} = Vector{GO}()
     # config::Matrix{Int} = ones(n) # defines configuration of agents relative to each other during collaborative task
 end
-
 
 export
     eligible_successors,
@@ -288,38 +291,36 @@ export
 	align_with_predecessor,
 	align_with_successor
 
-eligible_predecessors(node::GO)         = Dict((ROBOT_AT,DEPOSIT)=>1)
-eligible_successors(node::GO)           = Dict(COLLECT=>1)
-eligible_predecessors(node::COLLECT)    = Dict(OBJECT_AT=>1,GO=>1)
-eligible_successors(node::COLLECT)      = Dict(CARRY=>1)
-eligible_predecessors(node::CARRY)      = Dict(COLLECT=>1)
-eligible_successors(node::CARRY)        = Dict(DEPOSIT=>1)
-eligible_predecessors(node::DEPOSIT)    = Dict(CARRY=>1)
-eligible_successors(node::DEPOSIT)      = Dict(Operation=>1,GO=>1)
-eligible_predecessors(node::Operation)  = Dict(DEPOSIT=>length(node.pre))
-eligible_successors(node::Operation)    = Dict(OBJECT_AT=>length(node.post))
-eligible_predecessors(node::OBJECT_AT)  = Dict(Operation=>1)
-eligible_successors(node::OBJECT_AT)    = Dict(COLLECT=>1)
-eligible_predecessors(node::ROBOT_AT)   = Dict()
-eligible_successors(node::ROBOT_AT)     = Dict(GO=>1)
-
-required_predecessors(node::GO)         = Dict((ROBOT_AT,DEPOSIT)=>1)
-# required_successors(node::GO)           = Dict(COLLECT=>1)
+required_predecessors(node::GO)         = Dict((ROBOT_AT,DEPOSIT,TEAM_ACTION{DEPOSIT})=>1)
 required_successors(node::GO)           = Dict()
 required_predecessors(node::COLLECT)    = Dict(OBJECT_AT=>1,GO=>1)
 required_successors(node::COLLECT)      = Dict(CARRY=>1)
 required_predecessors(node::CARRY)      = Dict(COLLECT=>1)
 required_successors(node::CARRY)        = Dict(DEPOSIT=>1)
 required_predecessors(node::DEPOSIT)    = Dict(CARRY=>1)
-# required_successors(node::DEPOSIT)      = Dict(Operation=>1)
 required_successors(node::DEPOSIT)      = Dict(Operation=>1,GO=>1)
 required_predecessors(node::Operation)  = Dict(DEPOSIT=>length(node.pre))
 required_successors(node::Operation)    = Dict(OBJECT_AT=>length(node.post))
 required_predecessors(node::OBJECT_AT)  = Dict()
 required_successors(node::OBJECT_AT)    = Dict(COLLECT=>1)
 required_predecessors(node::ROBOT_AT)   = Dict()
-# required_successors(node::ROBOT_AT)     = Dict()
 required_successors(node::ROBOT_AT)     = Dict(GO=>1)
+
+eligible_predecessors(node) 			= required_predecessors(node)
+eligible_successors(node) 				= required_successors(node)
+
+eligible_successors(node::GO)           = Dict((TEAM_ACTION{GO},COLLECT)=>1)
+eligible_predecessors(node::OBJECT_AT)  = Dict(Operation=>1)
+
+required_predecessors(node::TEAM_ACTION{GO})        = Dict(GO=>length(node.instructions))
+required_predecessors(node::TEAM_ACTION{COLLECT})   = Dict(TEAM_ACTION{GO}=>1,OBJECT_AT=>1)
+required_predecessors(node::TEAM_ACTION{CARRY})     = Dict(TEAM_ACTION{COLLECT}=>1)
+required_predecessors(node::TEAM_ACTION{DEPOSIT})   = Dict(TEAM_ACTION{CARRY}=>1)
+
+required_successors(node::TEAM_ACTION{GO})         	= Dict(TEAM_ACTION{COLLECT}=>1)
+required_successors(node::TEAM_ACTION{COLLECT})    	= Dict(TEAM_ACTION{CARRY}=>1)
+required_successors(node::TEAM_ACTION{CARRY})      	= Dict(TEAM_ACTION{DEPOSIT}=>1)
+required_successors(node::TEAM_ACTION{DEPOSIT})    	= Dict(GO=>length(node.instructions),Operation=>1)
 
 matches_template(template,node) = false
 matches_template(template::T,node::T) where {T} = true
@@ -344,6 +345,7 @@ align_with_predecessor(node::DEPOSIT,pred::CARRY)		= DEPOSIT(first_valid(node.r,
 
 align_with_successor(node,pred) 						= node
 align_with_successor(node::GO,succ::COLLECT) 			= GO(first_valid(node.r,succ.r), node.x1, first_valid(node.x2,succ.x))
+
 
 
 """
