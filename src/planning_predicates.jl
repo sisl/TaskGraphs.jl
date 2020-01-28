@@ -122,6 +122,7 @@ export
     get_id,
     get_object_id,
     get_location_id,
+    get_location_ids,
     get_robot_id
 
 abstract type AbstractID end
@@ -154,15 +155,18 @@ end
 abstract type AbstractPlanningPredicate end
 struct OBJECT_AT <: AbstractPlanningPredicate
     o::ObjectID
-    x::StationID
+    x::Vector{StationID} # can occupy multiple locations
 	n::Int # number of robots required for transport
 end
-OBJECT_AT(o::ObjectID,x::StationID) 		= OBJECT_AT(o,x,1)
+OBJECT_AT(o::ObjectID,x::Vector{StationID}) = OBJECT_AT(o,x,length(x))
+OBJECT_AT(o::ObjectID,x::StationID,args...) = OBJECT_AT(o,[x],args...)
+OBJECT_AT(o::ObjectID,x::Vector{Int},args...) = OBJECT_AT(o,map(idx->StationID(idx),x),args...)
+OBJECT_AT(o::ObjectID,x::Int,args...) 		= OBJECT_AT(o,[StationID(x)],args...)
 OBJECT_AT(o::Int,args...) 					= OBJECT_AT(ObjectID(o),args...)
-OBJECT_AT(o::ObjectID,x::Int,args...) 		= OBJECT_AT(o,StationID(x),args...)
 # OBJECT_AT(o::Int,x::Int) = OBJECT_AT(ObjectID(o),StationID(x))
 get_object_id(pred::OBJECT_AT) = pred.o
-get_location_id(pred::OBJECT_AT) = pred.x
+get_location_id(pred::OBJECT_AT) = pred.x[1]
+get_location_ids(pred::OBJECT_AT) = pred.x
 
 struct ROBOT_AT <: AbstractPlanningPredicate
     r::RobotID
@@ -250,8 +254,8 @@ DEPOSIT(r::Int,o::Int,x::Int) = DEPOSIT(RobotID(r),ObjectID(o),StationID(x))
 get_initial_location_id(a::A) where {A<:Union{GO,CARRY}}        						= a.x1
 get_destination_location_id(a::A) where {A<:Union{GO,CARRY}}    						= a.x2
 get_location_id(a::A) where {A<:Union{COLLECT,DEPOSIT}}             					= a.x
-get_initial_location_id(a::A) where {A<:Union{COLLECT,DEPOSIT,ROBOT_AT,OBJECT_AT}}     	= a.x
-get_destination_location_id(a::A) where {A<:Union{COLLECT,DEPOSIT,ROBOT_AT,OBJECT_AT}} 	= a.x
+get_initial_location_id(a::A) where {A<:Union{COLLECT,DEPOSIT,ROBOT_AT,OBJECT_AT}}     	= get_location_id(a)
+get_destination_location_id(a::A) where {A<:Union{COLLECT,DEPOSIT,ROBOT_AT,OBJECT_AT}} 	= get_location_id(a)
 get_object_id(a::A) where {A<:Union{CARRY,COLLECT,DEPOSIT}}         					= a.o
 
 
@@ -285,10 +289,10 @@ export
     instructions::Vector{A} = Vector{GO}()
     # config::Matrix{Int} = ones(n) # defines configuration of agents relative to each other during collaborative task
 end
-struct LARGE_OBJECT_AT <: AbstractPlanningPredicate
-	o::ObjectID
-	x::Vector{StationID} # vector of locations
-end
+# struct LARGE_OBJECT_AT <: AbstractPlanningPredicate
+# 	o::ObjectID
+# 	x::Vector{StationID} # vector of locations
+# end
 
 export
     eligible_successors,
@@ -318,16 +322,16 @@ required_successors(node::ROBOT_AT)     = Dict(GO=>1)
 eligible_predecessors(node) 			= required_predecessors(node)
 eligible_successors(node) 				= required_successors(node)
 
-eligible_successors(node::GO)           = Dict((TEAM_ACTION{GO},COLLECT)=>1)
+eligible_successors(node::GO)           = Dict((TEAM_ACTION{COLLECT},TEAM_ACTION{GO},COLLECT)=>1)
 eligible_predecessors(node::OBJECT_AT)  = Dict(Operation=>1)
 
-required_predecessors(node::LARGE_OBJECT_AT)  = Dict()
+# required_predecessors(node::LARGE_OBJECT_AT)  = Dict()
 required_predecessors(node::TEAM_ACTION{GO})        = Dict(GO=>length(node.instructions))
-required_predecessors(node::TEAM_ACTION{COLLECT})   = Dict(TEAM_ACTION{GO}=>1,LARGE_OBJECT_AT=>1)
+required_predecessors(node::TEAM_ACTION{COLLECT})   = Dict(GO=>length(node.instructions),OBJECT_AT=>1)
 required_predecessors(node::TEAM_ACTION{CARRY})     = Dict(TEAM_ACTION{COLLECT}=>1)
 required_predecessors(node::TEAM_ACTION{DEPOSIT})   = Dict(TEAM_ACTION{CARRY}=>1)
 
-required_successors(node::LARGE_OBJECT_AT)  	= Dict(TEAM_ACTION{COLLECT}=>1)
+# required_successors(node::LARGE_OBJECT_AT)  		= Dict(TEAM_ACTION{COLLECT}=>1)
 required_successors(node::TEAM_ACTION{GO})         	= Dict(TEAM_ACTION{COLLECT}=>1)
 required_successors(node::TEAM_ACTION{COLLECT})    	= Dict(TEAM_ACTION{CARRY}=>1)
 required_successors(node::TEAM_ACTION{CARRY})      	= Dict(TEAM_ACTION{DEPOSIT}=>1)

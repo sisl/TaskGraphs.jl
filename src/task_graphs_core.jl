@@ -218,17 +218,28 @@ end
 function read_project_spec(toml_dict::Dict)
     project_spec = ProjectSpec()
     if typeof(toml_dict["initial_conditions"]) <: Dict
+        object_ids = Int[]
         for (i,arr) in toml_dict["initial_conditions"]
             object_id = arr[1]
+            push!(object_ids, object_id)
             station_id = arr[2]
             push!(project_spec.initial_conditions, OBJECT_AT(object_id, station_id))
-            project_spec.object_id_to_idx[object_id] = parse(Int,string(i))
+        end
+        sort!(object_ids)
+        for (i, object_id) in enumerate(object_ids)
+            project_spec.object_id_to_idx[object_id] = i
         end
     elseif typeof(toml_dict["initial_conditions"]) <: AbstractArray
+        object_ids = Int[]
         for (i,arr) in enumerate(toml_dict["initial_conditions"])
             object_id = arr[1]
+            push!(object_ids, object_id)
             station_id = arr[2]
             push!(project_spec.initial_conditions, OBJECT_AT(object_id, station_id))
+            # project_spec.object_id_to_idx[object_id] = i
+        end
+        sort!(object_ids)
+        for (i, object_id) in enumerate(object_ids)
             project_spec.object_id_to_idx[object_id] = i
         end
     end
@@ -572,11 +583,12 @@ function generate_path_spec(schedule::P,spec::T,op::Operation) where {P<:Project
         min_path_duration=duration(op)
         )
 end
-function generate_path_spec(schedule::P,spec::T,pred::TEAM_ACTION) where {P<:ProjectSchedule,T<:ProblemSpec}
+function generate_path_spec(schedule::P,spec::T,pred::TEAM_ACTION{A}) where {P<:ProjectSchedule,T<:ProblemSpec,A}
     path_spec = PathSpec(
         node_type=Symbol(typeof(pred)),
         min_path_duration = maximum(map(a->generate_path_spec(schedule,spec,a).min_path_duration, pred.instructions)),
-        plan_path = true
+        plan_path = true,
+        static = (A <: Union{COLLECT,DEPOSIT})
         )
 end
 function generate_path_spec(schedule::P,pred) where {P<:ProjectSchedule}
@@ -1026,12 +1038,17 @@ function construct_partial_project_schedule(
         for object_id in get_input_ids(op)
             # add action sequence
             object_ic           = get_node_from_id(project_schedule, ObjectID(object_id))
-            pickup_station_id   = get_location_id(object_ic)
+            pickup_station_ids  = get_location_ids(object_ic)
             object_fc           = object_FCs[object_id]
-            dropoff_station_id  = get_location_id(object_fc)
+            dropoff_station_ids = get_location_ids(object_fc)
             # TODO Handle collaborative tasks
-            action_id = add_headless_delivery_task!(project_schedule,problem_spec,
-                ObjectID(object_id),operation_id,pickup_station_id,dropoff_station_id)
+            if object_ic.n > 1 # COLLABORATIVE TRANSPORT
+                add_headless_delivery_task!(project_schedule,problem_spec,
+                    ObjectID(object_id),operation_id,pickup_station_ids,dropoff_station_ids)
+            else # SINGLE AGENT TRANSPORT
+                add_headless_delivery_task!(project_schedule,problem_spec,
+                    ObjectID(object_id),operation_id,pickup_station_ids[1],dropoff_station_ids[1])
+            end
         end
         for object_id in get_output_ids(op)
             add_edge!(project_schedule, operation_id, ObjectID(object_id))

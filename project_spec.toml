@@ -1,0 +1,45 @@
+final_conditions = [[8, 196], [4, 107], [1, 251], [10, 399], [2, 214], [7, 111], [5, 243], [6, 239], [9, 551], [3, 476]]
+initial_conditions = [[8, 112], [4, 544], [1, 85], [10, 197], [2, 69], [7, 355], [5, 75], [6, 513], [9, 215], [3, 556]]
+
+[[operations]]
+pre = [[9, 551]]
+post = [[10, 197]]
+station_id = -1
+id = 135
+dt = 0
+[[operations]]
+pre = [[6, 239], [8, 196], [7, 111]]
+post = [[9, 215]]
+station_id = -1
+id = 136
+dt = 0
+[[operations]]
+pre = [[5, 243], [4, 107]]
+post = [[8, 112]]
+station_id = -1
+id = 137
+dt = 0
+[[operations]]
+pre = [[3, 476]]
+post = [[6, 513]]
+station_id = -1
+id = 138
+dt = 0
+[[operations]]
+pre = [[2, 214]]
+post = [[7, 355]]
+station_id = -1
+id = 139
+dt = 0
+[[operations]]
+pre = [[1, 251]]
+post = [[5, 75]]
+station_id = -1
+id = 140
+dt = 0
+[[operations]]
+pre = [[10, 399]]
+post = []
+station_id = -1
+id = 141
+dt = 0

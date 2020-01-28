@@ -477,7 +477,7 @@ title_string(a::COLLECT,verbose=true)   = verbose ? string("collect\n",get_id(ge
 title_string(a::CARRY,verbose=true)     = verbose ? string("carry\n",get_id(get_robot_id(a)),",",get_id(get_object_id(a)),",",get_id(get_destination_location_id(a))) : "carry";
 title_string(a::DEPOSIT,verbose=true)   = verbose ? string("deposit\n",get_id(get_robot_id(a)),",",get_id(get_object_id(a)),",",get_id(get_location_id(a))) : "deposit";
 title_string(op::Operation,verbose=true)= verbose ? string("op",get_id(get_operation_id(op))) : "op";
-title_string(op::TEAM_ACTION{A},verbose=true) where {A} = verbose ? string("team", A) : string("team", A) 
+title_string(op::TEAM_ACTION{A},verbose=true) where {A} = verbose ? string("team", A) : string("team", A)
 
 function get_display_metagraph(project_schedule::ProjectSchedule;
     verbose=true,
@@ -533,6 +533,18 @@ end
 ################################################################################
 ######################### COMPARISONS AND VERIFICATION #########################
 ################################################################################
+function Base.:(==)(o1::OBJECT_AT,o2::OBJECT_AT)
+    try
+        @assert(o1.o == o2.o)
+        @assert(o1.x == o2.x)
+        @assert(o1.n == o2.n)
+    catch e
+        println(e.msg)
+        # throw(e)
+        return false
+    end
+    return true
+end
 function Base.:(==)(op1::Operation,op2::Operation)
     try
         @assert(op1.pre == op2.pre)

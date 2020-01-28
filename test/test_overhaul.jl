@@ -214,22 +214,20 @@ let
     let
 
         for (i, f) in enumerate([
-            initialize_toy_problem_1,
+            # initialize_toy_problem_1,
             initialize_toy_problem_2,
             initialize_toy_problem_3,
-            initialize_toy_problem_4,
-            initialize_toy_problem_5,
-            initialize_toy_problem_6,
+            # initialize_toy_problem_4,
+            # initialize_toy_problem_5,
+            # initialize_toy_problem_6,
             initialize_toy_problem_7,
-            initialize_toy_problem_8,
+            # initialize_toy_problem_8,
             ])
             for cost_model in [SumOfMakeSpans, MakeSpan]
                 let
                     # Compare against old method
-                    # f = initialize_toy_problem_8
-                    # i = 8
-                    # cost_model = MakeSpan
                     project_spec, problem_spec, robot_ICs, assignments, env_graph = f(;verbose=false);
+
                     model1 = formulate_optimization_problem(problem_spec,Gurobi.Optimizer;cost_model=cost_model);
                     optimize!(model1)
                     @test termination_status(model1) == MOI.OPTIMAL
@@ -263,10 +261,10 @@ let
                     model3 = formulate_milp(SparseAdjacencyMILP(),schedule3,problem_spec;cost_model=cost_model)
                     optimize!(model3)
                     @test termination_status(model3) == MOI.OPTIMAL
-                    obj_val3 = Int(round(value(objective_function(model2))))
+                    obj_val3 = Int(round(value(objective_function(model3))))
                     adj_matrix = get_assignment_matrix(model3)
-                    update_project_schedule!(schedule2,problem_spec,adj_matrix)
-                    @test validate(schedule2)
+                    update_project_schedule!(schedule3,problem_spec,adj_matrix)
+                    @test validate(schedule3)
 
                     @test obj_val1 == obj_val2
                     @test obj_val1 == obj_val3
@@ -699,8 +697,8 @@ let
     # 8  16  24  32  40  48  56  64
     env_graph = construct_factory_env_from_vtx_grid(vtx_grid)
     dist_matrix = get_dist_matrix(env_graph)
-    r0 = [1,25,4,28]
-    # r0 = [1,25,8,28] # check that planning works even when it takes longer for some robots to arrive than others
+    # r0 = [1,25,4,28]
+    r0 = [1,25,8,28] # check that planning works even when it takes longer for some robots to arrive than others
     s0 = [10,18,11,19]
     sF = [42,50,43,51]
 
@@ -713,31 +711,39 @@ let
 
 
     # Construct dummy project schedule by hand
+    #
+    # OBJECT ---------\
+    # R1 --> GO ----> TEAM_COLLECT --> TEAM_CARRY --> TEAM_DEPOSIT
+    # R2 --> GO ------/ / /
+    # R3 --> GO -------/ /
+    # R4 --> GO --------/
+    #
     project_schedule = ProjectSchedule()
+    prev_team_action_id = ActionID(-1)
     team_action_id = ActionID(get_unique_action_id())
-    team_action = TEAM_ACTION(
-        n = 4,
-        instructions = map(i->CARRY(i,1,s0[i],sF[i]), 1:4)
-    )
+    team_action = TEAM_ACTION( n = 4, instructions = map(i->COLLECT(i,1,s0[i]), 1:4))
     add_to_schedule!(project_schedule, problem_spec, team_action, team_action_id)
+    add_edge!(project_schedule,prev_team_action_id,team_action_id)
     for (r,x) in enumerate(r0)
         robot_id = RobotID(r)
         add_to_schedule!(project_schedule,problem_spec,ROBOT_AT(r,x),robot_id)
         action_id = ActionID(get_unique_action_id())
         add_to_schedule!(project_schedule,problem_spec,GO(r,x,s0[r]),action_id)
         add_edge!(project_schedule,robot_id,action_id)
-        prev_action_id = action_id
-        action_id = ActionID(get_unique_action_id())
-        add_to_schedule!(project_schedule,problem_spec,COLLECT(r,1,s0[r]),action_id)
-        add_edge!(project_schedule,prev_action_id,action_id)
+        # prev_action_id = action_id
+        # action_id = ActionID(get_unique_action_id())
+        # add_to_schedule!(project_schedule,problem_spec,COLLECT(r,1,s0[r]),action_id)
+        # add_edge!(project_schedule,prev_action_id,action_id)
         add_edge!(project_schedule,action_id,team_action_id)
     end
     prev_team_action_id = team_action_id
     team_action_id = ActionID(get_unique_action_id())
-    team_action = TEAM_ACTION(
-        n = 4,
-        instructions = map(i->DEPOSIT(i,1,sF[i]), 1:4)
-    )
+    team_action = TEAM_ACTION( n = 4, instructions = map(i->CARRY(i,1,s0[i],sF[i]), 1:4))
+    add_to_schedule!(project_schedule,problem_spec,team_action,team_action_id)
+    add_edge!(project_schedule,prev_team_action_id,team_action_id)
+    prev_team_action_id = team_action_id
+    team_action_id = ActionID(get_unique_action_id())
+    team_action = TEAM_ACTION( n = 4, instructions = map(i->DEPOSIT(i,1,sF[i]), 1:4))
     add_to_schedule!(project_schedule,problem_spec,team_action,team_action_id)
     add_edge!(project_schedule,prev_team_action_id,team_action_id)
     operation_id = OperationID(get_unique_operation_id())
@@ -758,8 +764,6 @@ let
     pc_mapf = PC_MAPF(env,mapf);
     ##### Call CBS Search Routine (LEVEL 2) #####
     root_node = initialize_root_node(mapf)
-
-
     low_level_search!(solver, pc_mapf.env, pc_mapf.mapf,root_node)
 
     for i in 1:12

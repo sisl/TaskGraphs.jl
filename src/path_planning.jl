@@ -352,15 +352,6 @@ function update_cost_model!(model::C,env::S) where {C<:CompositeCostModel,S<:Sea
     end
 end
 update_cost_model!(env::S) where {S<:SearchEnv} = update_cost_model!(env.cost_model,env)
-# function finalize_cost!(env::S,cost_model::M,cost::T) where {S<:SearchEnv,M<:AbstractCostModel,T}
-#     cost
-# end
-# function finalize_cost!(env::S,cost_model::M,cost::T) where {S<:SearchEnv,M<:CompositeCostModel,T}
-#     T(map(i->finalize_cost!(env,cost_model.models[i],cost[i]), 1:length(cost_model.models)))
-# end
-# function finalize_cost!(env::S,cost_model::M,cost::T) where {S<:SearchEnv,M<:SumOfMakeSpans,T}
-#     t0,tF,slack,local_slack = process_schedule(env.schedule;t0=env.cache.t0,tF=env.cache.tF)
-# end
 
 """
     `update_env!`
