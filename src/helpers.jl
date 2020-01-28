@@ -68,7 +68,7 @@ function initialize_toy_problem_1(;cost_function=SumOfMakeSpans,verbose=false)
     N = 2                  # num robots
     M = 3                  # num delivery tasks
     vtx_grid = initialize_dense_vtx_grid(4,4)
-    env_graph = initialize_grid_graph_from_vtx_grid(vtx_grid)
+    env_graph = construct_factory_env_from_vtx_grid(vtx_grid)
     dist_matrix = get_dist_matrix(env_graph)
     r0 = [1,4]
     s0 = [5,8,14]
@@ -103,7 +103,7 @@ function initialize_toy_problem_2(;cost_function=SumOfMakeSpans,verbose=false)
     # 2  6  10  14  18  22  26  30
     # 3  7  11  15  19  23  27  31
     # 4  8  12  16  20  24  28  32
-    env_graph = initialize_grid_graph_from_vtx_grid(vtx_grid)
+    env_graph = construct_factory_env_from_vtx_grid(vtx_grid)
     dist_matrix = get_dist_matrix(env_graph)
     r0 = [1,4]
     s0 = [5,8,13]
@@ -151,7 +151,7 @@ function initialize_toy_problem_3(;cost_function=SumOfMakeSpans,verbose=false,Δ
     # 2  6  10  14  18  22  26  30
     # 3  7  11  15  19  23  27  31
     # 4  8  12  16  20  24  28  32
-    env_graph = initialize_grid_graph_from_vtx_grid(vtx_grid)
+    env_graph = construct_factory_env_from_vtx_grid(vtx_grid)
     dist_matrix = get_dist_matrix(env_graph)
     r0 = [5,2]
     s0 = [7,30,12]
@@ -200,7 +200,7 @@ function initialize_toy_problem_4(;cost_function=SumOfMakeSpans,verbose=false)
     # 1  4  7
     # 2  5  8
     # 3  6  9
-    env_graph = initialize_grid_graph_from_vtx_grid(vtx_grid)
+    env_graph = construct_factory_env_from_vtx_grid(vtx_grid)
     dist_matrix = get_dist_matrix(env_graph)
     r0 = [2,4]
     s0 = [2,4]
@@ -248,7 +248,7 @@ function initialize_toy_problem_5(;cost_function=SumOfMakeSpans,verbose=false)
     #  2  6  10  14
     #  3  7  11  15
     #  4  8  12  16
-    env_graph = initialize_grid_graph_from_vtx_grid(vtx_grid)
+    env_graph = construct_factory_env_from_vtx_grid(vtx_grid)
     dist_matrix = get_dist_matrix(env_graph)
     r0 = [3,15]
     s0 = [3,15]
@@ -292,7 +292,7 @@ function initialize_toy_problem_6(;cost_function=SumOfMakeSpans,verbose=false,Δ
     # 2  6  10  14  18  22  26  30
     # 3  7  11  15  19  23  27  31
     # 4  8  12  16  20  24  28  32
-    env_graph = initialize_grid_graph_from_vtx_grid(vtx_grid)
+    env_graph = construct_factory_env_from_vtx_grid(vtx_grid)
     dist_matrix = get_dist_matrix(env_graph)
     r0 = [1,4]
     s0 = [5,12,13]
@@ -323,7 +323,7 @@ function initialize_toy_problem_7(;cost_function=SumOfMakeSpans,verbose=false,Δ
     # 2  6  10  14
     # 3  7  11  15
     # 4  8  12  16
-    env_graph = initialize_grid_graph_from_vtx_grid(vtx_grid)
+    env_graph = construct_factory_env_from_vtx_grid(vtx_grid)
     dist_matrix = get_dist_matrix(env_graph)
     r0 = [2,9]
     s0 = [6,10,15]
@@ -353,7 +353,7 @@ function initialize_toy_problem_8(;cost_function=SumOfMakeSpans,verbose=false,Δ
     # 2  6  10  14  18  22  26  30
     # 3  7  11  15  19  23  27  31
     # 4  8  12  16  20  24  28  32
-    env_graph = initialize_grid_graph_from_vtx_grid(vtx_grid)
+    env_graph = construct_factory_env_from_vtx_grid(vtx_grid)
     dist_matrix = get_dist_matrix(env_graph)
     r0 = [1,29]
     s0 = [5,25,12,24]
@@ -387,7 +387,7 @@ function initialize_toy_problem_9(;cost_function=SumOfMakeSpans,verbose=false,Δ
     # 2  6  10  14
     # 3  7  11  15
     # 4  8  12  16
-    env_graph = initialize_grid_graph_from_vtx_grid(vtx_grid)
+    env_graph = construct_factory_env_from_vtx_grid(vtx_grid)
     dist_matrix = get_dist_matrix(env_graph)
     r0 = [1,13]
     s0 = [5,5]

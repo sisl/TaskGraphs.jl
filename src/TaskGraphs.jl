@@ -22,13 +22,13 @@ global PROBLEM_DIR      = joinpath(EXPERIMENT_DIR,"problem_instances")
 global RESULTS_DIR      = joinpath(EXPERIMENT_DIR,"results")
 global VIDEO_DIR        = joinpath(EXPERIMENT_DIR,"videos")
 
-include("pccbs.jl")
 include("factory_worlds.jl")
+@reexport using TaskGraphs.FactoryWorlds
+include("pccbs.jl")
 include("planning_predicates.jl")
 # include("pc_tapf_solver.jl")
 # @reexport using TaskGraphs.TaskGraphsSolvers
 include("task_graphs_core.jl")
-@reexport using TaskGraphs.FactoryWorlds
 @reexport using TaskGraphs.PlanningPredicates
 @reexport using TaskGraphs.TaskGraphsCore
 include("utils.jl")

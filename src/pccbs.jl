@@ -4,6 +4,7 @@ module PCCBS
 
 using CRCBS
 using Parameters, LightGraphs, DataStructures
+using ..FactoryWorlds
 
 ################################################################################
 ############################### ENVIRONMENT DEF ################################
@@ -18,15 +19,20 @@ end
     e::Edge{Int}    = Edge(-1,-1)
     Δt::Int         = 1
 end
+# @enum GridWorldDirection begin
+#    NORTH
+#    EAST
+#    WEST
+#    SOUTH
+# end
 # LowLevelEnv
-@with_kw struct LowLevelEnv{C<:AbstractCostModel,H<:AbstractCostModel,G<:AbstractGraph} <: AbstractLowLevelEnv{State,Action,C}
-    graph::G                    = Graph()
-    constraints::ConstraintTable = ConstraintTable()
-    goal::State                 = State()
-    agent_idx::Int              = -1
-    # helpers # TODO parameterize LowLevelEnv by heuristic type as well
-    heuristic::H                = NullHeuristic() #PerfectHeuristic(graph,Vector{Int}(),Vector{Int}())
-    cost_model::C               = SumOfTravelTime()
+@with_kw struct LowLevelEnv{C<:AbstractCostModel,H<:AbstractCostModel} <: AbstractLowLevelEnv{State,Action,C}
+    graph::GridFactoryEnvironment   = GridFactoryEnvironment()
+    constraints::ConstraintTable    = ConstraintTable()
+    goal::State                     = State()
+    agent_idx::Int                  = -1
+    heuristic::H                    = NullHeuristic()
+    cost_model::C                   = SumOfTravelTime()
 end
 CRCBS.get_cost_model(env::E) where {E<:LowLevelEnv} = env.cost_model
 CRCBS.get_heuristic_model(env::E) where {E<:LowLevelEnv} = env.heuristic
@@ -106,6 +112,23 @@ function Base.iterate(it::ActionIter, iter_state::ActionIterState)
 end
 Base.length(iter::ActionIter) = length(iter.neighbor_list)
 CRCBS.get_possible_actions(env::LowLevelEnv,s::State) = ActionIter(s.vtx,outneighbors(env.graph,s.vtx))
+function CRCBS.get_possible_actions(env::MetaAgentCBS.LowLevelEnv,s::MetaAgentCBS.State{PCCBS.State})
+    d_set = Set{Tuple}([(0,0),(-1,0),(0,1),(1,0),(0,-1)])
+    for (e,s) in zip(env.envs, s.states)
+        intersect!(d_set, e.graph.edge_cache[s.vtx])
+    end
+    meta_actions = Vector{MetaAgentCBS.Action{PCCBS.Action}}()
+    for d in d_set
+        meta_action = MetaAgentCBS.Action{PCCBS.Action}()
+        for (e,s) in zip(env.envs, s.states)
+            vtx = e.graph.vtxs[s.vtx]
+            next_vtx = (vtx[1] + d[1], vtx[2] + d[2])
+            push!(meta_action.actions, PCCBS.Action(e = Edge(e.graph.vtx_map[vtx...], e.graph.vtx_map[next_vtx...])))
+        end
+        push!(meta_actions, meta_action)
+    end
+    meta_actions
+end
 # get_next_state
 CRCBS.get_next_state(s::State,a::Action) = State(a.e.dst,s.t+a.Δt)
 CRCBS.get_next_state(env::LowLevelEnv,s::State,a::Action) = get_next_state(s,a)

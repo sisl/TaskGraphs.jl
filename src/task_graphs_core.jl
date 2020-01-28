@@ -186,8 +186,8 @@ function TOML.parse(pred::OBJECT_AT)
 end
 function TOML.parse(op::Operation)
     toml_dict = Dict()
-    toml_dict["pre"] = map(pred->[get_id(get_object_id(pred)),get_id(get_location_id(pred))], collect(op.pre))
-    toml_dict["post"] = map(pred->[get_id(get_object_id(pred)),get_id(get_location_id(pred))], collect(op.post))
+    toml_dict["pre"] = map(pred->TOML.parse(pred), collect(op.pre))
+    toml_dict["post"] = map(pred->TOML.parse(pred), collect(op.post))
     toml_dict["dt"] = duration(op)
     toml_dict["station_id"] = get_id(op.station_id)
     toml_dict["id"] = get_id(op.id)
@@ -575,7 +575,8 @@ end
 function generate_path_spec(schedule::P,spec::T,pred::TEAM_ACTION) where {P<:ProjectSchedule,T<:ProblemSpec}
     path_spec = PathSpec(
         node_type=Symbol(typeof(pred)),
-        min_path_duration = maximum(map(a->generate_path_spec(schedule,spec,a).min_path_duration, pred.instructions))
+        min_path_duration = maximum(map(a->generate_path_spec(schedule,spec,a).min_path_duration, pred.instructions)),
+        plan_path = true
         )
 end
 function generate_path_spec(schedule::P,pred) where {P<:ProjectSchedule}

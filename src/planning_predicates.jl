@@ -157,7 +157,10 @@ struct OBJECT_AT <: AbstractPlanningPredicate
     x::StationID
 	n::Int # number of robots required for transport
 end
-OBJECT_AT(o::Int,x::Int) = OBJECT_AT(ObjectID(o),StationID(x),1)
+OBJECT_AT(o::ObjectID,x::StationID) 		= OBJECT_AT(o,x,1)
+OBJECT_AT(o::Int,args...) 					= OBJECT_AT(ObjectID(o),args...)
+OBJECT_AT(o::ObjectID,x::Int,args...) 		= OBJECT_AT(o,StationID(x),args...)
+# OBJECT_AT(o::Int,x::Int) = OBJECT_AT(ObjectID(o),StationID(x))
 get_object_id(pred::OBJECT_AT) = pred.o
 get_location_id(pred::OBJECT_AT) = pred.x
 

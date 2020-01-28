@@ -21,10 +21,33 @@ export
     get_num_free_vtxs,
     get_free_zones
 
+
+function construct_vtx_map(vtxs,dims)
+    vtx_map = zeros(Int,dims)
+    for (i,vtx) in enumerate(vtxs)
+        vtx_map[vtx[1],vtx[2]] = i
+    end
+    vtx_map
+end
+
+function construct_edge_cache(vtxs,vtx_map)
+    edge_cache = Vector{Set{Tuple{Int,Int}}}()
+    for (v,pt) in enumerate(vtxs)
+        edge_list = Set{Tuple{Int,Int}}()
+        for d in [(0,0),(-1,0),(0,1),(1,0),(0,-1)]
+            if get(vtx_map, (pt[1]+d[1], pt[2]+d[2]), 0) >= 1
+                push!(edge_list, d)
+            end
+        end
+        push!(edge_cache, edge_list)
+    end
+    edge_cache
+end
+
 """
     `GridFactoryEnvironment`
 """
-@with_kw struct GridFactoryEnvironment{G}
+@with_kw struct GridFactoryEnvironment{G} <: AbstractGraph{Int}
     graph               ::G                         = MetaDiGraph()
     x_dim               ::Int                       = 20
     y_dim               ::Int                       = 20
@@ -34,6 +57,8 @@ export
     pickup_zones        ::Vector{Int}               = Vector{Int}()
     dropoff_zones       ::Vector{Int}               = Vector{Int}()
     obstacles           ::Vector{Tuple{Int,Int}}    = Vector{Tuple{Int,Int}}()
+    vtx_map             ::Matrix{Int}               = construct_vtx_map(vtxs,(x_dim,y_dim))
+    edge_cache          ::Vector{Set{Tuple{Int,Int}}} = construct_edge_cache(vtxs,vtx_map)
     # robot_locations     ::Vector{Tuple{Int,Int}}        = Vector{Tuple{Int,Int}}()
 end
 # get_graph(env::E) where {E<:GridFactoryEnvironment} = env.graph
@@ -58,9 +83,22 @@ function GridFactoryEnvironment(env::E,graph::G) where {E<:GridFactoryEnvironmen
         vtxs            = env.vtxs,
         pickup_zones    = env.pickup_zones,
         dropoff_zones   = env.dropoff_zones,
-        obstacles       = env.obstacles
+        obstacles       = env.obstacles,
+        vtx_map         = env.vtx_map
     )
 end
+
+Base.zero(env::GridFactoryEnvironment{G}) where {G} = GridFactoryEnvironment(env,graph=G())
+LightGraphs.edges(env::GridFactoryEnvironment) = edges(env.graph)
+LightGraphs.edgetype(env::GridFactoryEnvironment{G}, args...) where {G} = edgetype(env.graph, args...)
+LightGraphs.has_edge(env::GridFactoryEnvironment{G}, args...) where {G} = has_edge(env.graph, args...)
+LightGraphs.has_vertex(env::GridFactoryEnvironment{G}, args...) where {G} = has_vertex(env.graph, args...)
+LightGraphs.inneighbors(env::GridFactoryEnvironment{G}, args...) where {G} = inneighbors(env.graph, args...)
+LightGraphs.is_directed(env::GridFactoryEnvironment{G}, args...) where {G} = is_directed(env.graph, args...)
+LightGraphs.ne(env::GridFactoryEnvironment{G}, args...) where {G} = ne(env.graph, args...)
+LightGraphs.nv(env::GridFactoryEnvironment{G}, args...) where {G} = nv(env.graph, args...)
+LightGraphs.outneighbors(env::GridFactoryEnvironment{G}, args...) where {G} = outneighbors(env.graph, args...)
+LightGraphs.vertices(env::GridFactoryEnvironment{G}, args...) where {G} = vertices(env.graph, args...)
 
 get_x(env::E,v::Int) where {E<:GridFactoryEnvironment} = get_vtxs(env)[v][1]
 get_y(env::E,v::Int) where {E<:GridFactoryEnvironment} = get_vtxs(env)[v][2]
@@ -148,6 +186,7 @@ function initialize_factory_graph(env::GridFactoryEnvironment)
     end
     G
 end
+
 
 function construct_regular_factory_world(;
     n_obstacles_x=2,
@@ -258,7 +297,7 @@ function construct_factory_env_from_vtx_grid(vtx_grid;
         transition_time     = transition_time,
         vtxs                = vtxs,
         pickup_zones        = pickup_zones,
-        dropoff_zones       = dropoff_zones
+        dropoff_zones       = dropoff_zones,
     )
 end
 

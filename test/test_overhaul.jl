@@ -18,7 +18,7 @@ function show_times(sched,v)
     arr = process_schedule(sched)
     return string(map(a->string(a[v],","), arr[1:2])...)
 end
-function print_project_schedule(project_schedule,filename;mode=:root_aligned)
+function print_project_schedule(project_schedule,filename;mode=:root_aligned,verbose=true)
     rg = get_display_metagraph(project_schedule;
         f=(v,p)->string(v,",",get_path_spec(project_schedule,v).agent_id))
     plot_graph_bfs(rg;
@@ -26,14 +26,14 @@ function print_project_schedule(project_schedule,filename;mode=:root_aligned)
         shape_function = (G,v,x,y,r)->Compose.circle(x,y,r),
         color_function = (G,v,x,y,r)->get_prop(G,v,:color),
         text_function = (G,v,x,y,r)->string(
-            title_string(get_node_from_id(project_schedule, get_vtx_id(project_schedule, v)),true),
+            title_string(get_node_from_id(project_schedule, get_vtx_id(project_schedule, v)),verbose),
             "\n",show_times(project_schedule,v)
             )
     ) |> Compose.SVG(string(filename,".svg"))
     # `inkscape -z project_schedule1.svg -e project_schedule1.png`
     # OR: `for f in *.svg; do inkscape -z $f -e $f.png; done`
 end
-function print_project_schedule(project_schedule,model,filename;mode=:root_aligned)
+function print_project_schedule(project_schedule,model,filename;mode=:root_aligned,verbose=true)
     rg = get_display_metagraph(project_schedule;
         f=(v,p)->string(v,",",get_path_spec(project_schedule,v).agent_id))
     plot_graph_bfs(rg;
@@ -41,7 +41,7 @@ function print_project_schedule(project_schedule,model,filename;mode=:root_align
         shape_function = (G,v,x,y,r)->Compose.circle(x,y,r),
         color_function = (G,v,x,y,r)->get_prop(G,v,:color),
         text_function = (G,v,x,y,r)->string(
-            title_string(get_node_from_id(project_schedule, get_vtx_id(project_schedule, v)),true),
+            title_string(get_node_from_id(project_schedule, get_vtx_id(project_schedule, v)),verbose),
             "\n",show_times(project_schedule,v),
             "-",Int(round(value(model[:t0][v]))),",",Int(round(value(model[:tF][v])))
             )
@@ -96,7 +96,8 @@ let
     env_id = 2
     env_file = joinpath(ENVIRONMENT_DIR,string("env_",env_id,".toml"))
     factory_env = read_env(env_file)
-    env_graph = factory_env.graph
+    # env_graph = factory_env.graph
+    env_graph = factory_env
     dist_matrix = get_dist_matrix(env_graph)
 
     let
@@ -401,7 +402,8 @@ let
     env_id = 2
     env_filename = string(ENVIRONMENT_DIR,"/env_",env_id,".toml")
     factory_env = read_env(env_filename)
-    env_graph = factory_env.graph
+    # env_graph = factory_env.graph
+    env_graph = factory_env
     dist_matrix = get_dist_matrix(env_graph)
 
     # problem_def = read_problem_def(joinpath(PROBLEM_DIR,"problem223.toml"))
@@ -543,7 +545,8 @@ let
     env_id = 2
     env_filename = string(ENVIRONMENT_DIR,"/env_",env_id,".toml")
     factory_env = read_env(env_filename)
-    env_graph = factory_env.graph
+    # env_graph = factory_env.graph
+    env_graph = factory_env
     dist_matrix = get_dist_matrix(env_graph)
 
     # problem_def = read_problem_def(joinpath(PROBLEM_DIR,"problem223.toml"))
@@ -557,6 +560,12 @@ let
     solver = PC_TAPF_Solver(DEBUG=true,verbosity=1,LIMIT_A_star_iterations=5*nv(env_graph));
     (solution, assignment, cost, search_env), elapsed_time, byte_ct, gc_time, mem_ct = @timed high_level_search!(
         SparseAdjacencyMILP(), solver, env_graph, project_spec, problem_spec, robot_ICs, Gurobi.Optimizer;)
+
+    meta_env = MetaAgentCBS.construct_meta_env([search_env.env], get_cost_model(search_env.env))
+    s = MetaAgentCBS.State([PCCBS.State(1,0)])
+    for a in get_possible_actions(meta_env, s)
+        @show get_next_state(meta_env, s, a)
+    end
 
     # project_schedule = construct_partial_project_schedule(project_spec,problem_spec,map(i->robot_ICs[i], 1:problem_spec.N))
     # model = formulate_milp(SparseAdjacencyMILP(),project_schedule,problem_spec;Presolve=1,TimeLimit=0.5)
@@ -688,13 +697,14 @@ let
     # 6  14  22  30  38  46  54  62
     # 7  15  23  31  39  47  55  63
     # 8  16  24  32  40  48  56  64
-    env_graph = initialize_grid_graph_from_vtx_grid(vtx_grid)
+    env_graph = construct_factory_env_from_vtx_grid(vtx_grid)
     dist_matrix = get_dist_matrix(env_graph)
-    r0 = [1,4,25,28]
-    s0 = [18]
-    sF = [50]
+    r0 = [1,25,4,28]
+    # r0 = [1,25,8,28] # check that planning works even when it takes longer for some robots to arrive than others
+    s0 = [10,18,11,19]
+    sF = [42,50,43,51]
 
-    project_spec, robot_ICs = TaskGraphs.initialize_toy_problem(r0,s0,sF,(v1,v2)->dist_matrix[v1,v2])
+    project_spec, robot_ICs = TaskGraphs.initialize_toy_problem(r0,[s0[1]],[sF[1]],(v1,v2)->dist_matrix[v1,v2])
     add_operation!(project_spec,construct_operation(project_spec,-1,[1],[],0))
 
     cost_function = SumOfMakeSpans
@@ -702,67 +712,67 @@ let
         project_spec,r0,s0,sF,dist_matrix;cost_function=cost_function)
 
 
-
+    # Construct dummy project schedule by hand
     project_schedule = ProjectSchedule()
+    team_action_id = ActionID(get_unique_action_id())
+    team_action = TEAM_ACTION(
+        n = 4,
+        instructions = map(i->CARRY(i,1,s0[i],sF[i]), 1:4)
+    )
+    add_to_schedule!(project_schedule, problem_spec, team_action, team_action_id)
     for (r,x) in enumerate(r0)
         robot_id = RobotID(r)
         add_to_schedule!(project_schedule,problem_spec,ROBOT_AT(r,x),robot_id)
         action_id = ActionID(get_unique_action_id())
-        add_to_schedule!(project_schedule,problem_spec,GO(r,x,-1),action_id)
+        add_to_schedule!(project_schedule,problem_spec,GO(r,x,s0[r]),action_id)
         add_edge!(project_schedule,robot_id,action_id)
+        prev_action_id = action_id
+        action_id = ActionID(get_unique_action_id())
+        add_to_schedule!(project_schedule,problem_spec,COLLECT(r,1,s0[r]),action_id)
+        add_edge!(project_schedule,prev_action_id,action_id)
+        add_edge!(project_schedule,action_id,team_action_id)
     end
-    nodes = [
-    [TEAM_ACTION(
+    prev_team_action_id = team_action_id
+    team_action_id = ActionID(get_unique_action_id())
+    team_action = TEAM_ACTION(
         n = 4,
-        instructions = [
-            GO(-1,-1,10),
-            GO(-1,-1,18),
-            GO(-1,-1,11),
-            GO(-1,-1,19)
-        ]
-    ),OBJECT_AT(1,s0[1])],
-    [TEAM_ACTION(
-        n = 4,
-        instructions = [
-            COLLECT(-1,1,10),
-            COLLECT(-1,1,18),
-            COLLECT(-1,1,11),
-            COLLECT(-1,1,19)
-        ]
-    )],
-    [TEAM_ACTION(
-        n = 4,
-        instructions = [
-            CARRY(-1,1,10,42),
-            CARRY(-1,1,18,50),
-            CARRY(-1,1,11,43),
-            CARRY(-1,1,19,51)
-        ]
-    )],
-    [TEAM_ACTION(
-        n = 4,
-        instructions = [
-            DEPOSIT(-1,1,42),
-            DEPOSIT(-1,1,50),
-            DEPOSIT(-1,1,43),
-            DEPOSIT(-1,1,51)
-        ]
-    ),get_operations(project_schedule)[1]],
-    ]
-    prev_ids = Set{AbstractID}()
-    for i in 1:length(nodes)
-        next_ids = Set{AbstractID}()
-        for node in nodes[i]
-            path_spec = generate_path_spec(project_schedule, problem_spec, node)
-            action_id = ActionID(get_unique_action_id())
-            add_to_schedule!(project_schedule,problem_spec,node,action_id)
-            global prev_ids
-            for prev_id in prev_ids
-                add_edge!(project_schedule,prev_id,action_id)
-            end
-            push!(next_ids,action_id)
-        end
-        global prev_ids = next_ids
+        instructions = map(i->DEPOSIT(i,1,sF[i]), 1:4)
+    )
+    add_to_schedule!(project_schedule,problem_spec,team_action,team_action_id)
+    add_edge!(project_schedule,prev_team_action_id,team_action_id)
+    operation_id = OperationID(get_unique_operation_id())
+    add_to_schedule!(project_schedule, construct_operation(project_spec,-1,[1],[],0), operation_id)
+    add_edge!(project_schedule,team_action_id,operation_id)
+    for (r,x) in enumerate(sF)
+        action_id = ActionID(get_unique_action_id())
+        add_to_schedule!(project_schedule,problem_spec,GO(r,x,-1),action_id)
+        add_edge!(project_schedule,team_action_id,action_id)
     end
+    set_leaf_operation_nodes!(project_schedule)
+
+    print_project_schedule(project_schedule,"team_schedule")
+
+    # Path planning
+    solver = PC_TAPF_Solver(DEBUG=true,verbosity=1,LIMIT_A_star_iterations=5*nv(env_graph));
+    env, mapf = construct_search_env(project_schedule, problem_spec, env_graph);
+    pc_mapf = PC_MAPF(env,mapf);
+    ##### Call CBS Search Routine (LEVEL 2) #####
+    root_node = initialize_root_node(mapf)
+
+
+    low_level_search!(solver, pc_mapf.env, pc_mapf.mapf,root_node)
+
+    for i in 1:12
+        valid_flag = plan_next_path!(solver, pc_mapf.env, pc_mapf.mapf,root_node)
+    end
+    meta_env, meta_path = build_env(solver, env, mapf, root_node, team_action, get_vtx(project_schedule,team_action_id))
+    @show convert_to_vertex_lists(root_node.solution)
+
+
+
+
+
+    valid_flag = plan_next_path!(solver, pc_mapf.env, pc_mapf.mapf,root_node)
+    @show convert_to_vertex_lists(root_node.solution)
 
 end

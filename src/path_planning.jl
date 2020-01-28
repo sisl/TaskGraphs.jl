@@ -159,6 +159,7 @@ export
     update_planning_cache!,
     repair_solution!,
     default_pc_tapf_solution,
+    plan_path!,
     plan_next_path!
 
 @with_kw struct PlanningCache
@@ -260,6 +261,7 @@ const Action = PCCBS.Action
     schedule::ProjectSchedule   = ProjectSchedule()
     cache::PlanningCache        = PlanningCache()
     env::E                      = PCCBS.LowLevelEnv()
+    problem_spec::ProblemSpec   = ProblemSpec()
     # solution::S                 = LowLevelSolution{}
     cost_model::C               = get_cost_model(env)
     num_agents::Int             = -1
@@ -303,10 +305,10 @@ function construct_search_env(schedule, problem_spec, env_graph;
     )
     ph = DefaultPerfectHeuristic(PerfectHeuristic(get_dist_matrix(env_graph)))
     heuristic_model = construct_composite_heuristic(
-        ph, # DefaultPerfectHeuristic(PerfectHeuristic(env_graph,map(s->s.vtx,starts),map(s->s.vtx,goals))),
+        ph,
         NullHeuristic(),
-        ph, # DefaultPerfectHeuristic(PerfectHeuristic(env_graph,map(s->s.vtx,starts),map(s->s.vtx,goals))),
-        ph  # DefaultPerfectHeuristic(PerfectHeuristic(env_graph,map(s->s.vtx,starts),map(s->s.vtx,goals)))
+        ph,
+        ph
     )
     # TODO should we remove this MAPF completely?
     mapf = MAPF(PCCBS.LowLevelEnv(
@@ -316,7 +318,7 @@ function construct_search_env(schedule, problem_spec, env_graph;
         ),starts,goals)
     # solution = get_initial_solution(mapf) # TODO
 
-    env = SearchEnv(schedule=schedule, cache=cache, env=mapf.env, num_agents=N)
+    env = SearchEnv(schedule=schedule, cache=cache, env=mapf.env, problem_spec=problem_spec, num_agents=N)
     return env, mapf #, node
 end
 function construct_search_env(project_spec, problem_spec, robot_ICs, assignments, env_graph;kwargs...)
@@ -365,7 +367,7 @@ update_cost_model!(env::S) where {S<:SearchEnv} = update_cost_model!(env.cost_mo
 
     `v` is the vertex id
 """
-function update_env!(solver::S,env::E,v::Int,path::P) where {S<:PC_TAPF_Solver,E<:SearchEnv,P<:Path}
+function update_env!(solver::S,env::E,v::Int,path::P,agent_id::Int=get_path_spec(env.schedule,v).agent_id) where {S<:PC_TAPF_Solver,E<:SearchEnv,P<:Path}
     cache = env.cache
     schedule = env.schedule
 
@@ -373,7 +375,6 @@ function update_env!(solver::S,env::E,v::Int,path::P) where {S<:PC_TAPF_Solver,E
     update_planning_cache!(solver,cache,schedule,v,path)
     update_cost_model!(env)
     # ADD UPDATED PATH TO HEURISTIC MODELS
-    agent_id    = get_path_spec(schedule, v).agent_id
     if agent_id != -1
         partially_set_path!(get_heuristic_model(env.env),agent_id,convert_to_vertex_lists(path))
         partially_set_path!(get_cost_model(env.env),agent_id,convert_to_vertex_lists(path))
@@ -382,12 +383,9 @@ function update_env!(solver::S,env::E,v::Int,path::P) where {S<:PC_TAPF_Solver,E
     env
 end
 
-function CRCBS.build_env(solver, env::E, mapf::M, node::N, v::Int,dt=0) where {E<:SearchEnv,M<:AbstractMAPF,N<:ConstraintTreeNode}
-    agent_id = get_path_spec(env.schedule, v).agent_id
-    node_id = get_vtx_id(env.schedule, v)
-    schedule_node = get_node_from_id(env.schedule, node_id)
-
-    goal_vtx = get_path_spec(env.schedule,v).final_vtx
+function CRCBS.build_env(solver, env::E, mapf::M, node::N, schedule_node::T, v::Int,path_spec=get_path_spec(env.schedule, v)) where {E<:SearchEnv,M<:AbstractMAPF,N<:ConstraintTreeNode,T}
+    agent_id = path_spec.agent_id
+    goal_vtx = path_spec.final_vtx
     goal_time = env.cache.tF[v]                             # time after which goal can be satisfied
     deadline = env.cache.tF[v] .+ env.cache.slack[v]         # deadline for DeadlineCost
     # Adjust deadlines if necessary:
@@ -407,7 +405,7 @@ function CRCBS.build_env(solver, env::E, mapf::M, node::N, v::Int,dt=0) where {E
             end
         end
     end
-    if (get_path_spec(env.schedule, v).free == true) && is_terminal_node(get_graph(env.schedule),v)
+    if (path_spec.free == true) && is_terminal_node(get_graph(env.schedule),v)
         goal_time = maximum(env.cache.tF)
         goal_vtx = -1
         # deadline = Inf # already taken care of, perhaps?
@@ -419,7 +417,7 @@ function CRCBS.build_env(solver, env::E, mapf::M, node::N, v::Int,dt=0) where {E
         goal        = PCCBS.State(goal_vtx,goal_time),
         agent_idx   = agent_id, # this is only used for the HardConflictTable, which can be updated via the combined search node
         heuristic   = get_heuristic_model(mapf.env),
-        cost_model  = get_cost_model(mapf.env)       # TODO update the cost model
+        cost_model  = get_cost_model(mapf.env)
         )
     # update deadline in DeadlineCost
     set_deadline!(get_cost_model(cbs_env),deadline)
@@ -429,14 +427,19 @@ function CRCBS.build_env(solver, env::E, mapf::M, node::N, v::Int,dt=0) where {E
         base_path = get_paths(node.solution)[agent_id]
     else
         # log_info(0,solver,string("initializing base path for node ",v," of type ",typeof(schedule_node)))
-        start_vtx = get_path_spec(env.schedule,v).start_vtx
+        start_vtx = path_spec.start_vtx
         base_path = Path{PCCBS.State,PCCBS.Action,get_cost_type(cbs_env)}(
             s0=PCCBS.State(start_vtx, 0), # TODO fix start time
             cost=get_initial_cost(cbs_env)
             )
     end
-    # base_path = get(get_paths(node.solution), agent_id, Path{PCCBS.State,PCCBS.Action,get_cost_type(cbs_env)}(
-    #     s0=get_start(env,v), cost=get_initial_cost(cbs_env)))
+    # make sure base_path hits t0 constraint
+    if get_end_index(base_path) < env.cache.t0[v]
+        log_info(-1, solver, string("# LOW LEVEL SEARCH: in schedule node ",v," of type ",
+            typeof(schedule_node),", cache.t0[v] - get_end_index(base_path) = ",env.cache.t0[v] - get_end_index(base_path),". Extending path to ",env.cache.t0[v]," ..."))
+        # base_path = extend_path(cbs_env,base_path,env.cache.t0[v])
+        extend_path!(cbs_env,base_path,env.cache.t0[v])
+    end
     log_info(2,solver,
     """
     agent_id = $(agent_id)
@@ -449,12 +452,138 @@ function CRCBS.build_env(solver, env::E, mapf::M, node::N, v::Int,dt=0) where {E
     )
     return cbs_env, base_path
 end
+function CRCBS.build_env(solver, env::E, mapf::M, node::N, schedule_node::TEAM_ACTION, v::Int) where {E<:SearchEnv,M<:AbstractMAPF,N<:ConstraintTreeNode}
+    envs = Vector{typeof(env.env)}()
+    starts = Vector{PCCBS.State}()
+    meta_cost = MetaCost(Vector{get_cost_type(env)}(),get_initial_cost(env.env))
+    # path_specs = Vector{PathSpec}()
+    for sub_node in schedule_node.instructions
+        cbs_env, base_path = build_env(solver,env,mapf,node,sub_node,v,generate_path_spec(env.schedule,env.problem_spec,sub_node)) # TODO need problem_spec here
+        push!(envs, cbs_env)
+        push!(starts, get_final_state(base_path))
+        push!(meta_cost.independent_costs, get_cost(base_path))
+    end
+    meta_env = MetaAgentCBS.construct_meta_env(envs, get_cost_model(env))
+    meta_path = Path{MetaAgentCBS.State{PCCBS.State},MetaAgentCBS.Action{PCCBS.Action},MetaCost{get_cost_type(env)}}(
+        s0 = MetaAgentCBS.State(starts),
+        cost = MetaCost(meta_cost.independent_costs, aggregate_costs(get_cost_model(meta_env), meta_cost.independent_costs))
+    )
+    return meta_env, meta_path
+end
 
 """
-    `plan_next_path`
+    plan_path!
 
     Computes nxxt path specified by the project schedule and updates the
     solution in the ConstraintTreeNode::node accordingly.
+"""
+function plan_path!(solver::PC_TAPF_Solver, env::SearchEnv, mapf::M, node::N, schedule_node::T, v::Int;
+        heuristic=get_heuristic_cost,
+        path_finder=A_star
+        ) where {M<:AbstractMAPF,N<:ConstraintTreeNode,T}
+
+    cache = env.cache
+    schedule = env.schedule
+    node_id = get_vtx_id(schedule,v)
+
+    # if get_path_spec(schedule, v).plan_path == true
+    cbs_env, base_path = build_env(solver, env, mapf, node, schedule_node, v)
+    ### PATH PLANNING ###
+    if typeof(schedule_node) <: Union{COLLECT,DEPOSIT} # Must sit and wait the whole time
+        path = base_path
+        extend_path!(cbs_env,path,cache.tF[v]) # NOTE looks like this might work out of the box for replanning. No need for node surgery
+        cost = get_cost(path)
+        solver.DEBUG ? validate(path,v) : nothing
+    else # if typeof(schedule_node) <: Union{GO,CARRY}
+        solver.DEBUG ? validate(base_path,v) : nothing
+        path, cost = path_finder(solver, cbs_env, base_path, heuristic;verbose=(solver.verbosity > 3))
+        if cost == get_infeasible_cost(cbs_env)
+            log_info(-1,solver,"# A*: returned infeasible path ... Exiting early")
+            return false
+        end
+        solver.DEBUG ? validate(path,v,cbs_env) : nothing
+    end
+    #####################
+    log_info(2,solver,string("LOW LEVEL SEARCH: solver.num_A_star_iterations = ",solver.num_A_star_iterations))
+    # Make sure every robot sticks around for the entire time horizon
+    if is_terminal_node(get_graph(schedule),v)
+        log_info(2,solver,string("LOW LEVEL SEARCH: Extending terminal node",
+        " (SHOULD NEVER HAPPEN IF THINGS ARE WORKING CORRECTLY)"))
+        extend_path!(cbs_env,path,maximum(cache.tF))
+        solver.DEBUG ? validate(path,v) : nothing
+    end
+    # add to solution
+    agent_id = get_path_spec(schedule, v).agent_id
+    set_solution_path!(node.solution, path, agent_id)
+    set_path_cost!(node.solution, cost, agent_id)
+    # update
+    update_env!(solver,env,v,path)
+    node.solution.cost = aggregate_costs(get_cost_model(env.env),get_path_costs(node.solution))
+    node.cost = get_cost(node.solution)
+    # Print for debugging
+    log_info(3,solver,string("agent_path = ", convert_to_vertex_lists(path)))
+    log_info(3,solver,string("cost = ", get_cost(path)))
+    if node.cost >= solver.best_cost
+        log_info(0,solver,"# LOW LEVEL SEARCH: node.cost >= solver.best_cost ... Exiting early")
+        return false
+    end
+
+    return true
+end
+function plan_path!(solver::PC_TAPF_Solver, env::SearchEnv, mapf::M, node::N, schedule_node::TEAM_ACTION{A}, v::Int;
+        heuristic=get_heuristic_cost,
+        path_finder=A_star
+        ) where {M<:AbstractMAPF,N<:ConstraintTreeNode,A}
+
+    cache = env.cache
+    schedule = env.schedule
+    node_id = get_vtx_id(schedule,v)
+
+    meta_env, base_path = build_env(solver, env, mapf, node, schedule_node, v)
+    ### PATH PLANNING ###
+    if A <: Union{COLLECT,DEPOSIT} # Must sit and wait the whole time
+        meta_path = base_path
+        extend_path!(meta_env,meta_path,cache.tF[v]-(cache.t0[v]-length(base_path)))
+        meta_cost = get_cost(meta_path)
+    else
+        meta_path, meta_cost = path_finder(solver, meta_env, base_path, heuristic;verbose=(solver.verbosity > 3))
+    end
+    paths = MetaAgentCBS.split_path(meta_path)
+    for (cbs_env, new_path, cost, sub_node) in zip(meta_env.envs, paths, meta_cost.independent_costs, schedule_node.instructions)
+        agent_id = get_id(get_robot_id(sub_node))
+        path = get_paths(node.solution)[agent_id]
+        for p in new_path.path_nodes
+            push!(path, p)
+            path.cost = accumulate_cost(cbs_env, get_cost(path), get_transition_cost(cbs_env, p.s, p.a, p.sp))
+        end
+        set_solution_path!(node.solution, path, agent_id)
+        set_path_cost!(node.solution, get_cost(path), agent_id)
+        update_env!(solver,env,v,path,agent_id)
+        # Print for debugging
+        log_info(3,solver,string("agent_path = ", convert_to_vertex_lists(path)))
+        log_info(3,solver,string("cost = ", get_cost(path)))
+    end
+    # solver.DEBUG ? validate(path,v,meta_env) : nothing
+    #####################
+    log_info(2,solver,string("LOW LEVEL SEARCH: solver.num_A_star_iterations = ",solver.num_A_star_iterations))
+    # update
+    # update_env!(solver,env,v,path)
+    node.solution.cost = aggregate_costs(get_cost_model(env.env),get_path_costs(node.solution))
+    node.cost = get_cost(node.solution)
+    if node.cost == get_infeasible_cost(meta_env)
+        log_info(-1,solver,"# A*: returned infeasible path ... Exiting early")
+        return false
+    end
+    if node.cost >= solver.best_cost
+        log_info(0,solver,"# LOW LEVEL SEARCH: node.cost >= solver.best_cost ... Exiting early")
+        return false
+    end
+
+    return true
+end
+
+"""
+    `plan_next_path`
 """
 function plan_next_path!(solver::S, env::E, mapf::M, node::N;
         heuristic=get_heuristic_cost,
@@ -462,70 +591,14 @@ function plan_next_path!(solver::S, env::E, mapf::M, node::N;
         ) where {S<:PC_TAPF_Solver,E<:SearchEnv,M<:AbstractMAPF,N<:ConstraintTreeNode}
 
     enter_a_star!(solver)
-    cache = env.cache
-    schedule = env.schedule
 
-    if length(cache.node_queue) > 0
-        v = dequeue!(cache.node_queue)
-        if get_path_spec(schedule, v).plan_path == true
-            cbs_env, base_path = build_env(solver, env, mapf, node, v)
-            # make sure base_path hits t0 constraint
-            if get_end_index(base_path) < cache.t0[v]
-                node_id = get_vtx_id(schedule,v)
-                schedule_node = get_node_from_id(schedule,node_id)
-                log_info(-1, solver, string("# LOW LEVEL SEARCH: in schedule node ",v," of type ",
-                    typeof(schedule_node),", cache.t0[v] - get_end_index(base_path) = ",cache.t0[v] - get_end_index(base_path),". Extending path to ",cache.t0[v]," ..."))
-                extend_path!(cbs_env,base_path,cache.t0[v])
-            end
-            # Solve!
-            node_id = get_vtx_id(schedule,v)
-            schedule_node = get_node_from_id(schedule,node_id)
-            ### PATH PLANNING ###
-            if typeof(schedule_node) <: Union{COLLECT,DEPOSIT} # Must sit and wait the whole time
-                path = base_path
-                extend_path!(cbs_env,path,cache.tF[v]) # NOTE looks like this might work out of the box for replanning. No need for node surgery
-                cost = get_cost(path)
-                solver.DEBUG ? validate(path,v) : nothing
-            else
-                solver.DEBUG ? validate(base_path,v) : nothing
-                path, cost = path_finder(solver, cbs_env, base_path, heuristic;verbose=(solver.verbosity > 3))
-                if cost == get_infeasible_cost(cbs_env)
-                    log_info(-1,solver,"# A*: returned infeasible path ... Exiting early")
-                    return false
-                end
-                solver.DEBUG ? validate(path,v,cbs_env) : nothing
-            end
-            #####################
-            log_info(2,solver,string("LOW LEVEL SEARCH: solver.num_A_star_iterations = ",solver.num_A_star_iterations))
-            # Make sure every robot sticks around for the entire time horizon
-            if is_terminal_node(get_graph(schedule),v)
-                log_info(2,solver,string("LOW LEVEL SEARCH: Extending terminal node",
-                " (SHOULD NEVER HAPPEN IF THINGS ARE WORKING CORRECTLY)"))
-                extend_path!(cbs_env,path,maximum(cache.tF))
-                solver.DEBUG ? validate(path,v) : nothing
-            end
-            # add to solution
-            agent_id = get_path_spec(schedule, v).agent_id
-            set_solution_path!(node.solution, path, agent_id)
-            set_path_cost!(node.solution, cost, agent_id)
-            # update
-            update_env!(solver,env,v,path)
-            # TODO incorporate multi-headed cost
-            node.solution.cost = aggregate_costs(get_cost_model(env.env),get_path_costs(node.solution))
-            node.cost = get_cost(node.solution)
-            # Print for DEBUGging
-            log_info(3,solver,string("agent_path = ", convert_to_vertex_lists(path)))
-            log_info(3,solver,string("cost = ", get_cost(path)))
-            if node.cost >= solver.best_cost
-                log_info(0,solver,"# LOW LEVEL SEARCH: node.cost >= solver.best_cost ... Exiting early")
-                return false
-            end
-            # Debugging
-            # vtx_lists = convert_to_vertex_lists(node.solution)
-            # for (i,p) in enumerate(vtx_lists)
-            #     log_info(-1,solver,string("path_",i," = ",p))
-            # end
-            # log_info(-1,solver,"\n\n")
+    if length(env.cache.node_queue) > 0
+        v = dequeue!(env.cache.node_queue)
+        node_id = get_vtx_id(env.schedule,v)
+        schedule_node = get_node_from_id(env.schedule,node_id)
+        if get_path_spec(env.schedule, v).plan_path == true
+            plan_path!(solver,env,mapf,node,schedule_node,v;
+                heuristic=heuristic,path_finder=path_finder)
         else
             # dummy path
             path = Path{PCCBS.State,PCCBS.Action,get_cost_type(mapf.env)}(
@@ -549,13 +622,6 @@ function CRCBS.low_level_search!(
         heuristic=get_heuristic_cost,
         path_finder=A_star
         ) where {S<:PC_TAPF_Solver,E<:SearchEnv,M<:AbstractMAPF,N<:ConstraintTreeNode}
-
-    # log_info(-1,solver,"low_level_search!")
-    # vtx_lists = convert_to_vertex_lists(node.solution)
-    # for (i,p) in enumerate(vtx_lists)
-    #     log_info(-1,solver,string("path_",i," = ",p))
-    # end
-    # log_info(-1,solver,"\n\n")
 
     while length(env.cache.node_queue) > 0
         if !(plan_next_path!(solver,env,mapf,node;heuristic=heuristic,path_finder=path_finder))
