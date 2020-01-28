@@ -259,7 +259,7 @@ let
 
                     # test sparse adjacency matrix formulation
                     schedule3 = construct_partial_project_schedule(project_spec,problem_spec,map(i->robot_ICs[i], 1:problem_spec.N))
-                    model3 = formulate_milp(SparseAdjacencyMILP(),schedule2,problem_spec;cost_model=cost_model)
+                    model3 = formulate_milp(SparseAdjacencyMILP(),schedule3,problem_spec;cost_model=cost_model)
                     optimize!(model3)
                     @test termination_status(model3) == MOI.OPTIMAL
                     obj_val3 = Int(round(value(objective_function(model2))))
@@ -674,5 +674,95 @@ let
 
     # print_project_schedule(new_schedule,"dummy_schedule";mode=:leaf_aligned)
 
+
+end
+
+# Collaborative transport
+let
+    vtx_grid = initialize_dense_vtx_grid(8,8)
+    # 1   9  17  25  33  41  49  57
+    # 2  10  18  26  34  42  50  58
+    # 3  11  19  27  35  43  51  59
+    # 4  12  20  28  36  44  52  60
+    # 5  13  21  29  37  45  53  61
+    # 6  14  22  30  38  46  54  62
+    # 7  15  23  31  39  47  55  63
+    # 8  16  24  32  40  48  56  64
+    env_graph = initialize_grid_graph_from_vtx_grid(vtx_grid)
+    dist_matrix = get_dist_matrix(env_graph)
+    r0 = [1,4,25,28]
+    s0 = [18]
+    sF = [50]
+
+    project_spec, robot_ICs = TaskGraphs.initialize_toy_problem(r0,s0,sF,(v1,v2)->dist_matrix[v1,v2])
+    add_operation!(project_spec,construct_operation(project_spec,-1,[1],[],0))
+
+    cost_function = SumOfMakeSpans
+    project_spec, problem_spec, object_ICs, object_FCs, robot_ICs = construct_task_graphs_problem(
+        project_spec,r0,s0,sF,dist_matrix;cost_function=cost_function)
+
+
+
+    project_schedule = ProjectSchedule()
+    for (r,x) in enumerate(r0)
+        robot_id = RobotID(r)
+        add_to_schedule!(project_schedule,problem_spec,ROBOT_AT(r,x),robot_id)
+        action_id = ActionID(get_unique_action_id())
+        add_to_schedule!(project_schedule,problem_spec,GO(r,x,-1),action_id)
+        add_edge!(project_schedule,robot_id,action_id)
+    end
+    nodes = [
+    [TEAM_ACTION(
+        n = 4,
+        instructions = [
+            GO(-1,-1,10),
+            GO(-1,-1,18),
+            GO(-1,-1,11),
+            GO(-1,-1,19)
+        ]
+    ),OBJECT_AT(1,s0[1])],
+    [TEAM_ACTION(
+        n = 4,
+        instructions = [
+            COLLECT(-1,1,10),
+            COLLECT(-1,1,18),
+            COLLECT(-1,1,11),
+            COLLECT(-1,1,19)
+        ]
+    )],
+    [TEAM_ACTION(
+        n = 4,
+        instructions = [
+            CARRY(-1,1,10,42),
+            CARRY(-1,1,18,50),
+            CARRY(-1,1,11,43),
+            CARRY(-1,1,19,51)
+        ]
+    )],
+    [TEAM_ACTION(
+        n = 4,
+        instructions = [
+            DEPOSIT(-1,1,42),
+            DEPOSIT(-1,1,50),
+            DEPOSIT(-1,1,43),
+            DEPOSIT(-1,1,51)
+        ]
+    ),get_operations(project_schedule)[1]],
+    ]
+    prev_ids = Set{AbstractID}()
+    for i in 1:length(nodes)
+        next_ids = Set{AbstractID}()
+        for node in nodes[i]
+            path_spec = generate_path_spec(project_schedule, problem_spec, node)
+            action_id = ActionID(get_unique_action_id())
+            add_to_schedule!(project_schedule,problem_spec,node,action_id)
+            global prev_ids
+            for prev_id in prev_ids
+                add_edge!(project_schedule,prev_id,action_id)
+            end
+            push!(next_ids,action_id)
+        end
+        global prev_ids = next_ids
+    end
 
 end

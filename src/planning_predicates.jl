@@ -155,8 +155,9 @@ abstract type AbstractPlanningPredicate end
 struct OBJECT_AT <: AbstractPlanningPredicate
     o::ObjectID
     x::StationID
+	n::Int # number of robots required for transport
 end
-OBJECT_AT(o::Int,x::Int) = OBJECT_AT(ObjectID(o),StationID(x))
+OBJECT_AT(o::Int,x::Int) = OBJECT_AT(ObjectID(o),StationID(x),1)
 get_object_id(pred::OBJECT_AT) = pred.o
 get_location_id(pred::OBJECT_AT) = pred.x
 
@@ -252,7 +253,8 @@ get_object_id(a::A) where {A<:Union{CARRY,COLLECT,DEPOSIT}}         					= a.o
 
 
 export
-	TEAM_ACTION
+	TEAM_ACTION,
+	LARGE_OBJECT_AT
 
 """
     For collaborative tasks
@@ -279,6 +281,10 @@ export
     n::Int = 2 # number of robots
     instructions::Vector{A} = Vector{GO}()
     # config::Matrix{Int} = ones(n) # defines configuration of agents relative to each other during collaborative task
+end
+struct LARGE_OBJECT_AT <: AbstractPlanningPredicate
+	o::ObjectID
+	x::Vector{StationID} # vector of locations
 end
 
 export
@@ -312,11 +318,13 @@ eligible_successors(node) 				= required_successors(node)
 eligible_successors(node::GO)           = Dict((TEAM_ACTION{GO},COLLECT)=>1)
 eligible_predecessors(node::OBJECT_AT)  = Dict(Operation=>1)
 
+required_predecessors(node::LARGE_OBJECT_AT)  = Dict()
 required_predecessors(node::TEAM_ACTION{GO})        = Dict(GO=>length(node.instructions))
-required_predecessors(node::TEAM_ACTION{COLLECT})   = Dict(TEAM_ACTION{GO}=>1,OBJECT_AT=>1)
+required_predecessors(node::TEAM_ACTION{COLLECT})   = Dict(TEAM_ACTION{GO}=>1,LARGE_OBJECT_AT=>1)
 required_predecessors(node::TEAM_ACTION{CARRY})     = Dict(TEAM_ACTION{COLLECT}=>1)
 required_predecessors(node::TEAM_ACTION{DEPOSIT})   = Dict(TEAM_ACTION{CARRY}=>1)
 
+required_successors(node::LARGE_OBJECT_AT)  	= Dict(TEAM_ACTION{COLLECT}=>1)
 required_successors(node::TEAM_ACTION{GO})         	= Dict(TEAM_ACTION{COLLECT}=>1)
 required_successors(node::TEAM_ACTION{COLLECT})    	= Dict(TEAM_ACTION{CARRY}=>1)
 required_successors(node::TEAM_ACTION{CARRY})      	= Dict(TEAM_ACTION{DEPOSIT}=>1)
@@ -345,6 +353,7 @@ align_with_predecessor(node::DEPOSIT,pred::CARRY)		= DEPOSIT(first_valid(node.r,
 
 align_with_successor(node,pred) 						= node
 align_with_successor(node::GO,succ::COLLECT) 			= GO(first_valid(node.r,succ.r), node.x1, first_valid(node.x2,succ.x))
+
 
 
 

@@ -11,6 +11,7 @@ using CRCBS
 using ..TaskGraphs
 
 export
+    initialize_toy_problem,
     initialize_toy_problem_1,
     initialize_toy_problem_2,
     initialize_toy_problem_3,

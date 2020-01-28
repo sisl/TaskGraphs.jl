@@ -358,14 +358,8 @@ function construct_random_project_spec(M::Int,object_ICs::Vector{OBJECT_AT},obje
         i = i - length(input_idxs)
         # Δt = Δt_min + (Δt_max-Δt_min)*rand()
         Δt=rand(Δt_min:Δt_max)
-        # add_operation!(project_spec,construct_operation(station_id, input_ids, [output_id], Δt))
         input_ids = map(idx->get_id(get_object_id(project_spec.initial_conditions[idx])), input_idxs)
         output_ids = map(idx->get_id(get_object_id(project_spec.initial_conditions[idx])), [output_idx])
-        # @show input_ids, output_ids
-        # @show project_spec.initial_conditions
-        # @show project_spec.object_id_to_idx
-        # @show map(id->project_spec.object_id_to_idx[id], input_ids)
-        # @show map(id->project_spec.object_id_to_idx[id], output_ids)
         add_operation!(project_spec,construct_operation(project_spec, station_id, input_ids, output_ids, Δt))
         for idx in input_idxs
             enqueue!(frontier, idx=>M-i)
@@ -376,13 +370,6 @@ function construct_random_project_spec(M::Int,object_ICs::Vector{OBJECT_AT},obje
     add_operation!(project_spec,construct_operation(project_spec, -1, [final_idx], [], Δt))
     project_spec
 end
-# function construct_random_project_spec(M::Int,object_ICs::Vector{OBJECT_AT},object_FCs::Vector{OBJECT_AT};
-#     kwargs...)
-#     object_IC_dict = Vector{OBJECT_AT}([pred for pred in object_ICs])
-#     object_FC_dict = Vector{OBJECT_AT}([pred for pred in object_FCs])
-#     construct_random_project_spec(M,object_IC_dict,object_FC_dict;
-#         kwargs...)
-# end
 function construct_random_project_spec(M::Int,s0::Vector{Int},sF::Vector{Int};
     kwargs...)
     object_ICs = Vector{OBJECT_AT}([OBJECT_AT(o,s) for (o,s) in enumerate(s0)])
