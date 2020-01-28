@@ -223,6 +223,10 @@ function initialize_toy_problem_4(;cost_function=SumOfMakeSpans,verbose=false)
             robot 1 does [2-2-8]
             robot 2 does [4-4-6]
 
+        As a result, the MILP solver will try switching assignment, see that the
+        cost of the switch is higher than the cost of the path planning for the
+        first assignment, and return with an optimality gap of -1.0.
+
         """
         print_toy_problem_specs(problem_description,vtx_grid,r0,s0,sF,project_spec)
     end

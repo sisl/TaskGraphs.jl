@@ -214,17 +214,20 @@ let
     let
 
         for (i, f) in enumerate([
-            # initialize_toy_problem_1,
+            initialize_toy_problem_1,
             initialize_toy_problem_2,
             initialize_toy_problem_3,
-            # initialize_toy_problem_4,
-            # initialize_toy_problem_5,
-            # initialize_toy_problem_6,
+            initialize_toy_problem_4,
+            initialize_toy_problem_5,
+            initialize_toy_problem_6,
             initialize_toy_problem_7,
-            # initialize_toy_problem_8,
+            initialize_toy_problem_8,
             ])
             for cost_model in [SumOfMakeSpans, MakeSpan]
                 let
+                    i = 2
+                    f = initialize_toy_problem_2
+                    cost_model = SumOfMakeSpans
                     # Compare against old method
                     project_spec, problem_spec, robot_ICs, assignments, env_graph = f(;verbose=false);
 
@@ -266,18 +269,18 @@ let
                     update_project_schedule!(schedule3,problem_spec,adj_matrix)
                     @test validate(schedule3)
 
-                    @test obj_val1 == obj_val2
-                    @test obj_val1 == obj_val3
                     # @show i, (obj_val1 == obj_val2), obj_val1, obj_val2
                     # @test schedule1 == schedule2
                     if !(obj_val1 == obj_val2)
                         print_project_schedule(schedule1,string("project_schedule1_",i))
-                        print_project_schedule(schedule2,model2,string("project_schedule2_",i))
+                        print_project_schedule(schedule2,string("project_schedule2_",i))
                     end
                     if !(obj_val1 == obj_val3)
                         print_project_schedule(schedule1,string("project_schedule1_",i))
-                        print_project_schedule(schedule3,model3,string("project_schedule3_",i))
+                        print_project_schedule(schedule3,string("project_schedule3_",i))
                     end
+                    @test obj_val1 == obj_val2
+                    @test obj_val1 == obj_val3
                 end
             end
         end
@@ -301,14 +304,14 @@ let
     let
 
         for (i, f) in enumerate([
-            initialize_toy_problem_1,
-            initialize_toy_problem_2,
-            initialize_toy_problem_3,
+            # initialize_toy_problem_1,
+            # initialize_toy_problem_2,
+            # initialize_toy_problem_3,
             initialize_toy_problem_4,
-            initialize_toy_problem_5,
-            initialize_toy_problem_6,
-            initialize_toy_problem_7,
-            initialize_toy_problem_8,
+            # initialize_toy_problem_5,
+            # initialize_toy_problem_6,
+            # initialize_toy_problem_7,
+            # initialize_toy_problem_8,
             ])
             for cost_model in [SumOfMakeSpans, MakeSpan]
                 let

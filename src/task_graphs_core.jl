@@ -1444,14 +1444,14 @@ function formulate_schedule_milp(project_schedule::ProjectSchedule,problem_spec:
     # set all initial times that are provided
     for (id,t) in t0_
         v = get_vtx(project_schedule, id)
-        @constraint(model, t0[v] == t)
+        @constraint(model, t0[v] >= t)
     end
     # Precedence constraints and duration constraints for existing nodes and edges
     for v in vertices(G)
         @constraint(model, tF[v] >= t0[v] + Δt[v])
         for v2 in outneighbors(G,v)
             @constraint(model, Xa[v,v2] == 1)
-            @constraint(model, t0[v2] >= tF[v])
+            @constraint(model, t0[v2] >= tF[v]) # NOTE DO NOT CHANGE TO EQUALITY CONSTRAINT
         end
     end
     # Identify required and eligible edges
@@ -1660,7 +1660,7 @@ function formulate_milp(milp_model::SparseAdjacencyMILP,project_schedule::Projec
         for v2 in outneighbors(G,v)
             Xa[v,v2] = @variable(model, binary=true) # TODO remove this (MUST UPDATE n_eligible_successors, etc. accordingly)
             @constraint(model, Xa[v,v2] == 1) #TODO this edge already exists--no reason to encode it as a decision variable
-            @constraint(model, t0[v2] == tF[v]) # TODO make this an equality constraint. May speed up the solver.
+            @constraint(model, t0[v2] >= tF[v]) # NOTE DO NOT CHANGE TO EQUALITY CONSTRAINT. Making this an equality constraint causes the solver to return a higher final value in some cases (e.g., toy problems 2,3,7). Why? Maybe the Big-M constraint forces it to bump up. I though the equality constraint might speed up the solver.
         end
     end
     # Identify required and eligible edges
