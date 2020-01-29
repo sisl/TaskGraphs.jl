@@ -172,7 +172,8 @@ struct ROBOT_AT <: AbstractPlanningPredicate
     r::RobotID
     x::StationID
 end
-ROBOT_AT(r::Int,x::Int) = ROBOT_AT(RobotID(r),StationID(x))
+ROBOT_AT(r::Int,args...) = ROBOT_AT(RobotID(r),args...)
+ROBOT_AT(r::RobotID,x::Int) = ROBOT_AT(r,StationID(x))
 get_robot_id(pred::ROBOT_AT) = pred.r
 get_location_id(pred::ROBOT_AT) = pred.x
 
@@ -227,7 +228,9 @@ get_robot_id(a::A) where {A<:AbstractRobotAction} = a.r
     x1::StationID	= StationID()
     x2::StationID	= StationID()
 end
-GO(r::Int,x1::Int,x2::Int) = GO(RobotID(r),StationID(x1),StationID(x2))
+GO(r::Int,args...) = GO(RobotID(r),args...)
+GO(r::RobotID,x1::Int,args...) = GO(r,StationID(x1),args...)
+GO(r::RobotID,x1::StationID,x2::Int) = GO(r,x1,StationID(x2))
 
 @with_kw struct CARRY <: AbstractRobotAction # carry object o to position x
     r::RobotID		= RobotID()
@@ -235,21 +238,28 @@ GO(r::Int,x1::Int,x2::Int) = GO(RobotID(r),StationID(x1),StationID(x2))
     x1::StationID	= StationID()
     x2::StationID	= StationID()
 end
-CARRY(r::Int,o::Int,x1::Int,x2::Int) = CARRY(RobotID(r),ObjectID(o),StationID(x1),StationID(x2))
+CARRY(r::Int,args...) = CARRY(RobotID(r),args...)
+CARRY(r::RobotID,o::Int,args...) 					= CARRY(r,ObjectID(o),args...)
+CARRY(r::RobotID,o::ObjectID,x1::Int,args) 			= CARRY(r,o,StationID(x1),args...)
+CARRY(r::RobotID,o::ObjectID,x1::StationID,x2::Int) = CARRY(r,o,x1,StationID(x2))
 
 @with_kw struct COLLECT <: AbstractRobotAction
     r::RobotID 		= RobotID()
     o::ObjectID 	= ObjectID()
     x::StationID 	= StationID()
 end
-COLLECT(r::Int,o::Int,x::Int) = COLLECT(RobotID(r),ObjectID(o),StationID(x))
+COLLECT(r::Int,args...) 				= COLLECT(RobotID(r),args...)
+COLLECT(r::RobotID,o::Int,args...) 		= COLLECT(r,ObjectID(o),args...)
+COLLECT(r::RobotID,o::ObjectID,x::Int) 	= COLLECT(r,o,StationID(x))
 
 @with_kw struct DEPOSIT <: AbstractRobotAction
     r::RobotID 		= RobotID()
     o::ObjectID 	= ObjectID()
     x::StationID 	= StationID()
 end
-DEPOSIT(r::Int,o::Int,x::Int) = DEPOSIT(RobotID(r),ObjectID(o),StationID(x))
+DEPOSIT(r::Int,args...) 				= DEPOSIT(RobotID(r),args...)
+DEPOSIT(r::RobotID,o::Int,) 			= DEPOSIT(r,ObjectID(o),args...)
+DEPOSIT(r::RobotID,o::ObjectID,x::Int) 	= DEPOSIT(r,o,StationID(x))
 
 get_initial_location_id(a::A) where {A<:Union{GO,CARRY}}        						= a.x1
 get_destination_location_id(a::A) where {A<:Union{GO,CARRY}}    						= a.x2
@@ -304,7 +314,7 @@ export
 	align_with_predecessor,
 	align_with_successor
 
-required_predecessors(node::GO)         = Dict((ROBOT_AT,DEPOSIT,TEAM_ACTION{DEPOSIT})=>1)
+required_predecessors(node::GO)         = Dict((GO,ROBOT_AT,DEPOSIT,TEAM_ACTION{DEPOSIT})=>1)
 required_successors(node::GO)           = Dict()
 required_predecessors(node::COLLECT)    = Dict(OBJECT_AT=>1,GO=>1)
 required_successors(node::COLLECT)      = Dict(CARRY=>1)
@@ -322,7 +332,7 @@ required_successors(node::ROBOT_AT)     = Dict(GO=>1)
 eligible_predecessors(node) 			= required_predecessors(node)
 eligible_successors(node) 				= required_successors(node)
 
-eligible_successors(node::GO)           = Dict((TEAM_ACTION{COLLECT},TEAM_ACTION{GO},COLLECT)=>1)
+eligible_successors(node::GO)           = Dict((GO,TEAM_ACTION{COLLECT},TEAM_ACTION{GO},COLLECT)=>1)
 eligible_predecessors(node::OBJECT_AT)  = Dict(Operation=>1)
 
 # required_predecessors(node::LARGE_OBJECT_AT)  = Dict()
@@ -352,14 +362,46 @@ first_valid(a,b) = is_valid(a) ? a : b
 
 align_with_predecessor(node,pred) 						= node
 align_with_predecessor(node::GO,pred::ROBOT_AT) 		= GO(first_valid(node.r,pred.r), first_valid(node.x1,pred.x), node.x2)
+align_with_predecessor(node::GO,pred::GO) 				= GO(first_valid(node.r,pred.r), first_valid(node.x1,pred.x2), node.x2)
 align_with_predecessor(node::GO,pred::DEPOSIT) 			= GO(first_valid(node.r,pred.r), first_valid(node.x1,pred.x), node.x2)
 align_with_predecessor(node::COLLECT,pred::OBJECT_AT) 	= COLLECT(node.r, first_valid(node.o,pred.o), first_valid(node.x,pred.x))
 align_with_predecessor(node::COLLECT,pred::GO) 			= COLLECT(first_valid(node.r,pred.r), node.o, first_valid(node.x,pred.x2))
 align_with_predecessor(node::CARRY,pred::COLLECT) 		= CARRY(first_valid(node.r,pred.r), first_valid(node.o,pred.o), first_valid(node.x1,pred.x), node.x2)
 align_with_predecessor(node::DEPOSIT,pred::CARRY)		= DEPOSIT(first_valid(node.r,pred.r), first_valid(node.o,pred.o), first_valid(node.x,pred.x2))
 
+function align_with_predecessor(node::TEAM_ACTION,pred)
+	for i in 1:length(node.instructions)
+		p = node.instructions[i]
+		if get_destination_location_id(pred) == get_initial_location_id(p)
+			node.instructions[i] = align_with_predecessor(p,pred)
+		end
+	end
+	node
+end
+function align_with_predecessor(node::AbstractRobotAction,pred::TEAM_ACTION)
+	for i in 1:length(pred.instructions)
+		p = pred.instructions[i]
+		if get_destination_location_id(p) == get_initial_location_id(node)
+			return align_with_predecessor(node,p)
+		end
+	end
+	return node
+end
+function align_with_predecessor(node::TEAM_ACTION,pred::TEAM_ACTION)
+	for i in 1:length(node.instructions)
+		p = node.instructions[i]
+		for pj in pred.instructions
+			if get_destination_location_id(pj) == get_initial_location_id(p)
+				node.instructions[i] = align_with_predecessor(p,pj)
+			end
+		end
+	end
+	node
+end
+
 align_with_successor(node,pred) 						= node
 align_with_successor(node::GO,succ::COLLECT) 			= GO(first_valid(node.r,succ.r), node.x1, first_valid(node.x2,succ.x))
+align_with_successor(node::GO,succ::GO) 				= GO(first_valid(node.r,succ.r), node.x1, first_valid(node.x2,succ.x1))
 
 
 

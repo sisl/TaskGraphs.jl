@@ -56,9 +56,9 @@ function initialize_toy_problem(r0,s0,sF,dist_function)
     object_FCs = Vector{OBJECT_AT}([OBJECT_AT(o,sF[o]) for o in 1:M]) # final conditions
     robot_ICs = Dict{Int,ROBOT_AT}(r => ROBOT_AT(r,r0[r]) for r in 1:N)
     for r in N+1:N+M
-        robot_ICs[r] = ROBOT_AT(r,sF[r-N])
+        robot_ICs[r] = ROBOT_AT(r,sF[r-N][1])
     end
-    Drs, Dss = cached_pickup_and_delivery_distances(r0,s0,sF,dist_function)
+    # Drs, Dss = cached_pickup_and_delivery_distances(r0,s0,sF,dist_function)
     project_spec = ProjectSpec( M=M, initial_conditions=object_ICs, final_conditions=object_FCs)
     project_spec, robot_ICs
 end

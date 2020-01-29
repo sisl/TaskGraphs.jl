@@ -304,14 +304,14 @@ let
     let
 
         for (i, f) in enumerate([
-            # initialize_toy_problem_1,
-            # initialize_toy_problem_2,
-            # initialize_toy_problem_3,
+            initialize_toy_problem_1,
+            initialize_toy_problem_2,
+            initialize_toy_problem_3,
             initialize_toy_problem_4,
-            # initialize_toy_problem_5,
-            # initialize_toy_problem_6,
-            # initialize_toy_problem_7,
-            # initialize_toy_problem_8,
+            initialize_toy_problem_5,
+            initialize_toy_problem_6,
+            initialize_toy_problem_7,
+            initialize_toy_problem_8,
             ])
             for cost_model in [SumOfMakeSpans, MakeSpan]
                 let
@@ -705,59 +705,20 @@ let
     s0 = [10,18,11,19]
     sF = [42,50,43,51]
 
-    project_spec, robot_ICs = TaskGraphs.initialize_toy_problem(r0,[s0[1]],[sF[1]],(v1,v2)->dist_matrix[v1,v2])
+    project_spec, robot_ICs = TaskGraphs.initialize_toy_problem(r0,[s0],[sF],(v1,v2)->dist_matrix[v1,v2])
     add_operation!(project_spec,construct_operation(project_spec,-1,[1],[],0))
 
     cost_function = SumOfMakeSpans
     project_spec, problem_spec, object_ICs, object_FCs, robot_ICs = construct_task_graphs_problem(
         project_spec,r0,s0,sF,dist_matrix;cost_function=cost_function)
 
-
-    # Construct dummy project schedule by hand
-    #
-    # OBJECT ---------\
-    # R1 --> GO ----> TEAM_COLLECT --> TEAM_CARRY --> TEAM_DEPOSIT
-    # R2 --> GO ------/ / /
-    # R3 --> GO -------/ /
-    # R4 --> GO --------/
-    #
-    project_schedule = ProjectSchedule()
-    prev_team_action_id = ActionID(-1)
-    team_action_id = ActionID(get_unique_action_id())
-    team_action = TEAM_ACTION( n = 4, instructions = map(i->COLLECT(i,1,s0[i]), 1:4))
-    add_to_schedule!(project_schedule, problem_spec, team_action, team_action_id)
-    add_edge!(project_schedule,prev_team_action_id,team_action_id)
-    for (r,x) in enumerate(r0)
-        robot_id = RobotID(r)
-        add_to_schedule!(project_schedule,problem_spec,ROBOT_AT(r,x),robot_id)
-        action_id = ActionID(get_unique_action_id())
-        add_to_schedule!(project_schedule,problem_spec,GO(r,x,s0[r]),action_id)
-        add_edge!(project_schedule,robot_id,action_id)
-        # prev_action_id = action_id
-        # action_id = ActionID(get_unique_action_id())
-        # add_to_schedule!(project_schedule,problem_spec,COLLECT(r,1,s0[r]),action_id)
-        # add_edge!(project_schedule,prev_action_id,action_id)
-        add_edge!(project_schedule,action_id,team_action_id)
-    end
-    prev_team_action_id = team_action_id
-    team_action_id = ActionID(get_unique_action_id())
-    team_action = TEAM_ACTION( n = 4, instructions = map(i->CARRY(i,1,s0[i],sF[i]), 1:4))
-    add_to_schedule!(project_schedule,problem_spec,team_action,team_action_id)
-    add_edge!(project_schedule,prev_team_action_id,team_action_id)
-    prev_team_action_id = team_action_id
-    team_action_id = ActionID(get_unique_action_id())
-    team_action = TEAM_ACTION( n = 4, instructions = map(i->DEPOSIT(i,1,sF[i]), 1:4))
-    add_to_schedule!(project_schedule,problem_spec,team_action,team_action_id)
-    add_edge!(project_schedule,prev_team_action_id,team_action_id)
-    operation_id = OperationID(get_unique_operation_id())
-    add_to_schedule!(project_schedule, construct_operation(project_spec,-1,[1],[],0), operation_id)
-    add_edge!(project_schedule,team_action_id,operation_id)
-    for (r,x) in enumerate(sF)
-        action_id = ActionID(get_unique_action_id())
-        add_to_schedule!(project_schedule,problem_spec,GO(r,x,-1),action_id)
-        add_edge!(project_schedule,team_action_id,action_id)
-    end
+    project_schedule = construct_partial_project_schedule(project_spec, problem_spec, map(i->robot_ICs[i], 1:problem_spec.N))
     set_leaf_operation_nodes!(project_schedule)
+    model = formulate_milp(SparseAdjacencyMILP(),project_schedule,problem_spec)
+    optimize!(model)
+    @test termination_status(model) == MOI.OPTIMAL
+    adj_mat = get_assignment_matrix(model)
+    update_project_schedule!(project_schedule,problem_spec,adj_mat)
 
     print_project_schedule(project_schedule,"team_schedule")
 

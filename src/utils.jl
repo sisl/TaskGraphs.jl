@@ -477,7 +477,7 @@ title_string(a::COLLECT,verbose=true)   = verbose ? string("collect\n",get_id(ge
 title_string(a::CARRY,verbose=true)     = verbose ? string("carry\n",get_id(get_robot_id(a)),",",get_id(get_object_id(a)),",",get_id(get_destination_location_id(a))) : "carry";
 title_string(a::DEPOSIT,verbose=true)   = verbose ? string("deposit\n",get_id(get_robot_id(a)),",",get_id(get_object_id(a)),",",get_id(get_location_id(a))) : "deposit";
 title_string(op::Operation,verbose=true)= verbose ? string("op",get_id(get_operation_id(op))) : "op";
-title_string(op::TEAM_ACTION{A},verbose=true) where {A} = verbose ? string("team", A) : string("team", A)
+title_string(a::TEAM_ACTION{A},verbose=true) where {A} = verbose ? string("team", A, "\n","r: (",map(i->string(get_id(get_robot_id(i)), ","), a.instructions)...,")") : string("team", A)
 
 function get_display_metagraph(project_schedule::ProjectSchedule;
     verbose=true,

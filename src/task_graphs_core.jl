@@ -780,7 +780,7 @@ function add_headless_delivery_task!(
     add_to_schedule!(schedule, problem_spec, GO(robot_id, dropoff_station_id,StationID(-1)), action_id)
     add_edge!(schedule, prev_action_id, action_id)
 
-    action_id
+    return
 end
 function add_headless_delivery_task!(
         schedule::S,
@@ -795,42 +795,49 @@ function add_headless_delivery_task!(
     @assert length(pickup_station_ids) == length(dropoff_station_ids)
     n = length(pickup_station_ids)
 
-    action_ids = map(id->ActionID(get_unique_action_id()), 1:n)
-    for (action_id, station_id) in zip(action_ids, pickup_station_ids)
-        add_to_schedule!(schedule, problem_spec, COLLECT(o=object_id, x=station_id), action_id)
-        add_edge!(schedule, ObjectID(object_id), action_id)
-    end
-
-    # Collaborative CARRY
-    action_id = ActionID(get_unique_action_id())
-    action = TEAM_ACTION(
+    # COLLABORATIVE COLLECT
+    prev_team_action_id = ActionID(-1)
+    team_action_id = ActionID(get_unique_action_id())
+    team_action = TEAM_ACTION(
         n = n,
-        instructions = [
-            CARRY(o=object_id, x1=id1, x2=id2) for (id1,id2) in zip(pickup_station_ids,dropoff_station_ids)
-        ]
-    )
-    add_to_schedule!(schedule, problem_spec, action, action_id)
-    for prev_action_id in action_ids
-        add_edge!(schedule, prev_action_id, action_id)
+        instructions = map(x->COLLECT(robot_id, object_id, x), pickup_station_ids)
+        )
+    add_to_schedule!(schedule, problem_spec, team_action, team_action_id)
+    # Add Edge from object
+    add_edge!(schedule,object_id,team_action_id)
+    # Add GO inputs to TEAM_COLLECT
+    for x in pickup_station_ids
+        action_id = ActionID(get_unique_action_id())
+        add_to_schedule!(schedule,problem_spec,GO(robot_id,x,x),action_id)
+        add_edge!(schedule,action_id,team_action_id)
     end
-    # Collaborative DEPOSIT
-    prev_action_id = action_id
-    action_id = ActionID(get_unique_action_id())
-    action = TEAM_ACTION(
+    # Add TEAM_CARRY
+    prev_team_action_id = team_action_id
+    team_action_id = ActionID(get_unique_action_id())
+    team_action = TEAM_ACTION(
         n = n,
-        instructions = map(id->DEPOSIT(robot_id, object_id, id), dropoff_station_ids)
-    )
-    add_to_schedule!(schedule, problem_spec, action, action_id)
-    add_edge!(schedule, prev_action_id, action_id)
-    add_edge!(schedule, action_id, operation_id)
-    # individual GO nodes
-    prev_action_id = action_id
-    action_ids = map(id->ActionID(get_unique_action_id()), 1:n)
-    for (action_id, station_id) in zip(action_ids, dropoff_station_ids)
-        add_to_schedule!(schedule, problem_spec, GO(r=robot_id, x1=station_id), action_id)
-        add_edge!(schedule, prev_action_id, action_id)
+        instructions = [CARRY(robot_id, object_id, x1, x2) for (x1,x2) in zip(pickup_station_ids,dropoff_station_ids)]
+        )
+    add_to_schedule!(schedule, problem_spec, team_action, team_action_id)
+    add_edge!(schedule,prev_team_action_id,team_action_id)
+    # TEAM_DEPOSIT
+    prev_team_action_id = team_action_id
+    team_action_id = ActionID(get_unique_action_id())
+    team_action = TEAM_ACTION(
+        n = n,
+        instructions = map(x->DEPOSIT(robot_id, object_id, x), dropoff_station_ids)
+        )
+    add_to_schedule!(schedule, problem_spec, team_action, team_action_id)
+    add_edge!(schedule,prev_team_action_id,team_action_id)
+    # Edge to Operation
+    add_edge!(schedule,team_action_id,operation_id)
+    # Individual GO nodes
+    for x in dropoff_station_ids
+        action_id = ActionID(get_unique_action_id())
+        add_to_schedule!(schedule,problem_spec,GO(robot_id,x,-1),action_id)
+        add_edge!(schedule, team_action_id, action_id)
     end
-    action_ids
+    return
 end
 function add_headless_delivery_task!(
         schedule::ProjectSchedule,
