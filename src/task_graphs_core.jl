@@ -1049,7 +1049,7 @@ function construct_partial_project_schedule(
             object_fc           = object_FCs[object_id]
             dropoff_station_ids = get_location_ids(object_fc)
             # TODO Handle collaborative tasks
-            if object_ic.n > 1 # COLLABORATIVE TRANSPORT
+            if length(pickup_station_ids) > 1 # COLLABORATIVE TRANSPORT
                 add_headless_delivery_task!(project_schedule,problem_spec,
                     ObjectID(object_id),operation_id,pickup_station_ids,dropoff_station_ids)
             else # SINGLE AGENT TRANSPORT
@@ -1315,7 +1315,7 @@ end
     Outputs:
         `model` - the optimization model
 """
-function formulate_optimization_problem(G,Drs,Dss,Δt,Δt_collect,Δt_deliver,to0_,tr0_,root_nodes,weights,s0,sF,nR,optimizer;
+function formulate_optimization_problem(G,D,Drs,Dss,Δt,Δt_collect,Δt_deliver,to0_,tr0_,root_nodes,weights,s0,sF,nR,optimizer;
     TimeLimit=100,
     OutputFlag=0,
     Presolve = -1, # automatic setting (-1), off (0), conservative (1), or aggressive (2)
@@ -1354,7 +1354,7 @@ function formulate_optimization_problem(G,Drs,Dss,Δt,Δt_collect,Δt_deliver,to
         @constraint(model, X[i,j] == 1)
     end
     # constraints
-    Mm = sum(Drs) + sum(Dss) # for big-M constraints
+    Mm = sum(D) # sum(Drs) + sum(Dss) # for big-M constraints
     for j in 1:M
         # constraint on task start time
         if !is_root_node(G,j)
@@ -1446,6 +1446,7 @@ function formulate_optimization_problem(spec::T,optimizer;
     ) where {T<:ProblemSpec}
     formulate_optimization_problem(
         spec.graph,
+        spec.D,
         spec.Drs,
         spec.Dss,
         spec.Δt,
@@ -1467,6 +1468,67 @@ function formulate_milp(milp_model::AssignmentMILP,project_schedule::ProjectSche
     optimizer=Gurobi.Optimizer,
     kwargs...)
     formulate_optimization_problem(problem_spec,optimizer;kwargs...)
+end
+
+export
+    preprocess_project_schedule
+
+"""
+    preprocess_project_schedule
+"""
+function preprocess_project_schedule(project_schedule)
+    G = get_graph(project_schedule);
+    # Identify required and eligible edges
+    missing_successors      = Dict{Int,Dict}()
+    missing_predecessors    = Dict{Int,Dict}()
+    n_eligible_successors   = zeros(Int,nv(G))
+    n_eligible_predecessors = zeros(Int,nv(G))
+    n_required_successors   = zeros(Int,nv(G))
+    n_required_predecessors = zeros(Int,nv(G))
+    for v in vertices(G)
+        node = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v))
+        for (key,val) in required_successors(node)
+            n_required_successors[v] += val
+        end
+        for (key,val) in required_predecessors(node)
+            n_required_predecessors[v] += val
+        end
+        for (key,val) in eligible_successors(node)
+            n_eligible_successors[v] += val
+        end
+        for (key,val) in eligible_predecessors(node)
+            n_eligible_predecessors[v] += val
+        end
+        missing_successors[v] = eligible_successors(node)
+        for v2 in outneighbors(G,v)
+            id2 = get_vtx_id(project_schedule, v2)
+            node2 = get_node_from_id(project_schedule, id2)
+            for key in collect(keys(missing_successors[v]))
+                if matches_template(key,typeof(node2))
+                    missing_successors[v][key] -= 1
+                    break
+                end
+            end
+        end
+        missing_predecessors[v] = eligible_predecessors(node)
+        for v2 in inneighbors(G,v)
+            id2 = get_vtx_id(project_schedule, v2)
+            node2 = get_node_from_id(project_schedule, id2)
+            for key in collect(keys(missing_predecessors[v]))
+                if matches_template(key,typeof(node2))
+                    missing_predecessors[v][key] -= 1
+                    break
+                end
+            end
+        end
+    end
+    @assert(!any(n_eligible_predecessors .< n_required_predecessors))
+    @assert(!any(n_eligible_successors .< n_required_successors))
+
+    upstream_vertices = map(v->[v, map(e->e.dst,collect(edges(bfs_tree(G,v;dir=:in))))...], vertices(G))
+    non_upstream_vertices = map(v->collect(setdiff(collect(vertices(G)),upstream_vertices[v])), vertices(G))
+
+    return missing_successors, missing_predecessors, n_eligible_successors, n_eligible_predecessors, n_required_successors, n_required_predecessors, upstream_vertices, non_upstream_vertices
 end
 
 """
@@ -1692,15 +1754,18 @@ function formulate_milp(milp_model::SparseAdjacencyMILP,project_schedule::Projec
         Mm = 10000, # for big M constraints
         cost_model = SumOfMakeSpans,
     )
-    G = get_graph(project_schedule);
-    assignments = [];
-    Δt = map(v->get_path_spec(project_schedule, v).min_path_duration, vertices(G))
 
     model = Model(with_optimizer(optimizer,
         TimeLimit=TimeLimit,
         OutputFlag=OutputFlag,
         Presolve=Presolve
         ));
+
+    G = get_graph(project_schedule);
+    (missing_successors, missing_predecessors, n_eligible_successors, n_eligible_predecessors,
+        n_required_successors, n_required_predecessors, upstream_vertices, non_upstream_vertices) = preprocess_project_schedule(project_schedule)
+    Δt = map(v->get_path_spec(project_schedule, v).min_path_duration, vertices(G))
+
     @variable(model, t0[1:nv(G)] >= 0.0); # initial times for all nodes
     @variable(model, tF[1:nv(G)] >= 0.0); # final times for all nodes
 
@@ -1722,82 +1787,33 @@ function formulate_milp(milp_model::SparseAdjacencyMILP,project_schedule::Projec
             @constraint(model, t0[v2] >= tF[v]) # NOTE DO NOT CHANGE TO EQUALITY CONSTRAINT. Making this an equality constraint causes the solver to return a higher final value in some cases (e.g., toy problems 2,3,7). Why? Maybe the Big-M constraint forces it to bump up. I though the equality constraint might speed up the solver.
         end
     end
-    # Identify required and eligible edges
-    missing_successors      = Dict{Int,Dict}()
-    missing_predecessors    = Dict{Int,Dict}()
-    n_eligible_successors   = zeros(Int,nv(G))
-    n_eligible_predecessors = zeros(Int,nv(G))
-    n_required_successors   = zeros(Int,nv(G))
-    n_required_predecessors = zeros(Int,nv(G))
-    for v in vertices(G)
-        node = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v))
-        for (key,val) in required_successors(node)
-            n_required_successors[v] += val
-        end
-        for (key,val) in required_predecessors(node)
-            n_required_predecessors[v] += val
-        end
-        for (key,val) in eligible_successors(node)
-            n_eligible_successors[v] += val
-        end
-        for (key,val) in eligible_predecessors(node)
-            n_eligible_predecessors[v] += val
-        end
-        missing_successors[v] = eligible_successors(node)
-        for v2 in outneighbors(G,v)
-            id2 = get_vtx_id(project_schedule, v2)
-            node2 = get_node_from_id(project_schedule, id2)
-            for key in collect(keys(missing_successors[v]))
-                if matches_template(key,typeof(node2))
-                    missing_successors[v][key] -= 1
-                    break
-                end
-            end
-        end
-        missing_predecessors[v] = eligible_predecessors(node)
-        for v2 in inneighbors(G,v)
-            id2 = get_vtx_id(project_schedule, v2)
-            node2 = get_node_from_id(project_schedule, id2)
-            for key in collect(keys(missing_predecessors[v]))
-                if matches_template(key,typeof(node2))
-                    missing_predecessors[v][key] -= 1
-                    break
-                end
-            end
-        end
-    end
-    @assert(!any(n_eligible_predecessors .< n_required_predecessors))
-    @assert(!any(n_eligible_successors .< n_required_successors))
 
-    upstream_vertices = map(v->[v, map(e->e.dst,collect(edges(bfs_tree(G,v;dir=:in))))...], vertices(G))
-    for v in vertices(G)
-        for v2 in upstream_vertices[v]
-            # @constraint(model, Xa[v,v2] == 0) #TODO this variable is not needed
-        end
-    end
-    non_upstream_vertices = map(v->collect(setdiff(collect(vertices(G)),upstream_vertices[v])), vertices(G))
     # Big M constraints
     for v in vertices(G)
         node = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v))
         potential_match = false
-        for v2 in non_upstream_vertices[v] # for v2 in vertices(G)
-            node2 = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v2))
-            for (template, val) in missing_successors[v]
-                if !matches_template(template, typeof(node2)) # possible to add an edge
-                    continue
-                end
-                for (template2, val2) in missing_predecessors[v2]
-                    if !matches_template(template2, typeof(node)) # possible to add an edge
-                        continue
-                    end
-                    if (val > 0 && val2 > 0)
-                        potential_match = true
-                        new_node = align_with_successor(node,node2)
-                        dt_min = generate_path_spec(project_schedule,problem_spec,new_node).min_path_duration
-                        Xa[v,v2] = @variable(model, binary=true) # initialize a new binary variable in the sparse adjacency matrix
-                        @constraint(model, tF[v] - (t0[v] + dt_min) >= -Mm*(1 - Xa[v,v2]))
-                        @constraint(model, t0[v2] - tF[v] >= -Mm*(1 - Xa[v,v2]))
-                        break
+        if outdegree(G,v) < n_eligible_successors[v] # NOTE: Trying this out to save time on formulation
+            for v2 in non_upstream_vertices[v] # for v2 in vertices(G)
+                if indegree(G,v2) < n_eligible_predecessors[v2]
+                    node2 = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v2))
+                    for (template, val) in missing_successors[v]
+                        if !matches_template(template, typeof(node2)) # possible to add an edge
+                            continue
+                        end
+                        for (template2, val2) in missing_predecessors[v2]
+                            if !matches_template(template2, typeof(node)) # possible to add an edge
+                                continue
+                            end
+                            if (val > 0 && val2 > 0)
+                                potential_match = true
+                                new_node = align_with_successor(node,node2)
+                                dt_min = generate_path_spec(project_schedule,problem_spec,new_node).min_path_duration
+                                Xa[v,v2] = @variable(model, binary=true) # initialize a new binary variable in the sparse adjacency matrix
+                                @constraint(model, tF[v] - (t0[v] + dt_min) >= -Mm*(1 - Xa[v,v2]))
+                                @constraint(model, t0[v2] - tF[v] >= -Mm*(1 - Xa[v,v2]))
+                                break
+                            end
+                        end
                     end
                 end
             end
@@ -1828,45 +1844,27 @@ function formulate_milp(milp_model::SparseAdjacencyMILP,project_schedule::Projec
     # j must occur before the operation for task j2. The opposite is true for y == [0,1].
     # We use the big M method here as well to tightly enforce the binary constraints.
     # job_shop_variables = Dict{Tuple{Int,Int},JuMP.VariableRef}();
-
     Xj = SparseMatrixCSC{VariableRef,Int}(nv(G),nv(G),ones(Int,nv(G)+1),Int[],VariableRef[])
-    # @variable(model, Xj[1:nv(G),1:nv(G)], binary = true); # job shop adjacency matrix
-    # @constraint(model, Xj .+ Xj' .<= 1) # no bidirectional or self edges
     for v in 1:nv(G)
         node = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v))
-        for v2 in v+1:nv(G)
-            node2 = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v2))
-            common_resources = intersect(resources_reserved(node),resources_reserved(node2))
-            if length(common_resources) > 0
-                # @show common_resources
-                # tmax = @variable(model)
-                # tmin = @variable(model)
-                # Big M constraints
-                Xj[v,v2] = @variable(model, binary=true)
-                Xj[v2,v] = @variable(model, binary=true)
-                @constraint(model, Xj[v,v2] + Xj[v2,v] == 1)
-                if !(v2 in upstream_vertices[v])
+        for v2 in non_upstream_vertices[v] #v+1:nv(G)
+            if v2 > v
+                node2 = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v2))
+                common_resources = intersect(resources_reserved(node),resources_reserved(node2))
+                if length(common_resources) > 0
+                    # @show common_resources
+                    # Big M constraints
+                    Xj[v,v2] = @variable(model, binary=true) #
+                    Xj[v2,v] = @variable(model, binary=true) # need both directions to have a valid adjacency matrix
+                    @constraint(model, Xj[v,v2] + Xj[v2,v] == 1)
                     @constraint(model, t0[v2] - tF[v] >= -Mm*(1 - Xj[v,v2]))
-                end
-                if !(v in upstream_vertices[v2])
                     @constraint(model, t0[v] - tF[v2] >= -Mm*(1 - Xj[v2,v]))
                 end
-            # else
-            #     @constraint(model, Xj[v,v2] == 0)
-            #     @constraint(model, Xj[v2,v] == 0)
             end
-        end
-    end
-    for i in 1:nv(G)
-        for j in i:nv(G)
-            # prevent self-edges and cycles
-            @constraint(model, Xj[i,j] + Xj[j,i] <= 1)
         end
     end
 
     # Full adjacency matrix
-    # @variable(model, X[1:nv(G),1:nv(G)]); # Adjacency Matrix
-    # @constraint(model, X .== Xa .+ Xj)
     @expression(model, X, Xa .+ Xj) # Make X an expression rather than a variable
 
     # Formulate Objective

@@ -54,6 +54,35 @@ function validate(project_schedule::ProjectSchedule)
     end
     return true
 end
+function validate(project_schedule::ProjectSchedule,paths::Vector{Vector{Int}},t0::Vector{Int},tF::Vector{Int})
+    G = get_graph(project_schedule)
+    for v in vertices(G)
+        node = get_node_from_vtx(project_schedule, v)
+        path_spec = get_path_spec(project_schedule, v)
+        agent_id = path_spec.agent_id
+        if agent_id != -1
+            path = paths[agent_id]
+            start_vtx = path_spec.start_vtx
+            final_vtx = path_spec.final_vtx
+            try
+                if start_vtx != -1
+                    @assert(path[t0[v] + 1] == start_vtx, string("node: ",typeof(node), ", vtx: ",start_vtx, ", t+1: ",t0[v]+1,", path: ", path))
+                end
+                if final_vtx != -1
+                    @assert(path[tF[v] + 1] == final_vtx, string("node: ",typeof(node), ", vtx: ",start_vtx, ", t+1: ",t0[v]+1,", path: ", path))
+                end
+            catch e
+                if typeof(e) <: AssertionError
+                    print(e.msg)
+                else
+                    throw(e)
+                end
+                return false
+            end
+        end
+    end
+    return true
+end
 
 export
     remap_object_id,
@@ -279,7 +308,12 @@ export
             possible.
 """
 function construct_random_project_spec(M::Int,object_ICs::Vector{OBJECT_AT},object_FCs::Vector{OBJECT_AT};
-    max_parents=1,depth_bias=1.0,Δt_min=0,Δt_max=0)
+        max_parents=1,
+        depth_bias=1.0,
+        Δt_min=0,
+        Δt_max=0,
+        zone_map=Dict{Int,Vector{Int}}(), # maps vtx to vector of vtxs for collaborative tasks
+    )
     project_spec = ProjectSpec(
         M=M,
         initial_conditions=object_ICs,
@@ -324,8 +358,8 @@ function construct_random_project_spec(M::Int,object_ICs::Vector{OBJECT_AT},obje
     add_operation!(project_spec,construct_operation(project_spec, -1, [final_idx], [], Δt))
     project_spec
 end
-function construct_random_project_spec(M::Int,s0::Vector{Int},sF::Vector{Int};
-    kwargs...)
+# function construct_random_project_spec(M::Int,s0::Vector{Int},sF::Vector{Int};
+function construct_random_project_spec(M::Int,s0::Vector{V},sF::Vector{V};kwargs...) where {V<:Union{Int,Vector{Int}}}
     object_ICs = Vector{OBJECT_AT}([OBJECT_AT(o,s) for (o,s) in enumerate(s0)])
     object_FCs = Vector{OBJECT_AT}([OBJECT_AT(o,s) for (o,s) in enumerate(sF)])
     construct_random_project_spec(M,object_ICs,object_FCs;
@@ -491,7 +525,6 @@ function Base.:(==)(o1::OBJECT_AT,o2::OBJECT_AT)
     try
         @assert(o1.o == o2.o)
         @assert(o1.x == o2.x)
-        @assert(o1.n == o2.n)
     catch e
         println(e.msg)
         # throw(e)

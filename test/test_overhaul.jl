@@ -185,6 +185,8 @@ let
                             )
                         push!(costs, cost[1])
                         @test validate(env.schedule)
+                        @show convert_to_vertex_lists(solution)
+                        @test validate(env.schedule, convert_to_vertex_lists(solution), env.cache.t0, env.cache.tF)
                         @test cost[1] != Inf
                     end
                     @test all(costs .== costs[1])
@@ -518,5 +520,20 @@ let
     low_level_search!(solver, pc_mapf.env, pc_mapf.mapf,root_node)
 
     @show convert_to_vertex_lists(root_node.solution)
+end
+let
+    # construct random collaborative transport tasks
+    env_id = 2
+    env_file = joinpath(ENVIRONMENT_DIR,string("env_",env_id,".toml"))
+    factory_env = read_env(env_file)
+    env_graph = factory_env
+    dist_matrix = get_dist_matrix(env_graph)
+    N = 5
+    M = 10
+    r0,s0,sF = get_random_problem_instantiation(N,M,get_pickup_zones(factory_env),get_dropoff_zones(factory_env),
+            get_free_zones(factory_env))
+
+    project_spec = construct_random_project_spec(M,s0,sF)
+    problem_def = SimpleProblemDef(project_spec,r0,s0,sF)
 
 end

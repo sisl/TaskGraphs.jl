@@ -582,13 +582,13 @@ function plan_next_path!(solver::S, env::E, mapf::M, node::N;
         ) where {S<:PC_TAPF_Solver,E<:SearchEnv,M<:AbstractMAPF,N<:ConstraintTreeNode}
 
     enter_a_star!(solver)
-
+    valid_flag = true
     if length(env.cache.node_queue) > 0
         v = dequeue!(env.cache.node_queue)
         node_id = get_vtx_id(env.schedule,v)
         schedule_node = get_node_from_id(env.schedule,node_id)
         if get_path_spec(env.schedule, v).plan_path == true
-            plan_path!(solver,env,mapf,node,schedule_node,v;
+            valid_flag = plan_path!(solver,env,mapf,node,schedule_node,v;
                 heuristic=heuristic,path_finder=path_finder)
         else
             # dummy path
@@ -601,7 +601,7 @@ function plan_next_path!(solver::S, env::E, mapf::M, node::N;
         end
     end
     exit_a_star!(solver)
-    return true
+    return valid_flag
 end
 
 """

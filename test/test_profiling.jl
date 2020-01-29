@@ -46,13 +46,13 @@ let
         :full_solver
         ]
     results_dirs = [
-        joinpath(EXPERIMENT_DIR,"assignment_solver/results")
-        joinpath(EXPERIMENT_DIR,"adjacency_solver/results")
+        # joinpath(EXPERIMENT_DIR,"assignment_solver/results")
+        # joinpath(EXPERIMENT_DIR,"adjacency_solver/results")
         joinpath(EXPERIMENT_DIR,"sparse_adjacency_solver/results")
     ]
     milp_models = [
-        AssignmentMILP(),
-        AdjacencyMILP(),
+        # AssignmentMILP(),
+        # AdjacencyMILP(),
         SparseAdjacencyMILP()
     ]
     for (milp_model, results_dir) in zip(milp_models, results_dirs)

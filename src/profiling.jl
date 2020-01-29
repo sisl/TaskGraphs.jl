@@ -120,13 +120,13 @@ function init_data_frame(;
 end
 function add_config_row!(df,toml_dict,problem_id)
     push!(df, Dict(
-        :problem_id => problem_id,
-        :min_process_time => toml_dict["min_process_time"],
-        :max_process_time => toml_dict["max_process_time"],
-        :max_parents => toml_dict["max_parents"],
-        :M => toml_dict["M"],
-        :N => toml_dict["N"],
-        :depth_bias => toml_dict["depth_bias"]
+        :problem_id         => problem_id,
+        :min_process_time   => toml_dict["min_process_time"],
+        :max_process_time   => toml_dict["max_process_time"],
+        :max_parents        => toml_dict["max_parents"],
+        :M                  => toml_dict["M"],
+        :N                  => toml_dict["N"],
+        :depth_bias         => toml_dict["depth_bias"]
     ))
 end
 function add_assignment_only_row!(df,toml_dict,problem_id)
@@ -148,10 +148,10 @@ function add_low_level_search_row!(df,toml_dict,problem_id)
 end
 function add_full_solver_row!(df,toml_dict,problem_id)
     push!(df, Dict(
-        :problem_id     => problem_id,
-        :time           => toml_dict["time"],
-        :optimal           => toml_dict["optimal"],
-        :cost           => Int(toml_dict["cost"][1]),
+        :problem_id                 => problem_id,
+        :time                       => toml_dict["time"],
+        :optimal                    => toml_dict["optimal"],
+        :cost                       => Int(toml_dict["cost"][1]),
         :total_assignment_iterations=> toml_dict["total_assignment_iterations"],
         :total_CBS_iterations       => toml_dict["total_CBS_iterations"],
         :total_A_star_iterations    => toml_dict["total_A_star_iterations"],
@@ -212,15 +212,11 @@ function profile_task_assignment(problem_def::SimpleProblemDef,env_graph,dist_ma
     project_schedule = construct_partial_project_schedule(project_spec, problem_spec, robot_ICs)
     model = formulate_milp(milp_model,project_schedule,problem_spec)
 
-    # model = formulate_optimization_problem(problem_spec,Gurobi.Optimizer;kwargs...);
     retval, elapsed_time, byte_ct, gc_time, mem_ct = @timed optimize!(model)
 
     optimal = (termination_status(model) == MathOptInterface.OPTIMAL);
-    # assignment_matrix = Matrix{Int}(round.(value.(model[:x])));
     assignment_matrix = get_assignment_matrix(model)
     cost = Int(round(value(objective_function(model))))
-    # cost = maximum(Int.(round.(value.(model[:tof]))));
-    # assignments = map(j->findfirst(assignment_matrix[:,j] .== 1),1:problem_spec.M);
 
     results_dict = TOML.parse(sparse(assignment_matrix))
     results_dict["time"] = elapsed_time
@@ -412,7 +408,7 @@ function run_profiling(MODE=:nothing;
                                     results_dict = profile_full_solver(problem_def,env_graph,dist_matrix;
                                         milp_model=milp_model,primary_objective=primary_objective,TimeLimit=TimeLimit,OutputFlag=OutputFlag,Presolve=Presolve)
                                 end
-                                println("PROFILER: Solved problem ",problem_id," in ",results_dict["time"]," seconds! MODE = ",string(MODE), " --- MILP = ",typeof(milp_model), "\n\n")
+                                println("PROFILER: ",typeof(milp_model)," --- ",string(MODE), " --- Solved problem ",problem_id," in ",results_dict["time"]," seconds! \n\n")
                                 # print the results
                                 open(results_filename, "w") do io
                                     TOML.print(io, results_dict)
