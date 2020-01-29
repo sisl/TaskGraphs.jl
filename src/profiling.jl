@@ -7,6 +7,7 @@ using Gurobi
 using TOML
 using Random
 using DataFrames
+using SparseArrays
 
 using GraphUtils
 using CRCBS
@@ -31,8 +32,36 @@ export
     profile_low_level_search,
     profile_full_solver,
     read_assignment,
+    read_sparse_matrix,
     run_profiling
 
+
+function read_assignment(toml_dict::Dict)
+    assignment = toml_dict["assignment"]
+end
+function read_assignment(io)
+    read_assignment(TOML.parsefile(io))
+end
+function TOML.parse(mat::SparseMatrixCSC{Int64,Int64})
+    toml_dict = Dict(
+        "edge_list" => map(idx->[idx[1],idx[2]], findall(!iszero, mat)),
+        "size_i" => size(mat,1),
+        "size_j" => size(mat,2)
+        )
+end
+function read_sparse_matrix(toml_dict::Dict)
+    edge_list   = toml_dict["edge_list"]
+    size_i      = toml_dict["size_i"]
+    size_j      = toml_dict["size_j"]
+    mat = sparse(zeros(size_i,size_j))
+    for e in edge_list
+        mat[e[1],e[2]] = 1
+    end
+    mat
+end
+function read_sparse_matrix(io)
+    read_sparse_matrix(TOML.parsefile(io))
+end
 
 function init_data_frame(;
         mode = :nothing,
@@ -174,11 +203,16 @@ function construct_result_dataframes(problem_dir,results_dir,N_problems)
     )
 end
 
-function profile_task_assignment(problem_def::SimpleProblemDef,env_graph,dist_matrix;kwargs...)
+function profile_task_assignment(problem_def::SimpleProblemDef,env_graph,dist_matrix;
+    milp_model=AssignmentMILP(),kwargs...)
     project_spec, r0, s0, sF = problem_def.project_spec,problem_def.r0,problem_def.s0,problem_def.sF
     project_spec, problem_spec, object_ICs, object_FCs, robot_ICs = construct_task_graphs_problem(
             project_spec, r0, s0, sF, dist_matrix);
-    model = formulate_optimization_problem(problem_spec,Gurobi.Optimizer;kwargs...);
+
+    project_schedule = construct_partial_project_schedule(project_spec, problem_spec, robot_ICs)
+    model = formulate_milp(milp_model,project_schedule,problem_spec)
+
+    # model = formulate_optimization_problem(problem_spec,Gurobi.Optimizer;kwargs...);
     retval, elapsed_time, byte_ct, gc_time, mem_ct = @timed optimize!(model)
 
     optimal = (termination_status(model) == MathOptInterface.OPTIMAL);
@@ -186,22 +220,26 @@ function profile_task_assignment(problem_def::SimpleProblemDef,env_graph,dist_ma
     assignment_matrix = get_assignment_matrix(model)
     cost = Int(round(value(objective_function(model))))
     # cost = maximum(Int.(round.(value.(model[:tof]))));
-    assignments = map(j->findfirst(assignment_matrix[:,j] .== 1),1:problem_spec.M);
+    # assignments = map(j->findfirst(assignment_matrix[:,j] .== 1),1:problem_spec.M);
 
-    results_dict = Dict()
+    results_dict = TOML.parse(sparse(assignment_matrix))
     results_dict["time"] = elapsed_time
-    results_dict["assignment"] = assignments
+    # results_dict["assignment"] = assignments
     results_dict["optimal"] = optimal
     results_dict["cost"] = cost
     results_dict
 end
-function profile_low_level_search_and_repair(problem_def::SimpleProblemDef,env_graph,dist_matrix,assignments::Vector{Int})
+function profile_low_level_search_and_repair(problem_def::SimpleProblemDef,env_graph,dist_matrix,adj_matrix;
+    milp_model=AssignmentMILP())
     project_spec, r0, s0, sF = problem_def.project_spec,problem_def.r0,problem_def.s0,problem_def.sF
     project_spec, problem_spec, object_ICs, object_FCs, robot_ICs = construct_task_graphs_problem(
             project_spec, r0, s0, sF, dist_matrix);
     # Solve the problem
     solver = PC_TAPF_Solver(verbosity=0,LIMIT_A_star_iterations=10*nv(env_graph));
-    env, mapf = construct_search_env(project_spec, problem_spec, robot_ICs, assignments, env_graph);
+    project_schedule = construct_partial_project_schedule(project_spec,problem_spec,map(i->robot_ICs[i], 1:problem_spec.N))
+    @assert update_project_schedule!(milp_model,project_schedule, problem_spec, adj_matrix)
+    env, mapf = construct_search_env(project_schedule, problem_spec, env_graph;
+        primary_objective=primary_objective); # TODO pass in t0_ here (maybe get it straight from model?)
     pc_mapf = PC_MAPF(env,mapf);
     node = initialize_root_node(pc_mapf)
     valid_flag, elapsed_time, byte_ct, gc_time, mem_ct = @timed low_level_search!(solver, pc_mapf, node)
@@ -217,13 +255,17 @@ function profile_low_level_search_and_repair(problem_def::SimpleProblemDef,env_g
     results_dict["num_conflicts"] = count_conflicts(detect_conflicts(node.solution))
     results_dict
 end
-function profile_low_level_search(problem_def::SimpleProblemDef,env_graph,dist_matrix,assignments::Vector{Int})
+function profile_low_level_search(problem_def::SimpleProblemDef,env_graph,dist_matrix,adj_matrix;
+    milp_model=AssignmentMILP())
     project_spec, r0, s0, sF = problem_def.project_spec,problem_def.r0,problem_def.s0,problem_def.sF
     project_spec, problem_spec, object_ICs, object_FCs, robot_ICs = construct_task_graphs_problem(
             project_spec, r0, s0, sF, dist_matrix);
     # Solve the problem
     solver = PC_TAPF_Solver(verbosity=0,LIMIT_A_star_iterations=10*nv(env_graph));
-    env, mapf = construct_search_env(project_spec, problem_spec, robot_ICs, assignments, env_graph);
+    project_schedule = construct_partial_project_schedule(project_spec,problem_spec,map(i->robot_ICs[i], 1:problem_spec.N))
+    @assert update_project_schedule!(milp_model, project_schedule, problem_spec, adj_matrix)
+    env, mapf = construct_search_env(project_schedule, problem_spec, env_graph;
+        primary_objective=primary_objective); # TODO pass in t0_ here (maybe get it straight from model?)
     pc_mapf = PC_MAPF(env,mapf);
     node = initialize_root_node(pc_mapf)
     valid_flag, elapsed_time, byte_ct, gc_time, mem_ct = @timed low_level_search!(solver, pc_mapf.env, pc_mapf.mapf, node)
@@ -239,24 +281,16 @@ function profile_low_level_search(problem_def::SimpleProblemDef,env_graph,dist_m
     results_dict["num_conflicts"] = count_conflicts(detect_conflicts(node.solution))
     results_dict
 end
-function profile_full_solver(problem_def::SimpleProblemDef,env_graph,dist_matrix;solver_mode=:adjacency,kwargs...)
+function profile_full_solver(problem_def::SimpleProblemDef,env_graph,dist_matrix;milp_model=AssignmentMILP(),kwargs...)
     project_spec, r0, s0, sF = problem_def.project_spec,problem_def.r0,problem_def.s0,problem_def.sF
     project_spec, problem_spec, object_ICs, object_FCs, robot_ICs = construct_task_graphs_problem(
             project_spec, r0, s0, sF, dist_matrix);
     # Solve the problem
     solver = PC_TAPF_Solver(verbosity=0,LIMIT_A_star_iterations=5*nv(env_graph));
-    if solver_mode == :adjacency
-        (solution, assignment, cost, search_env), elapsed_time, byte_ct, gc_time, mem_ct = @timed high_level_search_mod!(
-            solver, env_graph, project_spec, problem_spec, robot_ICs, Gurobi.Optimizer;
-            milp_model=AdjacencyMILP(),kwargs...);
-    elseif solver_mode == :sparse_adjacency
-        (solution, assignment, cost, search_env), elapsed_time, byte_ct, gc_time, mem_ct = @timed high_level_search_mod!(
-            solver, env_graph, project_spec, problem_spec, robot_ICs, Gurobi.Optimizer;
-            milp_model=SparseAdjacencyMILP(),kwargs...);
-    else
-        (solution, assignment, cost, search_env), elapsed_time, byte_ct, gc_time, mem_ct = @timed high_level_search!(
-            solver, env_graph, project_spec, problem_spec, robot_ICs, Gurobi.Optimizer;kwargs...);
-    end
+
+    (solution, assignment, cost, search_env), elapsed_time, byte_ct, gc_time, mem_ct = @timed high_level_search!(
+        milp_model, solver, env_graph, project_spec, problem_spec, robot_ICs, Gurobi.Optimizer;
+        kwargs...);
 
     robot_paths = convert_to_vertex_lists(solution)
     object_paths = get_object_paths(solution,search_env)
@@ -267,8 +301,9 @@ function profile_full_solver(problem_def::SimpleProblemDef,env_graph,dist_matrix
     end
 
     results_dict = TOML.parse(solver)
+    merge!(results_dict, TOML.parse(assignment))
     results_dict["time"] = elapsed_time
-    results_dict["assignment"] = assignment
+    # results_dict["assignment"] = assignment
     results_dict["robot_paths"] = robot_paths
     results_dict["object_paths"] = object_paths
     results_dict["optimal"] = optimal
@@ -276,12 +311,6 @@ function profile_full_solver(problem_def::SimpleProblemDef,env_graph,dist_matrix
     results_dict
 end
 
-function read_assignment(toml_dict::Dict)
-    assignment = toml_dict["assignment"]
-end
-function read_assignment(io)
-    read_assignment(TOML.parsefile(io))
-end
 
 function run_profiling(MODE=:nothing;
     num_tasks = [10,20,30,40,50,60],
@@ -295,7 +324,7 @@ function run_profiling(MODE=:nothing;
     results_dir = RESULTS_DIR,
     TimeLimit=50,
     OutputFlag=0,
-    solver_mode=:assignment
+    milp_model=AssignmentMILP()
     )
     # solver profiling
     env_filename = string(ENVIRONMENT_DIR,"/env_",env_id,".toml")
@@ -360,18 +389,24 @@ function run_profiling(MODE=:nothing;
                                 # Load the problem
                                 problem_def = read_problem_def(problem_filename)
                                 if MODE == :assignment_only
-                                    results_dict = profile_task_assignment(problem_def,env_graph,dist_matrix;TimeLimit=TimeLimit,OutputFlag=OutputFlag)
+                                    results_dict = profile_task_assignment(problem_def,env_graph,dist_matrix;
+                                        milp_model=milp_model,TimeLimit=TimeLimit,OutputFlag=OutputFlag)
                                 end
                                 if MODE == :low_level_search_without_repair
-                                    assignments = read_assignment(assignment_filename)
-                                    results_dict = profile_low_level_search(problem_def,env_graph,dist_matrix,assignments)
+                                    # assignments = read_assignment(assignment_filename)
+                                    adj_matrix = read_sparse_matrix(assignment_filename)
+                                    results_dict = profile_low_level_search(problem_def,env_graph,dist_matrix,adj_matrix;
+                                        milp_model=milp_model)
                                 end
                                 if MODE == :low_level_search_with_repair
-                                    assignments = read_assignment(assignment_filename)
-                                    results_dict = profile_low_level_search_and_repair(problem_def,env_graph,dist_matrix,assignments)
+                                    # assignments = read_assignment(assignment_filename)
+                                    adj_matrix = read_sparse_matrix(assignment_filename)
+                                    results_dict = profile_low_level_search_and_repair(problem_def,env_graph,dist_matrix,adj_matrix;
+                                        milp_model=milp_model)
                                 end
                                 if MODE == :full_solver
-                                    results_dict = profile_full_solver(problem_def,env_graph,dist_matrix;solver_mode=solver_mode,TimeLimit=TimeLimit,OutputFlag=OutputFlag)
+                                    results_dict = profile_full_solver(problem_def,env_graph,dist_matrix;
+                                        milp_model=milp_model,TimeLimit=TimeLimit,OutputFlag=OutputFlag)
                                 end
                                 println("Solved problem ",problem_id," in ",results_dict["time"]," seconds! MODE = ",string(MODE))
                                 # print the results

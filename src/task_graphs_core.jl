@@ -714,17 +714,17 @@ function add_single_robot_delivery_task!(
         schedule::S,
         problem_spec::T,
         pred_id::AbstractID,
-        robot_id::Int,
-        object_id::Int,
-        pickup_station_id::Int,
-        dropoff_station_id::Int
+        robot_id::RobotID,
+        object_id::ObjectID,
+        pickup_station_id::StationID,
+        dropoff_station_id::StationID
         ) where {S<:ProjectSchedule,T<:ProblemSpec}
 
     if robot_id != -1
         robot_pred = get_node_from_id(schedule,RobotID(robot_id))
-        robot_start_station_id = get_id(get_initial_location_id(get_node_from_id(schedule, pred_id)))
+        robot_start_station_id = get_initial_location_id(get_node_from_id(schedule, pred_id))
     else
-        robot_start_station_id = -1
+        robot_start_station_id = StationID(-1)
     end
 
     # THIS NODE IS DETERMINED BY THE TASK ASSIGNMENT.
@@ -928,18 +928,18 @@ function construct_project_schedule(
     end
     # for (robot_id, pred_id) in robot_pred_tips
     for (task_idx, robot_id) in enumerate(assignments)
-        object_id = get_id(get_object_id(object_ICs[task_idx]))
+        object_id = get_object_id(object_ICs[task_idx])
         # add action sequence
-        object_ic           = get_node_from_id(schedule, ObjectID(object_id))
-        pickup_station_id   = get_id(get_location_id(object_ic))
-        object_fc           = object_FCs[object_id]
-        dropoff_station_id  = get_id(get_location_id(object_fc))
+        object_ic           = get_node_from_id(schedule, object_id)
+        pickup_station_id   = get_location_id(object_ic)
+        object_fc           = object_FCs[get_id(object_id)]
+        dropoff_station_id  = get_location_id(object_fc)
 
         # TODO Handle collaborative tasks
         # robot_id = get(assignments, task_idx, -1)
         pred_id = robot_pred_tips[RobotID(robot_id)]
-        action_id = add_single_robot_delivery_task!(schedule,problem_spec,pred_id,robot_id,
-            object_id,pickup_station_id,dropoff_station_id) # DEPOSIT task id
+        action_id = add_single_robot_delivery_task!(schedule,problem_spec,pred_id,
+            RobotID(robot_id),object_id,pickup_station_id,dropoff_station_id) # DEPOSIT task id
         robot_pred_tips[RobotID(robot_id)] = action_id
         operation_id = object_ops[ObjectID(object_id)]
         add_edge!(schedule, action_id, operation_id)
@@ -1067,7 +1067,7 @@ function construct_partial_project_schedule(spec::ProjectSpec,problem_spec::Prob
     construct_partial_project_schedule(
         spec.initial_conditions,
         spec.final_conditions,
-        robot_ICs,
+        map(i->robot_ICs[i], 1:problem_spec.N),
         spec.operations,
         map(op->op.id, spec.operations[collect(spec.root_nodes)]),
         problem_spec,
@@ -1145,13 +1145,7 @@ export
     TaskGraphsMILP,
     AssignmentMILP,
     AdjacencyMILP,
-    SparseAdjacencyMILP,
-    add_job_shop_constraints!,
-    formulate_optimization_problem,
-    formulate_schedule_milp,
-    formulate_milp,
-    update_project_schedule!
-
+    SparseAdjacencyMILP
 
 abstract type TaskGraphsMILP end
 @with_kw struct AssignmentMILP <: TaskGraphsMILP
@@ -1176,6 +1170,62 @@ JuMP.dual_status(model::M) where {M<:TaskGraphsMILP}        = dual_status(model.
 #         JuMP.$op(model::M,args...) where {M<:TaskGraphsMILP} = $op(model.model,args...)
 #     end)
 # end
+
+export
+    get_assignment_matrix,
+    get_assignment_vector,
+    get_assignment_dict
+
+function get_assignment_matrix(model::M) where {M<:JuMP.Model}
+    Matrix{Int}(min.(1, round.(value.(model[:X])))) # guarantees binary matrix
+end
+get_assignment_matrix(model::TaskGraphsMILP) = get_assignment_matrix(model.model)
+function get_assignment_vector(assignment_matrix,M)
+    assignments = -ones(Int,M)
+    for j in 1:M
+        r = findfirst(assignment_matrix[:,j] .== 1)
+        if r != nothing
+            assignments[j] = r
+        end
+    end
+    assignments
+end
+
+"""
+    Returns dictionary of the "joint mission", mapping each robot id to a
+    sequence of tasks.
+"""
+function get_assignment_dict(assignment_matrix,N,M)
+    assignment_dict = Dict{Int,Vector{Int}}()
+    for i in 1:N
+        vec = get!(assignment_dict,i,Int[])
+        k = i
+        j = 1
+        while j <= M
+            if assignment_matrix[k,j] == 1
+                push!(vec,j)
+                k = j + N
+                j = 0
+            end
+            j += 1
+        end
+    end
+    assignment_dict
+    assignments = zeros(Int,M)
+    for (robot_id, task_list) in assignment_dict
+        for task_id in task_list
+            assignments[task_id] = robot_id
+        end
+    end
+    assignment_dict, assignments
+end
+
+export
+    add_job_shop_constraints!,
+    formulate_optimization_problem,
+    formulate_schedule_milp,
+    formulate_milp,
+    update_project_schedule!
 
 function add_job_shop_constraints!(schedule::P,spec::T,model::JuMP.Model) where {P<:ProjectSchedule,T<:ProblemSpec}
     M = spec.M
@@ -1663,7 +1713,7 @@ function formulate_milp(milp_model::SparseAdjacencyMILP,project_schedule::Projec
     end
     # Precedence constraints and duration constraints for existing nodes and edges
     for v in vertices(G)
-        @constraint(model, tF[v] >= t0[v] + Δt[v])
+        @constraint(model, tF[v] >= t0[v] + Δt[v]) # NOTE Δt may change for some nodes
         for v2 in outneighbors(G,v)
             Xa[v,v2] = @variable(model, binary=true) # TODO remove this (MUST UPDATE n_eligible_successors, etc. accordingly)
             @constraint(model, Xa[v,v2] == 1) #TODO this edge already exists--no reason to encode it as a decision variable
@@ -1727,9 +1777,9 @@ function formulate_milp(milp_model::SparseAdjacencyMILP,project_schedule::Projec
     # Big M constraints
     for v in vertices(G)
         node = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v))
+        potential_match = false
         for v2 in non_upstream_vertices[v] # for v2 in vertices(G)
             node2 = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v2))
-            potential_match = false
             for (template, val) in missing_successors[v]
                 if !matches_template(template, typeof(node2)) # possible to add an edge
                     continue
@@ -1738,8 +1788,8 @@ function formulate_milp(milp_model::SparseAdjacencyMILP,project_schedule::Projec
                     if !matches_template(template2, typeof(node)) # possible to add an edge
                         continue
                     end
-                    potential_match = true # TODO: investigate why the solver fails when this is moved inside the following if statement
                     if (val > 0 && val2 > 0)
+                        potential_match = true
                         new_node = align_with_successor(node,node2)
                         dt_min = generate_path_spec(project_schedule,problem_spec,new_node).min_path_duration
                         Xa[v,v2] = @variable(model, binary=true) # initialize a new binary variable in the sparse adjacency matrix
@@ -1749,9 +1799,9 @@ function formulate_milp(milp_model::SparseAdjacencyMILP,project_schedule::Projec
                     end
                 end
             end
-            if potential_match == false
-                # @constraint(model, Xa[v,v2] == 0) #TODO this variable is not needed
-            end
+        end
+        if potential_match == false
+            @constraint(model, tF[v] == t0[v] + Δt[v]) # adding this constraint may provide some speedup
         end
     end
 
@@ -1908,6 +1958,33 @@ function update_project_schedule!(milp_model::M,
         adj_matrix,
         DEBUG::Bool=false
     ) where {M<:TaskGraphsMILP,P<:ProjectSchedule,T<:ProblemSpec}
+    update_project_schedule!(project_schedule,problem_spec,adj_matrix,DEBUG)
+end
+function update_project_schedule!(milp_model::AssignmentMILP,
+        project_schedule::P,
+        problem_spec::T,
+        assignment_matrix,
+        DEBUG::Bool=false
+    ) where {M<:TaskGraphsMILP,P<:ProjectSchedule,T<:ProblemSpec}
+    assignment_dict, assignments = get_assignment_dict(assignment_matrix,problem_spec.N,problem_spec.M)
+    G = get_graph(project_schedule)
+    adj_matrix = adjacency_matrix(G)
+    for (robot_id, task_list) in assignment_dict
+        robot_node = get_node_from_id(project_schedule, RobotID(robot_id))
+        v_go = outneighbors(G, get_vtx(project_schedule, RobotID(robot_id)))[1] # GO_NODE
+        for object_id in task_list
+            v_collect = outneighbors(G,get_vtx(project_schedule, ObjectID(object_id)))[1]
+            adj_matrix[v_go,v_collect] = 1
+            v_carry = outneighbors(G,v_collect)[1]
+            v_deposit = outneighbors(G,v_carry)[1]
+            for v in outneighbors(G,v_deposit)
+                if isa(get_vtx_id(project_schedule, v), ActionID)
+                    v_go = v
+                    break
+                end
+            end
+        end
+    end
     update_project_schedule!(project_schedule,problem_spec,adj_matrix,DEBUG)
 end
 

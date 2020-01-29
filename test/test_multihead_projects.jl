@@ -12,8 +12,9 @@ let
     solver = PC_TAPF_Solver(verbosity=2)
 
     cost_model = :SumOfMakeSpans
+    milp_model = AssignmentMILP()
     solution, assignment, cost, search_env = high_level_search!(
-        solver, env_graph, project_spec, problem_spec, robot_ICs, Gurobi.Optimizer;
+        milp_model, solver, env_graph, project_spec, problem_spec, robot_ICs, Gurobi.Optimizer;
         cost_model=cost_model);
     path1 = convert_to_vertex_lists(solution.paths[1])
     path2 = convert_to_vertex_lists(solution.paths[2])

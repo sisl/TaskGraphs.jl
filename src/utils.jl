@@ -14,57 +14,11 @@ using CRCBS
 # using ..TaskGraphsCore
 
 export
-    get_assignment_matrix,
-    get_assignment_vector,
-    get_assignment_dict,
     validate,
     exclude_solutions!,
     cached_pickup_and_delivery_distances,
     construct_task_graphs_problem
 
-function get_assignment_matrix(model::M) where {M<:JuMP.Model}
-    Matrix{Int}(min.(1, round.(value.(model[:X])))) # guarantees binary matrix
-end
-get_assignment_matrix(model::TaskGraphsMILP) = get_assignment_matrix(model.model)
-function get_assignment_vector(assignment_matrix,M)
-    assignments = -ones(Int,M)
-    for j in 1:M
-        r = findfirst(assignment_matrix[:,j] .== 1)
-        if r != nothing
-            assignments[j] = r
-        end
-    end
-    assignments
-end
-
-"""
-    Returns dictionary of the "joint mission", mapping each robot id to a
-    sequence of tasks.
-"""
-function get_assignment_dict(assignment_matrix,N,M)
-    assignment_dict = Dict{Int,Vector{Int}}()
-    for i in 1:N
-        vec = get!(assignment_dict,i,Int[])
-        k = i
-        j = 1
-        while j <= M
-            if assignment_matrix[k,j] == 1
-                push!(vec,j)
-                k = j + N
-                j = 0
-            end
-            j += 1
-        end
-    end
-    assignment_dict
-    assignments = zeros(Int,M)
-    for (robot_id, task_list) in assignment_dict
-        for task_id in task_list
-            assignments[task_id] = robot_id
-        end
-    end
-    assignment_dict, assignments
-end
 # function get_station_precedence_dict(model::M) where {M<:JuMP.Model} end
 function validate(path::Path, msg::String)
     @assert( !any(convert_to_vertex_lists(path) .== -1), msg )

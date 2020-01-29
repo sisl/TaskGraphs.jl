@@ -6,9 +6,9 @@ let
     dummy_results_dir = "dummy_results_dir"
     modes = [
         :write,
-        # :assignment_only,
-        # :low_level_search_without_repair,
-        # :low_level_search_with_repair,
+        :assignment_only,
+        :low_level_search_without_repair,
+        :low_level_search_with_repair,
         :full_solver
         ]
     for mode in modes
@@ -19,7 +19,7 @@ let
             num_trials=1,
             problem_dir = dummy_problem_dir,
             results_dir = dummy_results_dir,
-            solver_mode=:sparse_adjacency # :assignment
+            milp_model = SparseAdjacencyMILP()
             )
     end
     run(pipeline(`rm -rf $dummy_problem_dir`, stdout=devnull, stderr=devnull))
