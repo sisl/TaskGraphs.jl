@@ -11,19 +11,29 @@ let
         :low_level_search_with_repair,
         :full_solver
         ]
-    for mode in modes
-        run_profiling(mode;
-            num_tasks=[10],
-            num_robots=[10],
-            depth_biases=[0.1],
-            num_trials=1,
-            problem_dir = dummy_problem_dir,
-            results_dir = dummy_results_dir,
-            milp_model = SparseAdjacencyMILP()
-            )
+    milp_models = [
+        AssignmentMILP(),
+        AdjacencyMILP(),
+        SparseAdjacencyMILP()
+    ]
+    for milp_model in milp_models
+        for mode in modes
+            run_profiling(mode;
+                num_tasks=[10],
+                num_robots=[10],
+                depth_biases=[0.1],
+                num_trials=1,
+                problem_dir = dummy_problem_dir,
+                results_dir = dummy_results_dir,
+                milp_model = milp_model,
+                TimeLimit=100,
+                OutputFlag=0,
+                Presolve = -1, # automatic setting (-1), off (0), conservative (1), or aggressive (2)
+                )
+        end
+        run(pipeline(`rm -rf $dummy_problem_dir`, stdout=devnull, stderr=devnull))
+        run(pipeline(`rm -rf $dummy_results_dir`, stdout=devnull, stderr=devnull))
     end
-    run(pipeline(`rm -rf $dummy_problem_dir`, stdout=devnull, stderr=devnull))
-    run(pipeline(`rm -rf $dummy_results_dir`, stdout=devnull, stderr=devnull))
 end
 let
 
@@ -35,24 +45,33 @@ let
         :low_level_search_with_repair,
         :full_solver
         ]
-    for mode in modes
-        run_profiling(mode;
-            num_tasks = [10,20,30,40,50,60],
-            num_robots = [10,20,30,40],
-            depth_biases = [0.1,0.4,0.7,1.0],
-            max_parent_settings = [3],
-            num_trials = 4,
-            env_id = 2,
-            initial_problem_id = 1,
-            problem_dir = PROBLEM_DIR,
-            # results_dir = joinpath(RESULTS_DIR)
-            # results_dir = joinpath(EXPERIMENT_DIR,"adjacency_solver/results"),
-            results_dir = joinpath(EXPERIMENT_DIR,"sparse_adjacency_solver/results"),
-            TimeLimit=100,
-            OutputFlag=0,
-            # solver_mode=:assignment,
-            # solver_mode=:adjacency,
-            solver_mode=:sparse_adjacency
-            )
+    results_dirs = [
+        joinpath(EXPERIMENT_DIR,"assignment_solver/results")
+        joinpath(EXPERIMENT_DIR,"adjacency_solver/results")
+        joinpath(EXPERIMENT_DIR,"sparse_adjacency_solver/results")
+    ]
+    milp_models = [
+        AssignmentMILP(),
+        AdjacencyMILP(),
+        SparseAdjacencyMILP()
+    ]
+    for (milp_model, results_dir) in zip(milp_models, results_dirs)
+        for mode in modes
+            run_profiling(mode;
+                num_tasks = [10,20,30,40,50,60],
+                num_robots = [10,20,30,40],
+                depth_biases = [0.1,0.4,0.7,1.0],
+                max_parent_settings = [3],
+                num_trials = 4,
+                env_id = 2,
+                initial_problem_id = 1,
+                problem_dir = PROBLEM_DIR,
+                results_dir = results_dir,
+                TimeLimit=100,
+                OutputFlag=0,
+                Presolve = -1, # automatic setting (-1), off (0), conservative (1), or aggressive (2)
+                milp_model = milp_model
+                )
+        end
     end
 end

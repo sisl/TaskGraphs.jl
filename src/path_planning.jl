@@ -836,7 +836,7 @@ function high_level_search!(solver::P, env_graph, project_schedule::ProjectSched
         exclude_solutions!(model) # exclude most recent solution in order to get next best solution
         optimize!(model)
         optimal = (termination_status(model) == MathOptInterface.OPTIMAL);
-        # feasible = (primal_status(modele) == MOI.FEASIBLE_POINT)
+        feasible = (primal_status(model) == MOI.FEASIBLE_POINT) # TODO use this!
         if !optimal
             log_info(0,solver,string("HIGH LEVEL SEARCH: Task assignment failed. Returning best solution so far.\n",
                 " * optimality gap = ", solver.best_cost[1] - lower_bound))

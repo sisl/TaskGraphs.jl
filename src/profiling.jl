@@ -204,7 +204,7 @@ function construct_result_dataframes(problem_dir,results_dir,N_problems)
 end
 
 function profile_task_assignment(problem_def::SimpleProblemDef,env_graph,dist_matrix;
-    milp_model=AssignmentMILP(),kwargs...)
+    milp_model=AssignmentMILP(),primary_objective=SumOfMakeSpans,kwargs...)
     project_spec, r0, s0, sF = problem_def.project_spec,problem_def.r0,problem_def.s0,problem_def.sF
     project_spec, problem_spec, object_ICs, object_FCs, robot_ICs = construct_task_graphs_problem(
             project_spec, r0, s0, sF, dist_matrix);
@@ -230,7 +230,7 @@ function profile_task_assignment(problem_def::SimpleProblemDef,env_graph,dist_ma
     results_dict
 end
 function profile_low_level_search_and_repair(problem_def::SimpleProblemDef,env_graph,dist_matrix,adj_matrix;
-    milp_model=AssignmentMILP())
+    milp_model=AssignmentMILP(),primary_objective=SumOfMakeSpans)
     project_spec, r0, s0, sF = problem_def.project_spec,problem_def.r0,problem_def.s0,problem_def.sF
     project_spec, problem_spec, object_ICs, object_FCs, robot_ICs = construct_task_graphs_problem(
             project_spec, r0, s0, sF, dist_matrix);
@@ -256,7 +256,7 @@ function profile_low_level_search_and_repair(problem_def::SimpleProblemDef,env_g
     results_dict
 end
 function profile_low_level_search(problem_def::SimpleProblemDef,env_graph,dist_matrix,adj_matrix;
-    milp_model=AssignmentMILP())
+    milp_model=AssignmentMILP(),primary_objective=SumOfMakeSpans)
     project_spec, r0, s0, sF = problem_def.project_spec,problem_def.r0,problem_def.s0,problem_def.sF
     project_spec, problem_spec, object_ICs, object_FCs, robot_ICs = construct_task_graphs_problem(
             project_spec, r0, s0, sF, dist_matrix);
@@ -281,7 +281,8 @@ function profile_low_level_search(problem_def::SimpleProblemDef,env_graph,dist_m
     results_dict["num_conflicts"] = count_conflicts(detect_conflicts(node.solution))
     results_dict
 end
-function profile_full_solver(problem_def::SimpleProblemDef,env_graph,dist_matrix;milp_model=AssignmentMILP(),kwargs...)
+function profile_full_solver(problem_def::SimpleProblemDef,env_graph,dist_matrix;
+        milp_model=AssignmentMILP(),primary_objective=SumOfMakeSpans,kwargs...)
     project_spec, r0, s0, sF = problem_def.project_spec,problem_def.r0,problem_def.s0,problem_def.sF
     project_spec, problem_spec, object_ICs, object_FCs, robot_ICs = construct_task_graphs_problem(
             project_spec, r0, s0, sF, dist_matrix);
@@ -290,6 +291,7 @@ function profile_full_solver(problem_def::SimpleProblemDef,env_graph,dist_matrix
 
     (solution, assignment, cost, search_env), elapsed_time, byte_ct, gc_time, mem_ct = @timed high_level_search!(
         milp_model, solver, env_graph, project_spec, problem_spec, robot_ICs, Gurobi.Optimizer;
+        primary_objective=primary_objective,
         kwargs...);
 
     robot_paths = convert_to_vertex_lists(solution)
@@ -301,7 +303,7 @@ function profile_full_solver(problem_def::SimpleProblemDef,env_graph,dist_matrix
     end
 
     results_dict = TOML.parse(solver)
-    merge!(results_dict, TOML.parse(assignment))
+    merge!(results_dict, TOML.parse(sparse(assignment)))
     results_dict["time"] = elapsed_time
     # results_dict["assignment"] = assignment
     results_dict["robot_paths"] = robot_paths
@@ -324,12 +326,14 @@ function run_profiling(MODE=:nothing;
     results_dir = RESULTS_DIR,
     TimeLimit=50,
     OutputFlag=0,
-    milp_model=AssignmentMILP()
+    Presolve = -1,
+    milp_model=AssignmentMILP(),
+    primary_objective=SumOfMakeSpans
     )
     # solver profiling
     env_filename = string(ENVIRONMENT_DIR,"/env_",env_id,".toml")
     factory_env = read_env(env_filename)
-    env_graph = factory_env.graph
+    env_graph = factory_env
     dist_matrix = get_dist_matrix(env_graph)
 
     Random.seed!(1)
@@ -390,25 +394,25 @@ function run_profiling(MODE=:nothing;
                                 problem_def = read_problem_def(problem_filename)
                                 if MODE == :assignment_only
                                     results_dict = profile_task_assignment(problem_def,env_graph,dist_matrix;
-                                        milp_model=milp_model,TimeLimit=TimeLimit,OutputFlag=OutputFlag)
+                                        milp_model=milp_model,primary_objective=primary_objective,TimeLimit=TimeLimit,OutputFlag=OutputFlag,Presolve=Presolve)
                                 end
                                 if MODE == :low_level_search_without_repair
                                     # assignments = read_assignment(assignment_filename)
                                     adj_matrix = read_sparse_matrix(assignment_filename)
                                     results_dict = profile_low_level_search(problem_def,env_graph,dist_matrix,adj_matrix;
-                                        milp_model=milp_model)
+                                        milp_model=milp_model,primary_objective=primary_objective)
                                 end
                                 if MODE == :low_level_search_with_repair
                                     # assignments = read_assignment(assignment_filename)
                                     adj_matrix = read_sparse_matrix(assignment_filename)
                                     results_dict = profile_low_level_search_and_repair(problem_def,env_graph,dist_matrix,adj_matrix;
-                                        milp_model=milp_model)
+                                        milp_model=milp_model,primary_objective=primary_objective)
                                 end
                                 if MODE == :full_solver
                                     results_dict = profile_full_solver(problem_def,env_graph,dist_matrix;
-                                        milp_model=milp_model,TimeLimit=TimeLimit,OutputFlag=OutputFlag)
+                                        milp_model=milp_model,primary_objective=primary_objective,TimeLimit=TimeLimit,OutputFlag=OutputFlag,Presolve=Presolve)
                                 end
-                                println("Solved problem ",problem_id," in ",results_dict["time"]," seconds! MODE = ",string(MODE))
+                                println("PROFILER: Solved problem ",problem_id," in ",results_dict["time"]," seconds! MODE = ",string(MODE), " --- MILP = ",typeof(milp_model), "\n\n")
                                 # print the results
                                 open(results_filename, "w") do io
                                     TOML.print(io, results_dict)
@@ -418,6 +422,7 @@ function run_profiling(MODE=:nothing;
                             if typeof(e) <: AssertionError
                                 println(e.msg)
                             else
+                                # throw(e)
                             end
                         end
                     end

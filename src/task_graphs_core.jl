@@ -1318,13 +1318,15 @@ end
 function formulate_optimization_problem(G,Drs,Dss,Δt,Δt_collect,Δt_deliver,to0_,tr0_,root_nodes,weights,s0,sF,nR,optimizer;
     TimeLimit=100,
     OutputFlag=0,
+    Presolve = -1, # automatic setting (-1), off (0), conservative (1), or aggressive (2)
     assignments=Dict{Int64,Int64}(),
     cost_model=MakeSpan
     )
 
     model = Model(with_optimizer(optimizer,
         TimeLimit=TimeLimit,
-        OutputFlag=OutputFlag
+        OutputFlag=OutputFlag,
+        Presolve=Presolve
         ))
     M = size(Dss,1)
     N = size(Drs,1)-M
@@ -1478,7 +1480,7 @@ function formulate_schedule_milp(project_schedule::ProjectSchedule,problem_spec:
         optimizer = Gurobi.Optimizer,
         TimeLimit=100,
         OutputFlag=0,
-        Presolve=2, # 2 is the highest level of pre-solve
+        Presolve=-1, # automatic setting (-1), off (0), conservative (1), or aggressive (2)
         t0_ = Dict{AbstractID,Float64}(), # dictionary of initial times. Default is empty
         Mm = 10000, # for big M constraints
         cost_model = SumOfMakeSpans,
@@ -1685,7 +1687,7 @@ function formulate_milp(milp_model::SparseAdjacencyMILP,project_schedule::Projec
         optimizer = Gurobi.Optimizer,
         TimeLimit=100,
         OutputFlag=0,
-        Presolve=2, # 2 is the highest level of pre-solve
+        Presolve=-1, # automatic setting (-1), off (0), conservative (1), or aggressive (2)
         t0_ = Dict{AbstractID,Float64}(), # dictionary of initial times. Default is empty
         Mm = 10000, # for big M constraints
         cost_model = SumOfMakeSpans,
