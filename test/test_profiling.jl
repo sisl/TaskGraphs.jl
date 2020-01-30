@@ -6,29 +6,34 @@ let
     dummy_results_dir = "dummy_results_dir"
     modes = [
         :write,
-        :assignment_only,
-        :low_level_search_without_repair,
-        :low_level_search_with_repair,
+        # :assignment_only,
+        # :low_level_search_without_repair,
+        # :low_level_search_with_repair,
         :full_solver
         ]
     milp_models = [
-        AssignmentMILP(),
-        AdjacencyMILP(),
+        # AssignmentMILP(),
+        # AdjacencyMILP(),
         SparseAdjacencyMILP()
     ]
     for milp_model in milp_models
         for mode in modes
             run_profiling(mode;
-                num_tasks=[10],
-                num_robots=[10],
+                num_tasks=[1],
+                num_robots=[4],
                 depth_biases=[0.1],
+                task_size_distributions = [
+                    ( 1=>0.0, 2=>0.0, 4=>1.0 )
+                    ],
                 num_trials=1,
                 problem_dir = dummy_problem_dir,
-                results_dir = dummy_results_dir,
+                results_dir = joinpath(dummy_results_dir, string(typeof(milp_model))),
                 milp_model = milp_model,
-                TimeLimit=100,
+                TimeLimit=20,
                 OutputFlag=0,
                 Presolve = -1, # automatic setting (-1), off (0), conservative (1), or aggressive (2)
+                verbosity = 4,
+                LIMIT_A_star_iterations=8000,
                 )
         end
         run(pipeline(`rm -rf $dummy_problem_dir`, stdout=devnull, stderr=devnull))

@@ -356,6 +356,7 @@ matches_template(template::T,node) where {T<:Tuple} = matches_template(template,
 resources_reserved(node)                = AbstractID[]
 resources_reserved(node::COLLECT)       = AbstractID[get_location_id(node)]
 resources_reserved(node::DEPOSIT)       = AbstractID[get_location_id(node)]
+resources_reserved(node::TEAM_ACTION)	= union(map(pred->resources_reserved(pred), node.instructions)...)
 
 is_valid(id::A) where {A<:AbstractID} = get_id(id) != -1
 first_valid(a,b) = is_valid(a) ? a : b

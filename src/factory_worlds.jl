@@ -44,6 +44,42 @@ function construct_edge_cache(vtxs,vtx_map)
     edge_cache
 end
 
+export
+    construct_expanded_zones
+
+"""
+    returns a dictionary mapping vertices to a dict of shape=>vtxs for expanded
+    ssize delivery zones.
+"""
+function construct_expanded_zones(vtxs,vtx_map,pickup_zones,dropoff_zones)
+    expanded_zones = Dict{Int,Dict{Tuple{Int,Int},Vector{Int}}}()
+    R = [ 0 -1 ; 1 0 ]
+    for v in vcat(pickup_zones, dropoff_zones)
+        expanded_zones[v] = Dict{Tuple{Int,Int},Vector{Int}}()
+        vtx = [vtxs[v]...]
+        d = [0,1]
+        while vtx_map[(vtx .- d)...] > 0
+            d = R*d # rotate d until it points at obstacle
+        end
+        anchor = (vtx .- d)
+        d2 = R*d
+        if vtx_map[(anchor .- d2)...] > vtx_map[(anchor .+ d2)...]
+            d2 = -d2
+        end
+        d = d + d2
+        for shape in [(1,1),(1,2),(2,1),(2,2)]
+            vtx_list = Int[]
+            for dx in sort([0,d[1]][1:shape[1]])
+                for dy in sort([0,d[2]][1:shape[2]])
+                    push!(vtx_list, vtx_map[vtx[1]+dx, vtx[2]+dy])
+                end
+            end
+            expanded_zones[v][shape] = vtx_list
+        end
+    end
+    expanded_zones
+end
+
 """
     `GridFactoryEnvironment`
 """
@@ -59,7 +95,7 @@ end
     obstacles           ::Vector{Tuple{Int,Int}}    = Vector{Tuple{Int,Int}}()
     vtx_map             ::Matrix{Int}               = construct_vtx_map(vtxs,(x_dim,y_dim))
     edge_cache          ::Vector{Set{Tuple{Int,Int}}} = construct_edge_cache(vtxs,vtx_map)
-    # robot_locations     ::Vector{Tuple{Int,Int}}        = Vector{Tuple{Int,Int}}()
+    expanded_zones     ::Dict{Int,Dict{Tuple{Int,Int},Vector{Int}}}     = construct_expanded_zones(vtxs,vtx_map,pickup_zones,dropoff_zones)
 end
 # get_graph(env::E) where {E<:GridFactoryEnvironment} = env.graph
 get_x_dim(env::E) where {E<:GridFactoryEnvironment} = env.x_dim

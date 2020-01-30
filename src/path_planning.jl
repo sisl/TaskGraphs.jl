@@ -16,6 +16,7 @@ using ..TaskGraphs
 
 export
     PC_TAPF_Solver,
+    SolverTimeOutException,
     # reset_solver!,
     read_solver
 
@@ -36,6 +37,9 @@ export
     max_CBS_iterations          ::Int = 0
     max_A_star_iterations       ::Int = 0
 
+    start_time                  ::Float64 = time()
+    time_limit                  ::Float64 = 200.0
+
     verbosity                   ::Int = 0
     l1_verbosity                ::Int = 0
     l2_verbosity                ::Int = 0
@@ -43,6 +47,11 @@ export
     l4_verbosity                ::Int = 0
     DEBUG                       ::Bool = false
 end
+
+@with_kw struct SolverTimeOutException <: Exception
+    msg::String = ""
+end
+
 function reset_solver!(solver::S) where {S<:PC_TAPF_Solver}
     solver.num_assignment_iterations = 0
     solver.num_CBS_iterations = 0
@@ -58,6 +67,11 @@ function reset_solver!(solver::S) where {S<:PC_TAPF_Solver}
 
     solver
 end
+function check_time(solver::PC_TAPF_Solver)
+    if time() - solver.start_time >= solver.time_limit
+        throw(SolverTimeOutException(string("TIME OUT: Overall time limit of ",solver.time_limit," seconds exceeded.")))
+    end
+end
 # update functions
 function enter_assignment!(solver::S) where {S<:PC_TAPF_Solver}
     reset_solver!(solver)
@@ -66,23 +80,29 @@ function exit_assignment!(solver::S) where {S<:PC_TAPF_Solver}
 end
 function enter_cbs!(solver::S) where {S<:PC_TAPF_Solver}
     solver.num_assignment_iterations += 1
+    check_time(solver)
 end
 function exit_cbs!(solver::S) where {S<:PC_TAPF_Solver}
     solver.max_CBS_iterations = max(solver.max_CBS_iterations,solver.num_CBS_iterations)
     solver.total_CBS_iterations += solver.num_CBS_iterations
     solver.num_CBS_iterations = 0
+    check_time(solver)
 end
 function enter_low_level!(solver::S) where {S<:PC_TAPF_Solver}
     solver.num_CBS_iterations += 1
+    check_time(solver)
 end
 function exit_low_level!(solver::S) where {S<:PC_TAPF_Solver}
+    check_time(solver)
 end
 function enter_a_star!(solver::S) where {S<:PC_TAPF_Solver}
+    check_time(solver)
 end
 function exit_a_star!(solver::S) where {S<:PC_TAPF_Solver}
     solver.max_A_star_iterations = max(solver.max_A_star_iterations,solver.num_A_star_iterations)
     solver.total_A_star_iterations += solver.num_A_star_iterations
     solver.num_A_star_iterations = 0
+    check_time(solver)
 end
 function TOML.parse(solver::S) where {S<:PC_TAPF_Solver}
     toml_dict = Dict()
@@ -103,6 +123,7 @@ function TOML.parse(solver::S) where {S<:PC_TAPF_Solver}
     toml_dict["total_A_star_iterations"] = solver.total_A_star_iterations
     toml_dict["max_CBS_iterations"] = solver.max_CBS_iterations
     toml_dict["max_A_star_iterations"] = solver.max_A_star_iterations
+    toml_dict["time_limit"] = solver.time_limit
     toml_dict["verbosity"] = solver.verbosity
     toml_dict["l1_verbosity"] = solver.l1_verbosity
     toml_dict["l2_verbosity"] = solver.l2_verbosity
@@ -130,6 +151,8 @@ function read_solver(toml_dict::Dict)
         max_CBS_iterations = toml_dict["max_CBS_iterations"],
         max_A_star_iterations = toml_dict["max_A_star_iterations"],
 
+        time_limit = toml_dict["time_limit"],
+
         verbosity = toml_dict["verbosity"],
         l1_verbosity = toml_dict["l1_verbosity"],
         l2_verbosity = toml_dict["l2_verbosity"],
@@ -143,9 +166,12 @@ function read_solver(io)
 end
 
 # Helpers for printing
+export
+    log_info
+
 function log_info(limit::Int,verbosity::Int,msg...)
     if verbosity > limit
-        println(msg...)
+        println("[ logger ]: ",msg...)
     end
 end
 function log_info(limit::Int,solver::S,msg...) where {S<:PC_TAPF_Solver}
@@ -289,7 +315,7 @@ end
 
 function construct_search_env(schedule, problem_spec, env_graph;
         primary_objective=SumOfMakeSpans,
-        extra_T=100
+        extra_T=400
     )
     # schedule = construct_project_schedule(project_spec, problem_spec, robot_ICs, assignments)
     cache = initialize_planning_cache(schedule)
@@ -326,7 +352,7 @@ function construct_search_env(project_spec, problem_spec, robot_ICs, assignments
     construct_search_env(schedule, problem_spec, env_graph;kwargs...)
 end
 
-function default_pc_tapf_solution(N::Int;extra_T=100)
+function default_pc_tapf_solution(N::Int;extra_T=400)
     c0 = (0.0, 0.0, 0.0, 0.0)
     LowLevelSolution(
         paths=map(i->Path{State,Action,typeof(c0)}(s0=State(),cost=c0),1:N),
@@ -562,11 +588,11 @@ function plan_path!(solver::PC_TAPF_Solver, env::SearchEnv, mapf::M, node::N, sc
     node.solution.cost = aggregate_costs(get_cost_model(env.env),get_path_costs(node.solution))
     node.cost = get_cost(node.solution)
     if node.cost == get_infeasible_cost(meta_env)
-        log_info(-1,solver,"# A*: returned infeasible path ... Exiting early")
+        log_info(-1,solver,"A*: returned infeasible path ... Exiting early")
         return false
     end
     if node.cost >= solver.best_cost
-        log_info(0,solver,"# LOW LEVEL SEARCH: node.cost >= solver.best_cost ... Exiting early")
+        log_info(0,solver,"LOW LEVEL SEARCH: node.cost >= solver.best_cost ... Exiting early")
         return false
     end
 
@@ -619,6 +645,7 @@ function CRCBS.low_level_search!(
             return false
         end
     end
+    log_info(0,solver,"LOW_LEVEL_SEARCH: Returning consistent path")
     return true
 end
 
@@ -815,11 +842,10 @@ export
 function high_level_search!(solver::P, env_graph, project_schedule::ProjectSchedule, problem_spec,  optimizer;
         milp_model=AdjacencyMILP(),
         primary_objective=SumOfMakeSpans,
-        TimeLimit=200,
         kwargs...) where {P<:PC_TAPF_Solver}
 
     enter_assignment!(solver)
-    log_info(0,solver,string("\nHIGH LEVEL SEARCH: beginning search ..."))
+    log_info(0,solver,string("HIGH LEVEL SEARCH: beginning search ..."))
 
     lower_bound = 0.0
     best_solution = default_pc_tapf_solution(problem_spec.N)
@@ -828,48 +854,53 @@ function high_level_search!(solver::P, env_graph, project_schedule::ProjectSched
     model = formulate_milp(milp_model,project_schedule,problem_spec;
         cost_model=primary_objective,optimizer=optimizer,kwargs...) #TODO pass t0_ in replanning mode
 
-    start_time = time()
+    solver.start_time = time()
     while solver.best_cost[1] > lower_bound
-        solver.num_assignment_iterations += 1
-        log_info(0,solver,string("HIGH LEVEL SEARCH: iteration ",solver.num_assignment_iterations,"..."))
-        ############## Task Assignment ###############
-        exclude_solutions!(model) # exclude most recent solution in order to get next best solution
-        optimize!(model)
-        optimal = (termination_status(model) == MathOptInterface.OPTIMAL);
-        feasible = (primal_status(model) == MOI.FEASIBLE_POINT) # TODO use this!
-        if !optimal
-            log_info(0,solver,string("HIGH LEVEL SEARCH: Task assignment failed. Returning best solution so far.\n",
-                " * optimality gap = ", solver.best_cost[1] - lower_bound))
-            break
-        elseif solver.num_assignment_iterations > solver.LIMIT_assignment_iterations
-            log_info(0,solver,string("HIGH LEVEL SEARCH: MILP iterations exceeded limit of ",
-            solver.LIMIT_assignment_iterations,". Returning best solution so far.\n",
-                " * optimality gap = ", solver.best_cost[1] - lower_bound))
-            break
-        end
-        lower_bound = max(lower_bound, Int(round(value(objective_function(model)))) )
-        log_info(0,solver,string("HIGH LEVEL SEARCH: Current lower bound cost = ",lower_bound))
-        if lower_bound < solver.best_cost[1]
-            ############## Route Planning ###############
-            adj_matrix = get_assignment_matrix(model);
-            if update_project_schedule!(milp_model,project_schedule,problem_spec, adj_matrix)
-                env, mapf = construct_search_env(project_schedule, problem_spec, env_graph;
-                    primary_objective=primary_objective); # TODO pass in t0_ here (maybe get it straight from model?)
-                pc_mapf = PC_MAPF(env,mapf);
-                ##### Call CBS Search Routine (LEVEL 2) #####
-                solution, cost = solve!(solver,pc_mapf);
-                if cost < solver.best_cost
-                    best_solution = solution
-                    best_assignment = adj_matrix # this represents an assignment matrix in AssignmentMILP
-                    solver.best_cost = cost # TODO make sure that the operation duration is accounted for here
-                    best_env = env
-                end
-                log_info(0,solver,string("HIGH LEVEL SEARCH: Best cost so far = ", solver.best_cost[1]))
+        try
+            solver.num_assignment_iterations += 1
+            log_info(0,solver,string("HIGH LEVEL SEARCH: iteration ",solver.num_assignment_iterations,"..."))
+            ############## Task Assignment ###############
+            exclude_solutions!(model) # exclude most recent solution in order to get next best solution
+            optimize!(model)
+            optimal = (termination_status(model) == MathOptInterface.OPTIMAL);
+            feasible = (primal_status(model) == MOI.FEASIBLE_POINT) # TODO use this!
+            if !optimal
+                log_info(0,solver,string("HIGH LEVEL SEARCH: Task assignment failed. Returning best solution so far.\n",
+                    " * optimality gap = ", solver.best_cost[1] - lower_bound))
+                break
+            elseif solver.num_assignment_iterations > solver.LIMIT_assignment_iterations
+                log_info(0,solver,string("HIGH LEVEL SEARCH: MILP iterations exceeded limit of ",
+                solver.LIMIT_assignment_iterations,". Returning best solution so far.\n",
+                    " * optimality gap = ", solver.best_cost[1] - lower_bound))
+                break
             end
-        end
-        if time() - start_time > TimeLimit
-            log_info(0,solver,string("Overall time limit of ",TimeLimit," seconds exceeded."))
-            break
+            lower_bound = max(lower_bound, Int(round(value(objective_function(model)))) )
+            log_info(0,solver,string("HIGH LEVEL SEARCH: Current lower bound cost = ",lower_bound))
+            if lower_bound < solver.best_cost[1]
+                ############## Route Planning ###############
+                adj_matrix = get_assignment_matrix(model);
+                if update_project_schedule!(milp_model,project_schedule,problem_spec, adj_matrix)
+                    env, mapf = construct_search_env(project_schedule, problem_spec, env_graph;
+                        primary_objective=primary_objective); # TODO pass in t0_ here (maybe get it straight from model?)
+                    pc_mapf = PC_MAPF(env,mapf);
+                    ##### Call CBS Search Routine (LEVEL 2) #####
+                    solution, cost = solve!(solver,pc_mapf);
+                    if cost < solver.best_cost
+                        best_solution = solution
+                        best_assignment = adj_matrix # this represents an assignment matrix in AssignmentMILP
+                        solver.best_cost = cost # TODO make sure that the operation duration is accounted for here
+                        best_env = env
+                    end
+                    log_info(0,solver,string("HIGH LEVEL SEARCH: Best cost so far = ", solver.best_cost[1]))
+                end
+            end
+        catch e
+            if isa(e, SolverTimeOutException)
+                log_info(0,solver,e.msg)
+                break
+            else
+                throw(e)
+            end
         end
     end
     exit_assignment!(solver)

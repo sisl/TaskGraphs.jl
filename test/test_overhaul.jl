@@ -486,17 +486,24 @@ let
     dist_matrix = get_dist_matrix(env_graph)
     # r0 = [1,25,4,28]
     r0 = [1,25,8,28] # check that planning works even when it takes longer for some robots to arrive than others
-    s0 = [10,18,11,19]
-    sF = [42,50,43,51]
+    s0 = [10]#,18,11,19]
+    sF = [42] #,50,43,51]
+
+    task_shapes = Dict(1=>(2,2))
+    shape_dict = Dict(
+        10=>Dict((2,2)=>[10,18,11,19]),
+        42=>Dict((2,2)=>[42,50,43,51]),
+        )
 
     project_spec, robot_ICs = TaskGraphs.initialize_toy_problem(r0,[s0],[sF],(v1,v2)->dist_matrix[v1,v2])
     add_operation!(project_spec,construct_operation(project_spec,-1,[1],[],0))
 
-    cost_function = SumOfMakeSpans
+    cost_function = MakeSpan
     project_spec, problem_spec, object_ICs, object_FCs, robot_ICs = construct_task_graphs_problem(
-        project_spec,r0,s0,sF,dist_matrix;cost_function=cost_function)
+        project_spec,r0,s0,sF,dist_matrix;cost_function=cost_function,
+        task_shapes=task_shapes,shape_dict=shape_dict)
 
-    solver = PC_TAPF_Solver(DEBUG=true,verbosity=1,LIMIT_A_star_iterations=5*nv(env_graph));
+    solver = PC_TAPF_Solver(DEBUG=true,LIMIT_A_star_iterations=5*nv(env_graph),verbosity=4);
 
     solution, _, cost, env = high_level_search!(SparseAdjacencyMILP(),solver,env_graph,project_spec,problem_spec,robot_ICs,Gurobi.Optimizer)
 
@@ -526,12 +533,28 @@ let
     env_id = 2
     env_file = joinpath(ENVIRONMENT_DIR,string("env_",env_id,".toml"))
     factory_env = read_env(env_file)
+
+    # for (v,dict) in factory_env.expanded_zones
+    #     for (shape,vtxs) in dict
+    #         @test sort(vtxs) == vtxs
+    #     end
+    # end
+
     env_graph = factory_env
     dist_matrix = get_dist_matrix(env_graph)
     N = 5
     M = 10
     r0,s0,sF = get_random_problem_instantiation(N,M,get_pickup_zones(factory_env),get_dropoff_zones(factory_env),
             get_free_zones(factory_env))
+    def = SimpleProblemDef(ProjectSpec(),r0,s0,sF)
+    open("dummy.toml", "w") do io
+        TOML.print(io, TOML.parse(def))
+    end
+    read_problem_def("dummy.toml")
+
+    project_spec, r0, s0, sF = def.project_spec,def.r0,def.s0,def.sF
+    project_spec, problem_spec, object_ICs, object_FCs, robot_ICs = construct_task_graphs_problem(
+            project_spec, r0, s0, sF, dist_matrix);
 
     project_spec = construct_random_project_spec(M,s0,sF)
     problem_def = SimpleProblemDef(project_spec,r0,s0,sF)
