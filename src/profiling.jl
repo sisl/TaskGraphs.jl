@@ -313,11 +313,12 @@ function run_profiling(MODE=:nothing;
     results_dir = RESULTS_DIR,
     Δt_min=0,
     Δt_max=0,
-    TimeLimit=50,
+    solver_template=PC_TAPF_Solver(),
+    TimeLimit=solver_template.time_limit,
     OutputFlag=0,
     Presolve = -1,
-    verbosity=0,
-    LIMIT_A_star_iterations=10000,
+    # verbosity=0,
+    # LIMIT_A_star_iterations=10000,
     milp_model=AssignmentMILP(),
     primary_objective=SumOfMakeSpans
     )
@@ -390,7 +391,7 @@ function run_profiling(MODE=:nothing;
                     shape_dict=factory_env.expanded_zones
                     );
 
-                solver = PC_TAPF_Solver(verbosity=verbosity,LIMIT_A_star_iterations=LIMIT_A_star_iterations,time_limit=TimeLimit);
+                solver = PC_TAPF_Solver(solver_template,start_time=time());
                 if MODE == :assignment_only
                     results_dict = profile_task_assignment(solver, project_spec, problem_spec, robot_ICs, env_graph, dist_matrix;
                         milp_model=milp_model,primary_objective=primary_objective,TimeLimit=TimeLimit,OutputFlag=OutputFlag,Presolve=Presolve)

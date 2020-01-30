@@ -112,7 +112,13 @@ function Base.iterate(it::ActionIter, iter_state::ActionIterState)
     Action(e=Edge(it.s,it.neighbor_list[iter_state.idx])), iter_state
 end
 Base.length(iter::ActionIter) = length(iter.neighbor_list)
-CRCBS.get_possible_actions(env::LowLevelEnv,s::State) = ActionIter(s.vtx,outneighbors(env.graph,s.vtx))
+function CRCBS.get_possible_actions(env::LowLevelEnv,s::State)
+    if s.vtx > 0
+        ActionIter(s.vtx,outneighbors(env.graph,s.vtx))
+    else
+        ActionIter(-1,Int[])
+    end
+end
 function CRCBS.get_possible_actions(env::MetaAgentCBS.LowLevelEnv,s::MetaAgentCBS.State{PCCBS.State})
     d_set = Set{Tuple}([(0,0),(-1,0),(0,1),(1,0),(0,-1)])
     for (e,s) in zip(env.envs, s.states)

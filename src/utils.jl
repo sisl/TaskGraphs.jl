@@ -15,75 +15,75 @@ using CRCBS
 # using ..TaskGraphsCore
 
 export
-    validate,
+    # validate,
     exclude_solutions!,
     cached_pickup_and_delivery_distances,
     construct_task_graphs_problem
 
 # function get_station_precedence_dict(model::M) where {M<:JuMP.Model} end
-function validate(path::Path, msg::String)
-    @assert( !any(convert_to_vertex_lists(path) .== -1), msg )
-    return true
-end
-function validate(path::Path, v::Int)
-    validate(path, string("invalid path with -1 vtxs: v = ",v,", path = ",convert_to_vertex_lists(path)))
-end
-function validate(path::Path, v::Int, cbs_env)
-    validate(path, string("v = ",v,", path = ",convert_to_vertex_lists(path),", goal: ",cbs_env.goal))
-end
-function validate(project_schedule::ProjectSchedule)
-    G = get_graph(project_schedule)
-    try
-        @assert !is_cyclic(G) "is_cyclic(G)"
-        for (id,node) in project_schedule.planning_nodes
-            if typeof(node) <: COLLECT
-                @assert(get_location_id(node) != -1, string("get_location_id(node) != -1 for node id ", id))
-            end
-        end
-        for v in vertices(G)
-            node = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v))
-            @assert( outdegree(G,v) >= sum([0, values(required_successors(node))...]) )
-            @assert( indegree(G,v) >= sum([0, values(required_predecessors(node))...]) )
-        end
-    catch e
-        # if typeof(e) <: AssertionError
-        #     print(e.msg)
-        # else
-            throw(e)
-        # end
-        return false
-    end
-    return true
-end
-function validate(project_schedule::ProjectSchedule,paths::Vector{Vector{Int}},t0::Vector{Int},tF::Vector{Int})
-    G = get_graph(project_schedule)
-    for v in vertices(G)
-        node = get_node_from_vtx(project_schedule, v)
-        path_spec = get_path_spec(project_schedule, v)
-        agent_id = path_spec.agent_id
-        if agent_id != -1
-            path = paths[agent_id]
-            start_vtx = path_spec.start_vtx
-            final_vtx = path_spec.final_vtx
-            try
-                if start_vtx != -1
-                    @assert(path[t0[v] + 1] == start_vtx, string("node: ",typeof(node), ", vtx: ",start_vtx, ", t+1: ",t0[v]+1,", path: ", path))
-                end
-                if final_vtx != -1
-                    @assert(path[tF[v] + 1] == final_vtx, string("node: ",typeof(node), ", vtx: ",start_vtx, ", t+1: ",t0[v]+1,", path: ", path))
-                end
-            catch e
-                # if typeof(e) <: AssertionError
-                #     print(e.msg)
-                # else
-                    throw(e)
-                # end
-                return false
-            end
-        end
-    end
-    return true
-end
+# function validate(path::Path, msg::String)
+#     @assert( !any(convert_to_vertex_lists(path) .== -1), msg )
+#     return true
+# end
+# function validate(path::Path, v::Int)
+#     validate(path, string("invalid path with -1 vtxs: v = ",v,", path = ",convert_to_vertex_lists(path)))
+# end
+# function validate(path::Path, v::Int, cbs_env)
+#     validate(path, string("v = ",v,", path = ",convert_to_vertex_lists(path),", goal: ",cbs_env.goal))
+# end
+# function validate(project_schedule::ProjectSchedule)
+#     G = get_graph(project_schedule)
+#     try
+#         @assert !is_cyclic(G) "is_cyclic(G)"
+#         for (id,node) in project_schedule.planning_nodes
+#             if typeof(node) <: COLLECT
+#                 @assert(get_location_id(node) != -1, string("get_location_id(node) != -1 for node id ", id))
+#             end
+#         end
+#         for v in vertices(G)
+#             node = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v))
+#             @assert( outdegree(G,v) >= sum([0, values(required_successors(node))...]) )
+#             @assert( indegree(G,v) >= sum([0, values(required_predecessors(node))...]) )
+#         end
+#     catch e
+#         # if typeof(e) <: AssertionError
+#         #     print(e.msg)
+#         # else
+#             throw(e)
+#         # end
+#         return false
+#     end
+#     return true
+# end
+# function validate(project_schedule::ProjectSchedule,paths::Vector{Vector{Int}},t0::Vector{Int},tF::Vector{Int})
+#     G = get_graph(project_schedule)
+#     for v in vertices(G)
+#         node = get_node_from_vtx(project_schedule, v)
+#         path_spec = get_path_spec(project_schedule, v)
+#         agent_id = path_spec.agent_id
+#         if agent_id != -1
+#             path = paths[agent_id]
+#             start_vtx = path_spec.start_vtx
+#             final_vtx = path_spec.final_vtx
+#             try
+#                 if start_vtx != -1
+#                     @assert(path[t0[v] + 1] == start_vtx, string("node: ",typeof(node), ", vtx: ",start_vtx, ", t+1: ",t0[v]+1,", path: ", path))
+#                 end
+#                 if final_vtx != -1
+#                     @assert(path[tF[v] + 1] == final_vtx, string("node: ",typeof(node), ", vtx: ",start_vtx, ", t+1: ",t0[v]+1,", path: ", path))
+#                 end
+#             catch e
+#                 # if typeof(e) <: AssertionError
+#                 #     print(e.msg)
+#                 # else
+#                     throw(e)
+#                 # end
+#                 return false
+#             end
+#         end
+#     end
+#     return true
+# end
 
 export
     remap_object_id,

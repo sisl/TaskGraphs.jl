@@ -83,6 +83,12 @@ end
 function check_time(solver::PC_TAPF_Solver)
     if time() - solver.start_time >= solver.time_limit
         throw(SolverTimeOutException(string("TIME OUT: Overall time limit of ",solver.time_limit," seconds exceeded.")))
+    elseif solver.num_assignment_iterations > solver.LIMIT_assignment_iterations
+        throw(SolverTimeOutException(string("MAX OUT: milp solver iteration limit of ",solver.LIMIT_assignment_iterations," exceeded.")))
+    elseif solver.num_CBS_iterations > solver.LIMIT_CBS_iterations
+        throw(SolverTimeOutException(string("MAX OUT: cbs iteration limit of ",solver.LIMIT_CBS_iterations," exceeded.")))
+    elseif solver.num_A_star_iterations > solver.LIMIT_A_star_iterations
+        throw(SolverTimeOutException(string("MAX OUT: A* iteration limit of ",solver.LIMIT_A_star_iterations," exceeded.")))
     end
 end
 # update functions
@@ -118,16 +124,16 @@ function exit_a_star!(solver::S,args...) where {S<:PC_TAPF_Solver}
     check_time(solver)
 end
 function CRCBS.logger_step_a_star!(solver::PC_TAPF_Solver, path, s, q_cost)
-    log_info(1,solver.l4_verbosity,"A_star: q_cost = ", q_cost)
+    log_info(1,solver.l4_verbosity,"A*: q_cost = ", q_cost)
 end
 function CRCBS.logger_enter_a_star!(solver::PC_TAPF_Solver)
-    log_info(0,solver.l4_verbosity,"A_star: entering...")
+    log_info(0,solver.l4_verbosity,"A*: entering...")
 end
 function CRCBS.logger_exit_a_star!(solver::PC_TAPF_Solver, path, cost, status)
     if status == false
-        log_info(0,solver.l4_verbosity,"A_star: failed to find feasible path. Returning path of cost ",cost)
+        log_info(-1,solver.l4_verbosity,"A*: failed to find feasible path. Returning path of cost ",cost)
     else
-        log_info(0,solver.l4_verbosity,"A_star: returning optimal path with cost ",cost)
+        log_info(0,solver.l4_verbosity,"A*: returning optimal path with cost ",cost)
     end
 end
 function TOML.parse(solver::S) where {S<:PC_TAPF_Solver}
@@ -466,7 +472,7 @@ function CRCBS.build_env(solver, env::E, mapf::M, node::N, schedule_node::T, v::
     end
     # make sure base_path hits t0 constraint
     if get_end_index(base_path) < env.cache.t0[v]
-        log_info(-1, solver, string("# LOW LEVEL SEARCH: in schedule node ",v," of type ",
+        log_info(-1, solver, string("LOW LEVEL SEARCH: in schedule node ",v," of type ",
             typeof(schedule_node),", cache.t0[v] - get_end_index(base_path) = ",env.cache.t0[v] - get_end_index(base_path),". Extending path to ",env.cache.t0[v]," ..."))
         # base_path = extend_path(cbs_env,base_path,env.cache.t0[v])
         extend_path!(cbs_env,base_path,env.cache.t0[v])
@@ -555,7 +561,7 @@ function plan_path!(solver::PC_TAPF_Solver, env::SearchEnv, mapf::M, node::N, sc
     log_info(3,solver,string("agent_path = ", convert_to_vertex_lists(path)))
     log_info(3,solver,string("cost = ", get_cost(path)))
     if node.cost >= solver.best_cost
-        log_info(0,solver,"# LOW LEVEL SEARCH: node.cost >= solver.best_cost ... Exiting early")
+        log_info(0,solver,"LOW LEVEL SEARCH: node.cost >= solver.best_cost ... Exiting early")
         return false
     end
 
@@ -775,7 +781,7 @@ function CRCBS.solve!(
             break
         end
     end
-    log_info(0,solver,"No Solution Found. Returning default solution")
+    log_info(0,solver,"CBS: No Solution Found. Returning default solution")
     exit_cbs!(solver)
     return default_solution(mapf)
 end
@@ -914,7 +920,7 @@ function high_level_search!(solver::P, env_graph, project_schedule::ProjectSched
             end
         catch e
             if isa(e, SolverTimeOutException)
-                log_info(0,solver,e.msg)
+                log_info(-1,solver,e.msg)
                 break
             else
                 throw(e)

@@ -19,21 +19,25 @@ let
     for milp_model in milp_models
         for mode in modes
             run_profiling(mode;
-                num_tasks=[1],
-                num_robots=[4],
+                num_tasks=[16],
+                num_robots=[20],
                 depth_biases=[0.1],
                 task_size_distributions = [
-                    ( 1=>0.0, 2=>0.0, 4=>1.0 )
+                    ( 1=>1.0, 2=>1.0, 4=>0.5 )
                     ],
                 num_trials=1,
                 problem_dir = dummy_problem_dir,
                 results_dir = joinpath(dummy_results_dir, string(typeof(milp_model))),
                 milp_model = milp_model,
-                TimeLimit=20,
                 OutputFlag=0,
                 Presolve = -1, # automatic setting (-1), off (0), conservative (1), or aggressive (2)
-                verbosity = 4,
-                LIMIT_A_star_iterations=8000,
+                # verbosity = 1,
+                solver_template = PC_TAPF_Solver(
+                    verbosity=1,
+                    l4_verbosity=0,
+                    LIMIT_A_star_iterations=8000,
+                    time_limit=20
+                    )
                 )
         end
         run(pipeline(`rm -rf $dummy_problem_dir`, stdout=devnull, stderr=devnull))
