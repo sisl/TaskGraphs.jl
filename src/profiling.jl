@@ -203,11 +203,8 @@ function construct_result_dataframes(problem_dir,results_dir,N_problems)
     )
 end
 
-function profile_task_assignment(problem_def::SimpleProblemDef,env_graph,dist_matrix;
+function profile_task_assignment(solver, project_spec, problem_spec, robot_ICs, env_graph, dist_matrix;
     milp_model=AssignmentMILP(),primary_objective=SumOfMakeSpans,kwargs...)
-    project_spec, r0, s0, sF = problem_def.project_spec,problem_def.r0,problem_def.s0,problem_def.sF
-    project_spec, problem_spec, object_ICs, object_FCs, robot_ICs = construct_task_graphs_problem(
-            project_spec, r0, s0, sF, dist_matrix);
 
     project_schedule = construct_partial_project_schedule(project_spec, problem_spec, robot_ICs)
     model = formulate_milp(milp_model,project_schedule,problem_spec)
@@ -225,14 +222,11 @@ function profile_task_assignment(problem_def::SimpleProblemDef,env_graph,dist_ma
     results_dict["cost"] = cost
     results_dict
 end
-function profile_low_level_search_and_repair(problem_def::SimpleProblemDef,env_graph,dist_matrix,adj_matrix;
+function profile_low_level_search_and_repair(solver, project_spec, problem_spec, robot_ICs, env_graph,dist_matrix,adj_matrix;
     milp_model=AssignmentMILP(),primary_objective=SumOfMakeSpans)
-    project_spec, r0, s0, sF = problem_def.project_spec,problem_def.r0,problem_def.s0,problem_def.sF
-    project_spec, problem_spec, object_ICs, object_FCs, robot_ICs = construct_task_graphs_problem(
-            project_spec, r0, s0, sF, dist_matrix);
-    # Solve the problem
-    solver = PC_TAPF_Solver(verbosity=0,LIMIT_A_star_iterations=10*nv(env_graph));
-    project_schedule = construct_partial_project_schedule(project_spec,problem_spec,map(i->robot_ICs[i], 1:problem_spec.N))
+
+    # solver = PC_TAPF_Solver(verbosity=0,LIMIT_A_star_iterations=10*nv(env_graph));
+    project_schedule = construct_partial_project_schedule(project_spec,problem_spec,robot_ICs)
     @assert update_project_schedule!(milp_model,project_schedule, problem_spec, adj_matrix)
     env, mapf = construct_search_env(project_schedule, problem_spec, env_graph;
         primary_objective=primary_objective); # TODO pass in t0_ here (maybe get it straight from model?)
@@ -251,14 +245,11 @@ function profile_low_level_search_and_repair(problem_def::SimpleProblemDef,env_g
     results_dict["num_conflicts"] = count_conflicts(detect_conflicts(node.solution))
     results_dict
 end
-function profile_low_level_search(problem_def::SimpleProblemDef,env_graph,dist_matrix,adj_matrix;
+function profile_low_level_search(solver, project_spec, problem_spec, robot_ICs, env_graph,dist_matrix,adj_matrix;
     milp_model=AssignmentMILP(),primary_objective=SumOfMakeSpans)
-    project_spec, r0, s0, sF = problem_def.project_spec,problem_def.r0,problem_def.s0,problem_def.sF
-    project_spec, problem_spec, object_ICs, object_FCs, robot_ICs = construct_task_graphs_problem(
-            project_spec, r0, s0, sF, dist_matrix);
-    # Solve the problem
-    solver = PC_TAPF_Solver(verbosity=0,LIMIT_A_star_iterations=10*nv(env_graph));
-    project_schedule = construct_partial_project_schedule(project_spec,problem_spec,map(i->robot_ICs[i], 1:problem_spec.N))
+
+    # solver = PC_TAPF_Solver(verbosity=0,LIMIT_A_star_iterations=10*nv(env_graph));
+    project_schedule = construct_partial_project_schedule(project_spec,problem_spec,robot_ICs)
     @assert update_project_schedule!(milp_model, project_schedule, problem_spec, adj_matrix)
     env, mapf = construct_search_env(project_schedule, problem_spec, env_graph;
         primary_objective=primary_objective); # TODO pass in t0_ here (maybe get it straight from model?)
@@ -277,13 +268,10 @@ function profile_low_level_search(problem_def::SimpleProblemDef,env_graph,dist_m
     results_dict["num_conflicts"] = count_conflicts(detect_conflicts(node.solution))
     results_dict
 end
-function profile_full_solver(problem_def::SimpleProblemDef,env_graph,dist_matrix;
+function profile_full_solver(solver, project_spec, problem_spec, robot_ICs, env_graph,dist_matrix;
         milp_model=AssignmentMILP(),primary_objective=SumOfMakeSpans,kwargs...)
-    project_spec, r0, s0, sF = problem_def.project_spec,problem_def.r0,problem_def.s0,problem_def.sF
-    project_spec, problem_spec, object_ICs, object_FCs, robot_ICs = construct_task_graphs_problem(
-            project_spec, r0, s0, sF, dist_matrix);
     # Solve the problem
-    solver = PC_TAPF_Solver(verbosity=0,LIMIT_A_star_iterations=5*nv(env_graph));
+    # solver = PC_TAPF_Solver(verbosity=0,LIMIT_A_star_iterations=5*nv(env_graph));
 
     (solution, assignment, cost, search_env), elapsed_time, byte_ct, gc_time, mem_ct = @timed high_level_search!(
         milp_model, solver, env_graph, project_spec, problem_spec, robot_ICs, Gurobi.Optimizer;
@@ -315,14 +303,21 @@ function run_profiling(MODE=:nothing;
     num_robots = [10,20,30,40],
     depth_biases = [0.1,0.4,0.7,1.0],
     max_parent_settings = [3],
+    task_size_distributions = [
+        (1=>1.0,2=>0.0,4=>0.0)
+        ],
     num_trials = 4,
     env_id = 2,
     initial_problem_id = 1,
     problem_dir = PROBLEM_DIR,
     results_dir = RESULTS_DIR,
+    Δt_min=0,
+    Δt_max=0,
     TimeLimit=50,
     OutputFlag=0,
     Presolve = -1,
+    verbosity=0,
+    LIMIT_A_star_iterations=10000,
     milp_model=AssignmentMILP(),
     primary_objective=SumOfMakeSpans
     )
@@ -335,96 +330,100 @@ function run_profiling(MODE=:nothing;
     Random.seed!(1)
     problem_id = initial_problem_id-1;
     # run tests and push results into table
-    for M in num_tasks
-        for N in num_robots
-            for max_parents in max_parent_settings
-                for depth_bias in depth_biases
-                    for trial in 1:num_trials
-                        try
-                            problem_id += 1 # moved this to the beginning so it doesn't get skipped
-                            problem_filename = joinpath(problem_dir,string("problem",problem_id,".toml"))
-                            config_filename = joinpath(problem_dir,string("config",problem_id,".toml"))
-                            if MODE == :write
-                                # initialize a random problem
-                                if !isdir(problem_dir)
-                                    mkdir(problem_dir)
-                                end
-                                if isfile(problem_filename)
-                                    println("file ",problem_filename," already exists. Skipping ...")
-                                    continue # don't overwrite existing files
-                                end
-                                Δt_min=0
-                                Δt_max=0
-                                r0,s0,sF = get_random_problem_instantiation(N,M,get_pickup_zones(factory_env),get_dropoff_zones(factory_env),
-                                        get_free_zones(factory_env))
-                                project_spec = construct_random_project_spec(M,s0,sF;max_parents=max_parents,depth_bias=depth_bias,Δt_min=0,Δt_max=0)
-                                problem_def = SimpleProblemDef(project_spec,r0,s0,sF)
-                                # Save the problem
-                                open(problem_filename, "w") do io
-                                    TOML.print(io, TOML.parse(problem_def))
-                                end
-                                open(config_filename, "w") do io
-                                    TOML.print(io, Dict(
-                                        "N"=>N,
-                                        "M"=>M,
-                                        "max_parents"=>max_parents,
-                                        "depth_bias"=>depth_bias,
-                                        "min_process_time"=>Δt_min,
-                                        "max_process_time"=>Δt_max,
-                                        "env_id"=>env_id
-                                        )
-                                    )
-                                end
-                            elseif MODE != :nothing
-                                subdir = joinpath(results_dir,string(MODE))
-                                results_filename = joinpath(subdir,string("results",problem_id,".toml"))
-                                if !isdir(subdir)
-                                    mkpath(subdir)
-                                end
-                                if isfile(results_filename)
-                                    println("file ",results_filename," already exists. Skipping ...")
-                                    continue # don't overwrite existing files
-                                end
-                                assignment_filename = joinpath(results_dir,string(:assignment_only),string("results",problem_id,".toml"))
-                                # Load the problem
-                                problem_def = read_problem_def(problem_filename)
-                                if MODE == :assignment_only
-                                    results_dict = profile_task_assignment(problem_def,env_graph,dist_matrix;
-                                        milp_model=milp_model,primary_objective=primary_objective,TimeLimit=TimeLimit,OutputFlag=OutputFlag,Presolve=Presolve)
-                                end
-                                if MODE == :low_level_search_without_repair
-                                    # assignments = read_assignment(assignment_filename)
-                                    adj_matrix = read_sparse_matrix(assignment_filename)
-                                    results_dict = profile_low_level_search(problem_def,env_graph,dist_matrix,adj_matrix;
-                                        milp_model=milp_model,primary_objective=primary_objective)
-                                end
-                                if MODE == :low_level_search_with_repair
-                                    # assignments = read_assignment(assignment_filename)
-                                    adj_matrix = read_sparse_matrix(assignment_filename)
-                                    results_dict = profile_low_level_search_and_repair(problem_def,env_graph,dist_matrix,adj_matrix;
-                                        milp_model=milp_model,primary_objective=primary_objective)
-                                end
-                                if MODE == :full_solver
-                                    results_dict = profile_full_solver(problem_def,env_graph,dist_matrix;
-                                        milp_model=milp_model,primary_objective=primary_objective,TimeLimit=TimeLimit,OutputFlag=OutputFlag,Presolve=Presolve)
-                                end
-                                println("PROFILER: ",typeof(milp_model)," --- ",string(MODE), " --- Solved problem ",problem_id," in ",results_dict["time"]," seconds! \n\n")
-                                # print the results
-                                open(results_filename, "w") do io
-                                    TOML.print(io, results_dict)
-                                end
-                            end
-                        catch e
-                            if typeof(e) <: AssertionError
-                                println(e.msg)
-                            else
-                                # throw(e)
-                            end
-                        end
-                    end
+    for (M,N,task_sizes,max_parents,depth_bias,trial) in Base.Iterators.product(
+        num_tasks,num_robots,task_size_distributions,max_parent_settings,depth_biases,1:num_trials
+        )
+        # try
+            problem_id += 1 # moved this to the beginning so it doesn't get skipped
+            problem_filename = joinpath(problem_dir,string("problem",problem_id,".toml"))
+            config_filename = joinpath(problem_dir,string("config",problem_id,".toml"))
+            if MODE == :write
+                # initialize a random problem
+                if !isdir(problem_dir)
+                    mkdir(problem_dir)
+                end
+                if isfile(problem_filename)
+                    println("file ",problem_filename," already exists. Skipping ...")
+                    continue # don't overwrite existing files
+                end
+                r0,s0,sF = get_random_problem_instantiation(N,M,get_pickup_zones(factory_env),get_dropoff_zones(factory_env),
+                        get_free_zones(factory_env))
+                project_spec = construct_random_project_spec(M,s0,sF;max_parents=max_parents,depth_bias=depth_bias,Δt_min=Δt_min,Δt_max=Δt_max)
+                shapes = choose_random_object_sizes(M,Dict(task_size_distributions...))
+                problem_def = SimpleProblemDef(project_spec,r0,s0,sF,shapes)
+                # Save the problem
+                open(problem_filename, "w") do io
+                    TOML.print(io, TOML.parse(problem_def))
+                end
+                open(config_filename, "w") do io
+                    TOML.print(io, Dict(
+                        "N"=>N,
+                        "M"=>M,
+                        "max_parents"=>max_parents,
+                        "depth_bias"=>depth_bias,
+                        "min_process_time"=>Δt_min,
+                        "max_process_time"=>Δt_max,
+                        "env_id"=>env_id
+                        )
+                    )
+                end
+            elseif MODE != :nothing
+                subdir = joinpath(results_dir,string(MODE))
+                results_filename = joinpath(subdir,string("results",problem_id,".toml"))
+                if !isdir(subdir)
+                    mkpath(subdir)
+                end
+                if isfile(results_filename)
+                    println("file ",results_filename," already exists. Skipping ...")
+                    continue # don't overwrite existing files
+                end
+                assignment_filename = joinpath(results_dir,string(:assignment_only),string("results",problem_id,".toml"))
+                # Load the problem
+                problem_def = read_problem_def(problem_filename)
+                project_spec, r0, s0, sF = problem_def.project_spec,problem_def.r0,problem_def.s0,problem_def.sF
+                # @show problem_def.shapes
+                # @show map(o->factory_env.expanded_zones[s0[o]][problem_def.shapes[o]], 1:M)
+                project_spec, problem_spec, _, _, robot_ICs = construct_task_graphs_problem(
+                    project_spec, r0, s0, sF, dist_matrix;
+                    cost_function=primary_objective,
+                    task_shapes=problem_def.shapes,
+                    shape_dict=factory_env.expanded_zones
+                    );
+
+                solver = PC_TAPF_Solver(verbosity=verbosity,LIMIT_A_star_iterations=LIMIT_A_star_iterations,time_limit=TimeLimit);
+                if MODE == :assignment_only
+                    results_dict = profile_task_assignment(solver, project_spec, problem_spec, robot_ICs, env_graph, dist_matrix;
+                        milp_model=milp_model,primary_objective=primary_objective,TimeLimit=TimeLimit,OutputFlag=OutputFlag,Presolve=Presolve)
+                end
+                if MODE == :low_level_search_without_repair
+                    # assignments = read_assignment(assignment_filename)
+                    adj_matrix = read_sparse_matrix(assignment_filename)
+                    results_dict = profile_low_level_search(solver, project_spec, problem_spec, robot_ICs,env_graph,dist_matrix,adj_matrix;
+                        milp_model=milp_model,primary_objective=primary_objective)
+                end
+                if MODE == :low_level_search_with_repair
+                    # assignments = read_assignment(assignment_filename)
+                    adj_matrix = read_sparse_matrix(assignment_filename)
+                    results_dict = profile_low_level_search_and_repair(solver, project_spec, problem_spec, robot_ICs,env_graph,dist_matrix,adj_matrix;
+                        milp_model=milp_model,primary_objective=primary_objective)
+                end
+                if MODE == :full_solver
+                    results_dict = profile_full_solver(solver, project_spec, problem_spec, robot_ICs,env_graph,dist_matrix;
+                        milp_model=milp_model,primary_objective=primary_objective,TimeLimit=TimeLimit,OutputFlag=OutputFlag,Presolve=Presolve)
+                end
+                println("PROFILER: ",typeof(milp_model)," --- ",string(MODE), " --- Solved problem ",problem_id," in ",results_dict["time"]," seconds! \n\n")
+                # print the results
+                open(results_filename, "w") do io
+                    TOML.print(io, results_dict)
                 end
             end
-        end
+        # catch e
+            # if typeof(e) <: AssertionError
+            #     println(e.msg)
+            # else
+                # throw(e)
+            # end
+        # end
     end
 end
 

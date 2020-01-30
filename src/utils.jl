@@ -6,6 +6,7 @@ using GraphUtils
 using LinearAlgebra
 using DataStructures
 using JuMP, MathOptInterface, Gurobi
+using Random
 
 using ..TaskGraphs
 using CRCBS
@@ -45,11 +46,11 @@ function validate(project_schedule::ProjectSchedule)
             @assert( indegree(G,v) >= sum([0, values(required_predecessors(node))...]) )
         end
     catch e
-        if typeof(e) <: AssertionError
-            print(e.msg)
-        else
+        # if typeof(e) <: AssertionError
+        #     print(e.msg)
+        # else
             throw(e)
-        end
+        # end
         return false
     end
     return true
@@ -72,11 +73,11 @@ function validate(project_schedule::ProjectSchedule,paths::Vector{Vector{Int}},t
                     @assert(path[tF[v] + 1] == final_vtx, string("node: ",typeof(node), ", vtx: ",start_vtx, ", t+1: ",t0[v]+1,", path: ", path))
                 end
             catch e
-                if typeof(e) <: AssertionError
-                    print(e.msg)
-                else
+                # if typeof(e) <: AssertionError
+                #     print(e.msg)
+                # else
                     throw(e)
-                end
+                # end
                 return false
             end
         end
@@ -193,15 +194,34 @@ function construct_task_graphs_problem(
         dist_matrix,
         Δt_collect=zeros(length(s0)),
         Δt_deliver=zeros(length(sF));
-        cost_function=SumOfMakeSpans
+        cost_function=SumOfMakeSpans,
+        task_shapes=map(o->(1,1),s0),
+        shape_dict=Dict{Int,Dict{Tuple{Int,Int},Vector{Int}}}()
         ) where {P<:ProjectSpec}
     # select subset of pickup, dropoff and free locations to instantiate objects and robots
     # r0,s0,sF        = get_random_problem_instantiation(N,M,pickup_vtxs,dropoff_vtxs,free_vtxs)
     # project_spec    = construct_random_project_spec(M,s0,sF;max_parents=3,depth_bias=1.0,Δt_min=0,Δt_max=0)
     N = length(r0)
     M = length(s0)
-    object_ICs = Vector{OBJECT_AT}([OBJECT_AT(o,s0[o]) for o in 1:M]) # initial object conditions
-    object_FCs = Vector{OBJECT_AT}([OBJECT_AT(o,sF[o]) for o in 1:M]) # final object conditions
+    object_ICs = Vector{OBJECT_AT}([OBJECT_AT(o, get(shape_dict[s0[o]], task_shapes[o], s0[o])) for o in 1:M]) # initial object conditions
+    object_FCs = Vector{OBJECT_AT}([OBJECT_AT(o,get(shape_dict[sF[o]], task_shapes[o], sF[o])) for o in 1:M]) # final object conditions
+    new_project_spec = ProjectSpec(
+        M=M,
+        initial_conditions=object_ICs,
+        final_conditions=object_FCs
+    )
+    for op in project_spec.operations
+        add_operation!(
+            new_project_spec,
+            construct_operation(
+                new_project_spec,
+                op.station_id,
+                map(o->get_id(get_object_id(o)), collect(op.pre)),
+                map(o->get_id(get_object_id(o)), collect(op.post)),
+                op.Δt
+            )
+        )
+    end
     # M = length(object_ICs)
     # object_ICs = project_spec.initial_conditions
     # object_FCs = project_spec.final_conditions
@@ -212,7 +232,7 @@ function construct_task_graphs_problem(
 
     Drs, Dss = cached_pickup_and_delivery_distances(r0,s0,sF,(v1,v2)->dist_matrix[v1,v2])
 
-    delivery_graph = construct_delivery_graph(project_spec,M)
+    delivery_graph = construct_delivery_graph(new_project_spec,M)
     # display(delivery_graph.tasks)
     G = delivery_graph.graph
     Δt = get_duration_vector(project_spec) # initialize vector of operation times
@@ -227,13 +247,13 @@ function construct_task_graphs_problem(
     for i in 1:N
         tr0_[i] = 0.0
     end
-    root_node_groups = map(v->get_input_ids(project_spec.operations[v]),collect(project_spec.root_nodes))
+    root_node_groups = map(v->get_input_ids(new_project_spec.operations[v]),collect(new_project_spec.root_nodes))
     problem_spec = ProblemSpec(N=N,M=M,graph=G,D=dist_matrix,Drs=Drs,
         Dss=Dss,Δt=Δt,tr0_=tr0_,to0_=to0_,root_nodes=root_node_groups,
         cost_function=cost_function,
-        Δt_collect=Δt_collect,Δt_deliver=Δt_deliver,s0=s0,sF=sF)
+        Δt_collect=Δt_collect,Δt_deliver=Δt_deliver,r0=r0,s0=s0,sF=sF)
     # @show problem_spec.root_nodes
-    return project_spec, problem_spec, object_ICs, object_FCs, robot_ICs
+    return new_project_spec, problem_spec, object_ICs, object_FCs, robot_ICs
 end
 function construct_task_graphs_problem(
         operations::Vector{Operation},
@@ -251,9 +271,9 @@ function construct_task_graphs_problem(
     # project_spec    = construct_random_project_spec(M,s0,sF;max_parents=3,depth_bias=1.0,Δt_min=0,Δt_max=0)
     N = length(robot_ICs)
     M = length(object_ICs)
-    r0 = map(pred->get_id(get_initial_location_id(pred)),robot_ICs)
-    s0 = map(pred->get_id(get_initial_location_id(pred)),object_ICs)
-    sF = map(pred->get_id(get_initial_location_id(pred)),object_FCs)
+    r0 = map(pred->get_id(get_location_id(pred)),robot_ICs)
+    s0 = map(pred->get_id(get_location_id(pred)),object_ICs)
+    sF = map(pred->get_id(get_location_id(pred)),object_FCs)
     # object_ICs = Vector{OBJECT_AT}([OBJECT_AT(o,s0[o]) for o in 1:M]) # initial object conditions
     # object_FCs = Vector{OBJECT_AT}([OBJECT_AT(o,sF[o]) for o in 1:M]) # final object conditions
     # M = length(object_ICs)
@@ -285,7 +305,7 @@ function construct_task_graphs_problem(
     problem_spec = ProblemSpec(N=N,M=M,graph=G,D=dist_matrix,Drs=Drs,
         Dss=Dss,Δt=Δt_process,tr0_=tr0_,to0_=to0_,root_nodes=root_node_groups,
         cost_function=cost_function,
-        Δt_collect=Δt_collect,Δt_deliver=Δt_deliver,s0=s0,sF=sF)
+        Δt_collect=Δt_collect,Δt_deliver=Δt_deliver,r0=r0,s0=s0,sF=sF)
     # @show problem_spec.root_nodes
     return project_spec, problem_spec, object_ICs, object_FCs, robot_ICs
 end
@@ -334,8 +354,7 @@ function construct_random_project_spec(M::Int,object_ICs::Vector{OBJECT_AT},obje
         pairs = Vector{Pair{Int,Int}}()
         # pair = Pair{Int,Int}(0,0)
         for d in 1:depth
-            push!(pairs, peek(frontier))
-            dequeue!(frontier)
+            push!(pairs, dequeue_pair!(frontier))
         end
         for p in pairs[1:end-1]
             enqueue!(frontier,p)
@@ -364,6 +383,65 @@ function construct_random_project_spec(M::Int,s0::Vector{V},sF::Vector{V};kwargs
     object_FCs = Vector{OBJECT_AT}([OBJECT_AT(o,s) for (o,s) in enumerate(sF)])
     construct_random_project_spec(M,object_ICs,object_FCs;
         kwargs...)
+end
+
+export
+    choose_random_object_sizes,
+    convert_to_collaborative
+
+"""
+    Tool for randomly selecting how many robots (and in what configuration)
+        should deliver each task.
+"""
+function choose_random_object_sizes(M,probs::Dict{Tuple{Int,Int},Float64})
+    k = sort(collect(keys(probs)))
+    v = cumsum(map(key->probs[key], k))
+    v = v / sum(collect(values(probs)))
+    sizes = Vector{Tuple{Int,Int}}()
+    for j in 1:M
+        n = rand()
+        i = 1
+        while n > v[i]
+            i += 1
+        end
+        push!(sizes,k[i])
+    end
+    sizes
+end
+function choose_random_object_sizes(M,probs::Dict{Int,Float64}=Dict(1=>1.0,2=>0.0,4=>0.0),choices=[(1,1),(2,1),(1,2),(2,2)])
+    k = sort(collect(keys(probs)))
+    size_probs = Dict(s=>probs[s[1]*s[2]] for s in choices)
+    for ksize in k
+        counts = sum(map(s->s[1]*s[2]==ksize, choices))
+        for s in choices
+            size_probs[s] = size_probs[s] / counts
+        end
+    end
+    choose_random_object_sizes(M,size_probs)
+end
+
+"""
+    convert_to_collaborative(project_spec)
+"""
+function convert_to_collaborative(project_spec::ProjectSpec,new_starts::Dict{ObjectID,Vector{Int}},new_goals::Dict{ObjectID,Vector{Int}})
+    new_spec = ProjectSpec(
+        M=project_spec.M,
+        initial_conditions  = map(o->OBJECT_AT(get_object_id(o), new_starts[get_object_id(o)]), project_spec.initial_conditions),
+        final_conditions    = map(o->OBJECT_AT(get_object_id(o), new_goals[get_object_id(o)]), project_spec.final_conditions),
+    )
+    for op in project_spec.operations
+        add_operation!(
+            new_spec,
+            construct_operation(
+                new_spec,
+                op.station_id,
+                map(o->get_id(get_object_id(o)), collect(op.pre)),
+                map(o->get_id(get_object_id(o)), collect(op.post)),
+                op.Δt
+            )
+        )
+    end
+    new_spec
 end
 
 """

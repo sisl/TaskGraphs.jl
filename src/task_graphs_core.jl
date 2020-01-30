@@ -63,6 +63,7 @@ export
     root_nodes::Vector{Set{Int}} = [get_all_root_nodes(graph)]
     weights::Dict{Int,Float64} = Dict{Int,Float64}(v=>1.0 for v in 1:length(root_nodes))
     cost_function::F        = SumOfMakeSpans
+    r0::Vector{Int} = zeros(N)
     s0::Vector{Int} = zeros(M) # pickup stations for each task
     sF::Vector{Int} = zeros(M) # delivery station for each task
     nR::Vector{Int} = ones(M) # num robots required for each task (>1 => collaborative task)
@@ -270,18 +271,21 @@ export
     SimpleProblemDef,
     read_problem_def
 
-struct SimpleProblemDef
-    project_spec::ProjectSpec
-    r0::Vector{Int}
-    s0::Vector{Int}
-    sF::Vector{Int}
+@with_kw struct SimpleProblemDef
+    project_spec::ProjectSpec       = ProjectSpec()
+    r0::Vector{Int}                 = Int[]
+    s0::Vector{Int}                 = Int[]
+    sF::Vector{Int}                 = Int[]
+    shapes::Vector{Tuple{Int,Int}}  = Vector{Tuple{Int,Int}}([(1,1) for o in s0])
 end
+SimpleProblemDef(project_spec,r0,s0,sF) = SimpleProblemDef(project_spec=project_spec,r0=r0,s0=s0,sF=sF)
 
 function TOML.parse(def::SimpleProblemDef)
     toml_dict = TOML.parse(def.project_spec)
     toml_dict["r0"] = def.r0
     toml_dict["s0"] = def.s0
     toml_dict["sF"] = def.sF
+    toml_dict["shapes"] = map(s->[s...], def.shapes)
     toml_dict
 end
 function read_problem_def(toml_dict::Dict)
@@ -289,7 +293,8 @@ function read_problem_def(toml_dict::Dict)
         read_project_spec(toml_dict),
         toml_dict["r0"],
         toml_dict["s0"],
-        toml_dict["sF"]
+        toml_dict["sF"],
+        map(s->tuple(s...), toml_dict["shapes"])
     )
 end
 function read_problem_def(io)
@@ -1050,9 +1055,11 @@ function construct_partial_project_schedule(
             dropoff_station_ids = get_location_ids(object_fc)
             # TODO Handle collaborative tasks
             if length(pickup_station_ids) > 1 # COLLABORATIVE TRANSPORT
+                # println("FORMULATING COLLABORATIVE TRANSPORT TASK")
                 add_headless_delivery_task!(project_schedule,problem_spec,
                     ObjectID(object_id),operation_id,pickup_station_ids,dropoff_station_ids)
             else # SINGLE AGENT TRANSPORT
+                # println("FORMULATING NON-COLLABORATIVE TRANSPORT TASK")
                 add_headless_delivery_task!(project_schedule,problem_spec,
                     ObjectID(object_id),operation_id,pickup_station_ids[1],dropoff_station_ids[1])
             end
@@ -1315,7 +1322,7 @@ end
     Outputs:
         `model` - the optimization model
 """
-function formulate_optimization_problem(G,D,Drs,Dss,Δt,Δt_collect,Δt_deliver,to0_,tr0_,root_nodes,weights,s0,sF,nR,optimizer;
+function formulate_optimization_problem(N,M,G,D,Drs,Dss,Δt,Δt_collect,Δt_deliver,to0_,tr0_,root_nodes,weights,r0,s0,sF,nR,optimizer;
     TimeLimit=100,
     OutputFlag=0,
     Presolve = -1, # automatic setting (-1), off (0), conservative (1), or aggressive (2)
@@ -1328,8 +1335,9 @@ function formulate_optimization_problem(G,D,Drs,Dss,Δt,Δt_collect,Δt_deliver,
         OutputFlag=OutputFlag,
         Presolve=Presolve
         ))
-    M = size(Dss,1)
-    N = size(Drs,1)-M
+    # M = size(Dss,1)
+    # N = size(Drs,1)-M
+    r0 = vcat(r0,sF) # combine to get dummy robot ``spawn'' locations too
     @variable(model, to0[1:M] >= 0.0) # object availability time
     @variable(model, tor[1:M] >= 0.0) # object robot arrival time
     @variable(model, toc[1:M] >= 0.0) # object collection complete time
@@ -1379,10 +1387,10 @@ function formulate_optimization_problem(G,D,Drs,Dss,Δt,Δt_collect,Δt_deliver,
         # When X[i,j] == 0, this constrains the final time to be greater than a large negative
         # number (meaning that this is a trivial constraint)
         for i in 1:N+M
-            @constraint(model, tor[j] - (tr0[i] + Drs[i,j]) >= -Mm*(1 - X[i,j]))
+            @constraint(model, tor[j] - (tr0[i] + D[r0[i],s0[j]]) >= -Mm*(1 - X[i,j]))
         end
         @constraint(model, toc[j] == tor[j] + Δt_collect[j])
-        @constraint(model, tod[j] == toc[j] + Dss[j,j])
+        @constraint(model, tod[j] == toc[j] + D[s0[j],sF[j]])
         @constraint(model, tof[j] == tod[j] + Δt_deliver[j])
         # "Job-shop" constraints specifying that no station may be double-booked. A station
         # can only support a single COLLECT or DEPOSIT operation at a time, meaning that all
@@ -1445,6 +1453,8 @@ function formulate_optimization_problem(spec::T,optimizer;
     kwargs...
     ) where {T<:ProblemSpec}
     formulate_optimization_problem(
+        spec.N,
+        spec.M,
         spec.graph,
         spec.D,
         spec.Drs,
@@ -1456,11 +1466,12 @@ function formulate_optimization_problem(spec::T,optimizer;
         spec.tr0_,
         spec.root_nodes,
         spec.weights,
+        spec.r0,
         spec.s0,
         spec.sF,
         spec.nR,
         optimizer;
-        # cost_model=spec.cost_function,
+        cost_model=spec.cost_function,
         kwargs...
         )
 end
