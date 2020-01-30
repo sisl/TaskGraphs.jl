@@ -484,8 +484,8 @@ let
     # 8  16  24  32  40  48  56  64
     env_graph = construct_factory_env_from_vtx_grid(vtx_grid)
     dist_matrix = get_dist_matrix(env_graph)
-    # r0 = [1,25,4,28]
-    r0 = [1,25,8,28] # check that planning works even when it takes longer for some robots to arrive than others
+    r0 = [1,25,4,29]
+    # r0 = [1,25,8,28] # check that planning works even when it takes longer for some robots to arrive than others
     s0 = [10]#,18,11,19]
     sF = [42] #,50,43,51]
 
@@ -498,12 +498,17 @@ let
     project_spec, robot_ICs = TaskGraphs.initialize_toy_problem(r0,[s0],[sF],(v1,v2)->dist_matrix[v1,v2])
     add_operation!(project_spec,construct_operation(project_spec,-1,[1],[],0))
 
-    cost_function = MakeSpan
+    cost_function = SumOfMakeSpans
     project_spec, problem_spec, object_ICs, object_FCs, robot_ICs = construct_task_graphs_problem(
         project_spec,r0,s0,sF,dist_matrix;cost_function=cost_function,
         task_shapes=task_shapes,shape_dict=shape_dict)
 
-    solver = PC_TAPF_Solver(DEBUG=true,LIMIT_A_star_iterations=5*nv(env_graph),verbosity=4);
+    solver = PC_TAPF_Solver(
+        DEBUG=true,
+        LIMIT_A_star_iterations=5*nv(env_graph),
+        verbosity=1,
+        l4_verbosity=2
+        );
 
     solution, _, cost, env = high_level_search!(SparseAdjacencyMILP(),solver,env_graph,project_spec,problem_spec,robot_ICs,Gurobi.Optimizer)
 

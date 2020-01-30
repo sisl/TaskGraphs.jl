@@ -19,6 +19,7 @@ end
     e::Edge{Int}    = Edge(-1,-1)
     Δt::Int         = 1
 end
+Base.:(==)(s1::S,s2::S) where {S<:State} = hash(s1) == hash(s2)
 # @enum GridWorldDirection begin
 #    NORTH
 #    EAST

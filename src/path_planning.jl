@@ -52,6 +52,19 @@ end
     msg::String = ""
 end
 
+# Helpers for printing
+export
+    log_info
+
+function log_info(limit::Int,verbosity::Int,msg...)
+    if verbosity > limit
+        println("[ logger ]: ",msg...)
+    end
+end
+function log_info(limit::Int,solver::S,msg...) where {S<:PC_TAPF_Solver}
+    log_info(limit,solver.verbosity,msg...)
+end
+
 function reset_solver!(solver::S) where {S<:PC_TAPF_Solver}
     solver.num_assignment_iterations = 0
     solver.num_CBS_iterations = 0
@@ -95,14 +108,27 @@ end
 function exit_low_level!(solver::S) where {S<:PC_TAPF_Solver}
     check_time(solver)
 end
-function enter_a_star!(solver::S) where {S<:PC_TAPF_Solver}
+function enter_a_star!(solver::S,args...) where {S<:PC_TAPF_Solver}
     check_time(solver)
 end
-function exit_a_star!(solver::S) where {S<:PC_TAPF_Solver}
+function exit_a_star!(solver::S,args...) where {S<:PC_TAPF_Solver}
     solver.max_A_star_iterations = max(solver.max_A_star_iterations,solver.num_A_star_iterations)
     solver.total_A_star_iterations += solver.num_A_star_iterations
     solver.num_A_star_iterations = 0
     check_time(solver)
+end
+function CRCBS.logger_step_a_star!(solver::PC_TAPF_Solver, path, s, q_cost)
+    log_info(1,solver.l4_verbosity,"A_star: q_cost = ", q_cost)
+end
+function CRCBS.logger_enter_a_star!(solver::PC_TAPF_Solver)
+    log_info(0,solver.l4_verbosity,"A_star: entering...")
+end
+function CRCBS.logger_exit_a_star!(solver::PC_TAPF_Solver, path, cost, status)
+    if status == false
+        log_info(0,solver.l4_verbosity,"A_star: failed to find feasible path. Returning path of cost ",cost)
+    else
+        log_info(0,solver.l4_verbosity,"A_star: returning optimal path with cost ",cost)
+    end
 end
 function TOML.parse(solver::S) where {S<:PC_TAPF_Solver}
     toml_dict = Dict()
@@ -165,18 +191,6 @@ function read_solver(io)
     read_solver(TOML.parsefile(io))
 end
 
-# Helpers for printing
-export
-    log_info
-
-function log_info(limit::Int,verbosity::Int,msg...)
-    if verbosity > limit
-        println("[ logger ]: ",msg...)
-    end
-end
-function log_info(limit::Int,solver::S,msg...) where {S<:PC_TAPF_Solver}
-    log_info(limit,solver.verbosity,msg...)
-end
 
 export
     PlanningCache,
@@ -599,6 +613,10 @@ function plan_path!(solver::PC_TAPF_Solver, env::SearchEnv, mapf::M, node::N, sc
     return true
 end
 
+function enter_a_star!(solver::S,schedule_node::N,args...) where {S<:PC_TAPF_Solver,N<:AbstractPlanningPredicate}
+    enter_a_star!(solver)
+    log_info(0,solver.l4_verbosity,"A*: planning for node ",string(schedule_node))
+end
 """
     `plan_next_path`
 """
@@ -607,12 +625,12 @@ function plan_next_path!(solver::S, env::E, mapf::M, node::N;
         path_finder=A_star
         ) where {S<:PC_TAPF_Solver,E<:SearchEnv,M<:AbstractMAPF,N<:ConstraintTreeNode}
 
-    enter_a_star!(solver)
     valid_flag = true
     if length(env.cache.node_queue) > 0
         v = dequeue!(env.cache.node_queue)
         node_id = get_vtx_id(env.schedule,v)
         schedule_node = get_node_from_id(env.schedule,node_id)
+        enter_a_star!(solver,schedule_node,node_id,v)
         if get_path_spec(env.schedule, v).plan_path == true
             valid_flag = plan_path!(solver,env,mapf,node,schedule_node,v;
                 heuristic=heuristic,path_finder=path_finder)
@@ -625,8 +643,8 @@ function plan_next_path!(solver::S, env::E, mapf::M, node::N;
             # update planning cache only
             update_planning_cache!(solver,env.cache,env.schedule,v,path) # NOTE I think this is all we need, since there is no actual path to update
         end
+        exit_a_star!(solver)
     end
-    exit_a_star!(solver)
     return valid_flag
 end
 
