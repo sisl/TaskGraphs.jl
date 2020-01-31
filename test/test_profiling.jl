@@ -6,11 +6,7 @@ let
     dummy_results_dir = "dummy_results_dir"
     modes = [
         :write,
-<<<<<<< HEAD
         :assignment_only,
-=======
-        # :assignment_only,
->>>>>>> 79a14404cd82735417a7d3c0259caa6f7cf6dc41
         # :low_level_search_without_repair,
         # :low_level_search_with_repair,
         :full_solver
@@ -23,44 +19,30 @@ let
     for milp_model in milp_models
         for mode in modes
             run_profiling(mode;
-<<<<<<< HEAD
-                num_tasks=[12],
+                num_tasks=[18],
                 num_robots=[24],
                 depth_biases=[0.1],
                 task_size_distributions = [
                     # ( 1=>1.0, 2=>0.0, 4=>0.0 ),
-                    # ( 1=>1.0, 2=>1.0, 4=>0.0 ),
+                    ( 1=>1.0, 2=>1.0, 4=>0.0 ),
                     ( 1=>1.0, 2=>1.0, 4=>1.0 ),
                     # ( 1=>0.0, 2=>1.0, 4=>1.0 ),
-=======
-                num_tasks=[1],
-                num_robots=[4],
-                depth_biases=[0.1],
-                task_size_distributions = [
-                    ( 1=>0.0, 2=>0.0, 4=>1.0 )
->>>>>>> 79a14404cd82735417a7d3c0259caa6f7cf6dc41
                     ],
                 num_trials=1,
                 problem_dir = dummy_problem_dir,
                 results_dir = joinpath(dummy_results_dir, string(typeof(milp_model))),
                 milp_model = milp_model,
-<<<<<<< HEAD
                 OutputFlag=0,
                 Presolve = -1, # automatic setting (-1), off (0), conservative (1), or aggressive (2)
                 TimeLimit = 20,
                 solver_template = PC_TAPF_Solver(
-                    verbosity=3,
-                    l4_verbosity=2,
+                    verbosity=0,
+                    l2_verbosity=2,
+                    l3_verbosity=0,
+                    l4_verbosity=0,
                     LIMIT_A_star_iterations=8000,
                     time_limit=25
                     )
-=======
-                TimeLimit=20,
-                OutputFlag=0,
-                Presolve = -1, # automatic setting (-1), off (0), conservative (1), or aggressive (2)
-                verbosity = 4,
-                LIMIT_A_star_iterations=8000,
->>>>>>> 79a14404cd82735417a7d3c0259caa6f7cf6dc41
                 )
         end
         run(pipeline(`rm -rf $dummy_problem_dir`, stdout=devnull, stderr=devnull))
@@ -122,7 +104,7 @@ let
     results_dirs = [
         # joinpath(EXPERIMENT_DIR,"assignment_solver/results")
         # joinpath(EXPERIMENT_DIR,"adjacency_solver/results")
-        joinpath(EXPERIMENT_DIR,"sparse_adjacency_solver/collaborative_transport/results")
+        joinpath(EXPERIMENT_DIR,"sparse_adjacency_solver/collaborative_transport_dist_maps/results")
     ]
     milp_models = [
         # AssignmentMILP(),

@@ -9,6 +9,7 @@ using Gurobi
 using TOML
 using CRCBS
 using SparseArrays
+using ImageFiltering
 
 using ..PlanningPredicates
 # using ..TaskGraphsSolvers
@@ -22,6 +23,68 @@ export
     object_id_map::Dict{ObjectID,Int}   = Dict{ObjectID,Int}(get_object_id(o)=>i for (i,o) in enumerate(object_states))
 end
 
+export
+    DistMatrixMap,
+    get_distance
+
+"""
+    maps team size to the effective distance (computed by Djikstra) between
+    leader (top left) vtxs.
+    A DistMatrixMap is constructed by starting with a base environment grid
+    graph, which is represented as a binary occupancy grid. The occupancy grid
+    is then convolved with kernels of various sizes (which represent
+    configurations of robots moving as a team). The output of each convolution
+    represents a new occupancy grid corresponding to the workspace of the robot
+    team.
+    It is assumed that the ``lead'' robot is always in the top left of the
+    configuration. If a team of robots wishes to query the distance to a
+    particular target configuration, they pass the leader's current vtx,
+    the leader's target vtx, and the team configuration (shape) to the
+    DistMatrixMap, which returns the correct distance.
+"""
+struct DistMatrixMap
+    shape_vtx_maps::Dict{Tuple{Int,Int},Vector{Int}}
+    dist_mtxs::Dict{Tuple{Int,Int},Matrix{Float64}}
+end
+function get_distance(mtx_map::DistMatrixMap,v1::Int,v2::Int,shape::Tuple{Int,Int}=(1,1))
+    D = mtx_map.dist_mtxs[shape]
+    v1_ = get(mtx_map.shape_vtx_maps[shape],v1,-1) # maps the top left shape vtx to the corresponding vtx in the inflated graph
+    v2_ = get(mtx_map.shape_vtx_maps[shape],v2,-1) # maps the top left shape vtx to the corresponding vtx in the inflated graph
+    # return D[v1_,v2_] # get(D,(v1_,v2_),0)
+    return get(D,(v1_,v2_),0)
+end
+function get_distance(mtx::Matrix,v1::Int,v2::Int,args...)
+    return get(mtx,(v1,v2),0)
+end
+function DistMatrixMap(base_vtx_map::Matrix{Int},shapes=[(1,1),(1,2),(2,1),(2,2)])
+    grid_map = Int.(base_vtx_map .== 0)
+    shape_vtx_maps = Dict{Tuple{Int,Int},Vector{Int}}()
+    dist_mtxs = Dict{Tuple{Int,Int},Matrix{Float64}}()
+    n_base_vtxs = maximum(base_vtx_map)
+    for s in shapes
+        # s = (2,2)
+        filtered_grid = imfilter(grid_map,centered(ones(s)),Inner())
+        filtered_grid = Int.(filtered_grid .> 0)
+        vtx_map = initialize_vtx_grid_from_indicator_grid(filtered_grid)
+        graph = initialize_grid_graph_from_vtx_grid(vtx_map)
+        shape_vtx_map = -1*ones(Int,n_base_vtxs) # maps upper left vtx (lowest v value) in new env to base env
+        for i in 1:size(vtx_map,1)
+            for j in 1:size(vtx_map,2)
+                v0 = base_vtx_map[i,j]
+                if v0 > 0
+                    shape_vtx_map[v0] = vtx_map[i,j]
+                end
+            end
+        end
+        dist_mtxs[s] = get_dist_matrix(graph)
+        shape_vtx_maps[s] = shape_vtx_map
+    end
+    DistMatrixMap(
+        shape_vtx_maps,
+        dist_mtxs
+    )
+end
+Base.getindex(d::DistMatrixMap,args...) = Base.getindex(d.dist_mtxs[(1,1)],args...)
 
 export
     ProblemSpec
@@ -48,11 +111,11 @@ export
     - sF::Vector{Int} - delivery station for each task
     - nR::Vector{Int} - num robots required for each task (>1 => collaborative task)
 """
-@with_kw struct ProblemSpec{G,F}
+@with_kw struct ProblemSpec{G,F,T}
     N::Int                  = 0 # num robots
     M::Int                  = 0 # num tasks
     graph::G                = DiGraph() # delivery graph
-    D::Matrix{Float64}      = zeros(0,0) # full distance matrix
+    D::T                    = zeros(0,0) # full distance matrix
     Drs::Matrix{Float64}    = zeros(N+M,M) # distance matrix robot initial locations -> pickup stations
     Dss::Matrix{Float64}    = zeros(M,M) # distance matrix pickup stations -> dropoff stations
     Δt::Vector{Float64}     = Vector{Float64}() # durations of operations
@@ -68,6 +131,7 @@ export
     sF::Vector{Int} = zeros(M) # delivery station for each task
     nR::Vector{Int} = ones(M) # num robots required for each task (>1 => collaborative task)
 end
+get_distance(spec::ProblemSpec,args...) = get_distance(spec.D,args...)
 
 export
     ProjectSpec,
@@ -508,7 +572,7 @@ function generate_path_spec(schedule::P,spec::T,a::GO) where {P<:ProjectSchedule
         node_type=Symbol(typeof(a)),
         start_vtx=s0,
         final_vtx=s,
-        min_path_duration=get(spec.D,(s0,s),0), # ProblemSpec distance matrix
+        min_path_duration=get_distance(spec.D,s0,s), # ProblemSpec distance matrix
         agent_id=r,
         tight=true,
         free = (s==-1) # if destination is -1, there is no goal location
@@ -523,7 +587,7 @@ function generate_path_spec(schedule::P,spec::T,a::CARRY) where {P<:ProjectSched
         node_type=Symbol(typeof(a)),
         start_vtx=s0,
         final_vtx=s,
-        min_path_duration=get(spec.D,(s0,s),0), # ProblemSpec distance matrix
+        min_path_duration=get_distance(spec.D,s0,s), # ProblemSpec distance matrix
         agent_id=r,
         object_id = o
         )
@@ -589,9 +653,12 @@ function generate_path_spec(schedule::P,spec::T,op::Operation) where {P<:Project
         )
 end
 function generate_path_spec(schedule::P,spec::T,pred::TEAM_ACTION{A}) where {P<:ProjectSchedule,T<:ProblemSpec,A}
+    s0 = get_id(get_initial_location_id(pred.instructions[1]))
+    s = get_id(get_destination_location_id(pred.instructions[1]))
     path_spec = PathSpec(
         node_type=Symbol(typeof(pred)),
-        min_path_duration = maximum(map(a->generate_path_spec(schedule,spec,a).min_path_duration, pred.instructions)),
+        # min_path_duration = maximum(map(a->generate_path_spec(schedule,spec,a).min_path_duration, pred.instructions)),
+        min_path_duration = get_distance(spec.D,s0,s,pred.shape),
         plan_path = true,
         static = (A <: Union{COLLECT,DEPOSIT})
         )
@@ -713,6 +780,73 @@ function get_task_sequences(N::Int,M::Int,assignments)
 end
 
 export
+    validate
+
+function validate(path::Path, msg::String)
+    @assert( !any(convert_to_vertex_lists(path) .== -1), msg )
+    return true
+end
+function validate(path::Path, v::Int)
+    validate(path, string("invalid path with -1 vtxs: v = ",v,", path = ",convert_to_vertex_lists(path)))
+end
+function validate(path::Path, v::Int, cbs_env)
+    validate(path, string("v = ",v,", path = ",convert_to_vertex_lists(path),", goal: ",cbs_env.goal))
+end
+function validate(project_schedule::ProjectSchedule)
+    G = get_graph(project_schedule)
+    try
+        @assert !is_cyclic(G) "is_cyclic(G)"
+        for (id,node) in project_schedule.planning_nodes
+            if typeof(node) <: COLLECT
+                @assert(get_location_id(node) != -1, string("get_location_id(node) != -1 for node id ", id))
+            end
+        end
+        for v in vertices(G)
+            node = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v))
+            @assert( outdegree(G,v) >= sum([0, values(required_successors(node))...]) )
+            @assert( indegree(G,v) >= sum([0, values(required_predecessors(node))...]) )
+        end
+    catch e
+        if typeof(e) <: AssertionError
+            print(e.msg)
+        else
+            # throw(e)
+        end
+        return false
+    end
+    return true
+end
+function validate(project_schedule::ProjectSchedule,paths::Vector{Vector{Int}},t0::Vector{Int},tF::Vector{Int})
+    G = get_graph(project_schedule)
+    for v in vertices(G)
+        node = get_node_from_vtx(project_schedule, v)
+        path_spec = get_path_spec(project_schedule, v)
+        agent_id = path_spec.agent_id
+        if agent_id != -1
+            path = paths[agent_id]
+            start_vtx = path_spec.start_vtx
+            final_vtx = path_spec.final_vtx
+            try
+                if start_vtx != -1
+                    @assert(path[t0[v] + 1] == start_vtx, string("node: ",typeof(node), ", vtx: ",start_vtx, ", t+1: ",t0[v]+1,", path: ", path))
+                end
+                if final_vtx != -1
+                    @assert(path[tF[v] + 1] == final_vtx, string("node: ",typeof(node), ", vtx: ",start_vtx, ", t+1: ",t0[v]+1,", path: ", path))
+                end
+            catch e
+                # if typeof(e) <: AssertionError
+                #     print(e.msg)
+                # else
+                    throw(e)
+                # end
+                return false
+            end
+        end
+    end
+    return true
+end
+
+export
     add_single_robot_delivery_task!
 
 function add_single_robot_delivery_task!(
@@ -800,12 +934,15 @@ function add_headless_delivery_task!(
     @assert length(pickup_station_ids) == length(dropoff_station_ids)
     n = length(pickup_station_ids)
 
+    object_node = get_node_from_id(schedule,object_id)
+    shape = object_node.shape
     # COLLABORATIVE COLLECT
     prev_team_action_id = ActionID(-1)
     team_action_id = ActionID(get_unique_action_id())
     team_action = TEAM_ACTION(
         n = n,
-        instructions = map(x->COLLECT(robot_id, object_id, x), pickup_station_ids)
+        instructions = map(x->COLLECT(robot_id, object_id, x), pickup_station_ids),
+        shape=shape
         )
     add_to_schedule!(schedule, problem_spec, team_action, team_action_id)
     # Add Edge from object
@@ -821,7 +958,8 @@ function add_headless_delivery_task!(
     team_action_id = ActionID(get_unique_action_id())
     team_action = TEAM_ACTION(
         n = n,
-        instructions = [CARRY(robot_id, object_id, x1, x2) for (x1,x2) in zip(pickup_station_ids,dropoff_station_ids)]
+        instructions = [CARRY(robot_id, object_id, x1, x2) for (x1,x2) in zip(pickup_station_ids,dropoff_station_ids)],
+        shape = shape
         )
     add_to_schedule!(schedule, problem_spec, team_action, team_action_id)
     add_edge!(schedule,prev_team_action_id,team_action_id)
@@ -830,7 +968,8 @@ function add_headless_delivery_task!(
     team_action_id = ActionID(get_unique_action_id())
     team_action = TEAM_ACTION(
         n = n,
-        instructions = map(x->DEPOSIT(robot_id, object_id, x), dropoff_station_ids)
+        instructions = map(x->DEPOSIT(robot_id, object_id, x), dropoff_station_ids),
+        shape=shape
         )
     add_to_schedule!(schedule, problem_spec, team_action, team_action_id)
     add_edge!(schedule,prev_team_action_id,team_action_id)
@@ -877,73 +1016,6 @@ function add_headless_delivery_task!(
         StationID(pickup_station_id),
         StationID(dropoff_station_id)
         )
-end
-
-export
-    validate
-
-function validate(path::Path, msg::String)
-    @assert( !any(convert_to_vertex_lists(path) .== -1), msg )
-    return true
-end
-function validate(path::Path, v::Int)
-    validate(path, string("invalid path with -1 vtxs: v = ",v,", path = ",convert_to_vertex_lists(path)))
-end
-function validate(path::Path, v::Int, cbs_env)
-    validate(path, string("v = ",v,", path = ",convert_to_vertex_lists(path),", goal: ",cbs_env.goal))
-end
-function validate(project_schedule::ProjectSchedule)
-    G = get_graph(project_schedule)
-    try
-        @assert !is_cyclic(G) "is_cyclic(G)"
-        for (id,node) in project_schedule.planning_nodes
-            if typeof(node) <: COLLECT
-                @assert(get_location_id(node) != -1, string("get_location_id(node) != -1 for node id ", id))
-            end
-        end
-        for v in vertices(G)
-            node = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v))
-            @assert( outdegree(G,v) >= sum([0, values(required_successors(node))...]) )
-            @assert( indegree(G,v) >= sum([0, values(required_predecessors(node))...]) )
-        end
-    catch e
-        if typeof(e) <: AssertionError
-            print(e.msg)
-        else
-            # throw(e)
-        end
-        return false
-    end
-    return true
-end
-function validate(project_schedule::ProjectSchedule,paths::Vector{Vector{Int}},t0::Vector{Int},tF::Vector{Int})
-    G = get_graph(project_schedule)
-    for v in vertices(G)
-        node = get_node_from_vtx(project_schedule, v)
-        path_spec = get_path_spec(project_schedule, v)
-        agent_id = path_spec.agent_id
-        if agent_id != -1
-            path = paths[agent_id]
-            start_vtx = path_spec.start_vtx
-            final_vtx = path_spec.final_vtx
-            try
-                if start_vtx != -1
-                    @assert(path[t0[v] + 1] == start_vtx, string("node: ",typeof(node), ", vtx: ",start_vtx, ", t+1: ",t0[v]+1,", path: ", path))
-                end
-                if final_vtx != -1
-                    @assert(path[tF[v] + 1] == final_vtx, string("node: ",typeof(node), ", vtx: ",start_vtx, ", t+1: ",t0[v]+1,", path: ", path))
-                end
-            catch e
-                # if typeof(e) <: AssertionError
-                #     print(e.msg)
-                # else
-                    throw(e)
-                # end
-                return false
-            end
-        end
-    end
-    return true
 end
 
 """

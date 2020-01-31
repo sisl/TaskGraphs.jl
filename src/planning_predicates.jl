@@ -156,9 +156,10 @@ abstract type AbstractPlanningPredicate end
 struct OBJECT_AT <: AbstractPlanningPredicate
     o::ObjectID
     x::Vector{StationID} # can occupy multiple locations
-	n::Int # number of robots required for transport
+	# n::Int # number of robots required for transport
+	shape::Tuple{Int,Int}
 end
-OBJECT_AT(o::ObjectID,x::Vector{StationID}) = OBJECT_AT(o,x,length(x))
+OBJECT_AT(o::ObjectID,x::Vector{StationID}) = OBJECT_AT(o,x,(1,1))
 OBJECT_AT(o::ObjectID,x::StationID,args...) = OBJECT_AT(o,[x],args...)
 OBJECT_AT(o::ObjectID,x::Vector{Int},args...) = OBJECT_AT(o,map(idx->StationID(idx),x),args...)
 OBJECT_AT(o::ObjectID,x::Int,args...) 		= OBJECT_AT(o,[StationID(x)],args...)
@@ -296,7 +297,8 @@ export
 """
 @with_kw struct TEAM_ACTION{A<:AbstractRobotAction} <: AbstractRobotAction
     n::Int = 2 # number of robots
-    instructions::Vector{A} = Vector{GO}()
+    instructions::Vector{A} = Vector{CARRY}()
+	shape::Tuple{Int,Int} = (1,1)
     # config::Matrix{Int} = ones(n) # defines configuration of agents relative to each other during collaborative task
 end
 # struct LARGE_OBJECT_AT <: AbstractPlanningPredicate

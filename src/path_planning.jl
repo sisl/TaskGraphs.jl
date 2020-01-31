@@ -15,14 +15,7 @@ using CRCBS
 using ..TaskGraphs
 
 export
-<<<<<<< HEAD
     PC_TAPF_Solver
-=======
-    PC_TAPF_Solver,
-    SolverTimeOutException,
-    # reset_solver!,
-    read_solver
->>>>>>> 79a14404cd82735417a7d3c0259caa6f7cf6dc41
 
 @with_kw mutable struct PC_TAPF_Solver{T} <: AbstractMAPFSolver
     LIMIT_assignment_iterations   ::Int = 50
@@ -52,7 +45,6 @@ export
     DEBUG                       ::Bool = false
 end
 
-<<<<<<< HEAD
 export
     SolverException,
     SolverTimeOutException,
@@ -86,11 +78,6 @@ end
 function log_info(limit::Int,solver::S,msg...) where {S<:PC_TAPF_Solver}
     log_info(limit,solver.verbosity,msg...)
 end
-=======
-@with_kw struct SolverTimeOutException <: Exception
-    msg::String = ""
-end
->>>>>>> 79a14404cd82735417a7d3c0259caa6f7cf6dc41
 
 function reset_solver!(solver::S) where {S<:PC_TAPF_Solver}
     solver.num_assignment_iterations = 0
@@ -109,7 +96,6 @@ function reset_solver!(solver::S) where {S<:PC_TAPF_Solver}
 end
 function check_time(solver::PC_TAPF_Solver)
     if time() - solver.start_time >= solver.time_limit
-<<<<<<< HEAD
         throw(SolverTimeOutException(string("# TIME OUT: Overall time limit of ",solver.time_limit," seconds exceeded.")))
     elseif solver.num_assignment_iterations > solver.LIMIT_assignment_iterations
         throw(SolverMilpMaxOutException(string("# MAX OUT: milp solver iteration limit of ",solver.LIMIT_assignment_iterations," exceeded.")))
@@ -117,9 +103,6 @@ function check_time(solver::PC_TAPF_Solver)
         throw(SolverCBSMaxOutException(string("# MAX OUT: cbs iteration limit of ",solver.LIMIT_CBS_iterations," exceeded.")))
     # elseif solver.num_A_star_iterations > solver.LIMIT_A_star_iterations
     #     throw(SolverAstarMaxOutException(string("# MAX OUT: A* iteration limit of ",solver.LIMIT_A_star_iterations," exceeded.")))
-=======
-        throw(SolverTimeOutException(string("TIME OUT: Overall time limit of ",solver.time_limit," seconds exceeded.")))
->>>>>>> 79a14404cd82735417a7d3c0259caa6f7cf6dc41
     end
 end
 # update functions
@@ -145,11 +128,7 @@ end
 function exit_low_level!(solver::S) where {S<:PC_TAPF_Solver}
     check_time(solver)
 end
-<<<<<<< HEAD
 function enter_a_star!(solver::S,args...) where {S<:PC_TAPF_Solver}
-=======
-function enter_a_star!(solver::S) where {S<:PC_TAPF_Solver}
->>>>>>> 79a14404cd82735417a7d3c0259caa6f7cf6dc41
     check_time(solver)
 end
 function enter_a_star!(solver::S,schedule_node::N,t0,tF,args...) where {S<:PC_TAPF_Solver,N<:AbstractPlanningPredicate}
@@ -161,7 +140,6 @@ function exit_a_star!(solver::S,args...) where {S<:PC_TAPF_Solver}
     solver.total_A_star_iterations += solver.num_A_star_iterations
     solver.num_A_star_iterations = 0
     check_time(solver)
-<<<<<<< HEAD
 end
 function CRCBS.logger_step_a_star!(solver::PC_TAPF_Solver, path, s, q_cost)
     log_info(1,solver.l4_verbosity,"A*: q_cost = ", q_cost)
@@ -175,8 +153,6 @@ function CRCBS.logger_exit_a_star!(solver::PC_TAPF_Solver, path, cost, status)
     else
         log_info(0,solver.l4_verbosity,"A*: returning optimal path with cost ",cost)
     end
-=======
->>>>>>> 79a14404cd82735417a7d3c0259caa6f7cf6dc41
 end
 function TOML.parse(solver::S) where {S<:PC_TAPF_Solver}
     toml_dict = Dict()
@@ -239,21 +215,6 @@ function read_solver(io)
     read_solver(TOML.parsefile(io))
 end
 
-<<<<<<< HEAD
-=======
-# Helpers for printing
-export
-    log_info
-
-function log_info(limit::Int,verbosity::Int,msg...)
-    if verbosity > limit
-        println("[ logger ]: ",msg...)
-    end
-end
-function log_info(limit::Int,solver::S,msg...) where {S<:PC_TAPF_Solver}
-    log_info(limit,solver.verbosity,msg...)
-end
->>>>>>> 79a14404cd82735417a7d3c0259caa6f7cf6dc41
 
 export
     PlanningCache,
@@ -319,7 +280,6 @@ function update_planning_cache!(solver::M,cache::C,schedule::S,v::Int,path::P) w
 
     # update t0, tF, slack, local_slack
     if get_final_state(path).t > cache.tF[v]
-        log_info(2,solver,string("# Updating cache.tF[v]"))
         cache.tF[v] = get_final_state(path).t
         t0,tF,slack,local_slack = process_schedule(schedule;t0=cache.t0,tF=cache.tF)
         cache.t0            .= t0
@@ -328,7 +288,7 @@ function update_planning_cache!(solver::M,cache::C,schedule::S,v::Int,path::P) w
         cache.local_slack   .= local_slack
     end
     # update closed_set
-    log_msg = string("# moving ", v," from active_set to closed_set ... moving (")
+    activated_vtxs = Int[]
     push!(closed_set,v)
     # update active_set
     setdiff!(active_set, v)
@@ -341,15 +301,16 @@ function update_planning_cache!(solver::M,cache::C,schedule::S,v::Int,path::P) w
             end
         end
         if active
-            log_msg = log_msg * string(" ",v2,",")
+            push!(activated_vtxs,v2)
             push!(active_set, v2)               # add to active set
         end
     end
-    log_info(2,solver,log_msg * string(") to active set"))
     # update priority queue
     for v2 in active_set
         node_queue[v2] = minimum(cache.slack[v2])
     end
+    log_info(2,solver,"moved ",v," to closed set, moved ",activated_vtxs," to active set")
+    log_info(3,solver,string("cache.tF[v] = ",cache.tF))
     return cache
 end
 
@@ -592,16 +553,16 @@ function plan_path!(solver::PC_TAPF_Solver, env::SearchEnv, mapf::M, node::N, sc
         solver.DEBUG ? validate(base_path,v) : nothing
         path, cost = path_finder(solver, cbs_env, base_path, heuristic;verbose=(solver.verbosity > 3))
         if cost == get_infeasible_cost(cbs_env)
-            log_info(-1,solver,"# A*: returned infeasible path ... Exiting early")
+            log_info(-1,solver.l3_verbosity,"# A*: returned infeasible path ... Exiting early")
             return false
         end
         solver.DEBUG ? validate(path,v,cbs_env) : nothing
     end
     #####################
-    log_info(2,solver,string("LOW LEVEL SEARCH: solver.num_A_star_iterations = ",solver.num_A_star_iterations))
+    log_info(2,solver.l3_verbosity,string("LOW LEVEL SEARCH: solver.num_A_star_iterations = ",solver.num_A_star_iterations))
     # Make sure every robot sticks around for the entire time horizon
     if is_terminal_node(get_graph(schedule),v)
-        log_info(2,solver,string("LOW LEVEL SEARCH: Extending terminal node",
+        log_info(2,solver.l3_verbosity,string("LOW LEVEL SEARCH: Extending terminal node",
         " (SHOULD NEVER HAPPEN IF THINGS ARE WORKING CORRECTLY)"))
         extend_path!(cbs_env,path,maximum(cache.tF))
         solver.DEBUG ? validate(path,v) : nothing
@@ -611,19 +572,14 @@ function plan_path!(solver::PC_TAPF_Solver, env::SearchEnv, mapf::M, node::N, sc
     set_solution_path!(node.solution, path, agent_id)
     set_path_cost!(node.solution, cost, agent_id)
     # update
-    try
-        update_env!(solver,env,v,path)
-    catch e
-        @show schedule_node, agent_id, v, convert_to_vertex_lists(path)
-        throw(e)
-    end
+    update_env!(solver,env,v,path)
     node.solution.cost = aggregate_costs(get_cost_model(env.env),get_path_costs(node.solution))
     node.cost = get_cost(node.solution)
     # Print for debugging
-    log_info(3,solver,string("agent_path = ", convert_to_vertex_lists(path)))
-    log_info(3,solver,string("cost = ", get_cost(path)))
+    log_info(3,solver.l3_verbosity,string("agent_path = ", convert_to_vertex_lists(path)))
+    log_info(3,solver.l3_verbosity,string("cost = ", get_cost(path)))
     if node.cost >= solver.best_cost
-        log_info(0,solver,"LOW LEVEL SEARCH: node.cost >= solver.best_cost ... Exiting early")
+        log_info(0,solver.l3_verbosity,"LOW LEVEL SEARCH: node.cost >= solver.best_cost ... Exiting early")
         return false
     end
 
@@ -659,12 +615,12 @@ function plan_path!(solver::PC_TAPF_Solver, env::SearchEnv, mapf::M, node::N, sc
         set_path_cost!(node.solution, get_cost(path), agent_id)
         update_env!(solver,env,v,path,agent_id)
         # Print for debugging
-        log_info(3,solver,string("agent_path = ", convert_to_vertex_lists(path)))
-        log_info(3,solver,string("cost = ", get_cost(path)))
+        log_info(3,solver.l3_verbosity,string("agent_path = ", convert_to_vertex_lists(path)))
+        log_info(3,solver.l3_verbosity,string("cost = ", get_cost(path)))
     end
     # solver.DEBUG ? validate(path,v,meta_env) : nothing
     #####################
-    log_info(2,solver,string("LOW LEVEL SEARCH: solver.num_A_star_iterations = ",solver.num_A_star_iterations))
+    log_info(2,solver.l3_verbosity,string("LOW LEVEL SEARCH: solver.num_A_star_iterations = ",solver.num_A_star_iterations))
     # update
     # update_env!(solver,env,v,path)
     node.solution.cost = aggregate_costs(get_cost_model(env.env),get_path_costs(node.solution))
@@ -727,7 +683,7 @@ function CRCBS.low_level_search!(
             return false
         end
     end
-    log_info(0,solver,"LOW_LEVEL_SEARCH: Returning consistent path")
+    log_info(0,solver.l3_verbosity,"LOW_LEVEL_SEARCH: Returning consistent path")
     return true
 end
 
@@ -797,8 +753,8 @@ function CRCBS.solve!(
 
     root_node = initialize_root_node(mapf) #TODO initialize with a partial solution when replanning
     valid_flag = low_level_search!(solver,mapf,root_node;path_finder=path_finder)
-    t0 = max(minimum(mapf.env.cache.t0), 1)
-    detect_conflicts!(root_node.conflict_table,root_node.solution,t0)
+    # t0 = max(minimum(mapf.env.cache.t0), 1)
+    detect_conflicts!(root_node.conflict_table,root_node.solution;t0=max(minimum(mapf.env.cache.t0), 1))
     if valid_flag
         enqueue!(priority_queue, root_node => root_node.cost)
     end
@@ -806,20 +762,14 @@ function CRCBS.solve!(
     while length(priority_queue) > 0
         try
             node = dequeue!(priority_queue)
-            log_info(1,solver,string("CBS: node.cost = ",get_cost(node.solution)))
+            log_info(1,solver.l2_verbosity,string("CBS: node.cost = ",get_cost(node.solution)))
             # check for conflicts
             conflict = get_next_conflict(node.conflict_table)
             if !CRCBS.is_valid(conflict)
-                log_info(-1,solver,string("CBS: Optimal Solution Found! Cost = ",node.cost))
+                log_info(-1,solver.l2_verbosity,string("CBS: valid route plan found after ",solver.num_CBS_iterations," CBS iterations! Cost = ",node.cost))
                 return node.solution, node.cost
             end
-            log_info(1,solver,string("CBS: ", string(conflict)))
-                # "CBS: ",conflict_type(conflict),
-                # ": agent1=",agent1_id(conflict),
-                # ", agent2=", agent2_id(conflict),
-                # ", v1=(",get_s(node1(conflict)).vtx,",",get_sp(node1(conflict)).vtx,")",
-                # ", v2=(",get_s(node2(conflict)).vtx,",",get_sp(node2(conflict)).vtx,")",
-                # ", t=",get_s(node1(conflict)).t))
+            log_info(1,solver.l2_verbosity,string("CBS: ", string(conflict)))
             # otherwise, create constraints and branch
             constraints = generate_constraints_from_conflict(conflict)
             for constraint in constraints
@@ -828,7 +778,7 @@ function CRCBS.solve!(
                     log_info(1,solver,string("CBS: iteration ", solver.num_CBS_iterations))
                     log_info(1,solver,string("CBS: constraint on agent id = ",get_agent_id(constraint),", time index = ",get_time_of(constraint)))
                     valid_flag = low_level_search!(solver, mapf, new_node, [get_agent_id(constraint)]; path_finder=path_finder)
-                    detect_conflicts!(new_node.conflict_table,new_node.solution,[get_agent_id(constraint)]) # update conflicts related to this agent
+                    detect_conflicts!(new_node.conflict_table,new_node.solution,[get_agent_id(constraint)];t0=max(minimum(mapf.env.cache.t0), 1)) # update conflicts related to this agent
                     if valid_flag
                         # TODO update env (i.e. update heuristic, etc.)
                         enqueue!(priority_queue, new_node => new_node.cost)
@@ -837,14 +787,14 @@ function CRCBS.solve!(
             end
         catch e
             if isa(e, SolverCBSMaxOutException)
-                log_info(-1,solver,e.msg)
+                log_info(-1,solver.l2_verbosity,e.msg)
                 break
             else
                 throw(e)
             end
         end
     end
-    log_info(0,solver,"CBS: No Solution Found. Returning default solution")
+    log_info(-1,solver.l2_verbosity,"CBS: no solution found. Returning default solution")
     exit_cbs!(solver)
     return default_solution(mapf)
 end
@@ -943,11 +893,7 @@ function high_level_search!(solver::P, env_graph, project_schedule::ProjectSched
 
     solver.start_time = time()
     while solver.best_cost[1] > lower_bound
-<<<<<<< HEAD
-        # try
-=======
         try
->>>>>>> 79a14404cd82735417a7d3c0259caa6f7cf6dc41
             solver.num_assignment_iterations += 1
             log_info(0,solver,string("HIGH LEVEL SEARCH: iteration ",solver.num_assignment_iterations,"..."))
             ############## Task Assignment ###############
@@ -955,7 +901,6 @@ function high_level_search!(solver::P, env_graph, project_schedule::ProjectSched
             optimize!(model)
             optimal = (termination_status(model) == MathOptInterface.OPTIMAL);
             feasible = (primal_status(model) == MOI.FEASIBLE_POINT) # TODO use this!
-<<<<<<< HEAD
             if !feasible
                 log_info(0,solver,string("HIGH LEVEL SEARCH: Task assignment failed. Returning best solution so far.\n",
                     " * optimality gap = ", solver.best_cost[1] - lower_bound))
@@ -971,19 +916,6 @@ function high_level_search!(solver::P, env_graph, project_schedule::ProjectSched
             else
                 lower_bound = max(lower_bound, Int(round(value(objective_function(model)))) )
             end
-=======
-            if !optimal
-                log_info(0,solver,string("HIGH LEVEL SEARCH: Task assignment failed. Returning best solution so far.\n",
-                    " * optimality gap = ", solver.best_cost[1] - lower_bound))
-                break
-            elseif solver.num_assignment_iterations > solver.LIMIT_assignment_iterations
-                log_info(0,solver,string("HIGH LEVEL SEARCH: MILP iterations exceeded limit of ",
-                solver.LIMIT_assignment_iterations,". Returning best solution so far.\n",
-                    " * optimality gap = ", solver.best_cost[1] - lower_bound))
-                break
-            end
-            lower_bound = max(lower_bound, Int(round(value(objective_function(model)))) )
->>>>>>> 79a14404cd82735417a7d3c0259caa6f7cf6dc41
             log_info(0,solver,string("HIGH LEVEL SEARCH: Current lower bound cost = ",lower_bound))
             if lower_bound < solver.best_cost[1]
                 ############## Route Planning ###############
@@ -1000,32 +932,18 @@ function high_level_search!(solver::P, env_graph, project_schedule::ProjectSched
                         solver.best_cost = cost # TODO make sure that the operation duration is accounted for here
                         best_env = env
                     end
-<<<<<<< HEAD
                     optimality_gap = solver.best_cost[1] - lower_bound
                     log_info(0,solver,string("HIGH LEVEL SEARCH: Best cost so far = ", solver.best_cost[1], ". Optimality gap = ",optimality_gap))
                 end
             end
-        # catch e
-        #     if isa(e, SolverException)
-        #         log_info(-1,solver,e.msg)
-        #         break
-        #     else
-        #         throw(e)
-        #     end
-        # end
-=======
-                    log_info(0,solver,string("HIGH LEVEL SEARCH: Best cost so far = ", solver.best_cost[1]))
-                end
-            end
         catch e
-            if isa(e, SolverTimeOutException)
-                log_info(0,solver,e.msg)
+            if isa(e, SolverException)
+                log_info(-1,solver,e.msg)
                 break
             else
                 throw(e)
             end
         end
->>>>>>> 79a14404cd82735417a7d3c0259caa6f7cf6dc41
     end
     exit_assignment!(solver)
     optimality_gap = solver.best_cost[1] - lower_bound

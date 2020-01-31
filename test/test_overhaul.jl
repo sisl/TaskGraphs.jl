@@ -3,6 +3,7 @@
 using TaskGraphs
 using CRCBS
 using LightGraphs, MetaGraphs, GraphUtils
+using ImageFiltering
 using Gurobi
 using JuMP, MathOptInterface
 using TOML
@@ -91,169 +92,107 @@ let
 
     @test validate(project_schedule)
 end
+# let
+
+# Verify that old method (assignment milp) and new method (adjacency matrix
+    # milp) yield the same costs
 let
 
-    env_id = 2
-    env_file = joinpath(ENVIRONMENT_DIR,string("env_",env_id,".toml"))
-    env_graph = read_env(env_file)
-    dist_matrix = get_dist_matrix(env_graph)
+    for (i, f) in enumerate([
+        initialize_toy_problem_1,
+        initialize_toy_problem_2,
+        initialize_toy_problem_3,
+        initialize_toy_problem_4,
+        initialize_toy_problem_5,
+        initialize_toy_problem_6,
+        initialize_toy_problem_7,
+        initialize_toy_problem_8,
+        ])
+        for cost_model in [SumOfMakeSpans, MakeSpan]
+            costs = Float64[]
+            schedules = ProjectSchedule[]
+            project_spec, problem_spec, robot_ICs, assignments, env_graph = f(;verbose=false);
+            for milp_model in [AssignmentMILP(),AdjacencyMILP(),SparseAdjacencyMILP()]
+                # MILP formulations alone
+                schedule = construct_partial_project_schedule(project_spec,problem_spec,map(i->robot_ICs[i], 1:problem_spec.N))
+                model = formulate_milp(milp_model,schedule,problem_spec;cost_model=cost_model)
+                optimize!(model)
+                @test termination_status(model) == MOI.OPTIMAL
+                cost = Int(round(value(objective_function(model))))
+                adj_matrix = get_assignment_matrix(model)
+                update_project_schedule!(milp_model,schedule,problem_spec,adj_matrix)
+                @test validate(schedule)
+                push!(costs, cost)
+                push!(schedules, schedule)
+                @test validate(schedule)
+                @test cost != Inf
 
-    # Verify that old method (assignment milp) and new method (adjacency matrix
-    # milp) yield the same costs
-    let
+                # Check that it matches low_level_search
+                solver = PC_TAPF_Solver(verbosity=0)
+                env, mapf = construct_search_env(schedule, problem_spec, env_graph;primary_objective=cost_model)
+                pc_mapf = PC_MAPF(env,mapf)
+                constraint_node = initialize_root_node(pc_mapf)
+                low_level_search!(solver,pc_mapf,constraint_node)
+                # @show i, f, obj_val1, constraint_node.cost
+                @test constraint_node.cost[1] == cost
+                @test validate(env.schedule)
+            end
+            if !(costs[1] == costs[2])
+                print_project_schedule(schedules[1],string("project_schedule1_",i))
+                print_project_schedule(schedules[2],string("project_schedule2_",i))
+            end
+            if !(costs[1] == costs[3])
+                print_project_schedule(schedules[1],string("project_schedule1_",i))
+                print_project_schedule(schedules[3],string("project_schedule3_",i))
+            end
+            @test all(costs .== costs[1])
+        end
+    end
+end
 
-        for (i, f) in enumerate([
-            initialize_toy_problem_1,
-            initialize_toy_problem_2,
-            initialize_toy_problem_3,
-            initialize_toy_problem_4,
-            initialize_toy_problem_5,
-            initialize_toy_problem_6,
-            initialize_toy_problem_7,
-            initialize_toy_problem_8,
-            ])
-            for cost_model in [SumOfMakeSpans, MakeSpan]
+# Test that the full planning stack works with the new model and returns the same final cost
+let
+
+    for (i, f) in enumerate([
+        initialize_toy_problem_1,
+        initialize_toy_problem_2,
+        initialize_toy_problem_3,
+        initialize_toy_problem_4,
+        initialize_toy_problem_5,
+        initialize_toy_problem_6,
+        initialize_toy_problem_7,
+        initialize_toy_problem_8,
+        ])
+        for cost_model in [SumOfMakeSpans, MakeSpan]
+            let
                 costs = Float64[]
-                schedules = ProjectSchedule[]
                 project_spec, problem_spec, robot_ICs, assignments, env_graph = f(;verbose=false);
                 for milp_model in [AssignmentMILP(),AdjacencyMILP(),SparseAdjacencyMILP()]
-                    # MILP formulations alone
-                    schedule = construct_partial_project_schedule(project_spec,problem_spec,map(i->robot_ICs[i], 1:problem_spec.N))
-                    model = formulate_milp(milp_model,schedule,problem_spec;cost_model=cost_model)
-                    optimize!(model)
-                    @test termination_status(model) == MOI.OPTIMAL
-                    cost = Int(round(value(objective_function(model))))
-                    adj_matrix = get_assignment_matrix(model)
-                    update_project_schedule!(milp_model,schedule,problem_spec,adj_matrix)
-                    @test validate(schedule)
-                    push!(costs, cost)
-                    push!(schedules, schedule)
-                    @test validate(schedule)
-                    @test cost != Inf
-
-                    # Check that it matches low_level_search
                     solver = PC_TAPF_Solver(verbosity=0)
-                    env, mapf = construct_search_env(schedule, problem_spec, env_graph;primary_objective=cost_model)
-                    pc_mapf = PC_MAPF(env,mapf)
-                    constraint_node = initialize_root_node(pc_mapf)
-                    low_level_search!(solver,pc_mapf,constraint_node)
-                    # @show i, f, obj_val1, constraint_node.cost
-                    @test constraint_node.cost[1] == cost
+                    solution, assignment, cost, env = high_level_search!(
+                        milp_model,
+                        solver,
+                        env_graph,
+                        project_spec,
+                        problem_spec,
+                        robot_ICs,
+                        Gurobi.Optimizer;
+                        primary_objective=cost_model,
+                        )
+                    push!(costs, cost[1])
                     @test validate(env.schedule)
-                end
-                if !(costs[1] == costs[2])
-                    print_project_schedule(schedules[1],string("project_schedule1_",i))
-                    print_project_schedule(schedules[2],string("project_schedule2_",i))
-                end
-                if !(costs[1] == costs[3])
-                    print_project_schedule(schedules[1],string("project_schedule1_",i))
-                    print_project_schedule(schedules[3],string("project_schedule3_",i))
+                    @show convert_to_vertex_lists(solution)
+                    @test validate(env.schedule, convert_to_vertex_lists(solution), env.cache.t0, env.cache.tF)
+                    @test cost[1] != Inf
                 end
                 @test all(costs .== costs[1])
             end
         end
     end
 
-    # Test that the full planning stack works with the new model and returns the same final cost
-    let
-
-        for (i, f) in enumerate([
-            initialize_toy_problem_1,
-            initialize_toy_problem_2,
-            initialize_toy_problem_3,
-            initialize_toy_problem_4,
-            initialize_toy_problem_5,
-            initialize_toy_problem_6,
-            initialize_toy_problem_7,
-            initialize_toy_problem_8,
-            ])
-            for cost_model in [SumOfMakeSpans, MakeSpan]
-                let
-                    costs = Float64[]
-                    project_spec, problem_spec, robot_ICs, assignments, env_graph = f(;verbose=false);
-                    for milp_model in [AssignmentMILP(),AdjacencyMILP(),SparseAdjacencyMILP()]
-                        solver = PC_TAPF_Solver(verbosity=0)
-                        solution, assignment, cost, env = high_level_search!(
-                            milp_model,
-                            solver,
-                            env_graph,
-                            project_spec,
-                            problem_spec,
-                            robot_ICs,
-                            Gurobi.Optimizer;
-                            primary_objective=cost_model,
-                            )
-                        push!(costs, cost[1])
-                        @test validate(env.schedule)
-                        @show convert_to_vertex_lists(solution)
-                        @test validate(env.schedule, convert_to_vertex_lists(solution), env.cache.t0, env.cache.tF)
-                        @test cost[1] != Inf
-                    end
-                    @test all(costs .== costs[1])
-                end
-            end
-        end
-
-    end
-
-    # Verify deterministic behavior of AdjacencyMILP formulation
-    # let
-    #
-    #     for (i, f) in enumerate([
-    #         initialize_toy_problem_1,
-    #         initialize_toy_problem_2,
-    #         initialize_toy_problem_3,
-    #         initialize_toy_problem_4,
-    #         initialize_toy_problem_5,
-    #         initialize_toy_problem_6,
-    #         initialize_toy_problem_7,
-    #         initialize_toy_problem_8,
-    #         ])
-    #         for cost_model in [SumOfMakeSpans, MakeSpan]
-    #             let
-    #                 project_spec, problem_spec, robot_ICs, assignments, env_graph = f(;verbose=false);
-    #                 solver = PC_TAPF_Solver(verbosity=0)
-    #                 solution, assignment, cost, env = high_level_search!(
-    #                     AdjacencyMILP(),
-    #                     solver,
-    #                     env_graph,
-    #                     project_spec,
-    #                     problem_spec,
-    #                     robot_ICs,
-    #                     Gurobi.Optimizer;
-    #                     primary_objective=cost_model
-    #                     );
-    #
-    #                 @test validate(env.schedule)
-    #
-    #                 for i in 1:10
-    #                     let
-    #                         solver = PC_TAPF_Solver(verbosity=0)
-    #                         solution2, assignment2, cost2, env2 = high_level_search!(
-    #                             AdjacencyMILP(),
-    #                             solver,
-    #                             env_graph,
-    #                             project_spec,
-    #                             problem_spec,
-    #                             robot_ICs,
-    #                             Gurobi.Optimizer;
-    #                             primary_objective=cost_model
-    #                             );
-    #                         @test !any(adjacency_matrix(env.schedule.graph) .!= adjacency_matrix(env2.schedule.graph))
-    #                         for v in vertices(env.schedule.graph)
-    #                             spec1 = get_path_spec(env.schedule, v)
-    #                             spec2 = get_path_spec(env2.schedule, v)
-    #                             @test spec1 == spec2
-    #                         end
-    #                         @test cost[1] == cost2[1]
-    #                         @test validate(env2.schedule)
-    #                     end
-    #                 end
-    #             end
-    #         end
-    #     end
-    # end
 end
+
+# end
 
 let
     env_id = 2
@@ -483,7 +422,8 @@ let
     # 7  15  23  31  39  47  55  63
     # 8  16  24  32  40  48  56  64
     env_graph = construct_factory_env_from_vtx_grid(vtx_grid)
-    dist_matrix = get_dist_matrix(env_graph)
+    # dist_matrix = get_dist_matrix(env_graph)
+    dist_matrix = DistMatrixMap(factory_env.vtx_map)
     r0 = [1,25,4,29]
     # r0 = [1,25,8,28] # check that planning works even when it takes longer for some robots to arrive than others
     s0 = [10]#,18,11,19]
@@ -534,34 +474,37 @@ let
     @show convert_to_vertex_lists(root_node.solution)
 end
 let
-    # construct random collaborative transport tasks
+    # build custom envs for different robot sizes
     env_id = 2
     env_file = joinpath(ENVIRONMENT_DIR,string("env_",env_id,".toml"))
     factory_env = read_env(env_file)
+    dist_matrix = get_dist_matrix(factory_env)
 
-    # for (v,dict) in factory_env.expanded_zones
-    #     for (shape,vtxs) in dict
-    #         @test sort(vtxs) == vtxs
-    #     end
-    # end
+    dist_mtx_map =DistMatrixMap(factory_env.vtx_map)
+    s = (2,2)
+    v1 = 79
+    v2 = 82
+    @test get_distance(dist_mtx_map,v1,v2) == dist_matrix[v1,v2]
+    @test get_distance(dist_mtx_map,v1,v2,(1,1)) == dist_matrix[v1,v2]
+    @test get_distance(dist_mtx_map,v1,v2,(1,2)) == dist_matrix[v1,v2]
+    @test get_distance(dist_mtx_map,v1,v2,(2,1)) == dist_matrix[v1,v2] + 2
+    @test get_distance(dist_mtx_map,v1,v2,(2,2)) == dist_matrix[v1,v2] + 2
 
-    env_graph = factory_env
-    dist_matrix = get_dist_matrix(env_graph)
-    N = 5
-    M = 10
+
+    N = 12
+    M = 12
     r0,s0,sF = get_random_problem_instantiation(N,M,get_pickup_zones(factory_env),get_dropoff_zones(factory_env),
             get_free_zones(factory_env))
-    def = SimpleProblemDef(ProjectSpec(),r0,s0,sF)
-    open("dummy.toml", "w") do io
-        TOML.print(io, TOML.parse(def))
-    end
-    read_problem_def("dummy.toml")
-
-    project_spec, r0, s0, sF = def.project_spec,def.r0,def.s0,def.sF
-    project_spec, problem_spec, object_ICs, object_FCs, robot_ICs = construct_task_graphs_problem(
-            project_spec, r0, s0, sF, dist_matrix);
-
     project_spec = construct_random_project_spec(M,s0,sF)
-    problem_def = SimpleProblemDef(project_spec,r0,s0,sF)
+    task_sizes = (1=>1.0,2=>1.0,4=>1.0)
+    shapes = choose_random_object_sizes(M,Dict(task_sizes...))
+    # problem_def = SimpleProblemDef(project_spec,r0,s0,sF,shapes)
 
+    project_spec, problem_spec, _, _, robot_ICs = construct_task_graphs_problem(
+        project_spec, r0, s0, sF, dist_matrix;
+        task_shapes=shapes,
+        shape_dict=factory_env.expanded_zones
+        );
+
+    project_spec.initial_conditions
 end
