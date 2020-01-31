@@ -83,6 +83,8 @@ function init_data_frame(;
             problem_id = Int[],
             time=Float64[],
             optimal=Bool[],
+            optimality_gap              = Int[],
+            feasible                    = Bool[],
             cost=Int[]
             )
     elseif mode == :low_level_search_without_repair
@@ -103,10 +105,12 @@ function init_data_frame(;
         )
     elseif mode == :full_solver
         return DataFrame(
-            problem_id = Int[],
-            time = Float64[],
-            optimal = Bool[],
-            cost = Int[],
+            problem_id                  = Int[],
+            time                        = Float64[],
+            optimal                     = Bool[],
+            optimality_gap              = Int[],
+            feasible                    = Bool[],
+            cost                        = Int[],
             # from solver
             total_assignment_iterations = Int[],
             total_CBS_iterations        = Int[],
@@ -134,6 +138,8 @@ function add_assignment_only_row!(df,toml_dict,problem_id)
         :problem_id => problem_id,
         :time       => toml_dict["time"],
         :optimal    => toml_dict["optimal"],
+        :optimality_gap             => toml_dict["optimality_gap"],
+        :feasible                   => toml_dict["feasible"],
         :cost       => toml_dict["cost"],
     ))
 end
@@ -151,6 +157,8 @@ function add_full_solver_row!(df,toml_dict,problem_id)
         :problem_id                 => problem_id,
         :time                       => toml_dict["time"],
         :optimal                    => toml_dict["optimal"],
+        :optimality_gap             => toml_dict["optimality_gap"],
+        :feasible                   => toml_dict["feasible"],
         :cost                       => Int(toml_dict["cost"][1]),
         :total_assignment_iterations=> toml_dict["total_assignment_iterations"],
         :total_CBS_iterations       => toml_dict["total_CBS_iterations"],
@@ -211,14 +219,17 @@ function profile_task_assignment(solver, project_spec, problem_spec, robot_ICs, 
 
     retval, elapsed_time, byte_ct, gc_time, mem_ct = @timed optimize!(model)
 
-    optimal = (termination_status(model) == MathOptInterface.OPTIMAL);
+    optimal = (termination_status(model) == MOI.OPTIMAL);
+    feasible = (primal_status(model) == MOI.FEASIBLE_POINT)
     assignment_matrix = get_assignment_matrix(model)
     cost = Int(round(value(objective_function(model))))
+    optimality_gap = cost - Int(round(value(objective_bound(model))))
 
     results_dict = TOML.parse(sparse(assignment_matrix))
     results_dict["time"] = elapsed_time
-    # results_dict["assignment"] = assignments
     results_dict["optimal"] = optimal
+    results_dict["optimality_gap"] = Int(optimality_gap)
+    results_dict["feasible"] = feasible
     results_dict["cost"] = cost
     results_dict
 end
@@ -273,17 +284,21 @@ function profile_full_solver(solver, project_spec, problem_spec, robot_ICs, env_
     # Solve the problem
     # solver = PC_TAPF_Solver(verbosity=0,LIMIT_A_star_iterations=5*nv(env_graph));
 
-    (solution, assignment, cost, search_env), elapsed_time, byte_ct, gc_time, mem_ct = @timed high_level_search!(
+    (solution, assignment, cost, search_env, optimality_gap), elapsed_time, byte_ct, gc_time, mem_ct = @timed high_level_search!(
         milp_model, solver, env_graph, project_spec, problem_spec, robot_ICs, Gurobi.Optimizer;
         primary_objective=primary_objective,
         kwargs...);
 
     robot_paths = convert_to_vertex_lists(solution)
-    object_paths = get_object_paths(solution,search_env)
-    optimal = true
+    object_paths, object_intervals = get_object_paths(solution,search_env)
+    optimal = (optimality_gap <= 0)
+    feasible = true
     if cost[1] == Inf
         cost = [-1 for c in cost]
-        optimal = false
+        feasible = false
+    end
+    if optimality_gap == Inf
+        optimality_gap = 10000
     end
 
     results_dict = TOML.parse(solver)
@@ -292,7 +307,10 @@ function profile_full_solver(solver, project_spec, problem_spec, robot_ICs, env_
     # results_dict["assignment"] = assignment
     results_dict["robot_paths"] = robot_paths
     results_dict["object_paths"] = object_paths
+    results_dict["object_intervals"] = object_intervals
+    results_dict["optimality_gap"] = Int(optimality_gap)
     results_dict["optimal"] = optimal
+    results_dict["feasible"] = feasible
     results_dict["cost"] = collect(cost)
     results_dict
 end
@@ -350,7 +368,7 @@ function run_profiling(MODE=:nothing;
                 r0,s0,sF = get_random_problem_instantiation(N,M,get_pickup_zones(factory_env),get_dropoff_zones(factory_env),
                         get_free_zones(factory_env))
                 project_spec = construct_random_project_spec(M,s0,sF;max_parents=max_parents,depth_bias=depth_bias,Δt_min=Δt_min,Δt_max=Δt_max)
-                shapes = choose_random_object_sizes(M,Dict(task_size_distributions...))
+                shapes = choose_random_object_sizes(M,Dict(task_sizes...))
                 problem_def = SimpleProblemDef(project_spec,r0,s0,sF,shapes)
                 # Save the problem
                 open(problem_filename, "w") do io

@@ -15,10 +15,7 @@ using CRCBS
 using ..TaskGraphs
 
 export
-    PC_TAPF_Solver,
-    SolverTimeOutException,
-    # reset_solver!,
-    read_solver
+    PC_TAPF_Solver
 
 @with_kw mutable struct PC_TAPF_Solver{T} <: AbstractMAPFSolver
     LIMIT_assignment_iterations   ::Int = 50
@@ -48,10 +45,27 @@ export
     DEBUG                       ::Bool = false
 end
 
-@with_kw struct SolverTimeOutException <: Exception
+export
+    SolverException,
+    SolverTimeOutException,
+    SolverMilpMaxOutException,
+    SolverAstarMaxOutException,
+    read_solver
+
+abstract type SolverException <: Exception end
+
+@with_kw struct SolverTimeOutException <: SolverException
     msg::String = ""
 end
-
+@with_kw struct SolverMilpMaxOutException <: SolverException
+    msg::String = ""
+end
+@with_kw struct SolverCBSMaxOutException <: SolverException
+    msg::String = ""
+end
+@with_kw struct SolverAstarMaxOutException <: SolverException
+    msg::String = ""
+end
 # Helpers for printing
 export
     log_info
@@ -82,13 +96,13 @@ function reset_solver!(solver::S) where {S<:PC_TAPF_Solver}
 end
 function check_time(solver::PC_TAPF_Solver)
     if time() - solver.start_time >= solver.time_limit
-        throw(SolverTimeOutException(string("TIME OUT: Overall time limit of ",solver.time_limit," seconds exceeded.")))
+        throw(SolverTimeOutException(string("# TIME OUT: Overall time limit of ",solver.time_limit," seconds exceeded.")))
     elseif solver.num_assignment_iterations > solver.LIMIT_assignment_iterations
-        throw(SolverTimeOutException(string("MAX OUT: milp solver iteration limit of ",solver.LIMIT_assignment_iterations," exceeded.")))
+        throw(SolverMilpMaxOutException(string("# MAX OUT: milp solver iteration limit of ",solver.LIMIT_assignment_iterations," exceeded.")))
     elseif solver.num_CBS_iterations > solver.LIMIT_CBS_iterations
-        throw(SolverTimeOutException(string("MAX OUT: cbs iteration limit of ",solver.LIMIT_CBS_iterations," exceeded.")))
-    elseif solver.num_A_star_iterations > solver.LIMIT_A_star_iterations
-        throw(SolverTimeOutException(string("MAX OUT: A* iteration limit of ",solver.LIMIT_A_star_iterations," exceeded.")))
+        throw(SolverCBSMaxOutException(string("# MAX OUT: cbs iteration limit of ",solver.LIMIT_CBS_iterations," exceeded.")))
+    # elseif solver.num_A_star_iterations > solver.LIMIT_A_star_iterations
+    #     throw(SolverAstarMaxOutException(string("# MAX OUT: A* iteration limit of ",solver.LIMIT_A_star_iterations," exceeded.")))
     end
 end
 # update functions
@@ -746,39 +760,44 @@ function CRCBS.solve!(
     end
 
     while length(priority_queue) > 0
-        node = dequeue!(priority_queue)
-        log_info(1,solver,string("CBS: node.cost = ",get_cost(node.solution)))
-        # check for conflicts
-        conflict = get_next_conflict(node.conflict_table)
-        if !CRCBS.is_valid(conflict)
-            log_info(-1,solver,string("CBS: Optimal Solution Found! Cost = ",node.cost))
-            return node.solution, node.cost
-        end
-        log_info(1,solver,string("CBS: ", string(conflict)))
-            # "CBS: ",conflict_type(conflict),
-            # ": agent1=",agent1_id(conflict),
-            # ", agent2=", agent2_id(conflict),
-            # ", v1=(",get_s(node1(conflict)).vtx,",",get_sp(node1(conflict)).vtx,")",
-            # ", v2=(",get_s(node2(conflict)).vtx,",",get_sp(node2(conflict)).vtx,")",
-            # ", t=",get_s(node1(conflict)).t))
-        # otherwise, create constraints and branch
-        constraints = generate_constraints_from_conflict(conflict)
-        for constraint in constraints
-            new_node = initialize_child_search_node(node)
-            if CRCBS.add_constraint!(new_node,constraint)
-                log_info(1,solver,string("CBS: iteration ", solver.num_CBS_iterations))
-                log_info(1,solver,string("CBS: constraint on agent id = ",get_agent_id(constraint),", time index = ",get_time_of(constraint)))
-                valid_flag = low_level_search!(solver, mapf, new_node, [get_agent_id(constraint)]; path_finder=path_finder)
-                detect_conflicts!(new_node.conflict_table,new_node.solution,[get_agent_id(constraint)]) # update conflicts related to this agent
-                if valid_flag
-                    # TODO update env (i.e. update heuristic, etc.)
-                    enqueue!(priority_queue, new_node => new_node.cost)
+        try
+            node = dequeue!(priority_queue)
+            log_info(1,solver,string("CBS: node.cost = ",get_cost(node.solution)))
+            # check for conflicts
+            conflict = get_next_conflict(node.conflict_table)
+            if !CRCBS.is_valid(conflict)
+                log_info(-1,solver,string("CBS: Optimal Solution Found! Cost = ",node.cost))
+                return node.solution, node.cost
+            end
+            log_info(1,solver,string("CBS: ", string(conflict)))
+                # "CBS: ",conflict_type(conflict),
+                # ": agent1=",agent1_id(conflict),
+                # ", agent2=", agent2_id(conflict),
+                # ", v1=(",get_s(node1(conflict)).vtx,",",get_sp(node1(conflict)).vtx,")",
+                # ", v2=(",get_s(node2(conflict)).vtx,",",get_sp(node2(conflict)).vtx,")",
+                # ", t=",get_s(node1(conflict)).t))
+            # otherwise, create constraints and branch
+            constraints = generate_constraints_from_conflict(conflict)
+            for constraint in constraints
+                new_node = initialize_child_search_node(node)
+                if CRCBS.add_constraint!(new_node,constraint)
+                    log_info(1,solver,string("CBS: iteration ", solver.num_CBS_iterations))
+                    log_info(1,solver,string("CBS: constraint on agent id = ",get_agent_id(constraint),", time index = ",get_time_of(constraint)))
+                    valid_flag = low_level_search!(solver, mapf, new_node, [get_agent_id(constraint)]; path_finder=path_finder)
+                    detect_conflicts!(new_node.conflict_table,new_node.solution,[get_agent_id(constraint)]) # update conflicts related to this agent
+                    if valid_flag
+                        # TODO update env (i.e. update heuristic, etc.)
+                        enqueue!(priority_queue, new_node => new_node.cost)
+                    end
                 end
             end
-        end
-        if solver.num_CBS_iterations > solver.LIMIT_CBS_iterations
-            println("CBS: Maximum allowable CBS iterations reached. Exiting with infeasible solution ... ")
-            break
+        catch e
+            if isa(e, SolverCBSMaxOutException)
+                log_info(-1,solver,e.msg)
+                break
+            else
+                throw(e)
+            end
         end
     end
     log_info(0,solver,"CBS: No Solution Found. Returning default solution")
@@ -888,17 +907,21 @@ function high_level_search!(solver::P, env_graph, project_schedule::ProjectSched
             optimize!(model)
             optimal = (termination_status(model) == MathOptInterface.OPTIMAL);
             feasible = (primal_status(model) == MOI.FEASIBLE_POINT) # TODO use this!
-            if !optimal
+            if !feasible
                 log_info(0,solver,string("HIGH LEVEL SEARCH: Task assignment failed. Returning best solution so far.\n",
                     " * optimality gap = ", solver.best_cost[1] - lower_bound))
                 break
-            elseif solver.num_assignment_iterations > solver.LIMIT_assignment_iterations
-                log_info(0,solver,string("HIGH LEVEL SEARCH: MILP iterations exceeded limit of ",
-                solver.LIMIT_assignment_iterations,". Returning best solution so far.\n",
-                    " * optimality gap = ", solver.best_cost[1] - lower_bound))
-                break
+            # elseif solver.num_assignment_iterations > solver.LIMIT_assignment_iterations
+            #     log_info(0,solver,string("HIGH LEVEL SEARCH: MILP iterations exceeded limit of ",
+            #     solver.LIMIT_assignment_iterations,". Returning best solution so far.\n",
+            #         " * optimality gap = ", solver.best_cost[1] - lower_bound))
+            #     break
             end
-            lower_bound = max(lower_bound, Int(round(value(objective_function(model)))) )
+            if optimal
+                lower_bound = max(lower_bound, Int(round(value(objective_function(model)))) )
+            else
+                lower_bound = max(lower_bound, Int(round(value(objective_function(model)))) )
+            end
             log_info(0,solver,string("HIGH LEVEL SEARCH: Current lower bound cost = ",lower_bound))
             if lower_bound < solver.best_cost[1]
                 ############## Route Planning ###############
@@ -919,7 +942,7 @@ function high_level_search!(solver::P, env_graph, project_schedule::ProjectSched
                 end
             end
         catch e
-            if isa(e, SolverTimeOutException)
+            if isa(e, SolverException)
                 log_info(-1,solver,e.msg)
                 break
             else
@@ -928,8 +951,9 @@ function high_level_search!(solver::P, env_graph, project_schedule::ProjectSched
         end
     end
     exit_assignment!(solver)
-    log_info(-1,solver.verbosity,string("HIGH LEVEL SEARCH: optimality gap = ",solver.best_cost[1] - lower_bound,". Returning best solution with cost ", solver.best_cost,"\n"))
-    return best_solution, best_assignment, solver.best_cost, best_env
+    optimality_gap = solver.best_cost[1] - lower_bound
+    log_info(-1,solver.verbosity,string("HIGH LEVEL SEARCH: optimality gap = ",optimality_gap,". Returning best solution with cost ", solver.best_cost,"\n"))
+    return best_solution, best_assignment, solver.best_cost, best_env, optimality_gap
 end
 function high_level_search_mod!(solver::P, env_graph, project_spec::ProjectSpec, problem_spec,
         robot_ICs, optimizer;

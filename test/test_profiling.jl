@@ -23,7 +23,9 @@ let
                 num_robots=[20],
                 depth_biases=[0.1],
                 task_size_distributions = [
-                    ( 1=>1.0, 2=>1.0, 4=>0.5 )
+                    ( 1=>1.0, 2=>0.0, 4=>0.0 ),
+                    ( 1=>1.0, 2=>1.0, 4=>0.0 ),
+                    ( 1=>1.0, 2=>1.0, 4=>1.0 ),
                     ],
                 num_trials=1,
                 problem_dir = dummy_problem_dir,
@@ -40,8 +42,8 @@ let
                     )
                 )
         end
-        run(pipeline(`rm -rf $dummy_problem_dir`, stdout=devnull, stderr=devnull))
-        run(pipeline(`rm -rf $dummy_results_dir`, stdout=devnull, stderr=devnull))
+        # run(pipeline(`rm -rf $dummy_problem_dir`, stdout=devnull, stderr=devnull))
+        # run(pipeline(`rm -rf $dummy_results_dir`, stdout=devnull, stderr=devnull))
     end
 end
 let

@@ -160,6 +160,7 @@ function visualize_env(vtxs,pickup_vtxs,dropoff_vtxs,t=0;
         object_vtxs=[],
         robot_paths=[],
         object_paths=[],
+        object_intervals=map(p->[0,length(p)], object_paths),
         search_patterns=[],
         goals=[],
         vpad = 0.05,
@@ -172,7 +173,10 @@ function visualize_env(vtxs,pickup_vtxs,dropoff_vtxs,t=0;
         colors_vec = color_scale.f(n),
         floor_color = "light gray",
         pickup_color= "light blue",
-        dropoff_color="pink"
+        dropoff_color="pink",
+        active_object_color="black",
+        completed_object_color="gray",
+        inactive_object_color="gray",
     )
 
 
@@ -217,8 +221,15 @@ function visualize_env(vtxs,pickup_vtxs,dropoff_vtxs,t=0;
         )
     end
     object_layers = []
-    for (i,p) in enumerate(object_paths)
-        if length(p) > 0
+    for (p,interval) in zip(object_paths,object_intervals)
+        if interval[1] > t
+            object_color = inactive_object_color
+        elseif interval[2] < t
+            object_color = completed_object_color
+        else
+            object_color = active_object_color
+        end
+        if length(p) > 0 && interval[2] > t
             interpolate(p[min(t1,length(p))],p[min(t1+1,length(p))],t1-(t+1))
             idx1 = p[max(1,min(t1,length(p)))]
             idx2 = p[max(1,min(t1+1,length(p)))]
@@ -226,7 +237,7 @@ function visualize_env(vtxs,pickup_vtxs,dropoff_vtxs,t=0;
                 layer(
                     x=[interpolate(vtxs[idx1][1],vtxs[idx2][1],t-(t1-1))],
                     y=[interpolate(vtxs[idx1][2],vtxs[idx2][2],t-(t1-1))],
-                    Geom.point,size=[osize],Theme(default_color="black"))
+                    Geom.point,size=[osize],Theme(default_color=object_color))
             )
         end
     end
@@ -289,7 +300,7 @@ function record_video(outfile_name,render_function;
 end
 
 render_env(t) = visualize_env(factory_env,t;robot_vtxs=r0,object_vtxs=s0,paths=paths,search_patterns=[],goals=[])
-render_paths(t,robot_paths,object_paths=[]) = visualize_env(factory_env,t;robot_paths=robot_paths,object_paths=object_paths)
+render_paths(t,robot_paths,object_paths=[];kwargs...) = visualize_env(factory_env,t;robot_paths=robot_paths,object_paths=object_paths,kwargs...)
 render_both(t,paths1,paths2) = hstack(render_paths(t,paths1),render_paths(t,paths2))
 
 
