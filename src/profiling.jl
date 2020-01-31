@@ -235,6 +235,18 @@ function profile_task_assignment(solver, project_spec, problem_spec, robot_ICs, 
 end
 function profile_low_level_search_and_repair(solver, project_spec, problem_spec, robot_ICs, env_graph,dist_matrix,adj_matrix;
     milp_model=AssignmentMILP(),primary_objective=SumOfMakeSpans)
+<<<<<<< HEAD
+=======
+
+    # solver = PC_TAPF_Solver(verbosity=0,LIMIT_A_star_iterations=10*nv(env_graph));
+    project_schedule = construct_partial_project_schedule(project_spec,problem_spec,robot_ICs)
+    @assert update_project_schedule!(milp_model,project_schedule, problem_spec, adj_matrix)
+    env, mapf = construct_search_env(project_schedule, problem_spec, env_graph;
+        primary_objective=primary_objective); # TODO pass in t0_ here (maybe get it straight from model?)
+    pc_mapf = PC_MAPF(env,mapf);
+    node = initialize_root_node(pc_mapf)
+    valid_flag, elapsed_time, byte_ct, gc_time, mem_ct = @timed low_level_search!(solver, pc_mapf, node)
+>>>>>>> 79a14404cd82735417a7d3c0259caa6f7cf6dc41
 
     # solver = PC_TAPF_Solver(verbosity=0,LIMIT_A_star_iterations=10*nv(env_graph));
     project_schedule = construct_partial_project_schedule(project_spec,problem_spec,robot_ICs)
@@ -267,6 +279,18 @@ function profile_low_level_search_and_repair(solver, project_spec, problem_spec,
 end
 function profile_low_level_search(solver, project_spec, problem_spec, robot_ICs, env_graph,dist_matrix,adj_matrix;
     milp_model=AssignmentMILP(),primary_objective=SumOfMakeSpans)
+<<<<<<< HEAD
+=======
+
+    # solver = PC_TAPF_Solver(verbosity=0,LIMIT_A_star_iterations=10*nv(env_graph));
+    project_schedule = construct_partial_project_schedule(project_spec,problem_spec,robot_ICs)
+    @assert update_project_schedule!(milp_model, project_schedule, problem_spec, adj_matrix)
+    env, mapf = construct_search_env(project_schedule, problem_spec, env_graph;
+        primary_objective=primary_objective); # TODO pass in t0_ here (maybe get it straight from model?)
+    pc_mapf = PC_MAPF(env,mapf);
+    node = initialize_root_node(pc_mapf)
+    valid_flag, elapsed_time, byte_ct, gc_time, mem_ct = @timed low_level_search!(solver, pc_mapf.env, pc_mapf.mapf, node)
+>>>>>>> 79a14404cd82735417a7d3c0259caa6f7cf6dc41
 
     # solver = PC_TAPF_Solver(verbosity=0,LIMIT_A_star_iterations=10*nv(env_graph));
     project_schedule = construct_partial_project_schedule(project_spec,problem_spec,robot_ICs)
@@ -349,12 +373,20 @@ function run_profiling(MODE=:nothing;
     results_dir = RESULTS_DIR,
     Δt_min=0,
     Δt_max=0,
+<<<<<<< HEAD
     solver_template=PC_TAPF_Solver(),
     TimeLimit=solver_template.time_limit,
     OutputFlag=0,
     Presolve = -1,
     # verbosity=0,
     # LIMIT_A_star_iterations=10000,
+=======
+    TimeLimit=50,
+    OutputFlag=0,
+    Presolve = -1,
+    verbosity=0,
+    LIMIT_A_star_iterations=10000,
+>>>>>>> 79a14404cd82735417a7d3c0259caa6f7cf6dc41
     milp_model=AssignmentMILP(),
     primary_objective=SumOfMakeSpans
     )
@@ -386,7 +418,11 @@ function run_profiling(MODE=:nothing;
                 r0,s0,sF = get_random_problem_instantiation(N,M,get_pickup_zones(factory_env),get_dropoff_zones(factory_env),
                         get_free_zones(factory_env))
                 project_spec = construct_random_project_spec(M,s0,sF;max_parents=max_parents,depth_bias=depth_bias,Δt_min=Δt_min,Δt_max=Δt_max)
+<<<<<<< HEAD
                 shapes = choose_random_object_sizes(M,Dict(task_sizes...))
+=======
+                shapes = choose_random_object_sizes(M,Dict(task_size_distributions...))
+>>>>>>> 79a14404cd82735417a7d3c0259caa6f7cf6dc41
                 problem_def = SimpleProblemDef(project_spec,r0,s0,sF,shapes)
                 # Save the problem
                 open(problem_filename, "w") do io
@@ -427,7 +463,11 @@ function run_profiling(MODE=:nothing;
                     shape_dict=factory_env.expanded_zones
                     );
 
+<<<<<<< HEAD
                 solver = PC_TAPF_Solver(solver_template,start_time=time());
+=======
+                solver = PC_TAPF_Solver(verbosity=verbosity,LIMIT_A_star_iterations=LIMIT_A_star_iterations,time_limit=TimeLimit);
+>>>>>>> 79a14404cd82735417a7d3c0259caa6f7cf6dc41
                 if MODE == :assignment_only
                     results_dict = profile_task_assignment(solver, project_spec, problem_spec, robot_ICs, env_graph, dist_matrix;
                         milp_model=milp_model,primary_objective=primary_objective,TimeLimit=TimeLimit,OutputFlag=OutputFlag,Presolve=Presolve)
@@ -455,11 +495,19 @@ function run_profiling(MODE=:nothing;
                 end
             end
         # catch e
+<<<<<<< HEAD
         #     if typeof(e) <: AssertionError
         #         println(e.msg)
         #     else
         #         throw(e)
         #     end
+=======
+            # if typeof(e) <: AssertionError
+            #     println(e.msg)
+            # else
+                # throw(e)
+            # end
+>>>>>>> 79a14404cd82735417a7d3c0259caa6f7cf6dc41
         # end
     end
 end

@@ -498,7 +498,7 @@ let
     project_spec, robot_ICs = TaskGraphs.initialize_toy_problem(r0,[s0],[sF],(v1,v2)->dist_matrix[v1,v2])
     add_operation!(project_spec,construct_operation(project_spec,-1,[1],[],0))
 
-    cost_function = SumOfMakeSpans
+    cost_function = MakeSpan
     project_spec, problem_spec, object_ICs, object_FCs, robot_ICs = construct_task_graphs_problem(
         project_spec,r0,s0,sF,dist_matrix;cost_function=cost_function,
         task_shapes=task_shapes,shape_dict=shape_dict)
