@@ -461,10 +461,10 @@ function get_object_paths(solution,env)
                             # object_paths[get_id(object_id)] = [
                             push!(object_paths,[
                                 map(t->s0,0:cache.t0[v]-1)...,
-                                map(t->robot_paths[agent_id][t],min(cache.t0[v]+1,tF):min(cache.tF[v]+1,tF))...,
+                                map(t->robot_paths[agent_id][t],min(cache.t0[v]+1,tF):min(cache.tF[v]+1,tF,length(robot_paths[agent_id])))...,
                                 map(t->sF,min(cache.tF[v]+1,tF):tF)...
                             ])
-                            push!(object_intervals,[cache.t0[object_vtx],cache.tF[v+1]])
+                            push!(object_intervals,[cache.t0[object_vtx],cache.tF[v]+1])
                     #     end
                     # end
                 end

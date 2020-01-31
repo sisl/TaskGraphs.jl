@@ -907,11 +907,11 @@ function validate(project_schedule::ProjectSchedule)
             @assert( indegree(G,v) >= sum([0, values(required_predecessors(node))...]) )
         end
     catch e
-        # if typeof(e) <: AssertionError
-        #     print(e.msg)
-        # else
-            throw(e)
-        # end
+        if typeof(e) <: AssertionError
+            print(e.msg)
+        else
+            # throw(e)
+        end
         return false
     end
     return true
@@ -2022,7 +2022,7 @@ function update_project_schedule!(project_schedule::P,problem_spec::T,adj_matrix
         # @assert !is_cyclic(G) "update_project_schedule!() -------> is_cyclic(G)"
         @assert validate(project_schedule)
     catch e
-        if typeof(e) <: AssertionError
+        if isa(e, AssertionError)
             println(e.msg)
         else
             throw(e)

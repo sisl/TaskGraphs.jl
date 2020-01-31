@@ -223,7 +223,7 @@ function profile_task_assignment(solver, project_spec, problem_spec, robot_ICs, 
     feasible = (primal_status(model) == MOI.FEASIBLE_POINT)
     assignment_matrix = get_assignment_matrix(model)
     cost = Int(round(value(objective_function(model))))
-    optimality_gap = cost - Int(round(value(objective_bound(model))))
+    optimality_gap = cost - Int(round(objective_bound(model)))
 
     results_dict = TOML.parse(sparse(assignment_matrix))
     results_dict["time"] = elapsed_time
@@ -238,46 +238,64 @@ function profile_low_level_search_and_repair(solver, project_spec, problem_spec,
 
     # solver = PC_TAPF_Solver(verbosity=0,LIMIT_A_star_iterations=10*nv(env_graph));
     project_schedule = construct_partial_project_schedule(project_spec,problem_spec,robot_ICs)
-    @assert update_project_schedule!(milp_model,project_schedule, problem_spec, adj_matrix)
-    env, mapf = construct_search_env(project_schedule, problem_spec, env_graph;
-        primary_objective=primary_objective); # TODO pass in t0_ here (maybe get it straight from model?)
-    pc_mapf = PC_MAPF(env,mapf);
-    node = initialize_root_node(pc_mapf)
-    valid_flag, elapsed_time, byte_ct, gc_time, mem_ct = @timed low_level_search!(solver, pc_mapf, node)
+    if update_project_schedule!(milp_model,project_schedule, problem_spec, adj_matrix)
+        env, mapf = construct_search_env(project_schedule, problem_spec, env_graph;
+            primary_objective=primary_objective); # TODO pass in t0_ here (maybe get it straight from model?)
+        pc_mapf = PC_MAPF(env,mapf);
+        node = initialize_root_node(pc_mapf)
+        valid_flag, elapsed_time, byte_ct, gc_time, mem_ct = @timed low_level_search!(solver, pc_mapf, node)
 
-    cost = collect(get_cost(node.solution))
-    if cost[1] == Inf
-        cost = [-1 for c in cost]
+        cost = collect(get_cost(node.solution))
+        if cost[1] == Inf
+            cost = [-1 for c in cost]
+        end
+        results_dict = TOML.parse(solver)
+        results_dict["time"] = elapsed_time
+        results_dict["valid_flag"] = valid_flag
+        results_dict["cost"] = cost
+        results_dict["num_conflicts"] = count_conflicts(detect_conflicts(node.solution))
+        return results_dict
+    else
+        println("update_project_schedule!() failed!")
+        results_dict = TOML.parse(solver)
+        results_dict["time"] = solver.time_limit
+        results_dict["valid_flag"] = false
+        results_dict["cost"] = 1000000
+        results_dict["num_conflicts"] = -1
+        return results_dict
     end
-    results_dict = TOML.parse(solver)
-    results_dict["time"] = elapsed_time
-    results_dict["valid_flag"] = valid_flag
-    results_dict["cost"] = cost
-    results_dict["num_conflicts"] = count_conflicts(detect_conflicts(node.solution))
-    results_dict
 end
 function profile_low_level_search(solver, project_spec, problem_spec, robot_ICs, env_graph,dist_matrix,adj_matrix;
     milp_model=AssignmentMILP(),primary_objective=SumOfMakeSpans)
 
     # solver = PC_TAPF_Solver(verbosity=0,LIMIT_A_star_iterations=10*nv(env_graph));
     project_schedule = construct_partial_project_schedule(project_spec,problem_spec,robot_ICs)
-    @assert update_project_schedule!(milp_model, project_schedule, problem_spec, adj_matrix)
-    env, mapf = construct_search_env(project_schedule, problem_spec, env_graph;
-        primary_objective=primary_objective); # TODO pass in t0_ here (maybe get it straight from model?)
-    pc_mapf = PC_MAPF(env,mapf);
-    node = initialize_root_node(pc_mapf)
-    valid_flag, elapsed_time, byte_ct, gc_time, mem_ct = @timed low_level_search!(solver, pc_mapf.env, pc_mapf.mapf, node)
+    if update_project_schedule!(milp_model, project_schedule, problem_spec, adj_matrix)
+        env, mapf = construct_search_env(project_schedule, problem_spec, env_graph;
+            primary_objective=primary_objective); # TODO pass in t0_ here (maybe get it straight from model?)
+        pc_mapf = PC_MAPF(env,mapf);
+        node = initialize_root_node(pc_mapf)
+        valid_flag, elapsed_time, byte_ct, gc_time, mem_ct = @timed low_level_search!(solver, pc_mapf.env, pc_mapf.mapf, node)
 
-    cost = collect(get_cost(node.solution))
-    if cost[1] == Inf
-        cost = [-1 for c in cost]
+        cost = collect(get_cost(node.solution))
+        if cost[1] == Inf
+            cost = [-1 for c in cost]
+        end
+        results_dict = TOML.parse(solver)
+        results_dict["time"] = elapsed_time
+        results_dict["valid_flag"] = valid_flag
+        results_dict["cost"] = cost
+        results_dict["num_conflicts"] = count_conflicts(detect_conflicts(node.solution))
+        return results_dict
+    else
+        println("update_project_schedule!() failed!")
+        results_dict = TOML.parse(solver)
+        results_dict["time"] = solver.time_limit
+        results_dict["valid_flag"] = false
+        results_dict["cost"] = 1000000
+        results_dict["num_conflicts"] = -1
+        return results_dict
     end
-    results_dict = TOML.parse(solver)
-    results_dict["time"] = elapsed_time
-    results_dict["valid_flag"] = valid_flag
-    results_dict["cost"] = cost
-    results_dict["num_conflicts"] = count_conflicts(detect_conflicts(node.solution))
-    results_dict
 end
 function profile_full_solver(solver, project_spec, problem_spec, robot_ICs, env_graph,dist_matrix;
         milp_model=AssignmentMILP(),primary_objective=SumOfMakeSpans,kwargs...)
@@ -437,11 +455,11 @@ function run_profiling(MODE=:nothing;
                 end
             end
         # catch e
-            # if typeof(e) <: AssertionError
-            #     println(e.msg)
-            # else
-                # throw(e)
-            # end
+        #     if typeof(e) <: AssertionError
+        #         println(e.msg)
+        #     else
+        #         throw(e)
+        #     end
         # end
     end
 end

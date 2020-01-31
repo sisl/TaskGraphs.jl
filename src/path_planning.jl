@@ -131,6 +131,10 @@ end
 function enter_a_star!(solver::S,args...) where {S<:PC_TAPF_Solver}
     check_time(solver)
 end
+function enter_a_star!(solver::S,schedule_node::N,t0,tF,args...) where {S<:PC_TAPF_Solver,N<:AbstractPlanningPredicate}
+    enter_a_star!(solver)
+    log_info(0,solver.l4_verbosity,"A*: planning for node ",string(schedule_node), " t0 = ", t0, ", tF = ",tF)
+end
 function exit_a_star!(solver::S,args...) where {S<:PC_TAPF_Solver}
     solver.max_A_star_iterations = max(solver.max_A_star_iterations,solver.num_A_star_iterations)
     solver.total_A_star_iterations += solver.num_A_star_iterations
@@ -568,7 +572,12 @@ function plan_path!(solver::PC_TAPF_Solver, env::SearchEnv, mapf::M, node::N, sc
     set_solution_path!(node.solution, path, agent_id)
     set_path_cost!(node.solution, cost, agent_id)
     # update
-    update_env!(solver,env,v,path)
+    try
+        update_env!(solver,env,v,path)
+    catch e
+        @show schedule_node, agent_id, v, convert_to_vertex_lists(path)
+        throw(e)
+    end
     node.solution.cost = aggregate_costs(get_cost_model(env.env),get_path_costs(node.solution))
     node.cost = get_cost(node.solution)
     # Print for debugging
@@ -633,10 +642,6 @@ function plan_path!(solver::PC_TAPF_Solver, env::SearchEnv, mapf::M, node::N, sc
     return true
 end
 
-function enter_a_star!(solver::S,schedule_node::N,args...) where {S<:PC_TAPF_Solver,N<:AbstractPlanningPredicate}
-    enter_a_star!(solver)
-    log_info(0,solver.l4_verbosity,"A*: planning for node ",string(schedule_node))
-end
 """
     `plan_next_path`
 """
@@ -650,7 +655,7 @@ function plan_next_path!(solver::S, env::E, mapf::M, node::N;
         v = dequeue!(env.cache.node_queue)
         node_id = get_vtx_id(env.schedule,v)
         schedule_node = get_node_from_id(env.schedule,node_id)
-        enter_a_star!(solver,schedule_node,node_id,v)
+        enter_a_star!(solver,schedule_node,env.cache.t0[v],env.cache.tF[v])
         if get_path_spec(env.schedule, v).plan_path == true
             valid_flag = plan_path!(solver,env,mapf,node,schedule_node,v;
                 heuristic=heuristic,path_finder=path_finder)
@@ -899,7 +904,7 @@ function high_level_search!(solver::P, env_graph, project_schedule::ProjectSched
 
     solver.start_time = time()
     while solver.best_cost[1] > lower_bound
-        try
+        # try
             solver.num_assignment_iterations += 1
             log_info(0,solver,string("HIGH LEVEL SEARCH: iteration ",solver.num_assignment_iterations,"..."))
             ############## Task Assignment ###############
@@ -938,17 +943,18 @@ function high_level_search!(solver::P, env_graph, project_schedule::ProjectSched
                         solver.best_cost = cost # TODO make sure that the operation duration is accounted for here
                         best_env = env
                     end
-                    log_info(0,solver,string("HIGH LEVEL SEARCH: Best cost so far = ", solver.best_cost[1]))
+                    optimality_gap = solver.best_cost[1] - lower_bound
+                    log_info(0,solver,string("HIGH LEVEL SEARCH: Best cost so far = ", solver.best_cost[1], ". Optimality gap = ",optimality_gap))
                 end
             end
-        catch e
-            if isa(e, SolverException)
-                log_info(-1,solver,e.msg)
-                break
-            else
-                throw(e)
-            end
-        end
+        # catch e
+        #     if isa(e, SolverException)
+        #         log_info(-1,solver,e.msg)
+        #         break
+        #     else
+        #         throw(e)
+        #     end
+        # end
     end
     exit_assignment!(solver)
     optimality_gap = solver.best_cost[1] - lower_bound

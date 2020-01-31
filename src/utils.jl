@@ -387,6 +387,7 @@ end
 
 export
     choose_random_object_sizes,
+    choose_and_shuffle_object_sizes,
     convert_to_collaborative
 
 """
@@ -408,16 +409,37 @@ function choose_random_object_sizes(M,probs::Dict{Tuple{Int,Int},Float64})
     end
     sizes
 end
+function choose_and_shuffle_object_sizes(M,probs::Dict{Tuple{Int,Int},Float64})
+    k = sort(collect(keys(probs)),by=i->i[1]*i[2])
+    v = map(key->probs[key], k)
+    v = M * v / sum(v)
+    v_rounded = Int.(round.(v))
+    while sum(v_rounded) < sum(v)
+        idx = sort(collect(1:length(v)),by=i->abs(v[i]-v_rounded[i]))[end]
+        v_rounded[idx] = v_rounded[idx] + 1
+    end
+    while sum(v_rounded) > sum(v)
+        idx = sort(collect(1:length(v)),by=i->abs(v[i]-v_rounded[i]))[end]
+        v_rounded[idx] = v_rounded[idx] - 1
+    end
+    sizes = Vector{Tuple{Int,Int}}()
+    for (idx,n) in enumerate(v_rounded)
+        for i in 1:n
+            push!(sizes,k[idx])
+        end
+    end
+    shuffle(sizes)
+end
 function choose_random_object_sizes(M,probs::Dict{Int,Float64}=Dict(1=>1.0,2=>0.0,4=>0.0),choices=[(1,1),(2,1),(1,2),(2,2)])
     k = sort(collect(keys(probs)))
-    size_probs = Dict(s=>probs[s[1]*s[2]] for s in choices)
+    size_probs = Dict{Tuple{Int,Int},Float64}(s=>probs[s[1]*s[2]] for s in choices)
     for ksize in k
         counts = sum(map(s->s[1]*s[2]==ksize, choices))
         for s in choices
             size_probs[s] = size_probs[s] / counts
         end
     end
-    choose_random_object_sizes(M,size_probs)
+    choose_and_shuffle_object_sizes(M,size_probs)
 end
 
 """
