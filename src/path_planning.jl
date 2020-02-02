@@ -396,7 +396,6 @@ function default_pc_tapf_solution(N::Int;extra_T=400)
         paths=map(i->Path{State,Action,typeof(c0)}(s0=State(),cost=c0),1:N),
         cost_model = construct_composite_cost_model(
                 SumOfMakeSpans(Float64[0],Int64[1],Float64[1],Float64[0]),
-                # FullDeadlineCost(DeadlineCost(0.0)),
                 HardConflictCost(DiGraph(10), 10+extra_T, N),
                 SumOfTravelDistance(),
                 FullCostModel(sum,NullCost())

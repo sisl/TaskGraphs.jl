@@ -358,7 +358,8 @@ function read_problem_def(toml_dict::Dict)
         toml_dict["r0"],
         toml_dict["s0"],
         toml_dict["sF"],
-        map(s->tuple(s...), toml_dict["shapes"])
+        # map(s->tuple(s...), toml_dict["shapes"])
+        map(s->tuple(s...), get(toml_dict,"shapes",[[1,1] for o in toml_dict["s0"]]) )
     )
 end
 function read_problem_def(io)
@@ -1205,6 +1206,16 @@ function construct_partial_project_schedule(
         end
         for object_id in get_output_ids(op)
             add_edge!(project_schedule, operation_id, ObjectID(object_id))
+        end
+    end
+    # NOTE: A hack to get speed up on SparseAdjacencyMILP. Not sure if it will work
+    for (id, pred) in get_object_ICs(project_schedule)
+        v = get_vtx(project_schedule, ObjectID(id))
+        if indegree(get_graph(project_schedule),v) == 0
+            op_id = OperationID(get_unique_operation_id())
+            op = Operation(post=Set{OBJECT_AT}([pred]),id=op_id)
+            add_to_schedule!(project_schedule,op,op_id)
+            add_edge!(project_schedule,op_id,ObjectID(id))
         end
     end
     project_schedule

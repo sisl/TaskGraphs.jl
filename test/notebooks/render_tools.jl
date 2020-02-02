@@ -337,7 +337,7 @@ function robots_vs_task_vs_time_box_plot(df;
     
     plot(df, xgroup=:M, x=:N_string, y=:time, color=:N_string,
         Geom.subplot_grid(
-            Geom.boxplot(;suppress_outliers=true),
+            Geom.boxplot(;suppress_outliers=false),
             Coord.cartesian(; ymin=ymin, ymax=ymax),
             Guide.yticks(;ticks=yticks),
             Guide.xticks(;label=false),

@@ -62,10 +62,10 @@ let
     results_dirs = [
         # joinpath(EXPERIMENT_DIR,"assignment_solver/results")
         # joinpath(EXPERIMENT_DIR,"adjacency_solver/results")
-        # joinpath(EXPERIMENT_DIR,"sparse_adjacency_solver/results")
+        joinpath(EXPERIMENT_DIR,"sparse_adjacency_solver/dummy_ops/results")
     ]
     milp_models = [
-        AssignmentMILP(),
+        # AssignmentMILP(),
         # AdjacencyMILP(),
         SparseAdjacencyMILP()
     ]
@@ -81,10 +81,18 @@ let
                 initial_problem_id = 1,
                 problem_dir = PROBLEM_DIR,
                 results_dir = results_dir,
-                TimeLimit=100,
+                milp_model = milp_model,
                 OutputFlag=0,
                 Presolve = -1, # automatic setting (-1), off (0), conservative (1), or aggressive (2)
-                milp_model = milp_model
+                TimeLimit = 100,
+                solver_template = PC_TAPF_Solver(
+                    verbosity=0,
+                    l2_verbosity=2,
+                    l3_verbosity=0,
+                    l4_verbosity=0,
+                    LIMIT_A_star_iterations=8000,
+                    time_limit=100
+                    )
                 )
         end
     end
