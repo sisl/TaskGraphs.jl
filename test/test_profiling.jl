@@ -6,7 +6,7 @@ let
     dummy_results_dir = "dummy_results_dir"
     modes = [
         :write,
-        :assignment_only,
+        # :assignment_only,
         # :low_level_search_without_repair,
         # :low_level_search_with_repair,
         :full_solver
