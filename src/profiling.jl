@@ -135,36 +135,36 @@ function add_config_row!(df,toml_dict,problem_id)
 end
 function add_assignment_only_row!(df,toml_dict,problem_id)
     push!(df, Dict(
-        :problem_id => problem_id,
-        :time       => toml_dict["time"],
-        :optimal    => toml_dict["optimal"],
-        :optimality_gap             => toml_dict["optimality_gap"],
-        :feasible                   => toml_dict["feasible"],
-        :cost       => toml_dict["cost"],
+        :problem_id         => problem_id,
+        :time               => get(toml_dict, "time", -1),
+        :optimal            => get(toml_dict, "optimal", false),
+        :optimality_gap     => get(toml_dict, "optimality_gap", 10000),
+        :feasible           => get(toml_dict, "feasible", false),
+        :cost               => get(toml_dict, "cost", -1),
     ))
 end
 function add_low_level_search_row!(df,toml_dict,problem_id)
     push!(df, Dict(
         :problem_id     => problem_id,
-        :time           => toml_dict["time"],
-        :cost           => Int(toml_dict["cost"][1]),
-        :valid_flag     => toml_dict["valid_flag"],
-        :num_conflicts  => get(toml_dict["num_conflicts"], 100)
+        :time           => get(toml_dict, "time", -1),
+        :cost           => Int(get(toml_dict, "cost", (-1,-1,-1,-1))[1]),
+        :valid_flag     => get(toml_dict, "valid_flag", -1),
+        :num_conflicts  => get(toml_dict, "num_conflicts", -1)
     ))
 end
 function add_full_solver_row!(df,toml_dict,problem_id)
     push!(df, Dict(
         :problem_id                 => problem_id,
-        :time                       => toml_dict["time"],
-        :optimal                    => toml_dict["optimal"],
-        :optimality_gap             => toml_dict["optimality_gap"],
-        :feasible                   => toml_dict["feasible"],
-        :cost                       => Int(toml_dict["cost"][1]),
-        :total_assignment_iterations=> toml_dict["total_assignment_iterations"],
-        :total_CBS_iterations       => toml_dict["total_CBS_iterations"],
-        :total_A_star_iterations    => toml_dict["total_A_star_iterations"],
-        :max_CBS_iterations         => toml_dict["max_CBS_iterations"],
-        :max_A_star_iterations      => toml_dict["max_A_star_iterations"]
+        :time                       => get(toml_dict, "time", -1),
+        :optimal                    => get(toml_dict, "optimal", false),
+        :optimality_gap             => get(toml_dict, "optimality_gap", 10000),
+        :feasible                   => get(toml_dict, "feasible", false),
+        :cost                       => Int(get(toml_dict, "cost", (-1,-1,-1,-1))[1]),
+        :total_assignment_iterations=> get(toml_dict, "total_assignment_iterations", -1),
+        :total_CBS_iterations       => get(toml_dict, "total_CBS_iterations", -1),
+        :total_A_star_iterations    => get(toml_dict, "total_A_star_iterations", -1),
+        :max_CBS_iterations         => get(toml_dict, "max_CBS_iterations", -1),
+        :max_A_star_iterations      => get(toml_dict, "max_A_star_iterations", -1)
     ))
 end
 function add_results_row!(df,mode,toml_dict,problem_id)

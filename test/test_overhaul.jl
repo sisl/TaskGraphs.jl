@@ -423,7 +423,7 @@ let
     # 8  16  24  32  40  48  56  64
     env_graph = construct_factory_env_from_vtx_grid(vtx_grid)
     # dist_matrix = get_dist_matrix(env_graph)
-    dist_matrix = DistMatrixMap(factory_env.vtx_map)
+    dist_matrix = DistMatrixMap(env_graph.vtx_map)
     r0 = [1,25,4,29]
     # r0 = [1,25,8,28] # check that planning works even when it takes longer for some robots to arrive than others
     s0 = [10]#,18,11,19]
