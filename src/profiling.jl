@@ -349,6 +349,8 @@ function run_profiling(MODE=:nothing;
     results_dir = RESULTS_DIR,
     Δt_min=0,
     Δt_max=0,
+    Δt_collect=0,
+    Δt_deliver=0,
     solver_template=PC_TAPF_Solver(),
     TimeLimit=solver_template.time_limit,
     OutputFlag=0,
@@ -424,10 +426,12 @@ function run_profiling(MODE=:nothing;
                 project_spec, problem_spec, _, _, robot_ICs = construct_task_graphs_problem(
                     project_spec, r0, s0, sF,
                     dist_mtx_map;
+                    Δt_collect=map(i->Δt_collect, s0),
+                    Δt_deliver=map(i->Δt_deliver, s0),
                     # dist_matrix;
                     cost_function=primary_objective,
                     task_shapes=problem_def.shapes,
-                    shape_dict=factory_env.expanded_zones
+                    shape_dict=factory_env.expanded_zones,
                     );
                 # problem_spec = ProblemSpec(problem_spec, D=dist_mtx_map)
 

@@ -191,9 +191,9 @@ function construct_task_graphs_problem(
         r0::Vector{Int},
         s0::Vector{Int},
         sF::Vector{Int},
-        dist_matrix,
+        dist_matrix;
         Δt_collect=zeros(length(s0)),
-        Δt_deliver=zeros(length(sF));
+        Δt_deliver=zeros(length(sF)),
         cost_function=SumOfMakeSpans,
         task_shapes=map(o->(1,1),s0),
         shape_dict=Dict{Int,Dict{Tuple{Int,Int},Vector{Int}}}(s=>Dict{Tuple{Int,Int},Vector{Int}}() for s in vcat(s0,sF))

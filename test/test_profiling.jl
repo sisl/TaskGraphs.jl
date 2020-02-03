@@ -29,6 +29,8 @@ let
                     # ( 1=>0.0, 2=>1.0, 4=>1.0 ),
                     ],
                 num_trials=1,
+                Δt_collect=1,
+                Δt_deliver=1,
                 problem_dir = dummy_problem_dir,
                 results_dir = joinpath(dummy_results_dir, string(typeof(milp_model))),
                 milp_model = milp_model,
@@ -62,7 +64,7 @@ let
     results_dirs = [
         # joinpath(EXPERIMENT_DIR,"assignment_solver/results")
         # joinpath(EXPERIMENT_DIR,"adjacency_solver/results")
-        joinpath(EXPERIMENT_DIR,"sparse_adjacency_solver/dummy_ops/results")
+        joinpath(EXPERIMENT_DIR,"sparse_adjacency_solver/results")
     ]
     milp_models = [
         # AssignmentMILP(),
@@ -102,17 +104,17 @@ let
     println("RUNNING PROFILING TESTS")
 
     modes = [
-        # :write,
-        # :assignment_only,
+        :write,
+        :assignment_only,
         :low_level_search_without_repair,
         :low_level_search_with_repair,
         :full_solver
         ]
-    problem_dir = joinpath(PROBLEM_DIR,"collaborative_transport")
+    problem_dir = joinpath(PROBLEM_DIR,"collaborative_transport/non_zero_collect_time")
     results_dirs = [
         # joinpath(EXPERIMENT_DIR,"assignment_solver/results")
         # joinpath(EXPERIMENT_DIR,"adjacency_solver/results")
-        joinpath(EXPERIMENT_DIR,"sparse_adjacency_solver/collaborative_transport_dist_maps/results")
+        joinpath(EXPERIMENT_DIR,"sparse_adjacency_solver/non_zero_collect_time/results")
     ]
     milp_models = [
         # AssignmentMILP(),
@@ -132,6 +134,8 @@ let
                     ( 1=>0.0, 2=>1.0, 4=>1.0 ),
                     ],
                 num_trials=16,
+                Δt_collect=1,
+                Δt_deliver=1,
                 milp_model = milp_model,
                 problem_dir = problem_dir,
                 results_dir = results_dir,
@@ -142,8 +146,8 @@ let
                     verbosity=1,
                     l1_verbosity=1,
                     l2_verbosity=1,
-                    l3_verbosity=3,
-                    l4_verbosity=2,
+                    l3_verbosity=1,
+                    l4_verbosity=1,
                     LIMIT_A_star_iterations=8000,
                     time_limit=200 # 60
                     )

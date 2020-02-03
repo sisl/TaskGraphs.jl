@@ -361,6 +361,7 @@ function construct_search_env(schedule, problem_spec, env_graph;
     N = problem_spec.N                                          # number of robots
     starts = map(i->PCCBS.State(),1:N) # no need to fill because we pull each goal directly from the path_spec
     goals = map(i->PCCBS.State(),1:N) # no need to fill because we pull each goal directly from the path_spec
+    # NOTE: This particular setting of cost model is crucuial for good performance of A_start, because it encourages depth first search. If we were to replace them with SumOfTravelTime(), we would get worst-case exponentially slow breadth-first search!
     cost_model = construct_composite_cost_model(
         primary_objective(schedule,cache),
         HardConflictCost(env_graph,maximum(cache.tF)+extra_T, N),
