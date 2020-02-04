@@ -894,6 +894,7 @@ function high_level_search!(solver::P, env_graph, project_schedule::ProjectSched
     solver.start_time = time()
     while solver.best_cost[1] > lower_bound
         try
+            check_time(solver)
             solver.num_assignment_iterations += 1
             log_info(0,solver,string("HIGH LEVEL SEARCH: iteration ",solver.num_assignment_iterations,"..."))
             ############## Task Assignment ###############
@@ -914,7 +915,8 @@ function high_level_search!(solver::P, env_graph, project_schedule::ProjectSched
             if optimal
                 lower_bound = max(lower_bound, Int(round(value(objective_function(model)))) )
             else
-                lower_bound = max(lower_bound, Int(round(value(objective_function(model)))) )
+                log_info(0,solver,string("HIGH LEVEL SEARCH: MILP not optimally solved. Current lower bound cost = ",lower_bound))
+                lower_bound = max(lower_bound, Int(round(value(objective_bound(model)))) )
             end
             log_info(0,solver,string("HIGH LEVEL SEARCH: Current lower bound cost = ",lower_bound))
             if lower_bound < solver.best_cost[1]

@@ -447,12 +447,112 @@ let
         DEBUG=true,
         LIMIT_A_star_iterations=5*nv(env_graph),
         verbosity=1,
-        l4_verbosity=2
+        l4_verbosity=1
         );
 
     solution, _, cost, env = high_level_search!(SparseAdjacencyMILP(),solver,env_graph,project_spec,problem_spec,robot_ICs,Gurobi.Optimizer)
 
     project_schedule = construct_partial_project_schedule(project_spec, problem_spec, map(i->robot_ICs[i], 1:problem_spec.N))
+
+    # GreedyAssignment
+    print_project_schedule(project_schedule,"project_schedule")
+
+    G = get_graph(project_schedule);
+    (missing_successors, missing_predecessors, n_eligible_successors, n_eligible_predecessors,
+        n_required_successors, n_required_predecessors, upstream_vertices, non_upstream_vertices) = preprocess_project_schedule(project_schedule)
+
+    downstream_vertices = map(v->[v, map(e->e.dst,collect(edges(bfs_tree(G,v;dir=:out))))...], vertices(G))
+    traversal = topological_sort(G)
+    available_outgoing = Set{Int}(vertices(G))
+    available_incoming = Set{Int}(vertices(G))
+
+    for v in traversal
+        node = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v))
+        potential_match = false
+        if indegree(G,v) < n_eligible_predecessors[v] # NOTE: Trying this out to save time on formulation
+            for v2 in downstream_vertices[v]
+                if v2 != v
+                    setdiff!(available_incoming, v2)
+                    setdiff!(available_outgoing, v2)
+                end
+            end
+        else
+            setdiff!(available_incoming, v)
+        end
+        if outdegree(G,v) < n_eligible_successors[v]
+        else
+            setdiff!(available_outgoing, v)
+        end
+    end
+    for v in available_incoming
+        node = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v))
+        @show node
+    end
+    for v in available_outgoing
+        node = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v))
+        @show node
+    end
+
+    while length(available_outgoing) > 0
+        v = pop!(available_outgoing)
+        node = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v))
+        options = []
+        costs = []
+        for v2 in available_incoming
+            node2 = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v2))
+            for (template, val) in missing_successors[v]
+                if !matches_template(template, typeof(node2)) # possible to add an edge
+                    continue
+                end
+                for (template2, val2) in missing_predecessors[v2]
+                    if !matches_template(template2, typeof(node)) # possible to add an edge
+                        continue
+                    end
+                    if (val > 0 && val2 > 0)
+                        new_node = align_with_successor(node,node2)
+                        dt_min = generate_path_spec(project_schedule,problem_spec,new_node).min_path_duration
+                        push!(options, v2)
+                        push!(costs, dt_min)
+                    end
+                end
+            end
+        end
+        # add best edge
+        v2 = get(options,1,-1)
+        if v2 != -1
+            add_edge!(G,v,v2)
+            if outdegree(G,v) < n_required_successors[v]
+                push!(available_outgoing,v)
+            end
+            if indegree(G,v2) < get(n_required_predecessors,v2,Inf)
+                push!(available_incoming,v2)
+            else
+                pop!(available_incoming,v2)
+            end
+            # update available_incoming and available_outgoing
+            union!(available_outgoing, vertices(G))
+            union!(available_incoming, vertices(G))
+
+            for v in traversal
+                if indegree(G,v) < n_eligible_predecessors[v] # NOTE: Trying this out to save time on formulation
+                    for v2 in downstream_vertices[v]
+                        if v2 != v
+                            setdiff!(available_incoming, v2)
+                            setdiff!(available_outgoing, v2)
+                        end
+                    end
+                else
+                    setdiff!(available_incoming, v)
+                end
+                if outdegree(G,v) < n_eligible_successors[v]
+                else
+                    setdiff!(available_outgoing, v)
+                end
+            end
+        end
+    end
+
+
     set_leaf_operation_nodes!(project_schedule)
     model = formulate_milp(SparseAdjacencyMILP(),project_schedule,problem_spec)
     optimize!(model)

@@ -500,7 +500,7 @@ export
 """
     `ProjectSchedule`
 """
-@with_kw struct ProjectSchedule{G<:AbstractGraph}# <: AbstractProjectSchedule
+@with_kw struct ProjectSchedule{G<:AbstractGraph} <: AbstractGraph{Int}
     graph               ::G                     = DiGraph()
     planning_nodes      ::Dict{AbstractID,AbstractPlanningPredicate}    = Dict{AbstractID,AbstractPlanningPredicate}()
     vtx_map             ::Dict{AbstractID,Int}  = Dict{AbstractID,Int}()
@@ -510,6 +510,21 @@ export
     root_nodes          ::Vector{Int}           = Vector{Int}() # list of "project heads"
     weights             ::Dict{Int,Float64}     = Dict{Int,Float64}() # weights corresponding to project heads
 end
+
+Base.zero(schedule::ProjectSchedule{G}) where {G}                           = ProjectSchedule(graph=G())
+LightGraphs.edges(schedule::ProjectSchedule)                                = edges(schedule.graph)
+LightGraphs.edgetype(schedule::ProjectSchedule{G}, args...) where {G}       = edgetype(schedule.graph, args...)
+LightGraphs.has_edge(schedule::ProjectSchedule{G}, args...) where {G}       = has_edge(schedule.graph, args...)
+LightGraphs.has_vertex(schedule::ProjectSchedule{G}, args...) where {G}     = has_vertex(schedule.graph, args...)
+LightGraphs.inneighbors(schedule::ProjectSchedule{G}, args...) where {G}    = inneighbors(schedule.graph, args...)
+# LightGraphs.is_directed(schedule::ProjectSchedule{G}, args...) where {G}    = is_directed(schedule.graph, args...)
+# LightGraphs.is_directed(schedule::ProjectSchedule, args...)                 = true
+LightGraphs.is_directed(schedule::ProjectSchedule)                          = true
+LightGraphs.ne(schedule::ProjectSchedule{G}, args...) where {G}             = ne(schedule.graph, args...)
+LightGraphs.nv(schedule::ProjectSchedule{G}, args...) where {G}             = nv(schedule.graph, args...)
+LightGraphs.outneighbors(schedule::ProjectSchedule{G}, args...) where {G}   = outneighbors(schedule.graph, args...)
+LightGraphs.vertices(schedule::ProjectSchedule{G}, args...) where {G}       = vertices(schedule.graph, args...)
+
 get_graph(schedule::P) where {P<:ProjectSchedule}       = schedule.graph
 get_vtx_ids(schedule::P) where {P<:ProjectSchedule}     = schedule.vtx_ids
 get_root_nodes(schedule::P) where {P<:ProjectSchedule}  = schedule.root_nodes
@@ -1329,6 +1344,36 @@ JuMP.dual_status(model::M) where {M<:TaskGraphsMILP}        = dual_status(model.
 # end
 
 export
+    exclude_solutions!,
+    exclude_current_solution!
+
+"""
+    `exclude_solutions!(model::JuMP.Model,forbidden_solutions::Vector{Matrix{Int}})`
+
+    This is the key utility for finding the next best solution to the MILP
+    problem. It simply excludes every specific solution passed to it. It requires
+    that X be a binary matrix.
+"""
+function exclude_solutions!(model::JuMP.Model,X::Matrix{Int})
+    @assert !any((X .< 0) .| (X .> 1))
+    @constraint(model, sum(model[:X] .* X) <= sum(model[:X])-1)
+end
+exclude_solutions!(model::TaskGraphsMILP,args...) = exclude_solutions!(model.model, args...)
+function exclude_solutions!(model::JuMP.Model,M::Int,forbidden_solutions::Vector{Matrix{Int}})
+    for X in forbidden_solutions
+        exclude_solutions!(model,X)
+    end
+end
+function exclude_solutions!(model::JuMP.Model)
+    if termination_status(model) != MOI.OPTIMIZE_NOT_CALLED
+        X = get_assignment_matrix(model)
+        exclude_solutions!(model,X)
+    end
+end
+exclude_current_solution!(args...) = exclude_solutions!(args...)
+
+
+export
     get_assignment_matrix,
     get_assignment_vector,
     get_assignment_dict
@@ -2048,6 +2093,146 @@ function formulate_milp(milp_model::SparseAdjacencyMILP,project_schedule::Projec
     # @objective(model, Min, cost1 + sparsity_cost)
     @objective(model, Min, cost1)
     SparseAdjacencyMILP(model,Xa,Xj) #, job_shop_variables
+end
+
+export
+    GreedyAssignment
+
+"""
+    GreedyAssignment - baseline for task assignment. It works by maintaining two
+    "open" sets of vertices: one containing vertices that are eligible for a
+"""
+@with_kw struct GreedyAssignment{C} <: TaskGraphsMILP
+    schedule::ProjectSchedule   = ProjectSchedule()
+    problem_spec::ProblemSpec   = ProblemSpec()
+    cost_model::C               = SumOfMakeSpans
+    # X::M                        = sparse(zeros(Int,nv(project_schedule),nv(project_schedule)))
+    t0::Vector{Int}             = zeros(Int,nv(schedule))
+    # cost::Float64               = Inf
+    # lower_bound::Float64        = Inf
+end
+exclude_solutions!(model::GreedyAssignment) = nothing # exclude most recent solution in order to get next best solution
+JuMP.termination_status(model::GreedyAssignment)    = MOI.OPTIMAL
+JuMP.primal_status(model::GreedyAssignment)         = MOI.FEASIBLE_POINT
+get_assignment_matrix(model::GreedyAssignment)      = adjacency_matrix(get_graph(model.schedule))
+function JuMP.objective_function(model::GreedyAssignment)
+    t0,tF,slack,local_slack = process_schedule(model.schedule;t0=model.t0)
+    if model.cost_model == MakeSpan
+        return maximum(tF[model.schedule.root_nodes])
+    elseif model.cost_model == SumOfMakeSpans
+        return sum(tF[model.schedule.root_nodes] .* map(v->model.schedule.weights[v], model.schedule.root_nodes))
+    end
+    println("UNKNOWN COST FUNCTION!")
+    return Inf
+end
+JuMP.objective_bound(model::GreedyAssignment)       = objective_function(model)
+JuMP.value(c::Real) = c
+function formulate_milp(milp_model::GreedyAssignment,project_schedule::ProjectSchedule,problem_spec::ProblemSpec;
+        t0_ = Dict{AbstractID,Float64}(),
+        cost_model = SumOfMakeSpans,
+        kwargs...
+    )
+
+    model = GreedyAssignment(
+        schedule = project_schedule,
+        problem_spec = problem_spec,
+        cost_model = cost_model
+    )
+    for (id,t) in t0_
+        v = get_vtx(project_schedule, id)
+        model.t0[v] = t
+    end
+    model
+end
+function JuMP.optimize!(model::GreedyAssignment)
+
+    project_schedule    = model.schedule
+    problem_spec        = model.problem_spec
+    G                   = get_graph(project_schedule);
+    (missing_successors, missing_predecessors, n_eligible_successors, n_eligible_predecessors,
+        n_required_successors, n_required_predecessors, upstream_vertices, non_upstream_vertices) = preprocess_project_schedule(project_schedule)
+    downstream_vertices = map(v->[v, map(e->e.dst,collect(edges(bfs_tree(G,v;dir=:out))))...], vertices(G))
+
+    traversal = topological_sort(G)
+    available_outgoing = Set{Int}(vertices(G))
+    available_incoming = Set{Int}(vertices(G))
+
+    for v in traversal
+        if indegree(G,v) < n_eligible_predecessors[v] # NOTE: Trying this out to save time on formulation
+            for v2 in downstream_vertices[v]
+                if v2 != v
+                    setdiff!(available_incoming, v2)
+                    setdiff!(available_outgoing, v2)
+                end
+            end
+        else
+            setdiff!(available_incoming, v)
+        end
+        if !(outdegree(G,v) < n_eligible_successors[v])
+            setdiff!(available_outgoing, v)
+        end
+    end
+
+    while length(available_outgoing) > 0
+        v = pop!(available_outgoing)
+        node = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v))
+        options = []
+        costs = []
+        for v2 in available_incoming
+            node2 = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v2))
+            for (template, val) in missing_successors[v]
+                if !matches_template(template, typeof(node2)) # possible to add an edge
+                    continue
+                end
+                for (template2, val2) in missing_predecessors[v2]
+                    if !matches_template(template2, typeof(node)) # possible to add an edge
+                        continue
+                    end
+                    if (val > 0 && val2 > 0)
+                        new_node = align_with_successor(node,node2)
+                        dt_min = generate_path_spec(project_schedule,problem_spec,new_node).min_path_duration
+                        push!(options, v2)
+                        push!(costs, dt_min)
+                    end
+                end
+            end
+        end
+        # add best edge
+        v2 = get(options,1,-1)
+        if v2 != -1
+            add_edge!(G,v,v2)
+            if outdegree(G,v) < n_required_successors[v]
+                push!(available_outgoing,v)
+            end
+            if indegree(G,v2) < get(n_required_predecessors,v2,Inf)
+                push!(available_incoming,v2)
+            else
+                pop!(available_incoming,v2)
+            end
+            # update available_incoming and available_outgoing
+            union!(available_outgoing, vertices(G))
+            union!(available_incoming, vertices(G))
+
+            for v in traversal
+                if indegree(G,v) < n_eligible_predecessors[v] # NOTE: Trying this out to save time on formulation
+                    for v2 in downstream_vertices[v]
+                        if v2 != v
+                            setdiff!(available_incoming, v2)
+                            setdiff!(available_outgoing, v2)
+                        end
+                    end
+                else
+                    setdiff!(available_incoming, v)
+                end
+                if !(outdegree(G,v) < n_eligible_successors[v])
+                    setdiff!(available_outgoing, v)
+                end
+            end
+        end
+    end
+    set_leaf_operation_nodes!(project_schedule)
+    update_project_schedule!(project_schedule,problem_spec,adjacency_matrix(G))
+    model
 end
 
 export

@@ -114,12 +114,14 @@ let
     results_dirs = [
         # joinpath(EXPERIMENT_DIR,"assignment_solver/results")
         # joinpath(EXPERIMENT_DIR,"adjacency_solver/results")
-        joinpath(EXPERIMENT_DIR,"sparse_adjacency_solver/non_zero_collect_time/results")
+        # joinpath(EXPERIMENT_DIR,"sparse_adjacency_solver/non_zero_collect_time/results")
+        joinpath(EXPERIMENT_DIR,"greedy_assignment/non_zero_collect_time/results")
     ]
     milp_models = [
         # AssignmentMILP(),
         # AdjacencyMILP(),
-        SparseAdjacencyMILP()
+        # SparseAdjacencyMILP(),
+        GreedyAssignment()
     ]
     for (milp_model, results_dir) in zip(milp_models, results_dirs)
         for mode in modes
@@ -146,8 +148,9 @@ let
                     verbosity=1,
                     l1_verbosity=1,
                     l2_verbosity=1,
-                    l3_verbosity=1,
-                    l4_verbosity=1,
+                    l3_verbosity=0,
+                    l4_verbosity=0,
+                    LIMIT_assignment_iterations = isa(milp_model, GreedyAssignment) ? 1 : 50,
                     LIMIT_A_star_iterations=8000,
                     time_limit=200 # 60
                     )

@@ -117,34 +117,7 @@ function remap_object_ids!(project_schedule::ProjectSchedule,args...)
     project_schedule
 end
 
-export
-    exclude_solutions!,
-    exclude_current_solution!
 
-"""
-    `exclude_solutions!(model::JuMP.Model,forbidden_solutions::Vector{Matrix{Int}})`
-
-    This is the key utility for finding the next best solution to the MILP
-    problem. It simply excludes every specific solution passed to it. It requires
-    that X be a binary matrix.
-"""
-function exclude_solutions!(model::JuMP.Model,X::Matrix{Int})
-    @assert !any((X .< 0) .| (X .> 1))
-    @constraint(model, sum(model[:X] .* X) <= sum(model[:X])-1)
-end
-exclude_solutions!(model::TaskGraphsMILP,args...) = exclude_solutions!(model.model, args...)
-function exclude_solutions!(model::JuMP.Model,M::Int,forbidden_solutions::Vector{Matrix{Int}})
-    for X in forbidden_solutions
-        exclude_solutions!(model,X)
-    end
-end
-function exclude_solutions!(model::JuMP.Model)
-    if termination_status(model) != MOI.OPTIMIZE_NOT_CALLED
-        X = get_assignment_matrix(model)
-        exclude_solutions!(model,X)
-    end
-end
-exclude_current_solution!(args...) = exclude_solutions!(args...)
 
 """
     `cached_pickup_and_delivery_distances(r₀,oₒ,sₒ,dist=(x1,x2)->norm(x2-x1,1))`
