@@ -1,0 +1,25 @@
+final_conditions = [[1, 234], [2, 202], [3, 374]]
+r0 = [165, 587, 181, 305]
+s0 = [229, 388, 100]
+sF = [234, 202, 374]
+shapes = [[2, 1], [1, 1], [1, 2]]
+initial_conditions = [[1, 229], [2, 388], [3, 100]]
+
+[[operations]]
+pre = [[2, 202]]
+post = [[3, 100]]
+station_id = 3
+id = 15283
+dt = 0
+[[operations]]
+pre = [[1, 234]]
+post = [[2, 388]]
+station_id = 2
+id = 15284
+dt = 0
+[[operations]]
+pre = [[3, 374]]
+post = []
+station_id = -1
+id = 15285
+dt = 0

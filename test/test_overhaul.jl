@@ -455,104 +455,17 @@ let
 
     project_schedule = construct_partial_project_schedule(project_spec, problem_spec, map(i->robot_ICs[i], 1:problem_spec.N))
 
+    ######################
     # GreedyAssignment
     print_project_schedule(project_schedule,"project_schedule")
 
-    G = get_graph(project_schedule);
-    (missing_successors, missing_predecessors, n_eligible_successors, n_eligible_predecessors,
-        n_required_successors, n_required_predecessors, upstream_vertices, non_upstream_vertices) = preprocess_project_schedule(project_schedule)
+    milp_model = formulate_milp(GreedyAssignment(),project_schedule,problem_spec)
+    optimize!(milp_model)
+    X = get_assignment_matrix(milp_model)
+    update_project_schedule!(milp_model,project_schedule,problem_spec,X)
 
-    downstream_vertices = map(v->[v, map(e->e.dst,collect(edges(bfs_tree(G,v;dir=:out))))...], vertices(G))
-    traversal = topological_sort(G)
-    available_outgoing = Set{Int}(vertices(G))
-    available_incoming = Set{Int}(vertices(G))
-
-    for v in traversal
-        node = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v))
-        potential_match = false
-        if indegree(G,v) < n_eligible_predecessors[v] # NOTE: Trying this out to save time on formulation
-            for v2 in downstream_vertices[v]
-                if v2 != v
-                    setdiff!(available_incoming, v2)
-                    setdiff!(available_outgoing, v2)
-                end
-            end
-        else
-            setdiff!(available_incoming, v)
-        end
-        if outdegree(G,v) < n_eligible_successors[v]
-        else
-            setdiff!(available_outgoing, v)
-        end
-    end
-    for v in available_incoming
-        node = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v))
-        @show node
-    end
-    for v in available_outgoing
-        node = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v))
-        @show node
-    end
-
-    while length(available_outgoing) > 0
-        v = pop!(available_outgoing)
-        node = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v))
-        options = []
-        costs = []
-        for v2 in available_incoming
-            node2 = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v2))
-            for (template, val) in missing_successors[v]
-                if !matches_template(template, typeof(node2)) # possible to add an edge
-                    continue
-                end
-                for (template2, val2) in missing_predecessors[v2]
-                    if !matches_template(template2, typeof(node)) # possible to add an edge
-                        continue
-                    end
-                    if (val > 0 && val2 > 0)
-                        new_node = align_with_successor(node,node2)
-                        dt_min = generate_path_spec(project_schedule,problem_spec,new_node).min_path_duration
-                        push!(options, v2)
-                        push!(costs, dt_min)
-                    end
-                end
-            end
-        end
-        # add best edge
-        v2 = get(options,1,-1)
-        if v2 != -1
-            add_edge!(G,v,v2)
-            if outdegree(G,v) < n_required_successors[v]
-                push!(available_outgoing,v)
-            end
-            if indegree(G,v2) < get(n_required_predecessors,v2,Inf)
-                push!(available_incoming,v2)
-            else
-                pop!(available_incoming,v2)
-            end
-            # update available_incoming and available_outgoing
-            union!(available_outgoing, vertices(G))
-            union!(available_incoming, vertices(G))
-
-            for v in traversal
-                if indegree(G,v) < n_eligible_predecessors[v] # NOTE: Trying this out to save time on formulation
-                    for v2 in downstream_vertices[v]
-                        if v2 != v
-                            setdiff!(available_incoming, v2)
-                            setdiff!(available_outgoing, v2)
-                        end
-                    end
-                else
-                    setdiff!(available_incoming, v)
-                end
-                if outdegree(G,v) < n_eligible_successors[v]
-                else
-                    setdiff!(available_outgoing, v)
-                end
-            end
-        end
-    end
-
+    #######################
+    #######################
 
     set_leaf_operation_nodes!(project_schedule)
     model = formulate_milp(SparseAdjacencyMILP(),project_schedule,problem_spec)
@@ -573,6 +486,58 @@ let
     low_level_search!(solver, pc_mapf.env, pc_mapf.mapf,root_node)
 
     @show convert_to_vertex_lists(root_node.solution)
+end
+# GreedyAssignment
+let
+    vtx_grid = initialize_dense_vtx_grid(8,8)
+    # 1   9  17  25  33  41  49  57
+    # 2  10  18  26  34  42  50  58
+    # 3  11  19  27  35  43  51  59
+    # 4  12  20  28  36  44  52  60
+    # 5  13  21  29  37  45  53  61
+    # 6  14  22  30  38  46  54  62
+    # 7  15  23  31  39  47  55  63
+    # 8  16  24  32  40  48  56  64
+    env_graph = construct_factory_env_from_vtx_grid(vtx_grid)
+    # dist_matrix = get_dist_matrix(env_graph)
+    dist_matrix = DistMatrixMap(env_graph.vtx_map)
+    r0 = [1,25,4,29]
+    # r0 = [1,25,8,28] # check that planning works even when it takes longer for some robots to arrive than others
+    s0 = [10]#,18,11,19]
+    sF = [42] #,50,43,51]
+
+    task_shapes = Dict(1=>(2,2))
+    shape_dict = Dict(
+        10=>Dict((2,2)=>[10,18,11,19]),
+        42=>Dict((2,2)=>[42,50,43,51]),
+        )
+
+    project_spec, robot_ICs = TaskGraphs.initialize_toy_problem(r0,[s0],[sF],(v1,v2)->dist_matrix[v1,v2])
+    add_operation!(project_spec,construct_operation(project_spec,-1,[1],[],0))
+
+    cost_function = MakeSpan
+    project_spec, problem_spec, object_ICs, object_FCs, robot_ICs = construct_task_graphs_problem(
+        project_spec,r0,s0,sF,dist_matrix;cost_function=cost_function,
+        task_shapes=task_shapes,shape_dict=shape_dict)
+
+    solver = PC_TAPF_Solver(
+        DEBUG=true,
+        LIMIT_A_star_iterations=5*nv(env_graph),
+        verbosity=1,
+        l4_verbosity=1
+        );
+
+    # solution, _, cost, env = high_level_search!(SparseAdjacencyMILP(),solver,env_graph,project_spec,problem_spec,robot_ICs,Gurobi.Optimizer)
+    # solution, _, cost, env = high_level_search!(GreedyAssignment(),solver,env_graph,project_spec,problem_spec,robot_ICs,Gurobi.Optimizer)
+
+    project_schedule = construct_partial_project_schedule(project_spec, problem_spec, map(i->robot_ICs[i], 1:problem_spec.N))
+
+    print_project_schedule(project_schedule,"project_schedule")
+
+    milp_model = formulate_milp(GreedyAssignment(),project_schedule,problem_spec)
+    optimize!(milp_model)
+    X = get_assignment_matrix(milp_model)
+    update_project_schedule!(milp_model,project_schedule,problem_spec,X)
 end
 let
     # build custom envs for different robot sizes

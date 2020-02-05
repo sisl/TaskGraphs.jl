@@ -2173,6 +2173,48 @@ function JuMP.optimize!(model::GreedyAssignment)
         end
     end
 
+    @show available_incoming
+    @show available_outgoing
+    # NOTE of course the problem is that not all assignments can be made this way for collaborative tasks.
+
+    # D = Inf * ones(nv(G),nv(G))
+    # for v in vertices(G)
+    #     if outdegree(G,v) < n_eligible_successors[v] # NOTE: Trying this out to save time on formulation
+    #         node = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v))
+    #         for v2 in non_upstream_vertices[v] # for v2 in vertices(G)
+    #             if indegree(G,v2) < n_eligible_predecessors[v2]
+    #                 node2 = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v2))
+    #                 for (template, val) in missing_successors[v]
+    #                     if !matches_template(template, typeof(node2)) # possible to add an edge
+    #                         continue
+    #                     end
+    #                     for (template2, val2) in missing_predecessors[v2]
+    #                         if !matches_template(template2, typeof(node)) # possible to add an edge
+    #                             continue
+    #                         end
+    #                         if (val > 0 && val2 > 0)
+    #                             new_node = align_with_successor(node,node2)
+    #                             D[v,v2] = generate_path_spec(project_schedule,problem_spec,new_node).min_path_duration
+    #                         end
+    #                     end
+    #                 end
+    #             end
+    #         end
+    #     end
+    # end
+
+    # for v in traversal
+    #     if outdegree(G,v) < n_eligible_successors[v] # NOTE: Trying this out to save time on formulation
+    #         v2, val = findmin(D[v,:])
+    #         if val != Inf
+    #             add_edge!(G,v)
+    #         end
+    #         if indegree(G,v2) >= n_required_predecessors[v2]
+    #             D[:,v2] .= Inf
+    #         end
+    #     end
+    # end
+
     while length(available_outgoing) > 0
         v = pop!(available_outgoing)
         node = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v))
@@ -2201,20 +2243,21 @@ function JuMP.optimize!(model::GreedyAssignment)
         v2 = get(options,1,-1)
         if v2 != -1
             add_edge!(G,v,v2)
-            if outdegree(G,v) < n_required_successors[v]
-                push!(available_outgoing,v)
-            end
-            if indegree(G,v2) < get(n_required_predecessors,v2,Inf)
-                push!(available_incoming,v2)
-            else
-                pop!(available_incoming,v2)
-            end
+            # if outdegree(G,v) < n_required_successors[v]
+            #     push!(available_outgoing,v)
+            # end
+            # if indegree(G,v2) < get(n_required_predecessors,v2,Inf)
+            #     push!(available_incoming,v2)
+            # else
+            #     setdiff!(available_incoming,v2)
+            # end
             # update available_incoming and available_outgoing
             union!(available_outgoing, vertices(G))
             union!(available_incoming, vertices(G))
 
             for v in traversal
-                if indegree(G,v) < n_eligible_predecessors[v] # NOTE: Trying this out to save time on formulation
+                # if indegree(G,v) < n_eligible_predecessors[v] # NOTE: Trying this out to save time on formulation
+                if indegree(G,v) < n_required_predecessors[v] # NOTE: Trying this out to save time on formulation
                     for v2 in downstream_vertices[v]
                         if v2 != v
                             setdiff!(available_incoming, v2)
