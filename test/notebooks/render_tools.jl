@@ -429,6 +429,128 @@ function get_runtime_box_plot(df;obj=:time,m_range=10:10:60,n_range=10:10:40,ymi
     return tikzpic
 end
 
+function preprocess_collab_results!(df_dict)
+    num_tasks = [12,18,24]
+    num_robots = [24]
+    depth_biases=[0.1]
+    task_size_distributions = [1,2,3,4]
+    num_trials=16
+    task_ratios = Int[]
+    for (M,N,task_sizes,trial) in Base.Iterators.product(
+            num_tasks,num_robots,task_size_distributions,1:num_trials
+            )
+        push!(task_ratios, task_sizes)
+    end
+    
+    for (k,df) in df_dict
+        if nrow(df) > 0
+            begin df[!,:depth_bias_string] = string.(df.depth_bias)
+                df
+            end
+            begin df[!,:N_string] = string.(df.N)
+                df
+            end
+            begin df[!,:M_string] = string.(df.M)
+                df
+            end
+            begin df[!,:TaskRatio] = task_ratios[df.problem_id]
+                df
+            end
+        end
+    end
+    df_dict
+end
+function plot_collab_runtimes(df;
+        title="Solution time by Number of Tasks (M) and ratio of tasks (task ratio )",
+        yticks=[-1,0,1,2],
+        ymin=-1.5,
+        ymax=2.3,
+        y_bounds=[0.01,100.0],
+        big_font=14pt,
+        small_font=12pt,
+        xgroup=:TaskRatio,
+        x=:M_string,
+        y=:time
+    )
+    latex_fonts = Theme(major_label_font="CMU Serif", major_label_font_size=big_font,
+                    minor_label_font="CMU Serif", minor_label_font_size=small_font,
+                    key_title_font="CMU Serif", key_title_font_size=small_font,
+                    key_label_font="CMU Serif", key_label_font_size=small_font)
+    
+    plot(df, xgroup=xgroup, x=x, y=y, color=x,
+        Geom.subplot_grid(
+            Geom.boxplot(;suppress_outliers=true),
+            Coord.cartesian(; ymin=ymin, ymax=ymax),
+            Guide.yticks(;ticks=yticks),
+            Guide.xticks(;label=false),
+            ),
+        Guide.title(title),
+        Guide.colorkey(title="num tasks", labels=["12","18","24"], pos=[0.1w,-0.32h]),
+#         Scale.group_discrete(labels=M->string(M," Tasks"),levels=[1,2,3,4]),
+        Guide.xlabel("task ratio"),
+        Guide.ylabel("computation time (s)"),
+        Scale.y_log10(minvalue=y_bounds[1],maxvalue=y_bounds[2]),
+        latex_fonts
+    )
+end
+function plot_collab_counts(df;
+        title="# failures vs. # Tasks (M) x Task Ratio",
+        yticks=[0,4,8,12,16],
+        ymin=0,
+        ymax=16,
+        y_bounds=[0.01,100.0],
+        big_font=14pt,
+        small_font=12pt,
+        task_ratios = [
+            ( 1=>1.0, 2=>0.0, 4=>0.0 ),
+            ( 1=>1.0, 2=>1.0, 4=>0.0 ),
+            ( 1=>1.0, 2=>1.0, 4=>1.0 ),
+            ( 1=>0.0, 2=>1.0, 4=>1.0 ),
+        ],
+        key=df.optimal
+    )
+    
+    
+    opt_df = DataFrame( M = Int[], task_ratio = Int[], num_no = Int[], num_yes = Int[] )
+
+    for (i,ratio) in enumerate(task_ratios)
+        for m in Set(collect(df.M))
+        push!(
+            opt_df,
+            Dict(
+                :M =>m,
+                :task_ratio => i,
+                :num_no => nrow(df[(df.M .== m) .* (df.TaskRatio .== i) .* (key .== false),:]),
+                :num_yes => nrow(df[(df.M .== m) .* (df.TaskRatio .== i) .* (key .== true),:]),
+            )
+        )
+        end
+    end
+    begin opt_df[!,:M_string] = string.(opt_df.M)
+        opt_df
+    end
+    
+    latex_fonts = Theme(major_label_font="CMU Serif", major_label_font_size=big_font,
+                    minor_label_font="CMU Serif", minor_label_font_size=small_font,
+                    key_title_font="CMU Serif", key_title_font_size=small_font,
+                    key_label_font="CMU Serif", key_label_font_size=small_font)
+    
+    plot(opt_df, xgroup=:task_ratio, x=:M_string, y=:num_no, color=:M_string,
+        Geom.subplot_grid(
+            Geom.bar,
+            Coord.cartesian(; ymin=ymin, ymax=ymax),
+            Guide.yticks(;ticks=yticks),
+            Guide.xticks(;label=false),
+            ),
+        Guide.title(title),
+        Guide.colorkey(title="num tasks", labels=["12","18","24"], pos=[0.1w,-0.32h]),
+        Scale.group_discrete(labels=M->string(M," Tasks"),levels=[1,2,3,4]),
+        Guide.xlabel("task ratio"),
+        Guide.ylabel("computation time (s)"),
+        latex_fonts
+    )
+end
+
 # For rendering the factory floor as a custom ImageAppearance in Webots
 function caution_tape(d,n;yellow_color=RGB(0.8,0.7,0.0),black_color=RGB(0.0,0.0,0.0))
     compose(context(),map(i->(context(),
