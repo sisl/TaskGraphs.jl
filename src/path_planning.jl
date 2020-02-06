@@ -438,7 +438,10 @@ function update_env!(solver::S,env::E,v::Int,path::P,agent_id::Int=get_path_spec
     env
 end
 
-function CRCBS.build_env(solver, env::E, mapf::M, node::N, schedule_node::T, v::Int,path_spec=get_path_spec(env.schedule, v)) where {E<:SearchEnv,M<:AbstractMAPF,N<:ConstraintTreeNode,T}
+function CRCBS.build_env(solver, env::E, mapf::M, node::N, schedule_node::T, v::Int,path_spec=get_path_spec(env.schedule, v);
+        heuristic = get_heuristic_model(mapf.env),
+        cost_model = get_cost_model(mapf.env)
+    ) where {E<:SearchEnv,M<:AbstractMAPF,N<:ConstraintTreeNode,T}
     agent_id = path_spec.agent_id
     goal_vtx = path_spec.final_vtx
     goal_time = env.cache.tF[v]                             # time after which goal can be satisfied
@@ -471,8 +474,8 @@ function CRCBS.build_env(solver, env::E, mapf::M, node::N, schedule_node::T, v::
         constraints = get_constraints(node, agent_id), # agent_id represents the whole path
         goal        = PCCBS.State(goal_vtx,goal_time),
         agent_idx   = agent_id, # this is only used for the HardConflictTable, which can be updated via the combined search node
-        heuristic   = get_heuristic_model(mapf.env),
-        cost_model  = get_cost_model(mapf.env)
+        heuristic   = heuristic,
+        cost_model  = cost_model
         )
     # update deadline in DeadlineCost
     set_deadline!(get_cost_model(cbs_env),deadline)
@@ -512,7 +515,7 @@ function CRCBS.build_env(solver, env::E, mapf::M, node::N, schedule_node::TEAM_A
     starts = Vector{PCCBS.State}()
     meta_cost = MetaCost(Vector{get_cost_type(env)}(),get_initial_cost(env.env))
     # path_specs = Vector{PathSpec}()
-    for sub_node in schedule_node.instructions
+    for (i, sub_node) in enumerate(schedule_node.instructions)
         cbs_env, base_path = build_env(solver,env,mapf,node,sub_node,v,generate_path_spec(env.schedule,env.problem_spec,sub_node)) # TODO need problem_spec here
         push!(envs, cbs_env)
         push!(starts, get_final_state(base_path))

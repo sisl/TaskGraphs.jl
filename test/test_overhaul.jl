@@ -457,12 +457,12 @@ let
 
     ######################
     # GreedyAssignment
-    print_project_schedule(project_schedule,"project_schedule")
-
-    milp_model = formulate_milp(GreedyAssignment(),project_schedule,problem_spec)
-    optimize!(milp_model)
-    X = get_assignment_matrix(milp_model)
-    update_project_schedule!(milp_model,project_schedule,problem_spec,X)
+    # print_project_schedule(project_schedule,"project_schedule")
+    #
+    # milp_model = formulate_milp(GreedyAssignment(),project_schedule,problem_spec)
+    # optimize!(milp_model)
+    # X = get_assignment_matrix(milp_model)
+    # update_project_schedule!(milp_model,project_schedule,problem_spec,X)
 
     #######################
     #######################
@@ -592,4 +592,6 @@ let
         );
 
     project_spec.initial_conditions
+
+    # Make A_star work the same way
 end
