@@ -527,17 +527,36 @@ let
         l4_verbosity=1
         );
 
+    env_id = 2
+    env_filename = string(ENVIRONMENT_DIR,"/env_",env_id,".toml")
+    factory_env = read_env(env_filename)
+    env_graph = factory_env
+    dist_matrix = get_dist_matrix(env_graph)
+    dist_mtx_map = DistMatrixMap(factory_env.vtx_map)
+
+    problem_filename = "dummy_problem_dir/problem1.toml"
+    problem_def = read_problem_def(problem_filename)
+    project_spec, r0, s0, sF = problem_def.project_spec,problem_def.r0,problem_def.s0,problem_def.sF
+
+    project_spec, problem_spec, _, _, robot_ICs = construct_task_graphs_problem(
+        project_spec, r0, s0, sF,
+        dist_mtx_map;
+        task_shapes=problem_def.shapes,
+        shape_dict=factory_env.expanded_zones,
+        );
     # solution, _, cost, env = high_level_search!(SparseAdjacencyMILP(),solver,env_graph,project_spec,problem_spec,robot_ICs,Gurobi.Optimizer)
     # solution, _, cost, env = high_level_search!(GreedyAssignment(),solver,env_graph,project_spec,problem_spec,robot_ICs,Gurobi.Optimizer)
 
     project_schedule = construct_partial_project_schedule(project_spec, problem_spec, map(i->robot_ICs[i], 1:problem_spec.N))
 
-    print_project_schedule(project_schedule,"project_schedule")
+    print_project_schedule(project_schedule,"project_schedule1")
 
     milp_model = formulate_milp(GreedyAssignment(),project_schedule,problem_spec)
     optimize!(milp_model)
     X = get_assignment_matrix(milp_model)
-    update_project_schedule!(milp_model,project_schedule,problem_spec,X)
+    @test update_project_schedule!(milp_model,project_schedule,problem_spec,X)
+
+    print_project_schedule(project_schedule,"project_schedule2")
 end
 let
     # build custom envs for different robot sizes

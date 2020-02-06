@@ -48,8 +48,8 @@ let
                     )
                 )
         end
-        # run(pipeline(`rm -rf $dummy_problem_dir`, stdout=devnull, stderr=devnull))
-        # run(pipeline(`rm -rf $dummy_results_dir`, stdout=devnull, stderr=devnull))
+        run(pipeline(`rm -rf $dummy_problem_dir`, stdout=devnull, stderr=devnull))
+        run(pipeline(`rm -rf $dummy_results_dir`, stdout=devnull, stderr=devnull))
     end
 end
 let

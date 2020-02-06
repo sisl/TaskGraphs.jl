@@ -441,35 +441,35 @@ export
     # retrieve the portion of the path directly from the pre-existing solution.
     fixed               ::Bool          = false
 end
-function PathSpec(
-        spec::PathSpec,
-        node_type=spec.node_type,
-        start_vtx=spec.start_vtx,
-        final_vtx=spec.final_vtx,
-        min_path_duration=spec.min_path_duration,
-        agent_id=spec.agent_id,
-        object_id=spec.object_id,
-        plan_path=spec.plan_path,
-        tight=spec.tight,
-        static=spec.static,
-        free=spec.free,
-        fixed=spec.fixed,
-    )
-
-    PathSpec(
-        node_type,
-        start_vtx,
-        final_vtx,
-        min_path_duration,
-        agent_id,
-        object_id,
-        plan_path,
-        tight,
-        static,
-        free,
-        fixed,
-    )
-end
+# function PathSpec(
+#         spec::PathSpec,
+#         node_type=spec.node_type,
+#         start_vtx=spec.start_vtx,
+#         final_vtx=spec.final_vtx,
+#         min_path_duration=spec.min_path_duration,
+#         agent_id=spec.agent_id,
+#         object_id=spec.object_id,
+#         plan_path=spec.plan_path,
+#         tight=spec.tight,
+#         static=spec.static,
+#         free=spec.free,
+#         fixed=spec.fixed,
+#     )
+#
+#     PathSpec(
+#         node_type,
+#         start_vtx,
+#         final_vtx,
+#         min_path_duration,
+#         agent_id,
+#         object_id,
+#         plan_path,
+#         tight,
+#         static,
+#         free,
+#         fixed,
+#     )
+# end
 
 export
     ProjectSchedule,
@@ -819,8 +819,8 @@ function validate(project_schedule::ProjectSchedule)
         end
         for v in vertices(G)
             node = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v))
-            @assert( outdegree(G,v) >= sum([0, values(required_successors(node))...]) )
-            @assert( indegree(G,v) >= sum([0, values(required_predecessors(node))...]) )
+            @assert( outdegree(G,v) >= sum([0, values(required_successors(node))...]) , string("node = ", string(node), " outdegree = ",outdegree(G,v), " "))
+            @assert( indegree(G,v) >= sum([0, values(required_predecessors(node))...]), string("node = ", string(node), " indegree = ",indegree(G,v), " ") )
         end
     catch e
         if typeof(e) <: AssertionError
@@ -2155,123 +2155,105 @@ function JuMP.optimize!(model::GreedyAssignment)
 
     traversal = topological_sort(G)
     available_outgoing = Set{Int}(vertices(G))
-    available_incoming = Set{Int}(vertices(G))
+    required_incoming = Set{Int}()
 
     for v in traversal
-        if indegree(G,v) < n_eligible_predecessors[v] # NOTE: Trying this out to save time on formulation
+        if indegree(G,v) < n_required_predecessors[v] # NOTE: Trying this out to save time on formulation
             for v2 in downstream_vertices[v]
                 if v2 != v
-                    setdiff!(available_incoming, v2)
+                    # setdiff!(required_incoming, v2)
                     setdiff!(available_outgoing, v2)
                 end
             end
-        else
-            setdiff!(available_incoming, v)
+            push!(required_incoming, v)
+        # else
+        #     setdiff!(required_incoming, v)
         end
-        if !(outdegree(G,v) < n_eligible_successors[v])
+        if outdegree(G,v) >= n_eligible_successors[v]
             setdiff!(available_outgoing, v)
         end
     end
 
-    @show available_incoming
-    @show available_outgoing
-    # NOTE of course the problem is that not all assignments can be made this way for collaborative tasks.
-
-    # D = Inf * ones(nv(G),nv(G))
-    # for v in vertices(G)
-    #     if outdegree(G,v) < n_eligible_successors[v] # NOTE: Trying this out to save time on formulation
-    #         node = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v))
-    #         for v2 in non_upstream_vertices[v] # for v2 in vertices(G)
-    #             if indegree(G,v2) < n_eligible_predecessors[v2]
-    #                 node2 = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v2))
-    #                 for (template, val) in missing_successors[v]
-    #                     if !matches_template(template, typeof(node2)) # possible to add an edge
-    #                         continue
-    #                     end
-    #                     for (template2, val2) in missing_predecessors[v2]
-    #                         if !matches_template(template2, typeof(node)) # possible to add an edge
-    #                             continue
-    #                         end
-    #                         if (val > 0 && val2 > 0)
-    #                             new_node = align_with_successor(node,node2)
-    #                             D[v,v2] = generate_path_spec(project_schedule,problem_spec,new_node).min_path_duration
-    #                         end
-    #                     end
-    #                 end
-    #             end
-    #         end
-    #     end
-    # end
-
-    # for v in traversal
-    #     if outdegree(G,v) < n_eligible_successors[v] # NOTE: Trying this out to save time on formulation
-    #         v2, val = findmin(D[v,:])
-    #         if val != Inf
-    #             add_edge!(G,v)
-    #         end
-    #         if indegree(G,v2) >= n_required_predecessors[v2]
-    #             D[:,v2] .= Inf
-    #         end
-    #     end
-    # end
-
-    while length(available_outgoing) > 0
-        v = pop!(available_outgoing)
-        node = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v))
-        options = []
-        costs = []
-        for v2 in available_incoming
-            node2 = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v2))
-            for (template, val) in missing_successors[v]
-                if !matches_template(template, typeof(node2)) # possible to add an edge
-                    continue
-                end
-                for (template2, val2) in missing_predecessors[v2]
-                    if !matches_template(template2, typeof(node)) # possible to add an edge
-                        continue
-                    end
-                    if (val > 0 && val2 > 0)
-                        new_node = align_with_successor(node,node2)
-                        dt_min = generate_path_spec(project_schedule,problem_spec,new_node).min_path_duration
-                        push!(options, v2)
-                        push!(costs, dt_min)
-                    end
-                end
-            end
-        end
-        # add best edge
-        v2 = get(options,1,-1)
-        if v2 != -1
-            add_edge!(G,v,v2)
-            # if outdegree(G,v) < n_required_successors[v]
-            #     push!(available_outgoing,v)
-            # end
-            # if indegree(G,v2) < get(n_required_predecessors,v2,Inf)
-            #     push!(available_incoming,v2)
-            # else
-            #     setdiff!(available_incoming,v2)
-            # end
-            # update available_incoming and available_outgoing
-            union!(available_outgoing, vertices(G))
-            union!(available_incoming, vertices(G))
-
-            for v in traversal
-                # if indegree(G,v) < n_eligible_predecessors[v] # NOTE: Trying this out to save time on formulation
-                if indegree(G,v) < n_required_predecessors[v] # NOTE: Trying this out to save time on formulation
-                    for v2 in downstream_vertices[v]
-                        if v2 != v
-                            setdiff!(available_incoming, v2)
-                            setdiff!(available_outgoing, v2)
+    # construct distance matrix
+    D = Inf * ones(nv(G),nv(G))
+    for v in vertices(G)
+        if outdegree(G,v) < n_eligible_successors[v] # NOTE: Trying this out to save time on formulation
+            node = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v))
+            for v2 in non_upstream_vertices[v] # for v2 in vertices(G)
+                if indegree(G,v2) < n_eligible_predecessors[v2]
+                    node2 = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v2))
+                    for (template, val) in missing_successors[v]
+                        if !matches_template(template, typeof(node2)) # possible to add an edge
+                            continue
+                        end
+                        for (template2, val2) in missing_predecessors[v2]
+                            if !matches_template(template2, typeof(node)) # possible to add an edge
+                                continue
+                            end
+                            if (val > 0 && val2 > 0)
+                                new_node = align_with_successor(node,node2)
+                                D[v,v2] = generate_path_spec(project_schedule,problem_spec,new_node).min_path_duration
+                            end
                         end
                     end
-                else
-                    setdiff!(available_incoming, v)
-                end
-                if !(outdegree(G,v) < n_eligible_successors[v])
-                    setdiff!(available_outgoing, v)
                 end
             end
         end
+    end
+
+    iters = 0
+    satisfied_set = Set{Int}()
+    while length(required_incoming) > 0 && iters < 100
+        iters += 1
+        @assert length(available_outgoing) > 0
+
+        for v in traversal
+            node = get_node_from_vtx(project_schedule, v)
+            if !(v in satisfied_set) && isa(node,Union{COLLECT,TEAM_ACTION{COLLECT}})
+                for v2 in [v, inneighbors(G,v)...]
+                    if indegree(G,v2) < n_required_predecessors[v2]
+                        # add possible input
+                        vtx = -1
+                        for v_ in available_outgoing
+                            if D[v_,v2] < get(D, (vtx,v2), Inf)
+                                vtx = v_
+                            end
+                        end
+                        add_edge!(G,vtx,v2)
+                        setdiff!(available_outgoing, vtx)
+                    end
+                end
+                push!(satisfied_set, v)
+                v2 = v
+                while !isa(get_node_from_vtx(project_schedule, v2),Union{DEPOSIT,TEAM_ACTION{DEPOSIT}})
+                    v2 = outneighbors(G,v2)[1]
+                end
+                for v3 in outneighbors(G,v2)
+                    if isa(get_node_from_vtx(project_schedule, v3), GO)
+                        push!(available_outgoing, v3)
+                    end
+                end
+                break
+            end
+        end
+
+        # union!(available_outgoing, vertices(G))
+        # union!(required_incoming, vertices(G))
+        # for v in topological_sort(G)
+        #     if indegree(G,v) < n_required_predecessors[v] # NOTE: Trying this out to save time on formulation
+        #         for v2 in downstream_vertices[v]
+        #             if v2 != v
+        #                 setdiff!(required_incoming, v2)
+        #                 setdiff!(available_outgoing, v2)
+        #             end
+        #         end
+        #     else
+        #         setdiff!(required_incoming, v)
+        #     end
+        #     if !(outdegree(G,v) < n_eligible_successors[v])
+        #         setdiff!(available_outgoing, v)
+        #     end
+        # end
     end
     set_leaf_operation_nodes!(project_schedule)
     update_project_schedule!(project_schedule,problem_spec,adjacency_matrix(G))
