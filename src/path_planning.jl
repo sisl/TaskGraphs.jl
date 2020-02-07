@@ -326,7 +326,7 @@ const Action = PCCBS.Action
     cache::PlanningCache            = PlanningCache()
     env::E                          = PCCBS.LowLevelEnv()
     problem_spec::ProblemSpec       = ProblemSpec()
-    dist_function::DistMatrixMap    = DistMatrixMap(env.graph.vtx_map, env.graph.vtxs)
+    dist_function::DistMatrixMap    = env.graph.dist_function #DistMatrixMap(env.graph.vtx_map, env.graph.vtxs)
     # solution::S                     = LowLevelSolution{}
     cost_model::C                   = get_cost_model(env)
     num_agents::Int                 = -1
@@ -471,7 +471,8 @@ function CRCBS.build_env(solver, env::E, mapf::M, node::N, schedule_node::T, v::
         # deadline = Inf # already taken care of, perhaps?
         log_info(3,solver,string("BUILD ENV: setting goal_vtx = ",goal_vtx,", t = maximum(cache.tF) = ",goal_time))
     end
-    cbs_env = typeof(mapf.env)(
+    # cbs_env = typeof(mapf.env)(
+    cbs_env = PCCBS.LowLevelEnv(
         graph       = mapf.env.graph,
         constraints = get_constraints(node, agent_id), # agent_id represents the whole path
         goal        = PCCBS.State(goal_vtx,goal_time),
@@ -513,17 +514,17 @@ function CRCBS.build_env(solver, env::E, mapf::M, node::N, schedule_node::T, v::
     return cbs_env, base_path
 end
 function CRCBS.build_env(solver, env::E, mapf::M, node::N, schedule_node::TEAM_ACTION, v::Int) where {E<:SearchEnv,M<:AbstractMAPF,N<:ConstraintTreeNode}
-    envs = Vector{typeof(env.env)}()
+    envs = Vector{PCCBS.LowLevelEnv}()
     starts = Vector{PCCBS.State}()
     meta_cost = MetaCost(Vector{get_cost_type(env)}(),get_initial_cost(env.env))
     # path_specs = Vector{PathSpec}()
     for (i, sub_node) in enumerate(schedule_node.instructions)
-        if i == 1 # leader
-            ph = PerfectHeuristic(env.distance_function[schedule_node.shape][i])
+        # if i == 1 # leader
+            ph = PerfectHeuristic(env.dist_function.dist_mtxs[schedule_node.shape][i])
             heuristic = construct_composite_heuristic(ph,NullHeuristic(),ph,ph)
-        else
-            heuristic = get_heuristic_model(mapf.env)
-        end
+        # else
+        #     heuristic = get_heuristic_model(mapf.env)
+        # end
         cbs_env, base_path = build_env(solver,env,mapf,node,sub_node,v,generate_path_spec(env.schedule,env.problem_spec,sub_node);
             heuristic=heuristic,
         ) # TODO need problem_spec here
@@ -531,7 +532,7 @@ function CRCBS.build_env(solver, env::E, mapf::M, node::N, schedule_node::TEAM_A
         push!(starts, get_final_state(base_path))
         push!(meta_cost.independent_costs, get_cost(base_path))
     end
-    meta_env = MetaAgentCBS.construct_meta_env(envs, get_cost_model(env))
+    meta_env = MetaAgentCBS.construct_meta_env([envs...], get_cost_model(env))
     meta_path = Path{MetaAgentCBS.State{PCCBS.State},MetaAgentCBS.Action{PCCBS.Action},MetaCost{get_cost_type(env)}}(
         s0 = MetaAgentCBS.State(starts),
         cost = MetaCost(meta_cost.independent_costs, aggregate_costs(get_cost_model(meta_env), meta_cost.independent_costs))
@@ -566,7 +567,7 @@ function plan_path!(solver::PC_TAPF_Solver, env::SearchEnv, mapf::M, node::N, sc
         solver.DEBUG ? validate(base_path,v) : nothing
         path, cost = path_finder(solver, cbs_env, base_path, heuristic;verbose=(solver.verbosity > 3))
         if cost == get_infeasible_cost(cbs_env)
-            log_info(-1,solver.l3_verbosity,"# A*: returned infeasible path ... Exiting early")
+            log_info(-1,solver.l3_verbosity,"# A*: returned infeasible path for node ",string(schedule_node)," ... Exiting early")
             return false
         end
         solver.DEBUG ? validate(path,v,cbs_env) : nothing
@@ -616,6 +617,10 @@ function plan_path!(solver::PC_TAPF_Solver, env::SearchEnv, mapf::M, node::N, sc
     else
         meta_path, meta_cost = path_finder(solver, meta_env, base_path, heuristic;verbose=(solver.verbosity > 3))
     end
+    if meta_cost == get_infeasible_cost(meta_env)
+        log_info(-1,solver.l3_verbosity,"# A*: returned infeasible path for node ",string(schedule_node)," ... Exiting early")
+        return false
+    end
     paths = MetaAgentCBS.split_path(meta_path)
     for (cbs_env, new_path, cost, sub_node) in zip(meta_env.envs, paths, meta_cost.independent_costs, schedule_node.instructions)
         agent_id = get_id(get_robot_id(sub_node))
@@ -638,10 +643,10 @@ function plan_path!(solver::PC_TAPF_Solver, env::SearchEnv, mapf::M, node::N, sc
     # update_env!(solver,env,v,path)
     node.solution.cost = aggregate_costs(get_cost_model(env.env),get_path_costs(node.solution))
     node.cost = get_cost(node.solution)
-    if node.cost == get_infeasible_cost(meta_env)
-        log_info(-1,solver,"A*: returned infeasible path ... Exiting early")
-        return false
-    end
+    # if node.cost == get_infeasible_cost(meta_env)
+    #     log_info(-1,solver.l3_verbosity,"# A*: returned infeasible path for node ",string(schedule_node)," ... Exiting early")
+    #     return false
+    # end
     if node.cost >= solver.best_cost
         log_info(0,solver,"LOW LEVEL SEARCH: node.cost >= solver.best_cost ... Exiting early")
         return false

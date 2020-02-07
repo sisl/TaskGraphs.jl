@@ -7,7 +7,7 @@ let
     modes = [
         :write,
         :assignment_only,
-        # :low_level_search_without_repair,
+        :low_level_search_without_repair,
         # :low_level_search_with_repair,
         # :full_solver
         ]
@@ -20,16 +20,16 @@ let
     for milp_model in milp_models
         for mode in modes
             run_profiling(mode;
-                num_tasks=[2,3,4],
-                num_robots=[4],
+                num_tasks=[24],
+                num_robots=[24],
                 depth_biases=[0.1],
                 task_size_distributions = [
                     # ( 1=>1.0, 2=>0.0, 4=>0.0 ),
-                    ( 1=>1.0, 2=>1.0, 4=>0.0 ),
+                    # ( 1=>1.0, 2=>1.0, 4=>0.0 ),
                     ( 1=>1.0, 2=>1.0, 4=>1.0 ),
-                    # ( 1=>0.0, 2=>1.0, 4=>1.0 ),
+                    ( 1=>0.0, 2=>1.0, 4=>1.0 ),
                     ],
-                num_trials=1,
+                num_trials=4,
                 Δt_collect=1,
                 Δt_deliver=1,
                 problem_dir = dummy_problem_dir,
@@ -48,8 +48,8 @@ let
                     )
                 )
         end
-        run(pipeline(`rm -rf $dummy_problem_dir`, stdout=devnull, stderr=devnull))
-        run(pipeline(`rm -rf $dummy_results_dir`, stdout=devnull, stderr=devnull))
+        # run(pipeline(`rm -rf $dummy_problem_dir`, stdout=devnull, stderr=devnull))
+        # run(pipeline(`rm -rf $dummy_results_dir`, stdout=devnull, stderr=devnull))
     end
 end
 let
@@ -105,24 +105,24 @@ let
     println("RUNNING PROFILING TESTS")
 
     modes = [
-        :write,
-        :assignment_only,
+        # :write,
+        # :assignment_only,
         :low_level_search_without_repair,
-        :low_level_search_with_repair,
-        :full_solver
+        # :low_level_search_with_repair,
+        # :full_solver
         ]
     problem_dir = joinpath(PROBLEM_DIR,"collaborative_transport/non_zero_collect_time")
     results_dirs = [
         # joinpath(EXPERIMENT_DIR,"assignment_solver/results")
         # joinpath(EXPERIMENT_DIR,"adjacency_solver/results")
-        # joinpath(EXPERIMENT_DIR,"sparse_adjacency_solver/non_zero_collect_time/results")
-        joinpath(EXPERIMENT_DIR,"greedy_assignment/non_zero_collect_time/results")
+        joinpath(EXPERIMENT_DIR,"sparse_adjacency_solver/fixed_A_star_heuristic/results")
+        # joinpath(EXPERIMENT_DIR,"greedy_assignment/non_zero_collect_time/results")
     ]
     milp_models = [
         # AssignmentMILP(),
         # AdjacencyMILP(),
-        # SparseAdjacencyMILP(),
-        GreedyAssignment()
+        SparseAdjacencyMILP(),
+        # GreedyAssignment()
     ]
     for (milp_model, results_dir) in zip(milp_models, results_dirs)
         for mode in modes

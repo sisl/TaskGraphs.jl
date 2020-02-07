@@ -26,10 +26,9 @@ include("factory_worlds.jl")
 @reexport using TaskGraphs.FactoryWorlds
 include("pccbs.jl")
 include("planning_predicates.jl")
-# include("pc_tapf_solver.jl")
-# @reexport using TaskGraphs.TaskGraphsSolvers
-include("task_graphs_core.jl")
+# include("task_graphs_core.jl")
 @reexport using TaskGraphs.PlanningPredicates
+include("task_graphs_core.jl")
 @reexport using TaskGraphs.TaskGraphsCore
 include("utils.jl")
 @reexport using TaskGraphs.TaskGraphsUtils

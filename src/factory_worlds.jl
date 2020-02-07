@@ -2,6 +2,8 @@ module FactoryWorlds
 
 using Parameters
 using LightGraphs, MetaGraphs, GraphUtils
+using SparseArrays
+using ImageFiltering
 using Printf
 using TOML
 
@@ -80,6 +82,83 @@ function construct_expanded_zones(vtxs,vtx_map,pickup_zones,dropoff_zones)
     expanded_zones
 end
 
+
+
+export
+    DistMatrixMap,
+    get_distance
+
+"""
+    maps team size to the effective distance (computed by Djikstra) between
+    leader (top left) vtxs.
+    A DistMatrixMap is constructed by starting with a base environment grid
+    graph, which is represented as a binary occupancy grid. The occupancy grid
+    is then convolved with kernels of various sizes (which represent
+    configurations of robots moving as a team). The output of each convolution
+    represents a new occupancy grid corresponding to the workspace of the robot
+    team.
+    It is assumed that the ``lead'' robot is always in the top left of the
+    configuration. If a team of robots wishes to query the distance to a
+    particular target configuration, they pass the leader's current vtx,
+    the leader's target vtx, and the team configuration (shape) to the
+    DistMatrixMap, which returns the correct distance.
+"""
+struct DistMatrixMap
+    dist_mtxs::Dict{Tuple{Int,Int},Dict{Int,Function}}
+end
+function get_distance(mtx_map::DistMatrixMap,v1::Int,v2::Int,shape::Tuple{Int,Int}=(1,1),config_idx=1)
+    D = mtx_map.dist_mtxs[shape][config_idx](v1,v2)
+end
+function get_distance(mtx::Matrix,v1::Int,v2::Int,args...)
+    return get(mtx,(v1,v2),0)
+end
+function DistMatrixMap(base_vtx_map::Matrix{Int},base_vtxs::Vector{Tuple{Int,Int}};shapes=[(1,1),(1,2),(2,1),(2,2)])
+    G_ = initialize_grid_graph_from_vtx_grid(base_vtx_map)
+    D_ = get_dist_matrix(G_)
+    # shape_vtx_maps = Dict{Tuple{Int,Int},Vector{Int}}()
+    dist_mtxs = Dict{Tuple{Int,Int},Dict{Int,Function}}(s=>Dict{Int,Function}() for s in shapes)
+    grid_map = Int.(base_vtx_map .== 0)
+    for s in shapes
+        # s = (2,2)
+        filtered_grid = imfilter(grid_map,centered(ones(s)))
+        filtered_grid = Int.(filtered_grid .> 0)
+        vtx_map = initialize_vtx_grid_from_indicator_grid(filtered_grid)
+        graph = initialize_grid_graph_from_vtx_grid(vtx_map)
+        D = get_dist_matrix(graph)
+        dist_mtx = zeros(Int,nv(G_),nv(G_))
+        for (v1,v1_) in zip(base_vtx_map,vtx_map)
+            if !(v1 > 0 && v1_ > 0)
+                continue
+            end
+            for (v2,v2_) in zip(base_vtx_map,vtx_map)
+                if !(v2 > 0 && v2_ > 0)
+                    continue
+                end
+                dist_mtx[v1,v2] = D[v1_,v2_]
+            end
+        end
+        config = 0
+        for i in 1:s[1]
+            for j in 1:s[2]
+                config += 1
+                # dist_mtxs[s][config] = dist_mtx
+                dist_mtxs[s][config] = (v1,v2) -> get(
+                    dist_mtx,(
+                    get(base_vtx_map, tuple(get(base_vtxs, v1, (-s[1],-s[2])) .+ [1-i, 1-j]...), -1),
+                    get(base_vtx_map, tuple(get(base_vtxs, v2, (-s[1],-s[2])) .+ [1-i, 1-j]...), -1) ),
+                    0)
+            end
+        end
+    end
+    DistMatrixMap(
+        # shape_vtx_maps,
+        dist_mtxs
+    )
+end
+Base.getindex(d::DistMatrixMap,v1::Int,v2::Int) = get_distance(d,v1,v2,(1,1),1)
+
+
+
 """
     `GridFactoryEnvironment`
 """
@@ -95,7 +174,8 @@ end
     obstacles           ::Vector{Tuple{Int,Int}}    = Vector{Tuple{Int,Int}}()
     vtx_map             ::Matrix{Int}               = construct_vtx_map(vtxs,(x_dim,y_dim))
     edge_cache          ::Vector{Set{Tuple{Int,Int}}} = construct_edge_cache(vtxs,vtx_map)
-    expanded_zones     ::Dict{Int,Dict{Tuple{Int,Int},Vector{Int}}}     = construct_expanded_zones(vtxs,vtx_map,pickup_zones,dropoff_zones)
+    expanded_zones      ::Dict{Int,Dict{Tuple{Int,Int},Vector{Int}}}     = construct_expanded_zones(vtxs,vtx_map,pickup_zones,dropoff_zones)
+    dist_function       ::DistMatrixMap             = DistMatrixMap(vtx_map,vtxs)
 end
 # get_graph(env::E) where {E<:GridFactoryEnvironment} = env.graph
 get_x_dim(env::E) where {E<:GridFactoryEnvironment} = env.x_dim
