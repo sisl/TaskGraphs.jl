@@ -566,7 +566,7 @@ let
     dist_matrix = get_dist_matrix(factory_env)
 
     dist_mtx_map = DistMatrixMap(factory_env.vtx_map,factory_env.vtxs)
-    
+
     # 27   28   29   30   31   32   33   34
     # 53   54   55   56   57   58   59   60
     # 79   80   81    0    0   82   83   84
@@ -585,5 +585,74 @@ let
     v4 = 101
     config = 4
     @test get_distance(dist_mtx_map,v3,v4,(2,2),config) == dist_matrix[v1,v2] + 2
+
+end
+# DEBUG infeasible assignment matrices from profiling
+let
+    env_id = 2
+    env_filename = string(ENVIRONMENT_DIR,"/env_",env_id,".toml")
+    factory_env = read_env(env_filename)
+    env_graph = factory_env
+    # dist_matrix = get_dist_matrix(env_graph)
+    dist_mtx_map = factory_env.dist_function # DistMatrixMap(factory_env.vtx_map,factory_env.vtxs)
+
+    problem_dir = joinpath(PROBLEM_DIR,"collaborative_transport/non_zero_collect_time")
+    results_dir = joinpath(EXPERIMENT_DIR,"sparse_adjacency_solver/fixed_A_star_heuristic/results")
+
+    # N_PROBLEMS = 192
+    # for problem_id in 1:N_PROBLEMS
+    #     problem_filename = joinpath(problem_dir,string("problem",problem_id,".toml"))
+    #     assignment_filename = joinpath(results_dir,string(:assignment_only),string("results",problem_id,".toml"))
+    #     # Load the problem
+    #     problem_def = read_problem_def(problem_filename)
+    #     project_spec, r0, s0, sF = problem_def.project_spec,problem_def.r0,problem_def.s0,problem_def.sF
+    #     # @show problem_def.shapes
+    #     # @show map(o->factory_env.expanded_zones[s0[o]][problem_def.shapes[o]], 1:M)
+    #     project_spec, problem_spec, _, _, robot_ICs = construct_task_graphs_problem(
+    #         project_spec, r0, s0, sF,
+    #         dist_mtx_map;
+    #         # Δt_collect=map(i->Δt_collect, s0),
+    #         # Δt_deliver=map(i->Δt_deliver, s0),
+    #         # dist_matrix;
+    #         # cost_function=primary_objective,
+    #         task_shapes=problem_def.shapes,
+    #         shape_dict=factory_env.expanded_zones,
+    #         );
+    #
+    #     solver = PC_TAPF_Solver(start_time=time());
+    #     adj_matrix = read_sparse_matrix(assignment_filename)
+    #     project_schedule = construct_partial_project_schedule(project_spec,problem_spec,robot_ICs)
+    #     milp_model=SparseAdjacencyMILP()
+    #     if !update_project_schedule!(milp_model, project_schedule, problem_spec, adj_matrix)
+    #         @show problem_id
+    #     end
+    # end
+
+    problem_id = 12
+    problem_filename = joinpath(problem_dir,string("problem",problem_id,".toml"))
+    assignment_filename = joinpath(results_dir,string(:assignment_only),string("results",problem_id,".toml"))
+    # Load the problem
+    problem_def = read_problem_def(problem_filename)
+    project_spec, r0, s0, sF = problem_def.project_spec,problem_def.r0,problem_def.s0,problem_def.sF
+    # @show problem_def.shapes
+    # @show map(o->factory_env.expanded_zones[s0[o]][problem_def.shapes[o]], 1:M)
+    project_spec, problem_spec, _, _, robot_ICs = construct_task_graphs_problem(
+        project_spec, r0, s0, sF,
+        dist_mtx_map;
+        # Δt_collect=map(i->Δt_collect, s0),
+        # Δt_deliver=map(i->Δt_deliver, s0),
+        # dist_matrix;
+        # cost_function=primary_objective,
+        task_shapes=problem_def.shapes,
+        shape_dict=factory_env.expanded_zones,
+        );
+
+    solver = PC_TAPF_Solver(start_time=time());
+    adj_matrix = read_sparse_matrix(assignment_filename)
+    project_schedule = construct_partial_project_schedule(project_spec,problem_spec,robot_ICs)
+    milp_model=SparseAdjacencyMILP()
+    if !update_project_schedule!(milp_model, project_schedule, problem_spec, adj_matrix)
+        @show problem_id
+    end
 
 end
