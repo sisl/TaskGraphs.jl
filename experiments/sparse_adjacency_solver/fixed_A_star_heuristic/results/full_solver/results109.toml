@@ -1,5 +1,5 @@
 object_intervals = [[54, 71], [0, 37], [0, 42], [38, 54], [0, 8], [22, 38], [0, 19], [0, 17], [19, 22], [0, 19], [0, 19], [71, 91]]
-time = 3.424130738
+time = 0.559357598
 num_A_star_iterations = 0
 optimal = true
 num_assignment_iterations = 2

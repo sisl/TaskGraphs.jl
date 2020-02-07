@@ -6,10 +6,10 @@ let
     dummy_results_dir = "dummy_results_dir"
     modes = [
         :write,
-        :assignment_only,
-        :low_level_search_without_repair,
+        # :assignment_only,
+        # :low_level_search_without_repair,
         # :low_level_search_with_repair,
-        # :full_solver
+        :full_solver
         ]
     milp_models = [
         # AssignmentMILP(),
@@ -20,8 +20,8 @@ let
     for milp_model in milp_models
         for mode in modes
             run_profiling(mode;
-                num_tasks=[24],
-                num_robots=[24],
+                num_tasks=[4],
+                num_robots=[4],
                 depth_biases=[0.1],
                 task_size_distributions = [
                     # ( 1=>1.0, 2=>0.0, 4=>0.0 ),
@@ -48,8 +48,8 @@ let
                     )
                 )
         end
-        # run(pipeline(`rm -rf $dummy_problem_dir`, stdout=devnull, stderr=devnull))
-        # run(pipeline(`rm -rf $dummy_results_dir`, stdout=devnull, stderr=devnull))
+        run(pipeline(`rm -rf $dummy_problem_dir`, stdout=devnull, stderr=devnull))
+        run(pipeline(`rm -rf $dummy_results_dir`, stdout=devnull, stderr=devnull))
     end
 end
 let
@@ -107,9 +107,9 @@ let
     modes = [
         # :write,
         # :assignment_only,
-        :low_level_search_without_repair,
+        # :low_level_search_without_repair,
         # :low_level_search_with_repair,
-        # :full_solver
+        :full_solver
         ]
     problem_dir = joinpath(PROBLEM_DIR,"collaborative_transport/non_zero_collect_time")
     results_dirs = [
@@ -147,12 +147,13 @@ let
                 TimeLimit = 100, # 50
                 solver_template = PC_TAPF_Solver(
                     verbosity=1,
-                    l1_verbosity=1,
-                    l2_verbosity=1,
+                    l1_verbosity=2,
+                    l2_verbosity=2,
                     l3_verbosity=0,
-                    l4_verbosity=0,
+                    l4_verbosity=1,
                     LIMIT_assignment_iterations = isa(milp_model, GreedyAssignment) ? 1 : 50,
                     LIMIT_A_star_iterations=8000,
+                    LIMIT_CBS_iterations=3,
                     time_limit=200 # 60
                     )
                 )
@@ -161,14 +162,15 @@ let
 end
 
 let
-    results_dir = joinpath(EXPERIMENT_DIR,"sparse_adjacency_solver/collaborative_transport_dist_maps/results")
+    # results_dir = joinpath(EXPERIMENT_DIR,"sparse_adjacency_solver/collaborative_transport_dist_maps/results")
+    results_dir = joinpath(EXPERIMENT_DIR,"sparse_adjacency_solver/fixed_A_star_heuristic/results/full_solver")
     for (root, dirs, files) in walkdir(results_dir)
         for file in files
             if splitext(file)[end] == ".toml"
                 toml_dict = TOML.parsefile(joinpath(root, file))
                 if get(toml_dict, "optimal", true) == false
                     println(joinpath(root, file)) # path to files
-                    # rm(joinpath(root,file))
+                    rm(joinpath(root,file))
                 end
             end
         end

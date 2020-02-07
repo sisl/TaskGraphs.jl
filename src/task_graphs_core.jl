@@ -191,8 +191,8 @@ export
 end
 get_initial_nodes(spec::ProjectSpec) = setdiff(
     Set(collect(vertices(spec.graph))),collect(keys(spec.pre_deps)))
-get_input_ids(op::Operation) = Set{Int}([get_id(get_object_id(p)) for p in op.pre])
-get_output_ids(op::Operation) = Set{Int}([get_id(get_object_id(p)) for p in op.post])
+get_input_ids(op::Operation) = sort([get_id(get_object_id(p)) for p in op.pre])
+get_output_ids(op::Operation) = sort([get_id(get_object_id(p)) for p in op.post])
 get_pre_deps(spec::ProjectSpec, op_id::Int) = get(spec.pre_deps, op_id, Set{Int}())
 get_post_deps(spec::ProjectSpec, op_id::Int) = get(spec.post_deps, op_id, Set{Int}())
 get_num_delivery_tasks(spec::ProjectSpec) = length(collect(union(map(op->union(get_input_ids(op),get_output_ids(op)),spec.operations)...)))

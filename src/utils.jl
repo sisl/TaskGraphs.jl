@@ -220,7 +220,7 @@ function construct_task_graphs_problem(
     for i in 1:N
         tr0_[i] = 0.0
     end
-    root_node_groups = map(v->get_input_ids(new_project_spec.operations[v]),collect(new_project_spec.root_nodes))
+    root_node_groups = map(v->Set(get_input_ids(new_project_spec.operations[v])),collect(new_project_spec.root_nodes))
     problem_spec = ProblemSpec(N=N,M=M,graph=G,D=dist_matrix,Drs=Drs,
         Dss=Dss,Δt=Δt,tr0_=tr0_,to0_=to0_,root_nodes=root_node_groups,
         cost_function=cost_function,

@@ -151,6 +151,8 @@ end
 @with_kw struct OperationID <: AbstractID
 	id::Int = -1
 end
+Base.:(<)(id1::AbstractID,id2::AbstractID) = get_id(id1) < get_id(id2)
+Base.:(>)(id1::AbstractID,id2::AbstractID) = get_id(id1) > get_id(id2)
 
 abstract type AbstractPlanningPredicate end
 struct OBJECT_AT <: AbstractPlanningPredicate

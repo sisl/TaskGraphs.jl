@@ -373,7 +373,7 @@ function run_profiling(MODE=:nothing;
     for (M,N,task_sizes,max_parents,depth_bias,trial) in Base.Iterators.product(
         num_tasks,num_robots,task_size_distributions,max_parent_settings,depth_biases,1:num_trials
         )
-        # try
+        try
             problem_id += 1 # moved this to the beginning so it doesn't get skipped
             problem_filename = joinpath(problem_dir,string("problem",problem_id,".toml"))
             config_filename = joinpath(problem_dir,string("config",problem_id,".toml"))
@@ -462,13 +462,13 @@ function run_profiling(MODE=:nothing;
                     TOML.print(io, results_dict)
                 end
             end
-        # catch e
-        #     if typeof(e) <: AssertionError
-        #         println(e.msg)
-        #     else
-        #         # throw(e)
-        #     end
-        # end
+        catch e
+            if typeof(e) <: AssertionError
+                println(e.msg)
+            else
+                throw(e)
+            end
+        end
     end
 end
 

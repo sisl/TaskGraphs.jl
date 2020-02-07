@@ -587,7 +587,7 @@ let
     @test get_distance(dist_mtx_map,v3,v4,(2,2),config) == dist_matrix[v1,v2] + 2
 
 end
-# DEBUG infeasible assignment matrices from profiling
+# DEBUG Project Schedule seems weird after excluding a solution
 let
     env_id = 2
     env_filename = string(ENVIRONMENT_DIR,"/env_",env_id,".toml")
@@ -628,7 +628,7 @@ let
     #     end
     # end
 
-    problem_id = 12
+    problem_id = 4
     problem_filename = joinpath(problem_dir,string("problem",problem_id,".toml"))
     assignment_filename = joinpath(results_dir,string(:assignment_only),string("results",problem_id,".toml"))
     # Load the problem
@@ -648,11 +648,25 @@ let
         );
 
     solver = PC_TAPF_Solver(start_time=time());
-    adj_matrix = read_sparse_matrix(assignment_filename)
-    project_schedule = construct_partial_project_schedule(project_spec,problem_spec,robot_ICs)
     milp_model=SparseAdjacencyMILP()
-    if !update_project_schedule!(milp_model, project_schedule, problem_spec, adj_matrix)
-        @show problem_id
-    end
+    project_schedule = construct_partial_project_schedule(project_spec,problem_spec,robot_ICs)
+
+    model = formulate_milp(milp_model,project_schedule,problem_spec)
+
+    optimize!(model)
+    update_project_schedule!(milp_model, project_schedule, problem_spec, adj_matrix)
+
+    optimal = (termination_status(model) == MOI.OPTIMAL);
+    feasible = (primal_status(model) == MOI.FEASIBLE_POINT)
+    assignment_matrix = get_assignment_matrix(model)
+    cost = Int(round(value(objective_function(model))))
+    optimality_gap = cost - Int(round(objective_bound(model)))
+
+
+
+    # adj_matrix = read_sparse_matrix(assignment_filename)
+    # if !update_project_schedule!(milp_model, project_schedule, problem_spec, adj_matrix)
+    #     @show problem_id
+    # end
 
 end

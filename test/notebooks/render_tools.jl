@@ -470,7 +470,8 @@ function plot_collab_runtimes(df;
         small_font=12pt,
         xgroup=:TaskRatio,
         x=:M_string,
-        y=:time
+        y=:time,
+        suppress_outliers=true
     )
     latex_fonts = Theme(major_label_font="CMU Serif", major_label_font_size=big_font,
                     minor_label_font="CMU Serif", minor_label_font_size=small_font,
@@ -479,7 +480,7 @@ function plot_collab_runtimes(df;
     
     plot(df, xgroup=xgroup, x=x, y=y, color=x,
         Geom.subplot_grid(
-            Geom.boxplot(;suppress_outliers=true),
+            Geom.boxplot(;suppress_outliers=suppress_outliers),
             Coord.cartesian(; ymin=ymin, ymax=ymax),
             Guide.yticks(;ticks=yticks),
             Guide.xticks(;label=false),
