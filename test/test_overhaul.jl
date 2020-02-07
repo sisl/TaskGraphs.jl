@@ -653,8 +653,11 @@ let
 
     model = formulate_milp(milp_model,project_schedule,problem_spec)
 
+    exclude_solutions!(model)
     optimize!(model)
+    adj_matrix = get_assignment_matrix(model)
     update_project_schedule!(milp_model, project_schedule, problem_spec, adj_matrix)
+
 
     optimal = (termination_status(model) == MOI.OPTIMAL);
     feasible = (primal_status(model) == MOI.FEASIBLE_POINT)

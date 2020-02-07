@@ -150,10 +150,10 @@ let
                     l1_verbosity=2,
                     l2_verbosity=2,
                     l3_verbosity=0,
-                    l4_verbosity=1,
+                    l4_verbosity=0,
                     LIMIT_assignment_iterations = isa(milp_model, GreedyAssignment) ? 1 : 50,
                     LIMIT_A_star_iterations=8000,
-                    LIMIT_CBS_iterations=3,
+                    # LIMIT_CBS_iterations=5,
                     time_limit=200 # 60
                     )
                 )

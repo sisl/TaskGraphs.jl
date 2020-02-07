@@ -832,6 +832,14 @@ function validate(project_schedule::ProjectSchedule)
             node = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v))
             @assert( outdegree(G,v) >= sum([0, values(required_successors(node))...]) , string("node = ", string(node), " outdegree = ",outdegree(G,v), " "))
             @assert( indegree(G,v) >= sum([0, values(required_predecessors(node))...]), string("node = ", string(node), " indegree = ",indegree(G,v), " ") )
+            if isa(node, Union{GO,COLLECT,CARRY,DEPOSIT})
+                for v2 in outneighbors(G,v)
+                    node2 = get_node_from_vtx(project_schedule, v2)
+                    if isa(node2, Union{GO,COLLECT,CARRY,DEPOSIT})
+                        @assert( get_robot_id(node) == get_robot_id(node2), string(string(node), " --> ", string(node2)))
+                    end
+                end
+            end
         end
     catch e
         if typeof(e) <: AssertionError
@@ -2322,8 +2330,9 @@ function update_project_schedule!(project_schedule::P,problem_spec::T,adj_matrix
         end
     end
     # DEBUG ? @assert(is_cyclic(G) == false) : nothing
+    # @assert !is_cyclic(G) "update_project_schedule!() -------> is_cyclic(G)"
     try
-        # @assert !is_cyclic(G) "update_project_schedule!() -------> is_cyclic(G)"
+        propagate_valid_ids!(project_schedule,problem_spec)
         @assert validate(project_schedule)
     catch e
         if isa(e, AssertionError)
@@ -2333,7 +2342,7 @@ function update_project_schedule!(project_schedule::P,problem_spec::T,adj_matrix
         end
         return false
     end
-    propagate_valid_ids!(project_schedule,problem_spec)
+    return true
 end
 function update_project_schedule!(milp_model::M,
         project_schedule::P,

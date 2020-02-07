@@ -939,6 +939,8 @@ function high_level_search!(solver::P, env_graph, project_schedule::ProjectSched
     model = formulate_milp(milp_model,project_schedule,problem_spec;
         cost_model=primary_objective,optimizer=optimizer,kwargs...) #TODO pass t0_ in replanning mode
 
+    base_schedule = deepcopy(project_schedule)
+
     solver.start_time = time()
     while solver.best_cost[1] > lower_bound
         try
@@ -970,6 +972,7 @@ function high_level_search!(solver::P, env_graph, project_schedule::ProjectSched
             if lower_bound < solver.best_cost[1]
                 ############## Route Planning ###############
                 adj_matrix = get_assignment_matrix(model);
+                project_schedule = deepcopy(base_schedule)
                 if update_project_schedule!(milp_model,project_schedule,problem_spec, adj_matrix)
                     env, mapf = construct_search_env(project_schedule, problem_spec, env_graph;
                         primary_objective=primary_objective); # TODO pass in t0_ here (maybe get it straight from model?)
