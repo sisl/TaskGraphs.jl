@@ -322,13 +322,14 @@ export
 const State = PCCBS.State
 const Action = PCCBS.Action
 @with_kw struct SearchEnv{C,E<:AbstractLowLevelEnv{PCCBS.State,PCCBS.Action,C}} <: AbstractLowLevelEnv{PCCBS.State,PCCBS.Action,C}
-    schedule::ProjectSchedule   = ProjectSchedule()
-    cache::PlanningCache        = PlanningCache()
-    env::E                      = PCCBS.LowLevelEnv()
-    problem_spec::ProblemSpec   = ProblemSpec()
-    # solution::S                 = LowLevelSolution{}
-    cost_model::C               = get_cost_model(env)
-    num_agents::Int             = -1
+    schedule::ProjectSchedule       = ProjectSchedule()
+    cache::PlanningCache            = PlanningCache()
+    env::E                          = PCCBS.LowLevelEnv()
+    problem_spec::ProblemSpec       = ProblemSpec()
+    dist_function::DistMatrixMap    = DistMatrixMap(env.graph.vtx_map, env.graph.vtxs)
+    # solution::S                     = LowLevelSolution{}
+    cost_model::C                   = get_cost_model(env)
+    num_agents::Int                 = -1
 end
 function CRCBS.get_start(env::SearchEnv,v::Int)
     start_vtx   = get_path_spec(env.schedule,v).start_vtx
@@ -368,7 +369,8 @@ function construct_search_env(schedule, problem_spec, env_graph;
         SumOfTravelDistance(),
         FullCostModel(sum,NullCost()) # SumOfTravelTime(),
     )
-    ph = DefaultPerfectHeuristic(PerfectHeuristic(get_dist_matrix(env_graph)))
+    # ph = DefaultPerfectHeuristic(PerfectHeuristic(get_dist_matrix(env_graph)))
+    ph = PerfectHeuristic(get_dist_matrix(env_graph))
     heuristic_model = construct_composite_heuristic(
         ph,
         NullHeuristic(),
@@ -516,7 +518,15 @@ function CRCBS.build_env(solver, env::E, mapf::M, node::N, schedule_node::TEAM_A
     meta_cost = MetaCost(Vector{get_cost_type(env)}(),get_initial_cost(env.env))
     # path_specs = Vector{PathSpec}()
     for (i, sub_node) in enumerate(schedule_node.instructions)
-        cbs_env, base_path = build_env(solver,env,mapf,node,sub_node,v,generate_path_spec(env.schedule,env.problem_spec,sub_node)) # TODO need problem_spec here
+        if i == 1 # leader
+            ph = PerfectHeuristic(env.distance_function[schedule_node.shape][i])
+            heuristic = construct_composite_heuristic(ph,NullHeuristic(),ph,ph)
+        else
+            heuristic = get_heuristic_model(mapf.env)
+        end
+        cbs_env, base_path = build_env(solver,env,mapf,node,sub_node,v,generate_path_spec(env.schedule,env.problem_spec,sub_node);
+            heuristic=heuristic,
+        ) # TODO need problem_spec here
         push!(envs, cbs_env)
         push!(starts, get_final_state(base_path))
         push!(meta_cost.independent_costs, get_cost(base_path))

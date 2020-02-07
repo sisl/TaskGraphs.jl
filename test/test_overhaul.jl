@@ -423,7 +423,7 @@ let
     # 8  16  24  32  40  48  56  64
     env_graph = construct_factory_env_from_vtx_grid(vtx_grid)
     # dist_matrix = get_dist_matrix(env_graph)
-    dist_matrix = DistMatrixMap(env_graph.vtx_map)
+    dist_matrix = DistMatrixMap(env_graph.vtx_map,env_graph.vtxs)
     r0 = [1,25,4,29]
     # r0 = [1,25,8,28] # check that planning works even when it takes longer for some robots to arrive than others
     s0 = [10]#,18,11,19]
@@ -500,7 +500,7 @@ let
     # 8  16  24  32  40  48  56  64
     env_graph = construct_factory_env_from_vtx_grid(vtx_grid)
     # dist_matrix = get_dist_matrix(env_graph)
-    dist_matrix = DistMatrixMap(env_graph.vtx_map)
+    dist_matrix = DistMatrixMap(env_graph.vtx_map,env_graph.vtxs)
     r0 = [1,25,4,29]
     # r0 = [1,25,8,28] # check that planning works even when it takes longer for some robots to arrive than others
     s0 = [10]#,18,11,19]
@@ -532,7 +532,7 @@ let
     factory_env = read_env(env_filename)
     env_graph = factory_env
     dist_matrix = get_dist_matrix(env_graph)
-    dist_mtx_map = DistMatrixMap(factory_env.vtx_map)
+    dist_mtx_map = DistMatrixMap(factory_env.vtx_map,factory_env.vtxs)
 
     problem_filename = "dummy_problem_dir/problem1.toml"
     problem_def = read_problem_def(problem_filename)
@@ -565,8 +565,14 @@ let
     factory_env = read_env(env_file)
     dist_matrix = get_dist_matrix(factory_env)
 
-    dist_mtx_map =DistMatrixMap(factory_env.vtx_map)
-    s = (2,2)
+    dist_mtx_map = DistMatrixMap(factory_env.vtx_map,factory_env.vtxs)
+    
+    # 27   28   29   30   31   32   33   34
+    # 53   54   55   56   57   58   59   60
+    # 79   80   81    0    0   82   83   84
+    # 97   98   99    0    0  100  101  102
+    # 115  116  117  118  119  120  121  122
+    # 141  142  143  144  145  146  147  148
     v1 = 79
     v2 = 82
     @test get_distance(dist_mtx_map,v1,v2) == dist_matrix[v1,v2]
@@ -575,23 +581,9 @@ let
     @test get_distance(dist_mtx_map,v1,v2,(2,1)) == dist_matrix[v1,v2] + 2
     @test get_distance(dist_mtx_map,v1,v2,(2,2)) == dist_matrix[v1,v2] + 2
 
+    v3 = 98
+    v4 = 101
+    config = 4
+    @test get_distance(dist_mtx_map,v3,v4,(2,2),config) == dist_matrix[v1,v2] + 2
 
-    N = 12
-    M = 12
-    r0,s0,sF = get_random_problem_instantiation(N,M,get_pickup_zones(factory_env),get_dropoff_zones(factory_env),
-            get_free_zones(factory_env))
-    project_spec = construct_random_project_spec(M,s0,sF)
-    task_sizes = (1=>1.0,2=>1.0,4=>1.0)
-    shapes = choose_random_object_sizes(M,Dict(task_sizes...))
-    # problem_def = SimpleProblemDef(project_spec,r0,s0,sF,shapes)
-
-    project_spec, problem_spec, _, _, robot_ICs = construct_task_graphs_problem(
-        project_spec, r0, s0, sF, dist_matrix;
-        task_shapes=shapes,
-        shape_dict=factory_env.expanded_zones
-        );
-
-    project_spec.initial_conditions
-
-    # Make A_star work the same way
 end

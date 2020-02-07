@@ -43,48 +43,58 @@ export
     DistMatrixMap, which returns the correct distance.
 """
 struct DistMatrixMap
-    shape_vtx_maps::Dict{Tuple{Int,Int},Vector{Int}}
-    dist_mtxs::Dict{Tuple{Int,Int},Matrix{Float64}}
+    dist_mtxs::Dict{Tuple{Int,Int},Dict{Int,Function}}
 end
-function get_distance(mtx_map::DistMatrixMap,v1::Int,v2::Int,shape::Tuple{Int,Int}=(1,1))
-    D = mtx_map.dist_mtxs[shape]
-    v1_ = get(mtx_map.shape_vtx_maps[shape],v1,-1) # maps the top left shape vtx to the corresponding vtx in the inflated graph
-    v2_ = get(mtx_map.shape_vtx_maps[shape],v2,-1) # maps the top left shape vtx to the corresponding vtx in the inflated graph
-    # return D[v1_,v2_] # get(D,(v1_,v2_),0)
-    return get(D,(v1_,v2_),0)
+function get_distance(mtx_map::DistMatrixMap,v1::Int,v2::Int,shape::Tuple{Int,Int}=(1,1),config_idx=1)
+    D = mtx_map.dist_mtxs[shape][config_idx](v1,v2)
 end
 function get_distance(mtx::Matrix,v1::Int,v2::Int,args...)
     return get(mtx,(v1,v2),0)
 end
-function DistMatrixMap(base_vtx_map::Matrix{Int},shapes=[(1,1),(1,2),(2,1),(2,2)])
+function DistMatrixMap(base_vtx_map::Matrix{Int},base_vtxs::Vector{Tuple{Int,Int}};shapes=[(1,1),(1,2),(2,1),(2,2)])
+    G_ = initialize_grid_graph_from_vtx_grid(base_vtx_map)
+    D_ = get_dist_matrix(G_)
+    # shape_vtx_maps = Dict{Tuple{Int,Int},Vector{Int}}()
+    dist_mtxs = Dict{Tuple{Int,Int},Dict{Int,Function}}(s=>Dict{Int,Function}() for s in shapes)
     grid_map = Int.(base_vtx_map .== 0)
-    shape_vtx_maps = Dict{Tuple{Int,Int},Vector{Int}}()
-    dist_mtxs = Dict{Tuple{Int,Int},Matrix{Float64}}()
-    n_base_vtxs = maximum(base_vtx_map)
     for s in shapes
         # s = (2,2)
-        filtered_grid = imfilter(grid_map,centered(ones(s)),Inner())
+        filtered_grid = imfilter(grid_map,centered(ones(s)))
         filtered_grid = Int.(filtered_grid .> 0)
         vtx_map = initialize_vtx_grid_from_indicator_grid(filtered_grid)
         graph = initialize_grid_graph_from_vtx_grid(vtx_map)
-        shape_vtx_map = -1*ones(Int,n_base_vtxs) # maps upper left vtx (lowest v value) in new env to base env
-        for i in 1:size(vtx_map,1)
-            for j in 1:size(vtx_map,2)
-                v0 = base_vtx_map[i,j]
-                if v0 > 0
-                    shape_vtx_map[v0] = vtx_map[i,j]
+        D = get_dist_matrix(graph)
+        dist_mtx = zeros(Int,nv(G_),nv(G_))
+        for (v1,v1_) in zip(base_vtx_map,vtx_map)
+            if !(v1 > 0 && v1_ > 0)
+                continue
+            end
+            for (v2,v2_) in zip(base_vtx_map,vtx_map)
+                if !(v2 > 0 && v2_ > 0)
+                    continue
                 end
+                dist_mtx[v1,v2] = D[v1_,v2_]
             end
         end
-        dist_mtxs[s] = get_dist_matrix(graph)
-        shape_vtx_maps[s] = shape_vtx_map
+        config = 0
+        for i in 1:s[1]
+            for j in 1:s[2]
+                config += 1
+                # dist_mtxs[s][config] = dist_mtx
+                dist_mtxs[s][config] = (v1,v2) -> get(
+                    dist_mtx,(
+                    get(base_vtx_map, tuple(get(base_vtxs, v1, (-s[1],-s[2])) .+ [1-i, 1-j]...), -1),
+                    get(base_vtx_map, tuple(get(base_vtxs, v2, (-s[1],-s[2])) .+ [1-i, 1-j]...), -1) ),
+                    0)
+            end
+        end
     end
     DistMatrixMap(
-        shape_vtx_maps,
+        # shape_vtx_maps,
         dist_mtxs
     )
 end
-Base.getindex(d::DistMatrixMap,args...) = Base.getindex(d.dist_mtxs[(1,1)],args...)
+Base.getindex(d::DistMatrixMap,v1::Int,v2::Int) = get_distance(d,v1,v2,(1,1),1)
 
 export
     ProblemSpec

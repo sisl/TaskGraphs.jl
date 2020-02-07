@@ -14,8 +14,8 @@ let
     milp_models = [
         # AssignmentMILP(),
         # AdjacencyMILP(),
-        # SparseAdjacencyMILP()
-        GreedyAssignment()
+        SparseAdjacencyMILP()
+        # GreedyAssignment()
     ]
     for milp_model in milp_models
         for mode in modes
