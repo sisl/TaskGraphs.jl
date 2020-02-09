@@ -2284,7 +2284,7 @@ export
 
 function propagate_valid_ids!(project_schedule::ProjectSchedule,problem_spec::ProblemSpec)
     G = get_graph(project_schedule)
-    @assert (is_cyclic(G) == false) # string(sparse(adj_matrix))
+    @assert(is_cyclic(G) == false, "is_cyclic(G)") # string(sparse(adj_matrix))
     # Propagate valid IDs through the schedule
     for v in topological_sort(G)
         node_id = get_vtx_id(project_schedule, v)

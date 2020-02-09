@@ -105,17 +105,17 @@ let
     println("RUNNING PROFILING TESTS")
 
     modes = [
-        # :write,
-        # :assignment_only,
-        # :low_level_search_without_repair,
-        # :low_level_search_with_repair,
+        :write,
+        :assignment_only,
+        :low_level_search_without_repair,
+        :low_level_search_with_repair,
         :full_solver
         ]
-    problem_dir = joinpath(PROBLEM_DIR,"collaborative_transport/non_zero_collect_time")
+    problem_dir = joinpath(PROBLEM_DIR,"collaborative_transport/final")
     results_dirs = [
         # joinpath(EXPERIMENT_DIR,"assignment_solver/results")
         # joinpath(EXPERIMENT_DIR,"adjacency_solver/results")
-        joinpath(EXPERIMENT_DIR,"sparse_adjacency_solver/fixed_A_star_heuristic/results")
+        joinpath(EXPERIMENT_DIR,"sparse_adjacency_solver/final/results")
         # joinpath(EXPERIMENT_DIR,"greedy_assignment/non_zero_collect_time/results")
     ]
     milp_models = [
@@ -137,8 +137,8 @@ let
                     ( 1=>0.0, 2=>1.0, 4=>1.0 ),
                     ],
                 num_trials=16,
-                Δt_collect=1,
-                Δt_deliver=1,
+                Δt_collect=0,
+                Δt_deliver=0,
                 milp_model = milp_model,
                 problem_dir = problem_dir,
                 results_dir = results_dir,
@@ -163,14 +163,14 @@ end
 
 let
     # results_dir = joinpath(EXPERIMENT_DIR,"sparse_adjacency_solver/collaborative_transport_dist_maps/results")
-    results_dir = joinpath(EXPERIMENT_DIR,"sparse_adjacency_solver/fixed_A_star_heuristic/results/full_solver")
+    results_dir = joinpath(EXPERIMENT_DIR,"sparse_adjacency_solver/final/results/full_solver")
     for (root, dirs, files) in walkdir(results_dir)
         for file in files
             if splitext(file)[end] == ".toml"
                 toml_dict = TOML.parsefile(joinpath(root, file))
                 if get(toml_dict, "optimal", true) == false
                     println(joinpath(root, file)) # path to files
-                    rm(joinpath(root,file))
+                    # rm(joinpath(root,file))
                 end
             end
         end
