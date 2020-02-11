@@ -177,6 +177,7 @@ function visualize_env(vtxs,pickup_vtxs,dropoff_vtxs,t=0;
         active_object_color="black",
         completed_object_color="gray",
         inactive_object_color="gray",
+        show_paths=true
     )
 
 
@@ -186,12 +187,14 @@ function visualize_env(vtxs,pickup_vtxs,dropoff_vtxs,t=0;
 
     t1 = Int(floor(t))+1
     path_layers = []
-    for (i,p) in enumerate(robot_paths)
-        if length(p) > 0
-            push!(path_layers,
-                layer(x=map(v->vtxs[v][1],p),y=map(v->vtxs[v][2],p),Geom.path,
-                    Theme(line_width=line_width,default_color=colors_vec[i]))
-            )
+    if show_paths
+        for (i,p) in enumerate(robot_paths)
+            if length(p) > 0
+                push!(path_layers,
+                    layer(x=map(v->vtxs[v][1],p),y=map(v->vtxs[v][2],p),Geom.path,
+                        Theme(line_width=line_width,default_color=colors_vec[i]))
+                )
+            end
         end
     end
     robot_layers = []
