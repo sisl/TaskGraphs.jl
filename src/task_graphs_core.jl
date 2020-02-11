@@ -1544,6 +1544,8 @@ function formulate_optimization_problem(N,M,G,D,Drs,Dss,Δt,Δt_collect,Δt_deli
     TimeLimit=100,
     OutputFlag=0,
     Presolve = -1, # automatic setting (-1), off (0), conservative (1), or aggressive (2)
+    task_groups = Vector{Vector{Int}}(),
+    shapes = [(1,1) for j in 1:M],
     assignments=Dict{Int64,Int64}(),
     cost_model=MakeSpan
     )

@@ -497,7 +497,8 @@ function plot_collab_runtimes(df;
         xgroup=:TaskRatio,
         x=:M_string,
         y=:time,
-        suppress_outliers=true
+        suppress_outliers=true,
+        scale_y = Scale.y_log10(minvalue=y_bounds[1],maxvalue=y_bounds[2])
     )
     latex_fonts = Theme(major_label_font="CMU Serif", major_label_font_size=big_font,
                     minor_label_font="CMU Serif", minor_label_font_size=small_font,
@@ -516,7 +517,7 @@ function plot_collab_runtimes(df;
 #         Scale.group_discrete(labels=M->string(M," Tasks"),levels=[1,2,3,4]),
         Guide.xlabel("task ratio"),
         Guide.ylabel("computation time (s)"),
-        Scale.y_log10(minvalue=y_bounds[1],maxvalue=y_bounds[2]),
+        scale_y,
         latex_fonts
     )
 end
