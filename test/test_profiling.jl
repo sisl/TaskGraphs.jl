@@ -41,7 +41,8 @@ let
                 TimeLimit = 20,
                 solver_template = PC_TAPF_Solver(
                     verbosity=0,
-                    l2_verbosity=0,
+                    l1_verbosity=2,
+                    l2_verbosity=2,
                     l3_verbosity=1,
                     l4_verbosity=0,
                     LIMIT_A_star_iterations=8000,
@@ -108,15 +109,15 @@ let
     modes = [
         # :write,
         # :assignment_only,
-        # :low_level_search_without_repair,
-        # :low_level_search_with_repair,
+        :low_level_search_without_repair,
+        :low_level_search_with_repair,
         :full_solver
         ]
     problem_dir = joinpath(PROBLEM_DIR,"collaborative_transport/final")
     results_dirs = [
         # joinpath(EXPERIMENT_DIR,"assignment_solver/results")
         # joinpath(EXPERIMENT_DIR,"adjacency_solver/results")
-        joinpath(EXPERIMENT_DIR,"sparse_adjacency_solver/final/results")
+        joinpath(EXPERIMENT_DIR,"sparse_adjacency_solver/final/meta_env_repaired/results")
         # joinpath(EXPERIMENT_DIR,"greedy_assignment/final/results")
     ]
     milp_models = [
