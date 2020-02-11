@@ -531,7 +531,7 @@ function CRCBS.build_env(solver, env::E, mapf::M, node::N, schedule_node::T, v::
     return cbs_env, base_path
 end
 function CRCBS.build_env(solver, env::E, mapf::M, node::N, schedule_node::TEAM_ACTION, v::Int) where {E<:SearchEnv,M<:AbstractMAPF,N<:ConstraintTreeNode}
-    envs = Vector{PCCBS.LowLevelEnv{typeof(get_cost_model(mapf.env)),LowLevelSearchHeuristic}}()
+    envs = [] # Vector{PCCBS.LowLevelEnv{typeof(get_cost_model(mapf.env)),LowLevelSearchHeuristic}}()
     starts = Vector{PCCBS.State}()
     meta_cost = MetaCost(Vector{get_cost_type(env)}(),get_initial_cost(env.env))
     # path_specs = Vector{PathSpec}()
@@ -545,11 +545,11 @@ function CRCBS.build_env(solver, env::E, mapf::M, node::N, schedule_node::TEAM_A
         cbs_env, base_path = build_env(solver,env,mapf,node,sub_node,v,generate_path_spec(env.schedule,env.problem_spec,sub_node);
             heuristic=heuristic,
         ) # TODO need problem_spec here
-        push!([envs...], cbs_env)
+        push!(envs, cbs_env)
         push!(starts, get_final_state(base_path))
         push!(meta_cost.independent_costs, get_cost(base_path))
     end
-    meta_env = MetaAgentCBS.construct_meta_env(envs, get_cost_model(env))
+    meta_env = MetaAgentCBS.construct_meta_env([envs...], get_cost_model(env))
     meta_path = Path{MetaAgentCBS.State{PCCBS.State},MetaAgentCBS.Action{PCCBS.Action},MetaCost{get_cost_type(env)}}(
         s0 = MetaAgentCBS.State(starts),
         cost = MetaCost(meta_cost.independent_costs, aggregate_costs(get_cost_model(meta_env), meta_cost.independent_costs))
@@ -639,6 +639,10 @@ function plan_path!(solver::PC_TAPF_Solver, env::SearchEnv, mapf::M, node::N, sc
         end
     end
     paths = MetaAgentCBS.split_path(meta_path)
+    # @show length(paths)
+    # @show length(meta_env.envs)
+    # @show length(meta_cost.independent_costs)
+    # @show length(schedule_node.instructions)
     for (cbs_env, new_path, cost, sub_node) in zip(meta_env.envs, paths, meta_cost.independent_costs, schedule_node.instructions)
         agent_id = get_id(get_robot_id(sub_node))
         path = get_paths(node.solution)[agent_id]
@@ -650,6 +654,8 @@ function plan_path!(solver::PC_TAPF_Solver, env::SearchEnv, mapf::M, node::N, sc
         set_path_cost!(node.solution, get_cost(path), agent_id)
         update_env!(solver,env,v,path,agent_id)
         # Print for debugging
+        # @show agent_id
+        log_info(3,solver.l3_verbosity,"agent_id = ", agent_id)
         log_info(3,solver.l3_verbosity,string("agent_path = ", convert_to_vertex_lists(path)))
         log_info(3,solver.l3_verbosity,string("cost = ", get_cost(path)))
     end

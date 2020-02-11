@@ -25,7 +25,7 @@ let
                 depth_biases=[0.1],
                 task_size_distributions = [
                     # ( 1=>1.0, 2=>0.0, 4=>0.0 ),
-                    ( 1=>1.0, 2=>1.0, 4=>0.0 ),
+                    # ( 1=>1.0, 2=>1.0, 4=>0.0 ),
                     ( 1=>1.0, 2=>1.0, 4=>1.0 ),
                     # ( 1=>0.0, 2=>1.0, 4=>1.0 ),
                     ],
@@ -41,8 +41,8 @@ let
                 TimeLimit = 20,
                 solver_template = PC_TAPF_Solver(
                     verbosity=0,
-                    l2_verbosity=2,
-                    l3_verbosity=0,
+                    l2_verbosity=0,
+                    l3_verbosity=1,
                     l4_verbosity=0,
                     LIMIT_A_star_iterations=8000,
                     time_limit=25
@@ -107,23 +107,23 @@ let
 
     modes = [
         # :write,
-        :assignment_only,
+        # :assignment_only,
         # :low_level_search_without_repair,
         # :low_level_search_with_repair,
-        # :full_solver
+        :full_solver
         ]
     problem_dir = joinpath(PROBLEM_DIR,"collaborative_transport/final")
     results_dirs = [
         # joinpath(EXPERIMENT_DIR,"assignment_solver/results")
         # joinpath(EXPERIMENT_DIR,"adjacency_solver/results")
-        # joinpath(EXPERIMENT_DIR,"sparse_adjacency_solver/final/results")
-        joinpath(EXPERIMENT_DIR,"greedy_assignment/final/results")
+        joinpath(EXPERIMENT_DIR,"sparse_adjacency_solver/final/results")
+        # joinpath(EXPERIMENT_DIR,"greedy_assignment/final/results")
     ]
     milp_models = [
         # AssignmentMILP(),
         # AdjacencyMILP(),
-        # SparseAdjacencyMILP(),
-        GreedyAssignment()
+        SparseAdjacencyMILP(),
+        # GreedyAssignment()
     ]
     for (milp_model, results_dir) in zip(milp_models, results_dirs)
         for mode in modes
@@ -154,7 +154,7 @@ let
                     l4_verbosity=0,
                     LIMIT_assignment_iterations = isa(milp_model, GreedyAssignment) ? 1 : 50,
                     LIMIT_A_star_iterations=8000,
-                    # LIMIT_CBS_iterations=5,
+                    LIMIT_CBS_iterations=400,
                     time_limit=200 # 60
                     )
                 )
