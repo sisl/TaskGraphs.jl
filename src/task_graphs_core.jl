@@ -1342,6 +1342,10 @@ abstract type TaskGraphsMILP end
 @with_kw struct AssignmentMILP <: TaskGraphsMILP
     model::JuMP.Model = Model()
 end
+@with_kw struct TeamAssignmentMILP <: TaskGraphsMILP
+    model::JuMP.Model = Model()
+    task_group::Vector{Vector{Int}}
+end
 @with_kw struct AdjacencyMILP <: TaskGraphsMILP
     model::JuMP.Model = Model()
 end

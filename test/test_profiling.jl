@@ -105,24 +105,24 @@ let
     println("RUNNING PROFILING TESTS")
 
     modes = [
-        :write,
+        # :write,
         :assignment_only,
-        :low_level_search_without_repair,
-        :low_level_search_with_repair,
-        :full_solver
+        # :low_level_search_without_repair,
+        # :low_level_search_with_repair,
+        # :full_solver
         ]
     problem_dir = joinpath(PROBLEM_DIR,"collaborative_transport/final")
     results_dirs = [
         # joinpath(EXPERIMENT_DIR,"assignment_solver/results")
         # joinpath(EXPERIMENT_DIR,"adjacency_solver/results")
-        joinpath(EXPERIMENT_DIR,"sparse_adjacency_solver/final/results")
-        # joinpath(EXPERIMENT_DIR,"greedy_assignment/non_zero_collect_time/results")
+        # joinpath(EXPERIMENT_DIR,"sparse_adjacency_solver/final/results")
+        joinpath(EXPERIMENT_DIR,"greedy_assignment/final/results")
     ]
     milp_models = [
         # AssignmentMILP(),
         # AdjacencyMILP(),
-        SparseAdjacencyMILP(),
-        # GreedyAssignment()
+        # SparseAdjacencyMILP(),
+        GreedyAssignment()
     ]
     for (milp_model, results_dir) in zip(milp_models, results_dirs)
         for mode in modes

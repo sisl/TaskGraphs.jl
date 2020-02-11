@@ -306,17 +306,37 @@ render_both(t,paths1,paths2) = hstack(render_paths(t,paths1),render_paths(t,path
 
 
 # Plotting results
-function preprocess_results!(df_dict)
-    for (k,df) in df_dict
-        if nrow(df) > 0
+function preprocess_results!(df)
+#     for (k,df) in df_dict
+    if nrow(df) > 0
+        if :depth_bias in names(df)
             begin df[!,:depth_bias_string] = string.(df.depth_bias)
                 df
             end
+        end
+        if :N in names(df)
             begin df[!,:N_string] = string.(df.N)
                 df
             end
-            sort!(df, (:M,:N))
         end
+        sort!(df, (:M,:N))
+    end
+    df
+#     end
+#     df_dict
+end
+function preprocess_results!(df_dict::Dict)
+    for (k,df) in df_dict
+        preprocess_results!(df)
+#         if nrow(df) > 0
+#             begin df[!,:depth_bias_string] = string.(df.depth_bias)
+#                 df
+#             end
+#             begin df[!,:N_string] = string.(df.N)
+#                 df
+#             end
+#             sort!(df, (:M,:N))
+#         end
     end
     df_dict
 end
@@ -329,13 +349,19 @@ function robots_vs_task_vs_time_box_plot(df;
         y_bounds=[0.01,100.0],
         big_font=14pt,
         small_font=12pt,
+        y=:time,
+        x=:N_string,
+        xgroup=:M,
+        color=:N_string,
+        ylabel="computation time (s)",
+        scale_y = Scale.y_log10(minvalue=y_bounds[1],maxvalue=y_bounds[2])
     )
     latex_fonts = Theme(major_label_font="CMU Serif", major_label_font_size=big_font,
                     minor_label_font="CMU Serif", minor_label_font_size=small_font,
                     key_title_font="CMU Serif", key_title_font_size=small_font,
                     key_label_font="CMU Serif", key_label_font_size=small_font)
     
-    plot(df, xgroup=:M, x=:N_string, y=:time, color=:N_string,
+    plot(df, xgroup=xgroup, x=x, y=y, color=color,
         Geom.subplot_grid(
             Geom.boxplot(;suppress_outliers=false),
             Coord.cartesian(; ymin=ymin, ymax=ymax),
@@ -346,8 +372,8 @@ function robots_vs_task_vs_time_box_plot(df;
         Guide.colorkey(title="number of robots", labels=["10","20","30","40"], pos=[0.1w,-0.32h]),
         Scale.group_discrete(labels=M->string(M," Tasks"),levels=[10,20,30,40,60]),
         Guide.xlabel("number of tasks"),
-        Guide.ylabel("computation time (s)"),
-        Scale.y_log10(minvalue=y_bounds[1],maxvalue=y_bounds[2]),
+        Guide.ylabel(ylabel),
+        scale_y,
         latex_fonts
     )
 end
