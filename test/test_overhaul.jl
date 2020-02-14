@@ -285,12 +285,6 @@ let
     (solution, assignment, cost, search_env), elapsed_time, byte_ct, gc_time, mem_ct = @timed high_level_search!(
         SparseAdjacencyMILP(), solver, env_graph, project_spec, problem_spec, robot_ICs, Gurobi.Optimizer;)
 
-    meta_env = MetaAgentCBS.construct_meta_env([search_env.env], get_cost_model(search_env.env))
-    s = MetaAgentCBS.State([PCCBS.State(1,0)])
-    for a in get_possible_actions(meta_env, s)
-        @show get_next_state(meta_env, s, a)
-    end
-
     # project_schedule = construct_partial_project_schedule(project_spec,problem_spec,map(i->robot_ICs[i], 1:problem_spec.N))
     # model = formulate_milp(SparseAdjacencyMILP(),project_schedule,problem_spec;Presolve=1,TimeLimit=0.5)
     # exclude_solutions!(model)
@@ -381,27 +375,36 @@ let
     t0 = map(v->get(new_cache.t0, v, 0.0), vertices(G))
     new_cache = initialize_planning_cache(new_schedule;t0=t0)
 
-    high_level_search!(solver, env_graph, new_schedule, problem_spec, Gurobi.Optimizer;
-        milp_model=SparseAdjacencyMILP(),
-        t0_ = Dict{AbstractID,Int}(get_vtx_id(new_schedule, v)=>t0 for (v,t0) in enumerate(new_cache.t0))
-    )
+    model = formulate_milp(SparseAdjacencyMILP(),new_schedule,problem_spec)
+    optimize!(model)
+    @test termination_status(model) == MOI.OPTIMAL
+    @show Int(round(value(objective_function(model))))
+    adj_matrix = get_assignment_matrix(model)
+    # DEBUG something is wrong here
+    update_project_schedule!(new_schedule,problem_spec,adj_matrix)
+    @test validate(new_schedule)
+
+    # high_level_search!(solver, env_graph, new_schedule, problem_spec, Gurobi.Optimizer;
+    #     milp_model=SparseAdjacencyMILP(),
+    #     t0_ = Dict{AbstractID,Int}(get_vtx_id(new_schedule, v)=>t0 for (v,t0) in enumerate(new_cache.t0))
+    # )
 
     # Replan!
-    model = formulate_milp(SparseAdjacencyMILP(),new_schedule,problem_spec;
-        Presolve=1,
-        TimeLimit=20,
-        t0_ = Dict{AbstractID,Int}(get_vtx_id(new_schedule, v)=>t0 for (v,t0) in enumerate(new_cache.t0)) # TODO figure out a better way to do this
-        )
-    exclude_solutions!(model) # NOTE this is a high object-to-robot ratio. Consider changing that for the demo
-    retval, elapsed_time, byte_ct, gc_time, mem_ct = @timed optimize!(model)
-    @show elapsed_time
-    @show primal_status(model)
-    # @show dual_status(model)
-    @show objective_bound(model), value(objective_function(model))
-    @show termination_status(model)
-    @test termination_status(model) == MathOptInterface.OPTIMAL
-
-    assignment_matrix = get_assignment_matrix(model);
+    # model = formulate_milp(SparseAdjacencyMILP(),new_schedule,problem_spec;
+    #     Presolve=1,
+    #     TimeLimit=20,
+    #     t0_ = Dict{AbstractID,Int}(get_vtx_id(new_schedule, v)=>t0 for (v,t0) in enumerate(new_cache.t0)) # TODO figure out a better way to do this
+    #     )
+    # exclude_solutions!(model) # NOTE this is a high object-to-robot ratio. Consider changing that for the demo
+    # retval, elapsed_time, byte_ct, gc_time, mem_ct = @timed optimize!(model)
+    # @show elapsed_time
+    # @show primal_status(model)
+    # # @show dual_status(model)
+    # @show objective_bound(model), value(objective_function(model))
+    # @show termination_status(model)
+    # @test termination_status(model) == MathOptInterface.OPTIMAL
+    #
+    # assignment_matrix = get_assignment_matrix(model);
     update_project_schedule!(new_schedule,problem_spec,assignment_matrix)
     @test validate(new_schedule)
 

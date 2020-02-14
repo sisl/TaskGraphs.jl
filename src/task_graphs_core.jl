@@ -1258,7 +1258,7 @@ function construct_partial_project_schedule(spec::ProjectSpec,problem_spec::Prob
     construct_partial_project_schedule(
         spec.initial_conditions,
         spec.final_conditions,
-        map(i->robot_ICs[i], 1:problem_spec.N),
+        map(i->robot_ICs[i], 1:min(length(robot_ICs),problem_spec.N)),
         spec.operations,
         map(op->op.id, spec.operations[collect(spec.root_nodes)]),
         problem_spec,
