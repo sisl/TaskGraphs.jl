@@ -96,7 +96,9 @@ let
     # Test the full loop
     project_spec, problem_spec, robot_ICs, assignments, env_graph = initialize_toy_problem_4(;verbose=false);
     solver = PC_TAPF_Solver(verbosity=1)
-    high_level_search!(solver, env_graph, project_spec, problem_spec, robot_ICs, Gurobi.Optimizer);
+    # high_level_search!(solver, env_graph, project_spec, problem_spec, robot_ICs, Gurobi.Optimizer);
+    high_level_search!(AssignmentMILP(),solver,env_graph,project_spec,problem_spec,robot_ICs,Gurobi.Optimizer);
+    high_level_search!(SparseAdjacencyMILP(),solver,env_graph,project_spec,problem_spec,robot_ICs,Gurobi.Optimizer);
 end
 let
     N = 8
@@ -110,8 +112,9 @@ let
     optimal = (termination_status(model) == MathOptInterface.OPTIMAL);
     @show optimal;
     assignment_matrix = get_assignment_matrix(model);
-    assignments = map(j->findfirst(assignment_matrix[:,j] .== 1),1:M);
-    optimal_TA_cost = maximum(Int.(round.(value.(model[:tof])))); # lower bound on cost (from task assignment module)
+    # assignments = map(j->findfirst(assignment_matrix[:,j] .== 1),1:M);
+    assignment_dict, assignments = get_assignment_dict(assignment_matrix,N,M)
+    optimal_TA_cost = Int(round(value(objective_function(model))))
     @show optimal_TA_cost;
 
     # Routing
@@ -122,10 +125,10 @@ let
     solver = PC_TAPF_Solver(verbosity=1);
     low_level_search!(solver,env,mapf,node);
     # @show get_cost(node);
-    paths = convert_to_vertex_lists(node.solution)
-    # @show paths
-    repair_solution!(solver,env,mapf,node);
-    paths = convert_to_vertex_lists(node.solution)
+    # paths = convert_to_vertex_lists(node.solution)
+    # # @show paths
+    # repair_solution!(solver,env,mapf,node);
+    # paths = convert_to_vertex_lists(node.solution)
     # @show paths
     # @show get_cost(node);
 end
@@ -135,7 +138,9 @@ let
     Random.seed!(0);
     project_spec, problem_spec, robot_ICs, env_graph = initialize_test_problem(N,M)
     solver = PC_TAPF_Solver(verbosity=2);
-    high_level_search!(solver, env_graph, project_spec, problem_spec, robot_ICs, Gurobi.Optimizer);
+    # high_level_search!(solver, env_graph, project_spec, problem_spec, robot_ICs, Gurobi.Optimizer);
+    high_level_search!(AssignmentMILP(),solver,env_graph,project_spec,problem_spec,robot_ICs,Gurobi.Optimizer);
+    high_level_search!(SparseAdjacencyMILP(),solver,env_graph,project_spec,problem_spec,robot_ICs,Gurobi.Optimizer);
 end
 # let
 #     # try a bigger problem!
@@ -167,7 +172,7 @@ let
 
     filename = string(ENVIRONMENT_DIR,"/env_2.toml");
     factory_env = read_env(filename);
-    env_graph = factory_env.graph;
+    env_graph = factory_env;
     dist_matrix = get_dist_matrix(env_graph);
 
     r0,s0,sF = get_random_problem_instantiation(N,M,get_pickup_zones(factory_env),get_dropoff_zones(factory_env),
@@ -178,8 +183,11 @@ let
             project_spec, r0, s0, sF, dist_matrix);
     # Solve the problem
     solver = PC_TAPF_Solver(verbosity=0,LIMIT_A_star_iterations=5*nv(env_graph));
-    solution, assignment, cost, search_env = high_level_search!(
-        solver, env_graph, project_spec, problem_spec, robot_ICs, Gurobi.Optimizer);
+    # solution, assignment, cost, search_env = high_level_search!(
+    #     solver, env_graph, project_spec, problem_spec, robot_ICs, Gurobi.Optimizer);
+
+    solution, assignment, cost, search_env = high_level_search!(AssignmentMILP(),solver,env_graph,project_spec,problem_spec,robot_ICs,Gurobi.Optimizer);
+    # high_level_search!(SparseAdjacencyMILP(),solver,env_graph,project_spec,problem_spec,robot_ICs,Gurobi.Optimizer);
 
     robot_paths = convert_to_vertex_lists(solution)
 end

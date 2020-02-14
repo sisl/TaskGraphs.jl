@@ -469,7 +469,7 @@ function construct_random_task_graphs_problem(N::Int,M::Int,
     r0,s0,sF        = get_random_problem_instantiation(N,M,pickup_vtxs,dropoff_vtxs,free_vtxs)
     project_spec    = construct_random_project_spec(M,s0,sF;max_parents=3,depth_bias=1.0,Δt_min=0,Δt_max=0)
 
-    construct_task_graphs_problem(project_spec,r0,s0,sF,dist_matrix,Δt_collect,Δt_deliver)
+    construct_task_graphs_problem(project_spec,r0,s0,sF,dist_matrix;Δt_collect=Δt_collect,Δt_deliver=Δt_deliver)
 end
 
 export
@@ -487,7 +487,7 @@ function initialize_test_problem(N=8,M=12;env_id=2)
         get_free_zones(factory_env),
         get_dist_matrix(factory_env.graph));
 
-    project_spec, problem_spec, robot_ICs, factory_env.graph
+    project_spec, problem_spec, robot_ICs, factory_env
 end
 
 

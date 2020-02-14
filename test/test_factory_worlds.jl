@@ -47,3 +47,29 @@ let
         vtxs=vtxs
     )
 end
+# test custom envs for different-sized robot sizes
+let
+    factory_env = construct_regular_factory_world(;n_obstacles_x=1,n_obstacles_y=1)
+    # 1   2   3   4   5   6
+    # 7   8   9  10  11  12
+    # 13  14   0   0  15  16
+    # 17  18   0   0  19  20
+    # 21  22  23  24  25  26
+    # 27  28  29  30  31  32
+    dist_matrix = get_dist_matrix(factory_env)
+    dist_mtx_map = factory_env.dist_function
+
+    v1 = 13
+    v2 = 15
+    @test get_distance(dist_mtx_map,v1,v2) == dist_matrix[v1,v2]
+    @test get_distance(dist_mtx_map,v1,v2,(1,1)) == dist_matrix[v1,v2]
+    @test get_distance(dist_mtx_map,v1,v2,(1,2)) == dist_matrix[v1,v2]
+    @test get_distance(dist_mtx_map,v1,v2,(2,1)) == dist_matrix[v1,v2] + 2
+    @test get_distance(dist_mtx_map,v1,v2,(2,2)) == dist_matrix[v1,v2] + 2
+
+    v3 = 18
+    v4 = 20
+    config = 4
+    @test get_distance(dist_mtx_map,v3,v4,(2,2),config) == dist_matrix[v1,v2] + 2
+
+end

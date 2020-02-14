@@ -82,7 +82,6 @@ let
     optimize!(model)
     @show status = termination_status(model)
     obj_val = Int(round(value(objective_function(model))))
-    @show adj_matrix = Int.(round.(value.(model[:X])))
 
     print_project_schedule(project_schedule,"project_schedule1";mode=:leaf_aligned)
 
@@ -194,77 +193,78 @@ end
 
 # end
 
-let
-    env_id = 2
-    env_filename = string(ENVIRONMENT_DIR,"/env_",env_id,".toml")
-    factory_env = read_env(env_filename)
-    env_graph = factory_env.graph
-    dist_matrix = get_dist_matrix(env_graph)
-    logfile = "log.txt"
+# For catching troublesome problem instances
+# let
+#     env_id = 2
+#     env_filename = string(ENVIRONMENT_DIR,"/env_",env_id,".toml")
+#     factory_env = read_env(env_filename)
+#     env_graph = factory_env.graph
+#     dist_matrix = get_dist_matrix(env_graph)
+#     logfile = "log.txt"
+#
+#     TimeLimit = 40
+#     OutputFlag = 0
+#     problem_dir = PROBLEM_DIR
+#
+#     problematic_ids = [
+#         43, # one of the solvers gets stuck after A* returns an infeasible path (twice)
+#         146, # A* infeasible, again.
+#         197, # can't remember why I put this on here
+#         255, # more A* infeasible. These always seem to terminate with "bounds error"
+#         267, # just pausing here--nothing necessarily wrong.
+#         146, # TODO why does this fail for SparseAdjacencyMILP?
+#         ]
+#
+#     ##
+#     # for problem_id in problematic_ids[end]+1:384
+#     for problem_id in 1:10
+#         problem_filename = joinpath(problem_dir,string("problem",problem_id,".toml"))
+#         problem_def = read_problem_def(problem_filename)
+#         project_spec, r0, s0, sF = problem_def.project_spec,problem_def.r0,problem_def.s0,problem_def.sF
+#         project_spec, problem_spec, object_ICs, object_FCs, robot_ICs = construct_task_graphs_problem(project_spec, r0, s0, sF, dist_matrix)
+#         println("PROBLEM ID: ", problem_id)
+#         for cost_model in [SumOfMakeSpans, MakeSpan]
+#             costs = Float64[]
+#             for milp_model in [AdjacencyMILP(),SparseAdjacencyMILP()]
+#                 try
+#                     solver = PC_TAPF_Solver(verbosity=0)
+#                     solution, assignment, cost, env = high_level_search!(
+#                         milp_model,
+#                         solver,
+#                         env_graph,
+#                         project_spec,
+#                         problem_spec,
+#                         robot_ICs,
+#                         Gurobi.Optimizer;
+#                         primary_objective=cost_model,
+#                         TimeLimit=TimeLimit
+#                         )
+#                     push!(costs, cost[1])
+#                     @assert validate(env.schedule)
+#                     @assert cost[1] != Inf
+#                 catch e
+#                     open(logfile, "a") do io
+#                         write(io, string("PROBLEM ", problem_id, " - ",
+#                             "cost model: ", cost_model, " - ",
+#                             typeof(milp_model), " - ", e.msg, "\n"))
+#                     end
+#                 end
+#             end
+#             try
+#                 @assert all(costs .== costs[1])
+#             catch e
+#                 open(logfile, "a") do io
+#                     write(io, string("PROBLEM ", problem_id, " - ",
+#                         "cost model: ", cost_model, " - ",
+#                          e.msg, " costs: ", costs, "\n"))
+#                 end
+#             end
+#         end
+#     end
+#     ##
+# end
 
-    TimeLimit = 40
-    OutputFlag = 0
-    problem_dir = PROBLEM_DIR
-
-    problematic_ids = [
-        43, # one of the solvers gets stuck after A* returns an infeasible path (twice)
-        146, # A* infeasible, again.
-        197, # can't remember why I put this on here
-        255, # more A* infeasible. These always seem to terminate with "bounds error"
-        267, # just pausing here--nothing necessarily wrong.
-        146, # TODO why does this fail for SparseAdjacencyMILP?
-        ]
-
-    ##
-    # for problem_id in problematic_ids[end]+1:384
-    for problem_id in 1:10
-        problem_filename = joinpath(problem_dir,string("problem",problem_id,".toml"))
-        problem_def = read_problem_def(problem_filename)
-        project_spec, r0, s0, sF = problem_def.project_spec,problem_def.r0,problem_def.s0,problem_def.sF
-        project_spec, problem_spec, object_ICs, object_FCs, robot_ICs = construct_task_graphs_problem(project_spec, r0, s0, sF, dist_matrix)
-        println("PROBLEM ID: ", problem_id)
-        for cost_model in [SumOfMakeSpans, MakeSpan]
-            costs = Float64[]
-            for milp_model in [AdjacencyMILP(),SparseAdjacencyMILP()]
-                try
-                    solver = PC_TAPF_Solver(verbosity=0)
-                    solution, assignment, cost, env = high_level_search!(
-                        milp_model,
-                        solver,
-                        env_graph,
-                        project_spec,
-                        problem_spec,
-                        robot_ICs,
-                        Gurobi.Optimizer;
-                        primary_objective=cost_model,
-                        TimeLimit=TimeLimit
-                        )
-                    push!(costs, cost[1])
-                    @assert validate(env.schedule)
-                    @assert cost[1] != Inf
-                catch e
-                    open(logfile, "a") do io
-                        write(io, string("PROBLEM ", problem_id, " - ",
-                            "cost model: ", cost_model, " - ",
-                            typeof(milp_model), " - ", e.msg, "\n"))
-                    end
-                end
-            end
-            try
-                @assert all(costs .== costs[1])
-            catch e
-                open(logfile, "a") do io
-                    write(io, string("PROBLEM ", problem_id, " - ",
-                        "cost model: ", cost_model, " - ",
-                         e.msg, " costs: ", costs, "\n"))
-                end
-            end
-        end
-    end
-    ##
-end
-
-# Pruning projects
+# Pruning projects - for REPLANNING
 let
     env_id = 2
     env_filename = string(ENVIRONMENT_DIR,"/env_",env_id,".toml")
@@ -396,7 +396,7 @@ let
     retval, elapsed_time, byte_ct, gc_time, mem_ct = @timed optimize!(model)
     @show elapsed_time
     @show primal_status(model)
-    @show dual_status(model)
+    # @show dual_status(model)
     @show objective_bound(model), value(objective_function(model))
     @show termination_status(model)
     @test termination_status(model) == MathOptInterface.OPTIMAL
@@ -411,265 +411,75 @@ let
 end
 
 # Collaborative transport
-let
-    vtx_grid = initialize_dense_vtx_grid(8,8)
-    # 1   9  17  25  33  41  49  57
-    # 2  10  18  26  34  42  50  58
-    # 3  11  19  27  35  43  51  59
-    # 4  12  20  28  36  44  52  60
-    # 5  13  21  29  37  45  53  61
-    # 6  14  22  30  38  46  54  62
-    # 7  15  23  31  39  47  55  63
-    # 8  16  24  32  40  48  56  64
-    env_graph = construct_factory_env_from_vtx_grid(vtx_grid)
-    # dist_matrix = get_dist_matrix(env_graph)
-    dist_matrix = DistMatrixMap(env_graph.vtx_map,env_graph.vtxs)
-    r0 = [1,25,4,29]
-    # r0 = [1,25,8,28] # check that planning works even when it takes longer for some robots to arrive than others
-    s0 = [10]#,18,11,19]
-    sF = [42] #,50,43,51]
 
-    task_shapes = Dict(1=>(2,2))
-    shape_dict = Dict(
-        10=>Dict((2,2)=>[10,18,11,19]),
-        42=>Dict((2,2)=>[42,50,43,51]),
-        )
-
-    project_spec, robot_ICs = TaskGraphs.initialize_toy_problem(r0,[s0],[sF],(v1,v2)->dist_matrix[v1,v2])
-    add_operation!(project_spec,construct_operation(project_spec,-1,[1],[],0))
-
-    cost_function = MakeSpan
-    project_spec, problem_spec, object_ICs, object_FCs, robot_ICs = construct_task_graphs_problem(
-        project_spec,r0,s0,sF,dist_matrix;cost_function=cost_function,
-        task_shapes=task_shapes,shape_dict=shape_dict)
-
-    solver = PC_TAPF_Solver(
-        DEBUG=true,
-        LIMIT_A_star_iterations=5*nv(env_graph),
-        verbosity=1,
-        l4_verbosity=1
-        );
-
-    solution, _, cost, env = high_level_search!(SparseAdjacencyMILP(),solver,env_graph,project_spec,problem_spec,robot_ICs,Gurobi.Optimizer)
-    solution, _, cost, env = high_level_search!(GreedyAssignment(),solver,env_graph,project_spec,problem_spec,robot_ICs,Gurobi.Optimizer)
-
-    project_schedule = construct_partial_project_schedule(project_spec, problem_spec, map(i->robot_ICs[i], 1:problem_spec.N))
-
-    ######################
-    # GreedyAssignment
-    # print_project_schedule(project_schedule,"project_schedule")
-    #
-    # milp_model = formulate_milp(GreedyAssignment(),project_schedule,problem_spec)
-    # optimize!(milp_model)
-    # X = get_assignment_matrix(milp_model)
-    # update_project_schedule!(milp_model,project_schedule,problem_spec,X)
-
-    #######################
-    #######################
-
-    set_leaf_operation_nodes!(project_schedule)
-    model = formulate_milp(SparseAdjacencyMILP(),project_schedule,problem_spec)
-    optimize!(model)
-    @test termination_status(model) == MOI.OPTIMAL
-    adj_mat = get_assignment_matrix(model)
-    update_project_schedule!(project_schedule,problem_spec,adj_mat)
-
-
-    # print_project_schedule(project_schedule,"team_schedule")
-
-    # Path planning
-    solver = PC_TAPF_Solver(DEBUG=true,verbosity=1,LIMIT_A_star_iterations=5*nv(env_graph));
-    env, mapf = construct_search_env(project_schedule, problem_spec, env_graph);
-    pc_mapf = PC_MAPF(env,mapf);
-    ##### Call CBS Search Routine (LEVEL 2) #####
-    root_node = initialize_root_node(mapf)
-    low_level_search!(solver, pc_mapf.env, pc_mapf.mapf,root_node)
-
-    @show convert_to_vertex_lists(root_node.solution)
-end
 # GreedyAssignment
-let
-    vtx_grid = initialize_dense_vtx_grid(8,8)
-    # 1   9  17  25  33  41  49  57
-    # 2  10  18  26  34  42  50  58
-    # 3  11  19  27  35  43  51  59
-    # 4  12  20  28  36  44  52  60
-    # 5  13  21  29  37  45  53  61
-    # 6  14  22  30  38  46  54  62
-    # 7  15  23  31  39  47  55  63
-    # 8  16  24  32  40  48  56  64
-    env_graph = construct_factory_env_from_vtx_grid(vtx_grid)
-    # dist_matrix = get_dist_matrix(env_graph)
-    dist_matrix = DistMatrixMap(env_graph.vtx_map,env_graph.vtxs)
-    r0 = [1,25,4,29]
-    # r0 = [1,25,8,28] # check that planning works even when it takes longer for some robots to arrive than others
-    s0 = [10]#,18,11,19]
-    sF = [42] #,50,43,51]
-
-    task_shapes = Dict(1=>(2,2))
-    shape_dict = Dict(
-        10=>Dict((2,2)=>[10,18,11,19]),
-        42=>Dict((2,2)=>[42,50,43,51]),
-        )
-
-    project_spec, robot_ICs = TaskGraphs.initialize_toy_problem(r0,[s0],[sF],(v1,v2)->dist_matrix[v1,v2])
-    add_operation!(project_spec,construct_operation(project_spec,-1,[1],[],0))
-
-    cost_function = MakeSpan
-    project_spec, problem_spec, object_ICs, object_FCs, robot_ICs = construct_task_graphs_problem(
-        project_spec,r0,s0,sF,dist_matrix;cost_function=cost_function,
-        task_shapes=task_shapes,shape_dict=shape_dict)
-
-    solver = PC_TAPF_Solver(
-        DEBUG=true,
-        LIMIT_A_star_iterations=5*nv(env_graph),
-        verbosity=1,
-        l4_verbosity=1
-        );
-
-    env_id = 2
-    env_filename = string(ENVIRONMENT_DIR,"/env_",env_id,".toml")
-    factory_env = read_env(env_filename)
-    env_graph = factory_env
-    dist_matrix = get_dist_matrix(env_graph)
-    dist_mtx_map = DistMatrixMap(factory_env.vtx_map,factory_env.vtxs)
-
-    problem_filename = "dummy_problem_dir/problem1.toml"
-    problem_def = read_problem_def(problem_filename)
-    project_spec, r0, s0, sF = problem_def.project_spec,problem_def.r0,problem_def.s0,problem_def.sF
-
-    project_spec, problem_spec, _, _, robot_ICs = construct_task_graphs_problem(
-        project_spec, r0, s0, sF,
-        dist_mtx_map;
-        task_shapes=problem_def.shapes,
-        shape_dict=factory_env.expanded_zones,
-        );
-    # solution, _, cost, env = high_level_search!(SparseAdjacencyMILP(),solver,env_graph,project_spec,problem_spec,robot_ICs,Gurobi.Optimizer)
-    # solution, _, cost, env = high_level_search!(GreedyAssignment(),solver,env_graph,project_spec,problem_spec,robot_ICs,Gurobi.Optimizer)
-
-    project_schedule = construct_partial_project_schedule(project_spec, problem_spec, map(i->robot_ICs[i], 1:problem_spec.N))
-
-    print_project_schedule(project_schedule,"project_schedule1")
-
-    milp_model = formulate_milp(GreedyAssignment(),project_schedule,problem_spec)
-    optimize!(milp_model)
-    X = get_assignment_matrix(milp_model)
-    @test update_project_schedule!(milp_model,project_schedule,problem_spec,X)
-
-    print_project_schedule(project_schedule,"project_schedule2")
-end
-let
-    # build custom envs for different robot sizes
-    env_id = 2
-    env_file = joinpath(ENVIRONMENT_DIR,string("env_",env_id,".toml"))
-    factory_env = read_env(env_file)
-    dist_matrix = get_dist_matrix(factory_env)
-
-    dist_mtx_map = DistMatrixMap(factory_env.vtx_map,factory_env.vtxs)
-
-    # 27   28   29   30   31   32   33   34
-    # 53   54   55   56   57   58   59   60
-    # 79   80   81    0    0   82   83   84
-    # 97   98   99    0    0  100  101  102
-    # 115  116  117  118  119  120  121  122
-    # 141  142  143  144  145  146  147  148
-    v1 = 79
-    v2 = 82
-    @test get_distance(dist_mtx_map,v1,v2) == dist_matrix[v1,v2]
-    @test get_distance(dist_mtx_map,v1,v2,(1,1)) == dist_matrix[v1,v2]
-    @test get_distance(dist_mtx_map,v1,v2,(1,2)) == dist_matrix[v1,v2]
-    @test get_distance(dist_mtx_map,v1,v2,(2,1)) == dist_matrix[v1,v2] + 2
-    @test get_distance(dist_mtx_map,v1,v2,(2,2)) == dist_matrix[v1,v2] + 2
-
-    v3 = 98
-    v4 = 101
-    config = 4
-    @test get_distance(dist_mtx_map,v3,v4,(2,2),config) == dist_matrix[v1,v2] + 2
-
-end
-# DEBUG Project Schedule seems weird after excluding a solution
-let
-    env_id = 2
-    env_filename = string(ENVIRONMENT_DIR,"/env_",env_id,".toml")
-    factory_env = read_env(env_filename)
-    env_graph = factory_env
-    # dist_matrix = get_dist_matrix(env_graph)
-    dist_mtx_map = factory_env.dist_function # DistMatrixMap(factory_env.vtx_map,factory_env.vtxs)
-
-    problem_dir = joinpath(PROBLEM_DIR,"collaborative_transport/non_zero_collect_time")
-    results_dir = joinpath(EXPERIMENT_DIR,"sparse_adjacency_solver/fixed_A_star_heuristic/results")
-
-    # N_PROBLEMS = 192
-    # for problem_id in 1:N_PROBLEMS
-    #     problem_filename = joinpath(problem_dir,string("problem",problem_id,".toml"))
-    #     assignment_filename = joinpath(results_dir,string(:assignment_only),string("results",problem_id,".toml"))
-    #     # Load the problem
-    #     problem_def = read_problem_def(problem_filename)
-    #     project_spec, r0, s0, sF = problem_def.project_spec,problem_def.r0,problem_def.s0,problem_def.sF
-    #     # @show problem_def.shapes
-    #     # @show map(o->factory_env.expanded_zones[s0[o]][problem_def.shapes[o]], 1:M)
-    #     project_spec, problem_spec, _, _, robot_ICs = construct_task_graphs_problem(
-    #         project_spec, r0, s0, sF,
-    #         dist_mtx_map;
-    #         # Δt_collect=map(i->Δt_collect, s0),
-    #         # Δt_deliver=map(i->Δt_deliver, s0),
-    #         # dist_matrix;
-    #         # cost_function=primary_objective,
-    #         task_shapes=problem_def.shapes,
-    #         shape_dict=factory_env.expanded_zones,
-    #         );
-    #
-    #     solver = PC_TAPF_Solver(start_time=time());
-    #     adj_matrix = read_sparse_matrix(assignment_filename)
-    #     project_schedule = construct_partial_project_schedule(project_spec,problem_spec,robot_ICs)
-    #     milp_model=SparseAdjacencyMILP()
-    #     if !update_project_schedule!(milp_model, project_schedule, problem_spec, adj_matrix)
-    #         @show problem_id
-    #     end
-    # end
-
-    problem_id = 4
-    problem_filename = joinpath(problem_dir,string("problem",problem_id,".toml"))
-    assignment_filename = joinpath(results_dir,string(:assignment_only),string("results",problem_id,".toml"))
-    # Load the problem
-    problem_def = read_problem_def(problem_filename)
-    project_spec, r0, s0, sF = problem_def.project_spec,problem_def.r0,problem_def.s0,problem_def.sF
-    # @show problem_def.shapes
-    # @show map(o->factory_env.expanded_zones[s0[o]][problem_def.shapes[o]], 1:M)
-    project_spec, problem_spec, _, _, robot_ICs = construct_task_graphs_problem(
-        project_spec, r0, s0, sF,
-        dist_mtx_map;
-        # Δt_collect=map(i->Δt_collect, s0),
-        # Δt_deliver=map(i->Δt_deliver, s0),
-        # dist_matrix;
-        # cost_function=primary_objective,
-        task_shapes=problem_def.shapes,
-        shape_dict=factory_env.expanded_zones,
-        );
-
-    solver = PC_TAPF_Solver(start_time=time());
-    milp_model=SparseAdjacencyMILP()
-    project_schedule = construct_partial_project_schedule(project_spec,problem_spec,robot_ICs)
-
-    model = formulate_milp(milp_model,project_schedule,problem_spec)
-
-    exclude_solutions!(model)
-    optimize!(model)
-    adj_matrix = get_assignment_matrix(model)
-    update_project_schedule!(milp_model, project_schedule, problem_spec, adj_matrix)
-
-
-    optimal = (termination_status(model) == MOI.OPTIMAL);
-    feasible = (primal_status(model) == MOI.FEASIBLE_POINT)
-    assignment_matrix = get_assignment_matrix(model)
-    cost = Int(round(value(objective_function(model))))
-    optimality_gap = cost - Int(round(objective_bound(model)))
-
-
-
-    # adj_matrix = read_sparse_matrix(assignment_filename)
-    # if !update_project_schedule!(milp_model, project_schedule, problem_spec, adj_matrix)
-    #     @show problem_id
-    # end
-
-end
+# let
+#     vtx_grid = initialize_dense_vtx_grid(8,8)
+#     # 1   9  17  25  33  41  49  57
+#     # 2  10  18  26  34  42  50  58
+#     # 3  11  19  27  35  43  51  59
+#     # 4  12  20  28  36  44  52  60
+#     # 5  13  21  29  37  45  53  61
+#     # 6  14  22  30  38  46  54  62
+#     # 7  15  23  31  39  47  55  63
+#     # 8  16  24  32  40  48  56  64
+#     env_graph = construct_factory_env_from_vtx_grid(vtx_grid)
+#     # dist_matrix = get_dist_matrix(env_graph)
+#     dist_matrix = DistMatrixMap(env_graph.vtx_map,env_graph.vtxs)
+#     r0 = [1,25,4,29]
+#     # r0 = [1,25,8,28] # check that planning works even when it takes longer for some robots to arrive than others
+#     s0 = [10]#,18,11,19]
+#     sF = [42] #,50,43,51]
+#
+#     task_shapes = Dict(1=>(2,2))
+#     shape_dict = Dict(
+#         10=>Dict((2,2)=>[10,18,11,19]),
+#         42=>Dict((2,2)=>[42,50,43,51]),
+#         )
+#
+#     project_spec, robot_ICs = TaskGraphs.initialize_toy_problem(r0,[s0],[sF],(v1,v2)->dist_matrix[v1,v2])
+#     add_operation!(project_spec,construct_operation(project_spec,-1,[1],[],0))
+#
+#     cost_function = MakeSpan
+#     project_spec, problem_spec, object_ICs, object_FCs, robot_ICs = construct_task_graphs_problem(
+#         project_spec,r0,s0,sF,dist_matrix;cost_function=cost_function,
+#         task_shapes=task_shapes,shape_dict=shape_dict)
+#
+#     solver = PC_TAPF_Solver(
+#         DEBUG=true,
+#         LIMIT_A_star_iterations=5*nv(env_graph),
+#         verbosity=1,
+#         l4_verbosity=1
+#         );
+#
+#     env_id = 2
+#     env_filename = string(ENVIRONMENT_DIR,"/env_",env_id,".toml")
+#     factory_env = read_env(env_filename)
+#     env_graph = factory_env
+#     dist_matrix = get_dist_matrix(env_graph)
+#     dist_mtx_map = DistMatrixMap(factory_env.vtx_map,factory_env.vtxs)
+#
+#     problem_filename = "dummy_problem_dir/problem1.toml"
+#     problem_def = read_problem_def(problem_filename)
+#     project_spec, r0, s0, sF = problem_def.project_spec,problem_def.r0,problem_def.s0,problem_def.sF
+#
+#     project_spec, problem_spec, _, _, robot_ICs = construct_task_graphs_problem(
+#         project_spec, r0, s0, sF,
+#         dist_mtx_map;
+#         task_shapes=problem_def.shapes,
+#         shape_dict=factory_env.expanded_zones,
+#         );
+#     # solution, _, cost, env = high_level_search!(SparseAdjacencyMILP(),solver,env_graph,project_spec,problem_spec,robot_ICs,Gurobi.Optimizer)
+#     # solution, _, cost, env = high_level_search!(GreedyAssignment(),solver,env_graph,project_spec,problem_spec,robot_ICs,Gurobi.Optimizer)
+#
+#     project_schedule = construct_partial_project_schedule(project_spec, problem_spec, map(i->robot_ICs[i], 1:problem_spec.N))
+#
+#     print_project_schedule(project_schedule,"project_schedule1")
+#
+#     milp_model = formulate_milp(GreedyAssignment(),project_schedule,problem_spec)
+#     optimize!(milp_model)
+#     X = get_assignment_matrix(milp_model)
+#     @test update_project_schedule!(milp_model,project_schedule,problem_spec,X)
+#
+#     print_project_schedule(project_schedule,"project_schedule2")
+# end

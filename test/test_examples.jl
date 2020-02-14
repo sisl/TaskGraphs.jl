@@ -1,75 +1,44 @@
 # Root nodes
-let
-    # This project has only two delivery tasks, both of which converge into a
-    # single final project. Here we test that the cost models function correctly,
-    # treating the tasks as part of the same project head rather than as two
-    # separate project heads.
-    project_spec, problem_spec, robot_ICs, assignments, env_graph = initialize_toy_problem_4(;
-        verbose=false);
-    let
-        model = formulate_optimization_problem(problem_spec,Gurobi.Optimizer;cost_model=MakeSpan)
-        optimize!(model)
-        optimal = (termination_status(model) == MathOptInterface.OPTIMAL)
-        optimal_TA_cost = Int(round(value(objective_function(model))));
-        @test optimal == true
-        @test optimal_TA_cost == 2
-    end
-    let
-        model = formulate_optimization_problem(problem_spec,Gurobi.Optimizer;cost_model=SumOfMakeSpans)
-        optimize!(model)
-        optimal = (termination_status(model) == MathOptInterface.OPTIMAL)
-        optimal_TA_cost = Int(round(value(objective_function(model))));
-        @test optimal == true
-        @test optimal_TA_cost == 2
-    end
-end
-# Cost models
-let
-    project_spec, problem_spec, robot_ICs, assignments, env_graph = initialize_toy_problem_8(;
-        verbose=false);
-    let
-        model = formulate_optimization_problem(problem_spec,Gurobi.Optimizer;cost_model=MakeSpan)
-        optimize!(model)
-        optimal = (termination_status(model) == MathOptInterface.OPTIMAL)
-        optimal_TA_cost = Int(round(value(objective_function(model))));
-        @test optimal == true
-        @test optimal_TA_cost == 8
-    end
-    let
-        model = formulate_optimization_problem(problem_spec,Gurobi.Optimizer;cost_model=SumOfMakeSpans)
-        optimize!(model)
-        optimal = (termination_status(model) == MathOptInterface.OPTIMAL)
-        optimal_TA_cost = Int(round(value(objective_function(model))));
-        @test optimal == true
-        @test optimal_TA_cost == 16
+for (f,costs) in [
+        (initialize_toy_problem_4,[2,2]),
+        (initialize_toy_problem_8,[8,16])
+    ]
+    for (i,cost_model) in enumerate([MakeSpan,SumOfMakeSpans])
+        let
+            _, problem_spec, _, _, _ = f(;verbose=false);
+            let
+                model = formulate_optimization_problem(problem_spec,Gurobi.Optimizer;cost_model=cost_model)
+                optimize!(model)
+                optimal = (termination_status(model) == MathOptInterface.OPTIMAL)
+                optimal_TA_cost = Int(round(value(objective_function(model))));
+                @test optimal == true
+                @test optimal_TA_cost == costs[i]
+            end
+        end
     end
 end
 # Station Sharing
 let
-    for (i,true_cost) in zip([0,1,2],[7,8,9])
-        let
-            project_spec, problem_spec, robot_ICs, assignments, env_graph = initialize_toy_problem_9(;
-                verbose=false,Δt_op=0,Δt_collect=[i,0],Δt_deliver=[0,0]
-                );
-            model = formulate_optimization_problem(problem_spec,Gurobi.Optimizer;cost_model=SumOfMakeSpans)
-            optimize!(model)
-            optimal = (termination_status(model) == MathOptInterface.OPTIMAL)
-            optimal_TA_cost = Int(round(value(objective_function(model))));
-            @test optimal_TA_cost == true_cost
-            @test optimal == true
-        end
-    end
-    for (i,true_cost) in zip([0,1,2],[7,8,9])
-        let
-            project_spec, problem_spec, robot_ICs, assignments, env_graph = initialize_toy_problem_9(;
-                verbose=false,Δt_op=0,Δt_collect=[i,0],Δt_deliver=[0,0]
-                );
-            model = formulate_optimization_problem(problem_spec,Gurobi.Optimizer;cost_model=SumOfMakeSpans)
-            optimize!(model)
-            optimal = (termination_status(model) == MathOptInterface.OPTIMAL)
-            optimal_TA_cost = Int(round(value(objective_function(model))));
-            @test optimal_TA_cost == true_cost
-            @test optimal == true
+    for (i, dt) in enumerate([0,1,2])
+        for (cost_model, costs) in [
+            (MakeSpan,[4,5,6])
+            (SumOfMakeSpans,[7,8,9])
+            ]
+            let
+                # i = 0
+                # cost_model = SumOfMakeSpans
+                project_spec, problem_spec, robot_ICs, assignments, env_graph = initialize_toy_problem_9(;
+                    verbose=false,Δt_op=0,Δt_collect=[dt,0],Δt_deliver=[0,0]
+                    );
+                model = formulate_optimization_problem(problem_spec,Gurobi.Optimizer;cost_model=cost_model)
+                optimize!(model)
+                optimal = (termination_status(model) == MathOptInterface.OPTIMAL)
+                optimal_TA_cost = Int(round(value(objective_function(model))));
+                # @show optimal_TA_cost
+                @show i, cost_model
+                @test optimal == true
+                @test optimal_TA_cost == costs[i]
+            end
         end
     end
 end

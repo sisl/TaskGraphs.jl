@@ -261,7 +261,7 @@ COLLECT(r::RobotID,o::ObjectID,x::Int) 	= COLLECT(r,o,StationID(x))
     x::StationID 	= StationID()
 end
 DEPOSIT(r::Int,args...) 				= DEPOSIT(RobotID(r),args...)
-DEPOSIT(r::RobotID,o::Int,) 			= DEPOSIT(r,ObjectID(o),args...)
+DEPOSIT(r::RobotID,o::Int,args...) 			= DEPOSIT(r,ObjectID(o),args...)
 DEPOSIT(r::RobotID,o::ObjectID,x::Int) 	= DEPOSIT(r,o,StationID(x))
 
 get_initial_location_id(a::A) where {A<:Union{GO,CARRY}}        						= a.x1

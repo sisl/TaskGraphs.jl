@@ -1,7 +1,3 @@
-# Ensure that process_schedule works correctly on this matter
-let
-
-end
 # Non-zero process time
 let
     """
@@ -51,7 +47,7 @@ let
         node = initialize_root_node(pc_mapf);
         solver = PC_TAPF_Solver(verbosity=2)
 
-        solution, assignment, cost, search_env = high_level_search!(solver, env_graph, project_spec, problem_spec, robot_ICs, Gurobi.Optimizer);
+        solution, assignment, cost, search_env = high_level_search!(AssignmentMILP(),solver, env_graph, project_spec, problem_spec, robot_ICs, Gurobi.Optimizer);
         path1 = convert_to_vertex_lists(solution.paths[1])
         path2 = convert_to_vertex_lists(solution.paths[2])
         @show path1

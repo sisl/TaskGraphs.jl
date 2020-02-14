@@ -24,7 +24,7 @@ let
     n2 = COLLECT(-1,3,4)
     n = align_with_predecessor(n2,n1)
     @test n.o == n1.o
-    @test n.x == n1.x
+    @test n.x == n1.x[1]
 end
 let
     n1 = COLLECT(1,2,3)

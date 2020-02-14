@@ -77,7 +77,9 @@ function initialize_toy_problem_1(;cost_function=SumOfMakeSpans,verbose=false)
     project_spec, robot_ICs = initialize_toy_problem(r0,s0,sF,(v1,v2)->dist_matrix[v1,v2])
     add_operation!(project_spec,construct_operation(project_spec,-1,[1,2],[3],0))
     add_operation!(project_spec,construct_operation(project_spec,-1,[3],  [], 0))
-    assignments = [1,2,3]
+    assignment_dict = Dict(1=>[1,3],2=>[2])
+    assignments = [1,2,1]
+    # assignments = [1,2,3]
 
     project_spec, problem_spec, object_ICs, object_FCs, robot_ICs = construct_task_graphs_problem(
         project_spec,r0,s0,sF,dist_matrix;cost_function=cost_function)
@@ -112,7 +114,9 @@ function initialize_toy_problem_2(;cost_function=SumOfMakeSpans,verbose=false)
     project_spec, robot_ICs = initialize_toy_problem(r0,s0,sF,(v1,v2)->dist_matrix[v1,v2])
     add_operation!(project_spec,construct_operation(project_spec,-1,[1,2],[3],0))
     add_operation!(project_spec,construct_operation(project_spec,-1,[3],  [], 0))
-    assignments = [1,2,3]
+    # assignments = [1,2,3]
+    assignment_dict = Dict(1=>[1,3],2=>[2])
+    assignments = [1,2,1]
 
     project_spec, problem_spec, object_ICs, object_FCs, robot_ICs = construct_task_graphs_problem(
         project_spec,r0,s0,sF,dist_matrix;cost_function=cost_function)
@@ -160,7 +164,9 @@ function initialize_toy_problem_3(;cost_function=SumOfMakeSpans,verbose=false,Δ
     project_spec, robot_ICs = initialize_toy_problem(r0,s0,sF,(v1,v2)->dist_matrix[v1,v2])
     add_operation!(project_spec,construct_operation(project_spec,-1,[1,2],[3],0.0))
     add_operation!(project_spec,construct_operation(project_spec,-1,[3],  [], 0.0))
-    assignments = [1,2,3]
+    # assignments = [1,2,3]
+    assignment_dict = Dict(1=>[1,3],2=>[2])
+    assignments = [1,2,1]
 
     project_spec, problem_spec, object_ICs, object_FCs, robot_ICs = construct_task_graphs_problem(
         project_spec,r0,s0,sF,dist_matrix;Δt_collect=Δt_collect,Δt_deliver=Δt_deliver,cost_function=cost_function)
@@ -208,6 +214,8 @@ function initialize_toy_problem_4(;cost_function=SumOfMakeSpans,verbose=false)
 
     project_spec, robot_ICs = initialize_toy_problem(r0,s0,sF,(v1,v2)->dist_matrix[v1,v2])
     add_operation!(project_spec,construct_operation(project_spec,-1,[1,2],[],0))
+    # assignments = [1,2]
+    assignment_dict = Dict(1=>[1],2=>[2])
     assignments = [1,2]
 
     project_spec, problem_spec, object_ICs, object_FCs, robot_ICs = construct_task_graphs_problem(project_spec,r0,s0,sF,dist_matrix;cost_function=cost_function)
@@ -260,6 +268,8 @@ function initialize_toy_problem_5(;cost_function=SumOfMakeSpans,verbose=false)
 
     project_spec, robot_ICs = initialize_toy_problem(r0,s0,sF,(v1,v2)->dist_matrix[v1,v2])
     add_operation!(project_spec,construct_operation(project_spec,-1,[1,2],[],0))
+    # assignments = [1,2]
+    assignment_dict = Dict(1=>[1],2=>[2])
     assignments = [1,2]
 
     project_spec, problem_spec, object_ICs, object_FCs, robot_ICs = construct_task_graphs_problem(project_spec,r0,s0,sF,dist_matrix;cost_function=cost_function)
@@ -305,7 +315,9 @@ function initialize_toy_problem_6(;cost_function=SumOfMakeSpans,verbose=false,Δ
     project_spec, robot_ICs = initialize_toy_problem(r0,s0,sF,(v1,v2)->dist_matrix[v1,v2])
     add_operation!(project_spec,construct_operation(project_spec,-1,[1,2],[3],Δt_op))
     add_operation!(project_spec,construct_operation(project_spec,-1,[3],  [], Δt_op))
-    assignments = [1,2,3]
+    # assignments = [1,2,3]
+    assignment_dict = Dict(1=>[1,3],2=>[2])
+    assignments = [1,2,1]
 
     project_spec, problem_spec, object_ICs, object_FCs, robot_ICs = construct_task_graphs_problem(project_spec,r0,s0,sF,dist_matrix;Δt_collect=Δt_collect,Δt_deliver=Δt_deliver,cost_function=cost_function)
     if verbose
@@ -336,7 +348,9 @@ function initialize_toy_problem_7(;cost_function=SumOfMakeSpans,verbose=false,Δ
     project_spec, robot_ICs = initialize_toy_problem(r0,s0,sF,(v1,v2)->dist_matrix[v1,v2])
     add_operation!(project_spec,construct_operation(project_spec,-1,[1,2],[3],Δt_op))
     add_operation!(project_spec,construct_operation(project_spec,-1,[3],  [], Δt_op))
-    assignments = [1,2,3]
+    # assignments = [1,2,3]
+    assignment_dict = Dict(1=>[1,3],2=>[2])
+    assignments = [1,2,1]
 
     project_spec, problem_spec, object_ICs, object_FCs, robot_ICs = construct_task_graphs_problem(project_spec,r0,s0,sF,dist_matrix;Δt_collect=Δt_collect,Δt_deliver=Δt_deliver,cost_function=cost_function)
     if verbose
@@ -368,7 +382,9 @@ function initialize_toy_problem_8(;cost_function=SumOfMakeSpans,verbose=false,Δ
     add_operation!(project_spec,construct_operation(project_spec,-1,[2],[3],Δt_op))
     add_operation!(project_spec,construct_operation(project_spec,-1,[4],[],Δt_op))
     add_operation!(project_spec,construct_operation(project_spec,-1,[3],[],Δt_op))
-    assignments = [1,2,3,4]
+    # assignments = [1,2,3,4]
+    assignment_dict = Dict(1=>[1,3],2=>[2,4])
+    assignments = [1,2,1,2]
 
     project_spec, problem_spec, object_ICs, object_FCs, robot_ICs = construct_task_graphs_problem(project_spec,r0,s0,sF,dist_matrix;Δt_collect=Δt_collect,Δt_deliver=Δt_deliver,cost_function=cost_function)
 
@@ -401,6 +417,8 @@ function initialize_toy_problem_9(;cost_function=SumOfMakeSpans,verbose=false,Δ
     add_operation!(project_spec,construct_operation(project_spec,-1,[1],[],Δt_op))
     add_operation!(project_spec,construct_operation(project_spec,-1,[2],[],Δt_op))
     project_spec, problem_spec, object_ICs, object_FCs, robot_ICs = construct_task_graphs_problem(project_spec,r0,s0,sF,dist_matrix;Δt_collect=Δt_collect,Δt_deliver=Δt_deliver,cost_function=cost_function)
+    # assignments = [1,2]
+    assignment_dict = Dict(1=>[1],2=>[2])
     assignments = [1,2]
 
     if verbose
