@@ -273,35 +273,39 @@ let
     env_graph = factory_env
     dist_matrix = get_dist_matrix(env_graph)
 
-    # problem_def = read_problem_def(joinpath(PROBLEM_DIR,"problem223.toml"))
-    problem_id = 25
-    problem_def = read_problem_def(joinpath(PROBLEM_DIR,string("problem",problem_id,".toml")))
-    # length(problem_def.r0), length(problem_def.s0)
-    project_spec, r0, s0, sF = problem_def.project_spec,problem_def.r0,problem_def.s0,problem_def.sF
+
+    # generate random problem sequence
+    Random.seed!(0)
+    N = 4
+    M = 6
+    max_parents = 3
+    depth_bias = 0.4
+    Δt_min = 0
+    Δt_max = 0
+    task_sizes = (1=>1.0,2=>0.0,4=>0.0) # all single agent tasks for now
+
+    project_list = SimpleProblemDef[]
+    for i in 1:10
+        r0,s0,sF = get_random_problem_instantiation(N,M,get_pickup_zones(factory_env),get_dropoff_zones(factory_env),
+                get_free_zones(factory_env))
+        project_spec = construct_random_project_spec(M,s0,sF;max_parents=max_parents,depth_bias=depth_bias,Δt_min=Δt_min,Δt_max=Δt_max)
+        shapes = choose_random_object_sizes(M,Dict(task_sizes...))
+        push!(project_list, SimpleProblemDef(project_spec,r0,s0,sF,shapes))
+    end
+
+    def1 = project_list[1]
+    def2 = project_list[2]
+
+    project_spec, r0, s0, sF = def1.project_spec,def1.r0,def1.s0,def1.sF
     project_spec, problem_spec, object_ICs, object_FCs, robot_ICs = construct_task_graphs_problem(
             project_spec, r0, s0, sF, dist_matrix);
+
+    project_spec2, problem_spec2, _, _, _ = construct_task_graphs_problem(def2.project_spec, def2.r0, def2.s0, def2.sF, dist_matrix);
+    next_schedule = construct_partial_project_schedule(project_spec2,problem_spec2)
 
     solver = PC_TAPF_Solver(DEBUG=true,verbosity=1,LIMIT_A_star_iterations=5*nv(env_graph));
     (solution, assignment, cost, search_env), elapsed_time, byte_ct, gc_time, mem_ct = @timed high_level_search!(
         SparseAdjacencyMILP(), solver, env_graph, project_spec, problem_spec, robot_ICs, Gurobi.Optimizer;)
-
-    # project_schedule = construct_partial_project_schedule(project_spec,problem_spec,map(i->robot_ICs[i], 1:problem_spec.N))
-    # model = formulate_milp(SparseAdjacencyMILP(),project_schedule,problem_spec;Presolve=1,TimeLimit=0.5)
-    # exclude_solutions!(model)
-    # retval, elapsed_time, byte_ct, gc_time, mem_ct = @timed optimize!(model)
-    # @show elapsed_time
-    # @show primal_status(model)
-    # @show dual_status(model)
-    # @show objective_bound(model), value(objective_function(model))
-    # @test termination_status(model) == MathOptInterface.OPTIMAL
-    # assignment_matrix = get_assignment_matrix(model);
-    # update_project_schedule!(project_schedule,problem_spec,assignment_matrix)
-    # @test validate(project_schedule)
-    # @test project_schedule.graph == DiGraph(assignment_matrix)
-    # cache = initialize_planning_cache(project_schedule)
-
-    # env, mapf = construct_search_env(project_schedule, problem_spec, env_graph);
-    # pc_mapf = PC_MAPF(env,mapf);
 
     project_schedule = search_env.schedule
     cache = search_env.cache
@@ -345,10 +349,6 @@ let
 
 
     #### New Project schedule to splice in:
-    problem_id2 = problem_id + 1
-    def2 = read_problem_def(joinpath(PROBLEM_DIR,string("problem",problem_id2,".toml")))
-    project_spec2, problem_spec2, _, _, _ = construct_task_graphs_problem(def2.project_spec, def2.r0, def2.s0, def2.sF, dist_matrix);
-    next_schedule = construct_partial_project_schedule(project_spec2,problem_spec2)
 
     # remap object ids
     max_obj_id = maximum([get_id(id) for id in get_vtx_ids(project_schedule) if typeof(id) <: ObjectID])
