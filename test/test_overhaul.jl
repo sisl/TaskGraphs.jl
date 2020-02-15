@@ -309,12 +309,12 @@ let
     # project_spec, r0, s0, sF = def.project_spec,def.r0,def.s0,def.sF
     # project_spec, problem_spec, object_ICs, object_FCs, robot_ICs = construct_task_graphs_problem(
     #         project_spec, r0, s0, sF, dist_matrix);
+    # (solution, assignment, cost, search_env), elapsed_time, byte_ct, gc_time, mem_ct = @timed high_level_search!(
+    #     SparseAdjacencyMILP(), solver, env_graph, project_spec, problem_spec, robot_ICs, Gurobi.Optimizer;)
+    # project_schedule = search_env.schedule
+    # cache = search_env.cache
     # while idx < length(project_list)
     #     # plan for current project
-    #     (solution, assignment, cost, search_env), elapsed_time, byte_ct, gc_time, mem_ct = @timed high_level_search!(
-    #         SparseAdjacencyMILP(), solver, env_graph, project_spec, problem_spec, robot_ICs, Gurobi.Optimizer;)
-    #     project_schedule = search_env.schedule
-    #     cache = search_env.cache
     #     idx += 1
     #     #### load next project
     #     def = project_list[idx]
@@ -341,11 +341,18 @@ let
     #         add_edge!(new_schedule, node_id1, node_id2)
     #     end
     #     set_leaf_operation_nodes!(new_schedule)
-    #     # do this again because now we have more nodes
+    #     # update cache
     #     t0 = map(v->get(new_cache.t0, v, t_arrival), vertices(get_graph(new_schedule)))
     #     new_cache = initialize_planning_cache(new_schedule;t0=t0)
     #
+    #     solution, assignment, cost, env  = high_level_search!(solver, env_graph, new_schedule, problem_spec, Gurobi.Optimizer;
+    #         milp_model=SparseAdjacencyMILP(),
+    #         t0_ = Dict{AbstractID,Int}(get_vtx_id(new_schedule, v)=>t0 for (v,t0) in enumerate(new_cache.t0))
+    #     )
+    #     project_schedule = search_env.schedule
+    #     cache = search_env.cache
     # end
+
 
     def1 = project_list[1]
 
@@ -363,7 +370,6 @@ let
     @test validate(project_schedule)
 
     print_project_schedule(project_schedule,"project_schedule";mode=:leaf_aligned)
-
 
     t = 30
     t_arrival = t
@@ -406,9 +412,11 @@ let
 
     #### Next Project schedule to splice in:
     def2 = project_list[2]
-    # project_spec2, problem_spec2, _, _, _ = construct_task_graphs_problem(def2.project_spec, def2.r0, def2.s0, def2.sF, dist_matrix);
-    # next_schedule = construct_partial_project_schedule(project_spec2,problem_spec2)
-    next_schedule = construct_partial_project_schedule(def2.project_spec,problem_spec)
+    project_spec2, problem_spec2, _, _, _ = construct_task_graphs_problem(
+        def2, dist_matrix, shape_dict=factory_env.expanded_zones);
+    next_schedule = construct_partial_project_schedule(project_spec2,problem_spec2)
+    # next_schedule = construct_partial_project_schedule(def2.project_spec,problem_spec)
+    set_leaf_operation_nodes!(next_schedule)
 
     print_project_schedule(next_schedule,"next_schedule";mode=:leaf_aligned)
 
@@ -435,13 +443,18 @@ let
         add_edge!(new_schedule, node_id1, node_id2)
     end
     set_leaf_operation_nodes!(new_schedule)
+    G = get_graph(new_schedule)
     # do this again because now we have more nodes
     t0 = map(v->get(new_cache.t0, v, t_arrival), vertices(G))
     new_cache = initialize_planning_cache(new_schedule;t0=t0)
 
     print_project_schedule(new_schedule,"spliced_schedule";mode=:leaf_aligned)
 
-    model = formulate_milp(SparseAdjacencyMILP(),new_schedule,problem_spec)
+    new_schedule_copy = deepcopy(new_schedule)
+
+    model = formulate_milp(SparseAdjacencyMILP(),new_schedule,problem_spec;
+        t0_ = Dict{AbstractID,Int}(get_vtx_id(new_schedule, v)=>t0 for (v,t0) in enumerate(new_cache.t0))
+        )
     optimize!(model)
     @test termination_status(model) == MOI.OPTIMAL
     @show Int(round(value(objective_function(model))))
@@ -452,7 +465,11 @@ let
 
     print_project_schedule(new_schedule,"updated_schedule";mode=:leaf_aligned)
 
-    solution, assignment, cost, env  = high_level_search!(solver, env_graph, new_schedule, problem_spec, Gurobi.Optimizer;
+    # TODO Pass the final solution
+    solver = PC_TAPF_Solver(DEBUG=true,l1_verbosity=1,LIMIT_A_star_iterations=5*nv(env_graph));
+    solution, assignment, cost, env  = high_level_search!(solver, env_graph, new_schedule_copy, problem_spec, Gurobi.Optimizer;
+        cost_model=SumOfMakeSpans,
+        # cost_model=MakeSpan,
         milp_model=SparseAdjacencyMILP(),
         t0_ = Dict{AbstractID,Int}(get_vtx_id(new_schedule, v)=>t0 for (v,t0) in enumerate(new_cache.t0))
     )

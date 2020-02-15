@@ -338,15 +338,20 @@ export
 
 const State = PCCBS.State
 const Action = PCCBS.Action
-@with_kw struct SearchEnv{C,E<:AbstractLowLevelEnv{PCCBS.State,PCCBS.Action,C}} <: AbstractLowLevelEnv{PCCBS.State,PCCBS.Action,C}
+@with_kw struct SearchEnv{C,E<:AbstractLowLevelEnv{State,Action,C},S<:LowLevelSolution} <: AbstractLowLevelEnv{State,Action,C}
     schedule::ProjectSchedule       = ProjectSchedule()
     cache::PlanningCache            = PlanningCache()
     env::E                          = PCCBS.LowLevelEnv()
     problem_spec::ProblemSpec       = ProblemSpec()
-    dist_function::DistMatrixMap    = env.graph.dist_function #DistMatrixMap(env.graph.vtx_map, env.graph.vtxs)
-    # solution::S                     = LowLevelSolution{}
+    dist_function::DistMatrixMap    = env.graph.dist_function # DistMatrixMap(env.graph.vtx_map, env.graph.vtxs)
     cost_model::C                   = get_cost_model(env)
     num_agents::Int                 = -1
+    # solution::S                     = LowLevelSolution(
+    #     paths = map(i->Path{State,Action,get_cost_type(cost_model)}(), 1:num_agents),
+    #     cost_model = cost_model,
+    #     costs = map(p->get_cost(p), paths),
+    #     cost  = aggregate_costs(cost_model, costs),
+    #     )
 end
 function CRCBS.get_start(env::SearchEnv,v::Int)
     start_vtx   = get_path_spec(env.schedule,v).start_vtx
@@ -408,6 +413,13 @@ end
 function construct_search_env(project_spec, problem_spec, robot_ICs, assignments, env_graph;kwargs...)
     schedule = construct_project_schedule(project_spec, problem_spec, robot_ICs, assignments)
     construct_search_env(schedule, problem_spec, env_graph;kwargs...)
+end
+
+
+struct PC_TAPF{L<:LowLevelSolution}
+    env::GridFactoryEnvironment
+    schedule::ProjectSchedule
+    initial_solution::L             # initial condition
 end
 
 function default_pc_tapf_solution(N::Int;extra_T=400)
@@ -750,6 +762,7 @@ end
 export
     PC_MAPF
 
+
 """
     `PC_MAPF`
 
@@ -932,6 +945,7 @@ export
 """
 function high_level_search!(solver::P, env_graph, project_schedule::ProjectSchedule, problem_spec,  optimizer;
         milp_model=AdjacencyMILP(),
+        initial_solution=nothing,
         primary_objective=SumOfMakeSpans,
         kwargs...) where {P<:PC_TAPF_Solver}
 
@@ -1131,6 +1145,20 @@ function prune_project_schedule(project_schedule::ProjectSchedule,cache::Plannin
     # @assert all(s3 .> 0)
 
     new_schedule, new_cache
+end
+
+function splice_schedules!(project_schedule::P,next_schedule::P) where {P<:ProjectSchedule}
+    for v in vertices(get_graph(next_schedule))
+        node_id = get_vtx_id(next_schedule, v)
+        add_to_schedule!(project_schedule, get_node_from_id(next_schedule, node_id), node_id)
+    end
+    for e in edges(get_graph(next_schedule))
+        node_id1 = get_vtx_id(next_schedule, e.src)
+        node_id2 = get_vtx_id(next_schedule, e.dst)
+        add_edge!(project_schedule, node_id1, node_id2)
+    end
+    set_leaf_operation_nodes!(project_schedule)
+    project_schedule
 end
 
 """

@@ -230,6 +230,13 @@ function construct_task_graphs_problem(
     return new_project_spec, problem_spec, object_ICs, object_FCs, robot_ICs
 end
 function construct_task_graphs_problem(
+        def::SimpleProblemDef,
+        dist_matrix;
+        task_shapes=def.shapes,
+        kwargs...)
+    construct_task_graphs_problem(def.project_spec,def.r0,def.s0,def.sF,dist_matrix;task_shapes=task_shapes,kwargs...)
+end
+function construct_task_graphs_problem(
         operations::Vector{Operation},
         robot_ICs::Vector{ROBOT_AT},
         object_ICs::Vector{OBJECT_AT},
