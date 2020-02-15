@@ -363,7 +363,7 @@ function robots_vs_task_vs_time_box_plot(df;
                     minor_label_font="CMU Serif", minor_label_font_size=small_font,
                     key_title_font="CMU Serif", key_title_font_size=small_font,
                     key_label_font="CMU Serif", key_label_font_size=small_font)
-    
+
     plot(df, xgroup=xgroup, x=x, y=y, color=color,
         Geom.subplot_grid(
             Geom.boxplot(;suppress_outliers=false),
@@ -470,7 +470,7 @@ function preprocess_collab_results!(df_dict)
             )
         push!(task_ratios, task_sizes)
     end
-    
+
     for (k,df) in df_dict
         if nrow(df) > 0
             begin df[!,:depth_bias_string] = string.(df.depth_bias)
@@ -507,7 +507,7 @@ function plot_collab_runtimes(df;
                     minor_label_font="CMU Serif", minor_label_font_size=small_font,
                     key_title_font="CMU Serif", key_title_font_size=small_font,
                     key_label_font="CMU Serif", key_label_font_size=small_font)
-    
+
     plot(df, xgroup=xgroup, x=x, y=y, color=x,
         Geom.subplot_grid(
             Geom.boxplot(;suppress_outliers=suppress_outliers),
@@ -517,7 +517,7 @@ function plot_collab_runtimes(df;
             ),
         Guide.title(title),
         Guide.colorkey(title="num tasks", labels=["12","18","24"], pos=[0.1w,-0.32h]),
-#         Scale.group_discrete(labels=M->string(M," Tasks"),levels=[1,2,3,4]),
+        # Scale.group_discrete(labels=M->string(M," Tasks"),levels=[1,2,3,4]),
         Guide.xlabel("task ratio"),
         Guide.ylabel("computation time (s)"),
         scale_y,
@@ -540,8 +540,8 @@ function plot_collab_counts(df;
         ],
         key=df.optimal
     )
-    
-    
+
+
     opt_df = DataFrame( M = Int[], task_ratio = Int[], num_no = Int[], num_yes = Int[] )
 
     for (i,ratio) in enumerate(task_ratios)
@@ -560,12 +560,12 @@ function plot_collab_counts(df;
     begin opt_df[!,:M_string] = string.(opt_df.M)
         opt_df
     end
-    
+
     latex_fonts = Theme(major_label_font="CMU Serif", major_label_font_size=big_font,
                     minor_label_font="CMU Serif", minor_label_font_size=small_font,
                     key_title_font="CMU Serif", key_title_font_size=small_font,
                     key_label_font="CMU Serif", key_label_font_size=small_font)
-    
+
     plot(opt_df, xgroup=:task_ratio, x=:M_string, y=:num_no, color=:M_string,
         Geom.subplot_grid(
             Geom.bar,
@@ -650,4 +650,40 @@ function get_node_text(search_env::SearchEnv,graph,v,x,y,r)
     cache = search_env.cache
     v_ = get_prop(graph,v,:vtx_id)
     string(cache.t0[v_]," - ",cache.tF[v_],"\n",cache.local_slack[v_]," - ",cache.slack[v_])
+end
+
+function show_times(sched,v)
+    arr = process_schedule(sched)
+    return string(map(a->string(a[v],","), arr[1:2])...)
+end
+function print_project_schedule(project_schedule,filename;mode=:root_aligned,verbose=true)
+    rg = get_display_metagraph(project_schedule;
+        f=(v,p)->string(v,",",get_path_spec(project_schedule,v).agent_id))
+    plot_graph_bfs(rg;
+        mode=mode,
+        shape_function = (G,v,x,y,r)->Compose.circle(x,y,r),
+        color_function = (G,v,x,y,r)->get_prop(G,v,:color),
+        text_function = (G,v,x,y,r)->string(
+            title_string(get_node_from_id(project_schedule, get_vtx_id(project_schedule, v)),verbose),
+            "\n",show_times(project_schedule,v)
+            )
+    ) |> Compose.SVG(string(filename,".svg"))
+    # `inkscape -z project_schedule1.svg -e project_schedule1.png`
+    # OR: `for f in *.svg; do inkscape -z $f -e $f.png; done`
+end
+function print_project_schedule(project_schedule,model,filename;mode=:root_aligned,verbose=true)
+    rg = get_display_metagraph(project_schedule;
+        f=(v,p)->string(v,",",get_path_spec(project_schedule,v).agent_id))
+    plot_graph_bfs(rg;
+        mode=mode,
+        shape_function = (G,v,x,y,r)->Compose.circle(x,y,r),
+        color_function = (G,v,x,y,r)->get_prop(G,v,:color),
+        text_function = (G,v,x,y,r)->string(
+            title_string(get_node_from_id(project_schedule, get_vtx_id(project_schedule, v)),verbose),
+            "\n",show_times(project_schedule,v),
+            "-",Int(round(value(model[:t0][v]))),",",Int(round(value(model[:tF][v])))
+            )
+    ) |> Compose.SVG(string(filename,".svg"))
+    # `inkscape -z project_schedule1.svg -e project_schedule1.png`
+    # OR: `for f in *.svg; do inkscape -z $f -e $f.png; done`
 end

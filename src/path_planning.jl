@@ -1098,7 +1098,39 @@ function prune_project_schedule(project_schedule::ProjectSchedule,cache::Plannin
             add_edge!(new_schedule, robot_id, node_id)
         end
     end
-    new_schedule
+    set_leaf_operation_nodes!(new_schedule)
+    ################################################################3
+    ################################################################3
+    ################################################################3
+    # init planning cache with the existing solution
+    G = get_graph(new_schedule)
+    t0 = map(v->get(cache.t0, get_vtx(project_schedule, get_vtx_id(new_schedule, v)), 0.0), vertices(G))
+    new_cache = initialize_planning_cache(new_schedule;t0=t0)
+    # identify active and fixed nodes
+    active_vtxs = Set{Int}()
+    fixed_vtxs = Set{Int}()
+    for v in vertices(G)
+        if new_cache.tF[v] < t
+            push!(fixed_vtxs, v)
+        elseif new_cache.t0[v] <= t <= new_cache.tF[v] # test if vertex is eligible to be dropped
+            node_id = get_vtx_id(new_schedule,v)
+            push!(active_vtxs, v)
+            for e in edges(bfs_tree(G,v;dir=:in))
+                push!(fixed_vtxs, e.dst)
+            end
+        end
+    end
+    # set all fixed_vtxs to plan_path=false
+    for v in fixed_vtxs
+        set_path_spec!(new_schedule,v,PathSpec(get_path_spec(new_schedule,v), plan_path=false, fixed=true))
+    end
+    # verify that all vertices following active_vtxs have a start time > 0
+    # s1 = map(v->new_cache.t0[v], collect(fixed_vtxs))
+    # s2 = map(v->new_cache.t0[v], collect(active_vtxs))
+    # s3 = map(v->new_cache.t0[v], collect(setdiff(collect(vertices(G)),union(fixed_vtxs,active_vtxs))))
+    # @assert all(s3 .> 0)
+
+    new_schedule, new_cache
 end
 
 """

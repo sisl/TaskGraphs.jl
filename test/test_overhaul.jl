@@ -14,42 +14,42 @@ using Compose
 
 # load rendering tools
 include(joinpath(pathof(TaskGraphs),"../..","test/notebooks/render_tools.jl"))
-
-function show_times(sched,v)
-    arr = process_schedule(sched)
-    return string(map(a->string(a[v],","), arr[1:2])...)
-end
-function print_project_schedule(project_schedule,filename;mode=:root_aligned,verbose=true)
-    rg = get_display_metagraph(project_schedule;
-        f=(v,p)->string(v,",",get_path_spec(project_schedule,v).agent_id))
-    plot_graph_bfs(rg;
-        mode=mode,
-        shape_function = (G,v,x,y,r)->Compose.circle(x,y,r),
-        color_function = (G,v,x,y,r)->get_prop(G,v,:color),
-        text_function = (G,v,x,y,r)->string(
-            title_string(get_node_from_id(project_schedule, get_vtx_id(project_schedule, v)),verbose),
-            "\n",show_times(project_schedule,v)
-            )
-    ) |> Compose.SVG(string(filename,".svg"))
-    # `inkscape -z project_schedule1.svg -e project_schedule1.png`
-    # OR: `for f in *.svg; do inkscape -z $f -e $f.png; done`
-end
-function print_project_schedule(project_schedule,model,filename;mode=:root_aligned,verbose=true)
-    rg = get_display_metagraph(project_schedule;
-        f=(v,p)->string(v,",",get_path_spec(project_schedule,v).agent_id))
-    plot_graph_bfs(rg;
-        mode=mode,
-        shape_function = (G,v,x,y,r)->Compose.circle(x,y,r),
-        color_function = (G,v,x,y,r)->get_prop(G,v,:color),
-        text_function = (G,v,x,y,r)->string(
-            title_string(get_node_from_id(project_schedule, get_vtx_id(project_schedule, v)),verbose),
-            "\n",show_times(project_schedule,v),
-            "-",Int(round(value(model[:t0][v]))),",",Int(round(value(model[:tF][v])))
-            )
-    ) |> Compose.SVG(string(filename,".svg"))
-    # `inkscape -z project_schedule1.svg -e project_schedule1.png`
-    # OR: `for f in *.svg; do inkscape -z $f -e $f.png; done`
-end
+# for f in *.svg; do inkscape -z $f -e $f.png; done
+# function show_times(sched,v)
+#     arr = process_schedule(sched)
+#     return string(map(a->string(a[v],","), arr[1:2])...)
+# end
+# function print_project_schedule(project_schedule,filename;mode=:root_aligned,verbose=true)
+#     rg = get_display_metagraph(project_schedule;
+#         f=(v,p)->string(v,",",get_path_spec(project_schedule,v).agent_id))
+#     plot_graph_bfs(rg;
+#         mode=mode,
+#         shape_function = (G,v,x,y,r)->Compose.circle(x,y,r),
+#         color_function = (G,v,x,y,r)->get_prop(G,v,:color),
+#         text_function = (G,v,x,y,r)->string(
+#             title_string(get_node_from_id(project_schedule, get_vtx_id(project_schedule, v)),verbose),
+#             "\n",show_times(project_schedule,v)
+#             )
+#     ) |> Compose.SVG(string(filename,".svg"))
+#     # `inkscape -z project_schedule1.svg -e project_schedule1.png`
+#     # OR: `for f in *.svg; do inkscape -z $f -e $f.png; done`
+# end
+# function print_project_schedule(project_schedule,model,filename;mode=:root_aligned,verbose=true)
+#     rg = get_display_metagraph(project_schedule;
+#         f=(v,p)->string(v,",",get_path_spec(project_schedule,v).agent_id))
+#     plot_graph_bfs(rg;
+#         mode=mode,
+#         shape_function = (G,v,x,y,r)->Compose.circle(x,y,r),
+#         color_function = (G,v,x,y,r)->get_prop(G,v,:color),
+#         text_function = (G,v,x,y,r)->string(
+#             title_string(get_node_from_id(project_schedule, get_vtx_id(project_schedule, v)),verbose),
+#             "\n",show_times(project_schedule,v),
+#             "-",Int(round(value(model[:t0][v]))),",",Int(round(value(model[:tF][v])))
+#             )
+#     ) |> Compose.SVG(string(filename,".svg"))
+#     # `inkscape -z project_schedule1.svg -e project_schedule1.png`
+#     # OR: `for f in *.svg; do inkscape -z $f -e $f.png; done`
+# end
 
 let
 
@@ -284,8 +284,12 @@ let
     Δt_max = 0
     task_sizes = (1=>1.0,2=>0.0,4=>0.0) # all single agent tasks for now
 
+################################################################################
+############################## Define Project List #############################
+################################################################################
+    stream_length = 10
     project_list = SimpleProblemDef[]
-    for i in 1:10
+    for i in 1:stream_length
         r0,s0,sF = get_random_problem_instantiation(N,M,get_pickup_zones(factory_env),get_dropoff_zones(factory_env),
                 get_free_zones(factory_env))
         project_spec = construct_random_project_spec(M,s0,sF;max_parents=max_parents,depth_bias=depth_bias,Δt_min=Δt_min,Δt_max=Δt_max)
@@ -293,15 +297,62 @@ let
         push!(project_list, SimpleProblemDef(project_spec,r0,s0,sF,shapes))
     end
 
+    arrival_interval = 50 # amount of timesteps between arrival of new projects in factory
+    commit_threshold = 20 # give solver 20 timesteps to solve the new problem
+
+################################################################################
+############################## Simulate Replanning #############################
+################################################################################
+    # solver = PC_TAPF_Solver(DEBUG=true,verbosity=1,LIMIT_A_star_iterations=5*nv(env_graph));
+    # idx = 1
+    # def = project_list[idx]
+    # project_spec, r0, s0, sF = def.project_spec,def.r0,def.s0,def.sF
+    # project_spec, problem_spec, object_ICs, object_FCs, robot_ICs = construct_task_graphs_problem(
+    #         project_spec, r0, s0, sF, dist_matrix);
+    # while idx < length(project_list)
+    #     # plan for current project
+    #     (solution, assignment, cost, search_env), elapsed_time, byte_ct, gc_time, mem_ct = @timed high_level_search!(
+    #         SparseAdjacencyMILP(), solver, env_graph, project_spec, problem_spec, robot_ICs, Gurobi.Optimizer;)
+    #     project_schedule = search_env.schedule
+    #     cache = search_env.cache
+    #     idx += 1
+    #     #### load next project
+    #     def = project_list[idx]
+    #     next_schedule = construct_partial_project_schedule(def.project_spec,problem_spec)
+    #     # remap object ids
+    #     max_obj_id = maximum([get_id(id) for id in get_vtx_ids(project_schedule) if typeof(id) <: ObjectID])
+    #     remap_object_ids!(next_schedule, max_obj_id)
+    #
+    #     ### trim previous project and solution at t_arrival+commit_threshold
+    #     t_arrival = arrival_interval * idx
+    #     t_commit = t_arrival + commit_threshold
+    #     trimmed_solution = trim_solution(search_env.env, solution, t_commit)
+    #     # prune schedule
+    #     new_schedule, new_cache = prune_project_schedule(project_schedule, cache, t_commit; robot_positions=get_env_snapshot(solution,t_commit))
+    #
+    #     # splice projects together!
+    #     for v in vertices(get_graph(next_schedule))
+    #         node_id = get_vtx_id(next_schedule, v)
+    #         add_to_schedule!(new_schedule, get_node_from_id(next_schedule, node_id), node_id)
+    #     end
+    #     for e in edges(get_graph(next_schedule))
+    #         node_id1 = get_vtx_id(next_schedule, e.src)
+    #         node_id2 = get_vtx_id(next_schedule, e.dst)
+    #         add_edge!(new_schedule, node_id1, node_id2)
+    #     end
+    #     set_leaf_operation_nodes!(new_schedule)
+    #     # do this again because now we have more nodes
+    #     t0 = map(v->get(new_cache.t0, v, t_arrival), vertices(get_graph(new_schedule)))
+    #     new_cache = initialize_planning_cache(new_schedule;t0=t0)
+    #
+    # end
+
     def1 = project_list[1]
-    def2 = project_list[2]
 
     project_spec, r0, s0, sF = def1.project_spec,def1.r0,def1.s0,def1.sF
     project_spec, problem_spec, object_ICs, object_FCs, robot_ICs = construct_task_graphs_problem(
             project_spec, r0, s0, sF, dist_matrix);
 
-    project_spec2, problem_spec2, _, _, _ = construct_task_graphs_problem(def2.project_spec, def2.r0, def2.s0, def2.sF, dist_matrix);
-    next_schedule = construct_partial_project_schedule(project_spec2,problem_spec2)
 
     solver = PC_TAPF_Solver(DEBUG=true,verbosity=1,LIMIT_A_star_iterations=5*nv(env_graph));
     (solution, assignment, cost, search_env), elapsed_time, byte_ct, gc_time, mem_ct = @timed high_level_search!(
@@ -311,48 +362,61 @@ let
     cache = search_env.cache
     @test validate(project_schedule)
 
+    print_project_schedule(project_schedule,"project_schedule";mode=:leaf_aligned)
+
+
     t = 30
+    t_arrival = t
     trimmed_solution = trim_solution(search_env.env, solution, t)
     @test all([length(p) == get_cost(p)[1] for p in get_paths(trimmed_solution)])
 
-    new_schedule = prune_project_schedule(project_schedule, cache, t; robot_positions=get_env_snapshot(solution,t))
-    set_leaf_operation_nodes!(new_schedule)
-    G = get_graph(new_schedule)
-    # init planning cache with the existing solution
-    t0 = map(v->get(cache.t0, get_vtx(project_schedule, get_vtx_id(new_schedule, v)), 0.0), vertices(G))
-    new_cache = initialize_planning_cache(new_schedule;t0=t0)
-    # identify active and fixed nodes
-    active_vtxs = Set{Int}()
-    fixed_vtxs = Set{Int}()
-    for v in vertices(G)
-        if new_cache.tF[v] < t
-            push!(fixed_vtxs, v)
-        elseif new_cache.t0[v] <= t <= new_cache.tF[v] # test if vertex is eligible to be dropped
-            node_id = get_vtx_id(new_schedule,v)
-            push!(active_vtxs, v)
-            for e in edges(bfs_tree(G,v;dir=:in))
-                push!(fixed_vtxs, e.dst)
-            end
-        end
-    end
-    # set all fixed_vtxs to plan_path=false
-    for v in fixed_vtxs
-        set_path_spec!(new_schedule,v,PathSpec(get_path_spec(new_schedule,v), plan_path=false, fixed=true))
-    end
-    # verify that all vertices following active_vtxs have a start time > 0
-    let
-        s1 = map(v->new_cache.t0[v], collect(fixed_vtxs))
-        s2 = map(v->new_cache.t0[v], collect(active_vtxs))
-        s3 = map(v->new_cache.t0[v], collect(setdiff(collect(vertices(G)),union(fixed_vtxs,active_vtxs))))
-        @test all(s3 .> 0)
-    end
+    new_schedule, new_cache = prune_project_schedule(project_schedule, cache, t; robot_positions=get_env_snapshot(solution,t))
+    # set_leaf_operation_nodes!(new_schedule)
+    # G = get_graph(new_schedule)
+    # # init planning cache with the existing solution
+    # t0 = map(v->get(cache.t0, get_vtx(project_schedule, get_vtx_id(new_schedule, v)), 0.0), vertices(G))
+    # new_cache = initialize_planning_cache(new_schedule;t0=t0)
+    # # identify active and fixed nodes
+    # active_vtxs = Set{Int}()
+    # fixed_vtxs = Set{Int}()
+    # for v in vertices(G)
+    #     if new_cache.tF[v] < t
+    #         push!(fixed_vtxs, v)
+    #     elseif new_cache.t0[v] <= t <= new_cache.tF[v] # test if vertex is eligible to be dropped
+    #         node_id = get_vtx_id(new_schedule,v)
+    #         push!(active_vtxs, v)
+    #         for e in edges(bfs_tree(G,v;dir=:in))
+    #             push!(fixed_vtxs, e.dst)
+    #         end
+    #     end
+    # end
+    # # set all fixed_vtxs to plan_path=false
+    # for v in fixed_vtxs
+    #     set_path_spec!(new_schedule,v,PathSpec(get_path_spec(new_schedule,v), plan_path=false, fixed=true))
+    # end
+    # # verify that all vertices following active_vtxs have a start time > 0
+    # let
+    #     s1 = map(v->new_cache.t0[v], collect(fixed_vtxs))
+    #     s2 = map(v->new_cache.t0[v], collect(active_vtxs))
+    #     s3 = map(v->new_cache.t0[v], collect(setdiff(collect(vertices(G)),union(fixed_vtxs,active_vtxs))))
+    #     @test all(s3 .> 0)
+    # end
 
+    print_project_schedule(new_schedule,"new_schedule";mode=:leaf_aligned)
 
-    #### New Project schedule to splice in:
+    #### Next Project schedule to splice in:
+    def2 = project_list[2]
+    # project_spec2, problem_spec2, _, _, _ = construct_task_graphs_problem(def2.project_spec, def2.r0, def2.s0, def2.sF, dist_matrix);
+    # next_schedule = construct_partial_project_schedule(project_spec2,problem_spec2)
+    next_schedule = construct_partial_project_schedule(def2.project_spec,problem_spec)
+
+    print_project_schedule(next_schedule,"next_schedule";mode=:leaf_aligned)
 
     # remap object ids
     max_obj_id = maximum([get_id(id) for id in get_vtx_ids(project_schedule) if typeof(id) <: ObjectID])
     remap_object_ids!(next_schedule,max_obj_id)
+
+    print_project_schedule(next_schedule,"next_schedule_remapped";mode=:leaf_aligned)
 
     let
         s1 = Set{AbstractID}(new_schedule.vtx_ids)
@@ -372,8 +436,10 @@ let
     end
     set_leaf_operation_nodes!(new_schedule)
     # do this again because now we have more nodes
-    t0 = map(v->get(new_cache.t0, v, 0.0), vertices(G))
+    t0 = map(v->get(new_cache.t0, v, t_arrival), vertices(G))
     new_cache = initialize_planning_cache(new_schedule;t0=t0)
+
+    print_project_schedule(new_schedule,"spliced_schedule";mode=:leaf_aligned)
 
     model = formulate_milp(SparseAdjacencyMILP(),new_schedule,problem_spec)
     optimize!(model)
@@ -384,10 +450,24 @@ let
     update_project_schedule!(new_schedule,problem_spec,adj_matrix)
     @test validate(new_schedule)
 
-    # high_level_search!(solver, env_graph, new_schedule, problem_spec, Gurobi.Optimizer;
-    #     milp_model=SparseAdjacencyMILP(),
-    #     t0_ = Dict{AbstractID,Int}(get_vtx_id(new_schedule, v)=>t0 for (v,t0) in enumerate(new_cache.t0))
-    # )
+    print_project_schedule(new_schedule,"updated_schedule";mode=:leaf_aligned)
+
+    solution, assignment, cost, env  = high_level_search!(solver, env_graph, new_schedule, problem_spec, Gurobi.Optimizer;
+        milp_model=SparseAdjacencyMILP(),
+        t0_ = Dict{AbstractID,Int}(get_vtx_id(new_schedule, v)=>t0 for (v,t0) in enumerate(new_cache.t0))
+    )
+
+
+    # robot_paths = convert_to_vertex_lists(solution)
+    # object_paths, object_intervals = get_object_paths(solution,env)
+    # tf = maximum(map(p->length(p),robot_paths))
+    # set_default_plot_size(24cm,24cm)
+    # record_video(joinpath(VIDEO_DIR,string("replanning.webm")),
+    #     t->render_paths(t,robot_paths,object_paths;
+    #         object_intervals=object_intervals,
+    #         colors_vec=map(i->LCHab(60,80,200),1:length(robot_paths)),
+    #         show_paths=false);tf=tf)
+
 
     # Replan!
     # model = formulate_milp(SparseAdjacencyMILP(),new_schedule,problem_spec;
@@ -405,11 +485,64 @@ let
     # @test termination_status(model) == MathOptInterface.OPTIMAL
     #
     # assignment_matrix = get_assignment_matrix(model);
-    update_project_schedule!(new_schedule,problem_spec,assignment_matrix)
-    @test validate(new_schedule)
+    # update_project_schedule!(new_schedule,problem_spec,assignment_matrix)
+    # @test validate(new_schedule)
 
     # print_project_schedule(new_schedule,"dummy_schedule";mode=:leaf_aligned)
 
+
+end
+
+# Better graph plotting
+let
+    G = get_graph(project_schedule)
+    traversal = topological_sort(G)
+    initial_dict = Dict(
+        :root_depth => (G,v)->0,
+        :degree_in => (G,v)->0,
+        :degree_out => (G,v)->0,
+        :leaf_depth => (G,v)->0,
+        :ancestors => (G,v)->Set([v]),
+    )
+    forward_dict = Dict(
+        :root_depth => (G,v,v2,a,b)->max(a,b+1),
+        :degree_in => (G,v,v2,a,b)->a+1,
+        :ancestors => (G,v,v2,a,b)->union(a,b),
+    )
+    backward_dict = Dict(
+        :leaf_depth => (G,v,v2,a,b)->max(a,b+1),
+        :degree_out => (G,v,v2,a,b)->a+1,
+    )
+    vtx_vals = map(v->Dict{Symbol,Any}(),traversal)
+    for v in traversal
+        for (k,f) in initial_dict
+            vtx_vals[v][k] = f(G,v)
+        end
+    end
+    for v in traversal
+        for v2 in inneighbors(G,v)
+            for (k,f) in forward_dict
+                vtx_vals[v][k] = f(G,v,v2,get(vtx_vals[v],k,0),get(vtx_vals[v2],k,0))
+            end
+        end
+    end
+    for v in reverse(traversal)
+        for v2 in outneighbors(G,v)
+            for (k,f) in backward_dict
+                vtx_vals[v][k] = f(G,v,v2,get(vtx_vals[v],k,0),get(vtx_vals[v2],k,0))
+            end
+        end
+    end
+
+    # A = adjacency_matrix(G)
+    # # min_x x * A * x' s.t.
+    # model = Model(with_optimizer(Gurobi.Optimizer))
+    # @variable(model, y[1:nv(G)])
+    # x = ones(nv(G))
+    # for v in vertices(G)
+    #     @NLconstraint(model, x[v]^2 + y[v]^2 >= 2.0)
+    # end
+    # @objective(model,Min, y'*A*y)
 
 end
 
