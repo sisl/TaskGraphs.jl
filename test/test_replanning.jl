@@ -2,8 +2,8 @@
 let
     project_spec, problem_spec, robot_ICs, assignments, env_graph = initialize_toy_problem_6(;
         verbose=false);
-    env, mapf = construct_search_env(project_spec, problem_spec, robot_ICs, assignments, env_graph)
-    pc_mapf = PC_MAPF(env,mapf)
+    env = construct_search_env(project_spec, problem_spec, robot_ICs, assignments, env_graph)
+    pc_mapf = PC_MAPF(env)
     node = initialize_root_node(pc_mapf)
     solver = PC_TAPF_Solver(verbosity=0)
 

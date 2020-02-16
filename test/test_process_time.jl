@@ -12,12 +12,12 @@ let
                 Δt_op=Δt
                 );
 
-            env, mapf = construct_search_env(project_spec, problem_spec, robot_ICs, assignments, env_graph)
-            pc_mapf = PC_MAPF(env,mapf)
+            env = construct_search_env(project_spec, problem_spec, robot_ICs, assignments, env_graph)
+            pc_mapf = PC_MAPF(env)
             node = initialize_root_node(pc_mapf)
             solver = PC_TAPF_Solver()
 
-            low_level_search!(solver,env,mapf,node)
+            low_level_search!(solver,env,node)
             path1 = convert_to_vertex_lists(node.solution.paths[1])
             path2 = convert_to_vertex_lists(node.solution.paths[2])
             @test path1[8+Δt] == 13
@@ -42,8 +42,8 @@ let
             Δt_collect=[0,Δt_collect_2,0],
             Δt_deliver=[Δt_deliver_1,0,0]
             );
-        env, mapf = construct_search_env(project_spec, problem_spec, robot_ICs, assignments, env_graph)
-        pc_mapf = PC_MAPF(env,mapf);
+        env = construct_search_env(project_spec, problem_spec, robot_ICs, assignments, env_graph)
+        pc_mapf = PC_MAPF(env);
         node = initialize_root_node(pc_mapf);
         solver = PC_TAPF_Solver(verbosity=2)
 

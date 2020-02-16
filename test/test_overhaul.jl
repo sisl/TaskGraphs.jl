@@ -128,8 +128,8 @@ let
 
                 # Check that it matches low_level_search
                 solver = PC_TAPF_Solver(verbosity=0)
-                env, mapf = construct_search_env(schedule, problem_spec, env_graph;primary_objective=cost_model)
-                pc_mapf = PC_MAPF(env,mapf)
+                env = construct_search_env(schedule, problem_spec, env_graph;primary_objective=cost_model)
+                pc_mapf = PC_MAPF(env)
                 constraint_node = initialize_root_node(pc_mapf)
                 low_level_search!(solver,pc_mapf,constraint_node)
                 # @show i, f, obj_val1, constraint_node.cost

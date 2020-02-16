@@ -239,9 +239,9 @@ function profile_low_level_search_and_repair(solver, project_spec, problem_spec,
     # solver = PC_TAPF_Solver(verbosity=0,LIMIT_A_star_iterations=10*nv(env_graph));
     project_schedule = construct_partial_project_schedule(project_spec,problem_spec,robot_ICs)
     if update_project_schedule!(milp_model,project_schedule, problem_spec, adj_matrix)
-        env, mapf = construct_search_env(project_schedule, problem_spec, env_graph;
+        env = construct_search_env(project_schedule, problem_spec, env_graph;
             primary_objective=primary_objective); # TODO pass in t0_ here (maybe get it straight from model?)
-        pc_mapf = PC_MAPF(env,mapf);
+        pc_mapf = PC_MAPF(env);
         node = initialize_root_node(pc_mapf)
         valid_flag, elapsed_time, byte_ct, gc_time, mem_ct = @timed low_level_search!(solver, pc_mapf, node)
 
@@ -271,11 +271,11 @@ function profile_low_level_search(solver, project_spec, problem_spec, robot_ICs,
     # solver = PC_TAPF_Solver(verbosity=0,LIMIT_A_star_iterations=10*nv(env_graph));
     project_schedule = construct_partial_project_schedule(project_spec,problem_spec,robot_ICs)
     if update_project_schedule!(milp_model, project_schedule, problem_spec, adj_matrix)
-        env, mapf = construct_search_env(project_schedule, problem_spec, env_graph;
+        env = construct_search_env(project_schedule, problem_spec, env_graph;
             primary_objective=primary_objective); # TODO pass in t0_ here (maybe get it straight from model?)
-        pc_mapf = PC_MAPF(env,mapf);
+        pc_mapf = PC_MAPF(env);
         node = initialize_root_node(pc_mapf)
-        valid_flag, elapsed_time, byte_ct, gc_time, mem_ct = @timed low_level_search!(solver, pc_mapf.env, pc_mapf.mapf, node)
+        valid_flag, elapsed_time, byte_ct, gc_time, mem_ct = @timed low_level_search!(solver, pc_mapf.env, node)
 
         cost = collect(get_cost(node.solution))
         if cost[1] == Inf

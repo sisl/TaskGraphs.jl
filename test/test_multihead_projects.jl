@@ -6,8 +6,8 @@ let
         mtx[i,j] = 1
     end
     assignment_dict, assignments = get_assignment_dict(mtx,problem_spec.N,problem_spec.M)
-    env, mapf = construct_search_env(project_spec, problem_spec, robot_ICs, assignments, env_graph)
-    pc_mapf = PC_MAPF(env,mapf)
+    env = construct_search_env(project_spec, problem_spec, robot_ICs, assignments, env_graph)
+    pc_mapf = PC_MAPF(env)
     node = initialize_root_node(pc_mapf)
     solver = PC_TAPF_Solver(verbosity=2)
 

@@ -1,12 +1,12 @@
 let
     project_spec, problem_spec, robot_ICs, assignments, env_graph = initialize_toy_problem_1(;verbose=false);
 
-    env, mapf = construct_search_env(project_spec, problem_spec, robot_ICs, assignments, env_graph)
-    pc_mapf = PC_MAPF(env,mapf)
+    env = construct_search_env(project_spec, problem_spec, robot_ICs, assignments, env_graph)
+    pc_mapf = PC_MAPF(env)
     node = initialize_root_node(pc_mapf)
     solver = PC_TAPF_Solver()
 
-    low_level_search!(solver,env,mapf,node)
+    low_level_search!(solver,env,node)
     path1 = convert_to_vertex_lists(node.solution.paths[1])
     path2 = convert_to_vertex_lists(node.solution.paths[2])
     @show path1
@@ -16,12 +16,12 @@ end
 let
     project_spec, problem_spec, robot_ICs, assignments, env_graph = initialize_toy_problem_2(;verbose=false);
 
-    env, mapf = construct_search_env(project_spec, problem_spec, robot_ICs, assignments, env_graph)
-    pc_mapf = PC_MAPF(env,mapf)
+    env = construct_search_env(project_spec, problem_spec, robot_ICs, assignments, env_graph)
+    pc_mapf = PC_MAPF(env)
     node = initialize_root_node(pc_mapf)
     solver = PC_TAPF_Solver()
 
-    low_level_search!(solver,env,mapf,node)
+    low_level_search!(solver,env,node)
     path1 = convert_to_vertex_lists(node.solution.paths[2])
     path2 = convert_to_vertex_lists(node.solution.paths[2])
     @show path1
@@ -32,12 +32,12 @@ end
 let
     project_spec, problem_spec, robot_ICs, assignments, env_graph = initialize_toy_problem_3(;verbose=false);
 
-    env, mapf = construct_search_env(project_spec, problem_spec, robot_ICs, assignments, env_graph);
-    pc_mapf = PC_MAPF(env,mapf)
+    env = construct_search_env(project_spec, problem_spec, robot_ICs, assignments, env_graph);
+    pc_mapf = PC_MAPF(env)
     node = initialize_root_node(pc_mapf)
     solver = PC_TAPF_Solver()
 
-    low_level_search!(solver,env,mapf,node);
+    low_level_search!(solver,env,node);
     path1 = convert_to_vertex_lists(node.solution.paths[1])
     path2 = convert_to_vertex_lists(node.solution.paths[2])
     @test path1[2] == 5 # test that robot one will indeed wait for robot 2
@@ -48,7 +48,7 @@ let
     # @show get_cost(node.solution.paths[1])
     # @show get_cost(node.solution.paths[2])
     # @show get_cost(node.solution)
-    @test get_cost(node) == aggregate_costs(get_cost_model(mapf.env),get_path_costs(node.solution))
+    @test get_cost(node) == aggregate_costs(get_cost_model(pc_mapf.env),get_path_costs(node.solution))
     @test get_cost(node)[1] == maximum(map(path->length(path),get_paths(node.solution)))
     # @test path1[4] == path1[5] == path1[6] == path1[7] == path1[8] == 13
 end
@@ -57,8 +57,8 @@ let
     project_spec, problem_spec, robot_ICs, assignments, env_graph = initialize_toy_problem_4(;
         verbose=false);
 
-    env, mapf = construct_search_env(project_spec, problem_spec, robot_ICs, assignments, env_graph);
-    pc_mapf = PC_MAPF(env,mapf)
+    env = construct_search_env(project_spec, problem_spec, robot_ICs, assignments, env_graph);
+    pc_mapf = PC_MAPF(env)
     solver = PC_TAPF_Solver()
 
     solution, cost = solve!(solver,pc_mapf)
@@ -78,8 +78,8 @@ let
     # Test Edge conflict
     project_spec, problem_spec, robot_ICs, assignments, env_graph = initialize_toy_problem_5(;verbose=false);
 
-    env, mapf = construct_search_env(project_spec, problem_spec, robot_ICs, assignments, env_graph);
-    pc_mapf = PC_MAPF(env,mapf)
+    env = construct_search_env(project_spec, problem_spec, robot_ICs, assignments, env_graph);
+    pc_mapf = PC_MAPF(env)
     solver = PC_TAPF_Solver()
 
     solution, cost = solve!(solver,pc_mapf)
@@ -119,18 +119,14 @@ let
 
     # Routing
     project_schedule = construct_project_schedule(project_spec, problem_spec, robot_ICs, assignments);
-    env, mapf = construct_search_env(project_spec, problem_spec, robot_ICs, assignments, env_graph);
-    pc_mapf = PC_MAPF(env,mapf)
+    env = construct_search_env(project_spec, problem_spec, robot_ICs, assignments, env_graph);
+    pc_mapf = PC_MAPF(env)
     node = initialize_root_node(pc_mapf)
     solver = PC_TAPF_Solver(verbosity=1);
-    low_level_search!(solver,env,mapf,node);
+    low_level_search!(solver,env,node);
     # @show get_cost(node);
     # paths = convert_to_vertex_lists(node.solution)
     # # @show paths
-    # repair_solution!(solver,env,mapf,node);
-    # paths = convert_to_vertex_lists(node.solution)
-    # @show paths
-    # @show get_cost(node);
 end
 let
     N = 8
