@@ -212,10 +212,10 @@ function construct_result_dataframes(problem_dir,results_dir,N_problems)
 end
 
 function profile_task_assignment(solver, project_spec, problem_spec, robot_ICs, env_graph, dist_matrix;
-    milp_model=AssignmentMILP(),primary_objective=SumOfMakeSpans,kwargs...)
+    primary_objective=SumOfMakeSpans,kwargs...)
 
     project_schedule = construct_partial_project_schedule(project_spec, problem_spec, robot_ICs)
-    model = formulate_milp(milp_model,project_schedule,problem_spec)
+    model = formulate_milp(solver.nbs_model,project_schedule,problem_spec)
 
     retval, elapsed_time, byte_ct, gc_time, mem_ct = @timed optimize!(model)
 
@@ -234,11 +234,11 @@ function profile_task_assignment(solver, project_spec, problem_spec, robot_ICs, 
     results_dict
 end
 function profile_low_level_search_and_repair(solver, project_spec, problem_spec, robot_ICs, env_graph,dist_matrix,adj_matrix;
-    milp_model=AssignmentMILP(),primary_objective=SumOfMakeSpans)
+    primary_objective=SumOfMakeSpans)
 
     # solver = PC_TAPF_Solver(verbosity=0,LIMIT_A_star_iterations=10*nv(env_graph));
     project_schedule = construct_partial_project_schedule(project_spec,problem_spec,robot_ICs)
-    if update_project_schedule!(milp_model,project_schedule, problem_spec, adj_matrix)
+    if update_project_schedule!(solver.nbs_model,project_schedule, problem_spec, adj_matrix)
         env = construct_search_env(project_schedule, problem_spec, env_graph;
             primary_objective=primary_objective); # TODO pass in t0_ here (maybe get it straight from model?)
         pc_mapf = PC_MAPF(env);
@@ -266,11 +266,11 @@ function profile_low_level_search_and_repair(solver, project_spec, problem_spec,
     end
 end
 function profile_low_level_search(solver, project_spec, problem_spec, robot_ICs, env_graph,dist_matrix,adj_matrix;
-    milp_model=AssignmentMILP(),primary_objective=SumOfMakeSpans)
+    primary_objective=SumOfMakeSpans)
 
     # solver = PC_TAPF_Solver(verbosity=0,LIMIT_A_star_iterations=10*nv(env_graph));
     project_schedule = construct_partial_project_schedule(project_spec,problem_spec,robot_ICs)
-    if update_project_schedule!(milp_model, project_schedule, problem_spec, adj_matrix)
+    if update_project_schedule!(solver.nbs_model, project_schedule, problem_spec, adj_matrix)
         env = construct_search_env(project_schedule, problem_spec, env_graph;
             primary_objective=primary_objective); # TODO pass in t0_ here (maybe get it straight from model?)
         pc_mapf = PC_MAPF(env);
@@ -298,12 +298,12 @@ function profile_low_level_search(solver, project_spec, problem_spec, robot_ICs,
     end
 end
 function profile_full_solver(solver, project_spec, problem_spec, robot_ICs, env_graph,dist_matrix;
-        milp_model=AssignmentMILP(),primary_objective=SumOfMakeSpans,kwargs...)
+        primary_objective=SumOfMakeSpans,kwargs...)
     # Solve the problem
     # solver = PC_TAPF_Solver(verbosity=0,LIMIT_A_star_iterations=5*nv(env_graph));
 
     (solution, assignment, cost, search_env, optimality_gap), elapsed_time, byte_ct, gc_time, mem_ct = @timed high_level_search!(
-        milp_model, solver, env_graph, project_spec, problem_spec, robot_ICs, Gurobi.Optimizer;
+        solver, env_graph, project_spec, problem_spec, robot_ICs, Gurobi.Optimizer;
         primary_objective=primary_objective,
         kwargs...);
 
@@ -355,9 +355,6 @@ function run_profiling(MODE=:nothing;
     TimeLimit=solver_template.time_limit,
     OutputFlag=0,
     Presolve = -1,
-    # verbosity=0,
-    # LIMIT_A_star_iterations=10000,
-    milp_model=AssignmentMILP(),
     primary_objective=SumOfMakeSpans
     )
     # solver profiling
@@ -438,25 +435,25 @@ function run_profiling(MODE=:nothing;
                 solver = PC_TAPF_Solver(solver_template,start_time=time());
                 if MODE == :assignment_only
                     results_dict = profile_task_assignment(solver, project_spec, problem_spec, robot_ICs, env_graph, dist_matrix;
-                        milp_model=milp_model,primary_objective=primary_objective,TimeLimit=TimeLimit,OutputFlag=OutputFlag,Presolve=Presolve)
+                        primary_objective=primary_objective,TimeLimit=TimeLimit,OutputFlag=OutputFlag,Presolve=Presolve)
                 end
                 if MODE == :low_level_search_without_repair
                     # assignments = read_assignment(assignment_filename)
                     adj_matrix = read_sparse_matrix(assignment_filename)
                     results_dict = profile_low_level_search(solver, project_spec, problem_spec, robot_ICs,env_graph,dist_matrix,adj_matrix;
-                        milp_model=milp_model,primary_objective=primary_objective)
+                        primary_objective=primary_objective)
                 end
                 if MODE == :low_level_search_with_repair
                     # assignments = read_assignment(assignment_filename)
                     adj_matrix = read_sparse_matrix(assignment_filename)
                     results_dict = profile_low_level_search_and_repair(solver, project_spec, problem_spec, robot_ICs,env_graph,dist_matrix,adj_matrix;
-                        milp_model=milp_model,primary_objective=primary_objective)
+                        primary_objective=primary_objective)
                 end
                 if MODE == :full_solver
                     results_dict = profile_full_solver(solver, project_spec, problem_spec, robot_ICs,env_graph,dist_matrix;
-                        milp_model=milp_model,primary_objective=primary_objective,TimeLimit=TimeLimit,OutputFlag=OutputFlag,Presolve=Presolve)
+                        primary_objective=primary_objective,TimeLimit=TimeLimit,OutputFlag=OutputFlag,Presolve=Presolve)
                 end
-                println("PROFILER: ",typeof(milp_model)," --- ",string(MODE), " --- Solved problem ",problem_id," in ",results_dict["time"]," seconds! \n\n")
+                println("PROFILER: ",typeof(solver.nbs_model)," --- ",string(MODE), " --- Solved problem ",problem_id," in ",results_dict["time"]," seconds! \n\n")
                 # print the results
                 open(results_filename, "w") do io
                     TOML.print(io, results_dict)

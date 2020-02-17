@@ -1248,6 +1248,7 @@ function construct_partial_project_schedule(
             add_edge!(project_schedule,op_id,ObjectID(id))
         end
     end
+    set_leaf_operation_nodes!(project_schedule)
     project_schedule
 end
 function construct_partial_project_schedule(spec::ProjectSpec,problem_spec::ProblemSpec,robot_ICs=Vector{ROBOT_AT}())
@@ -1653,7 +1654,7 @@ function formulate_optimization_problem(N,M,G,D,Δt,Δt_collect,Δt_deliver,to0_
         @constraint(model, T .>= tof .+ Δt)
         @objective(model, Min, T)
     end
-    model;
+    AssignmentMILP(model)
 end
 function formulate_optimization_problem(spec::T,optimizer;
     kwargs...
@@ -1949,7 +1950,7 @@ function formulate_schedule_milp(project_schedule::ProjectSchedule,problem_spec:
     sparsity_cost = @expression(model, (0.5/(nv(G)^2))*sum(X)) # cost term to encourage sparse X. Otherwise the solver may add pointless edges
     @objective(model, Min, cost1 + sparsity_cost)
     # @objective(model, Min, cost1 )
-    model #, job_shop_variables
+    AdjacencyMILP(model) #, job_shop_variables
 end
 function formulate_milp(milp_model::AdjacencyMILP,project_schedule::ProjectSchedule,problem_spec::ProblemSpec;
     optimizer=Gurobi.Optimizer,
@@ -2347,7 +2348,7 @@ function update_project_schedule!(milp_model::AssignmentMILP,
         problem_spec::T,
         assignment_matrix,
         DEBUG::Bool=false
-    ) where {M<:TaskGraphsMILP,P<:ProjectSchedule,T<:ProblemSpec}
+    ) where {P<:ProjectSchedule,T<:ProblemSpec}
     N = length(get_robot_ICs(project_schedule))
     M = length(get_object_ICs(project_schedule))
     # assignment_dict, assignments = get_assignment_dict(assignment_matrix,problem_spec.N,problem_spec.M)

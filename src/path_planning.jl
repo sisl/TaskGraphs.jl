@@ -49,14 +49,40 @@ function default_pc_tapf_solution(N::Int;extra_T=400)
     )
 end
 
+function CRCBS.get_initial_solution(schedule::ProjectSchedule,env::E) where {E<:PCCBS.LowLevelEnv}
+    starts = State[]
+    robot_ics = get_robot_ICs(schedule)
+    for k in sort(collect(keys(robot_ics)))
+        push!(starts, State(vtx = get_id(get_location_id(robot_ics[k])), t = 0))
+    end
+    cost_model = get_cost_model(env)
+    paths = map(s->Path{State,Action,get_cost_type(cost_model)}(s0=s, cost=get_initial_cost(cost_model)), starts)
+    costs = map(p->get_cost(p), paths)
+    cost = aggregate_costs(cost_model, costs)
+    LowLevelSolution(paths=paths, cost_model=cost_model,costs=costs, cost=cost)
+end
+
 export
     PC_TAPF_Solver
 
-@with_kw mutable struct PC_TAPF_Solver{T} <: AbstractMAPFSolver
+abstract type AbstractCBSModel end
+struct DefaultCBSModel <: AbstractCBSModel end
+abstract type AbstractISPSModel end
+@with_kw struct DefaultISPSModel <: AbstractISPSModel
+    n_repair_iters::Int = 2
+end
+abstract type AbstractPathFinderModel end
+struct AStarPathFinderModel <: AbstractPathFinderModel end
+
+@with_kw mutable struct PC_TAPF_Solver{M,C,I,A,T} <: AbstractMAPFSolver
     # TODO parameterize by MILP Solver, CBS solver, ISPS solver, A_star solver
-    LIMIT_assignment_iterations   ::Int = 50
-    LIMIT_CBS_iterations          ::Int = 100
-    LIMIT_A_star_iterations       ::Int = 5000
+    nbs_model                   ::M = SparseAdjacencyMILP()
+    cbs_model                   ::C = DefaultCBSModel()
+    isps_model                  ::I = DefaultISPSModel()
+    astar_model                 ::A = AStarPathFinderModel()
+    LIMIT_assignment_iterations ::Int = 50
+    LIMIT_CBS_iterations        ::Int = 100
+    LIMIT_A_star_iterations     ::Int = 5000
 
     num_assignment_iterations   ::Int = 0
     num_CBS_iterations          ::Int = 0
@@ -374,20 +400,20 @@ export
     update_env!
 
 # @with_kw struct SearchEnv{C,E<:AbstractLowLevelEnv{State,Action,C},S<:LowLevelSolution} <: AbstractLowLevelEnv{State,Action,C}
-@with_kw struct SearchEnv{C,E<:AbstractLowLevelEnv{State,Action,C}} <: AbstractLowLevelEnv{State,Action,C}
+@with_kw struct SearchEnv{C,E<:AbstractLowLevelEnv{State,Action,C},S} <: AbstractLowLevelEnv{State,Action,C}
     schedule::ProjectSchedule       = ProjectSchedule()
     cache::PlanningCache            = PlanningCache()
     env::E                          = PCCBS.LowLevelEnv()
     problem_spec::ProblemSpec       = ProblemSpec()
     dist_function::DistMatrixMap    = env.graph.dist_function # DistMatrixMap(env.graph.vtx_map, env.graph.vtxs)
     cost_model::C                   = get_cost_model(env)
-    num_agents::Int                 = -1
-    # solution::S                     = LowLevelSolution(
-    #     paths = map(i->Path{State,Action,get_cost_type(cost_model)}(), 1:num_agents),
-    #     cost_model = cost_model,
-    #     costs = map(p->get_cost(p), paths),
-    #     cost  = aggregate_costs(cost_model, costs),
-    #     )
+    num_agents::Int                 = length(get_robot_ICs(schedule))
+    base_solution::S                = LowLevelSolution(
+        paths = map(i->Path{State,Action,get_cost_type(cost_model)}(), 1:num_agents),
+        cost_model = cost_model,
+        costs = map(i->get_initial_cost(cost_model), 1:num_agents),
+        cost  = aggregate_costs(cost_model, map(i->get_initial_cost(cost_model), 1:num_agents)),
+        )
 end
 function CRCBS.get_start(env::SearchEnv,v::Int)
     start_vtx   = get_path_spec(env.schedule,v).start_vtx
@@ -427,9 +453,11 @@ function construct_search_env(schedule, problem_spec, env_graph;
     heuristic_model = construct_composite_heuristic(ph,NullHeuristic(),ph,ph)
     low_level_env = PCCBS.LowLevelEnv(
         graph=env_graph, cost_model=cost_model, heuristic=heuristic_model)
+    base_solution = get_initial_solution(schedule,low_level_env)
 
-    env = SearchEnv(schedule=schedule, cache=cache, env=low_level_env, problem_spec=problem_spec, num_agents=N)
-    return env
+    search_env = SearchEnv(schedule=schedule, cache=cache, env=low_level_env,
+        problem_spec=problem_spec, num_agents=N, base_solution=base_solution)
+    return search_env
 end
 function construct_search_env(project_spec, problem_spec, robot_ICs, assignments, env_graph;kwargs...)
     schedule = construct_project_schedule(project_spec, problem_spec, robot_ICs, assignments)
@@ -514,12 +542,14 @@ function CRCBS.build_env(solver, env::E, node::N, schedule_node::T, v::Int,path_
         # log_info(0,solver,string("retrieving base path for node ",v," of type ",typeof(schedule_node)))
         base_path = get_paths(node.solution)[agent_id]
     else
+        # base_path = get_paths(node.solution)[agent_id]
         # log_info(0,solver,string("initializing base path for node ",v," of type ",typeof(schedule_node)))
         start_vtx = path_spec.start_vtx
         base_path = Path{PCCBS.State,PCCBS.Action,get_cost_type(cbs_env)}(
             s0=PCCBS.State(start_vtx, 0), # TODO fix start time
             cost=get_initial_cost(cbs_env)
             )
+        @assert get_final_state(get_paths(node.solution)[agent_id]) == get_final_state(base_path)
     end
     # make sure base_path hits t0 constraint
     if get_end_index(base_path) < env.cache.t0[v]
@@ -732,6 +762,22 @@ function plan_next_path!(solver::S, env::E, node::N;
     return valid_flag
 end
 
+export
+    reset_solution!
+
+"""
+    Helper to reset the solution in a constraint node between re-runs of ISPS
+"""
+function reset_solution!(node::N,base_solution) where {N<:ConstraintTreeNode}
+    for (agent_id,path) in enumerate(get_paths(base_solution))
+        set_solution_path!(node.solution, deepcopy(path), agent_id)
+        set_path_cost!(node.solution, get_cost(path), agent_id)
+        node.solution.cost = base_solution.cost
+        node.cost = get_cost(node.solution)
+    end
+    node
+end
+
 """
     Computes all paths specified by the project schedule and updates the
     solution in the ConstraintTreeNode::node accordingly.
@@ -742,6 +788,7 @@ function CRCBS.low_level_search!(
         path_finder=A_star
         ) where {S<:PC_TAPF_Solver,E<:SearchEnv,N<:ConstraintTreeNode}
 
+    reset_solution!(node,env.base_solution)
     while length(env.cache.node_queue) > 0
         step_low_level!(solver)
         if !(plan_next_path!(solver,env,node;heuristic=heuristic,path_finder=path_finder))
@@ -767,7 +814,10 @@ function CRCBS.initialize_root_node(env::SearchEnv)
     N = env.num_agents
     # It is important to only have N starts! Does not matter if they are invalid states.
     dummy_mapf = MAPF(env.env,map(i->PCCBS.State(),1:N),map(i->PCCBS.State(),1:N))
-    initialize_root_node(dummy_mapf)
+    initialize_root_node(dummy_mapf,deepcopy(env.base_solution))
+end
+function CRCBS.initialize_child_search_node(node::N,env::SearchEnv) where {N<:ConstraintTreeNode}
+    initialize_child_search_node(node,deepcopy(env.base_solution))
 end
 function CRCBS.default_solution(env::SearchEnv)
     N = env.num_agents
@@ -786,6 +836,7 @@ struct PC_MAPF{E<:SearchEnv} <: AbstractMAPF
 end
 CRCBS.initialize_root_node(pc_mapf::P) where {P<:PC_MAPF} = initialize_root_node(pc_mapf.env)
 CRCBS.default_solution(pc_mapf::M) where {M<:PC_MAPF} = default_solution(pc_mapf.env)
+CRCBS.initialize_child_search_node(node::N,pc_mapf::PC_MAPF) where {N<:ConstraintTreeNode} = initialize_child_search_node(node,pc_mapf.env)
 
 function CRCBS.check_termination_criteria(solver::S,env::E,cost_so_far,path,s) where {S<:PC_TAPF_Solver,E<:AbstractLowLevelEnv}
     # solver.num_A_star_iterations += 1
@@ -849,7 +900,8 @@ function CRCBS.solve!(
             # otherwise, create constraints and branch
             constraints = generate_constraints_from_conflict(conflict)
             for constraint in constraints
-                new_node = initialize_child_search_node(node)
+                # new_node = initialize_child_search_node(node)
+                new_node = initialize_child_search_node(node,mapf)
                 if CRCBS.add_constraint!(new_node,constraint)
                     step_cbs!(solver,constraint)
                     if low_level_search!(solver, mapf, new_node, [get_agent_id(constraint)]; path_finder=path_finder)
@@ -878,15 +930,15 @@ end
 ############################## Outer Loop Search ###############################
 ################################################################################
 export
-    high_level_search!,
-    high_level_search_mod!
+    high_level_search!
+    # high_level_search_mod!
 
 """
     This is the modified version of high-level search that uses the adjacency
     matrix MILP formulation.
 """
 function high_level_search!(solver::P, env_graph, project_schedule::ProjectSchedule, problem_spec,  optimizer;
-        milp_model=AdjacencyMILP(),
+        # milp_model=AdjacencyMILP(),
         initial_solution=nothing,
         primary_objective=SumOfMakeSpans,
         kwargs...) where {P<:PC_TAPF_Solver}
@@ -897,8 +949,9 @@ function high_level_search!(solver::P, env_graph, project_schedule::ProjectSched
     lower_bound = 0.0
     best_solution = default_pc_tapf_solution(problem_spec.N)
     best_env    = SearchEnv()
-    best_assignment = adjacency_matrix(get_graph(project_schedule)) # meaningless
-    model = formulate_milp(milp_model,project_schedule,problem_spec;
+    best_assignment = adjacency_matrix(get_graph(project_schedule))
+    # model = formulate_milp(milp_model,project_schedule,problem_spec;
+    model = formulate_milp(solver.nbs_model,project_schedule,problem_spec;
         cost_model=primary_objective,optimizer=optimizer,kwargs...) #TODO pass t0_ in replanning mode
 
     base_schedule = deepcopy(project_schedule)
@@ -935,7 +988,7 @@ function high_level_search!(solver::P, env_graph, project_schedule::ProjectSched
                 ############## Route Planning ###############
                 adj_matrix = get_assignment_matrix(model);
                 project_schedule = deepcopy(base_schedule)
-                if update_project_schedule!(milp_model,project_schedule,problem_spec, adj_matrix)
+                if update_project_schedule!(model,project_schedule,problem_spec,adj_matrix)
                     env = construct_search_env(project_schedule, problem_spec, env_graph;
                         primary_objective=primary_objective); # TODO pass in t0_ here (maybe get it straight from model?)
                     pc_mapf = PC_MAPF(env);
@@ -965,31 +1018,26 @@ function high_level_search!(solver::P, env_graph, project_schedule::ProjectSched
     log_info(-1,solver.l1_verbosity,string("HIGH LEVEL SEARCH: optimality gap = ",optimality_gap,". Returning best solution with cost ", solver.best_cost,"\n"))
     return best_solution, best_assignment, solver.best_cost, best_env, optimality_gap
 end
-function high_level_search_mod!(solver::P, env_graph, project_spec::ProjectSpec, problem_spec,
-        robot_ICs, optimizer;
-        milp_model=AdjacencyMILP(),
-        primary_objective=SumOfMakeSpans,
-        TimeLimit=200,
-        kwargs...) where {P<:PC_TAPF_Solver}
+function high_level_search!(solver::P, env_graph, project_spec::ProjectSpec, problem_spec,
+        robot_ICs, optimizer;kwargs...) where {P<:PC_TAPF_Solver}
 
     project_schedule = construct_partial_project_schedule(project_spec,problem_spec,map(i->robot_ICs[i], 1:problem_spec.N))
 
+    search_env = construct_search_env(project_schedule,problem_spec,env_graph)
+
     high_level_search!(solver, env_graph, project_schedule, problem_spec, optimizer;
-        milp_model=milp_model,
-        primary_objective=primary_objective,
-        TimeLimit=TimeLimit,
         kwargs...
     )
 end
 
-# high_level_search!(milp_model::AssignmentMILP, args...;kwargs...) = high_level_search!(args...;kwargs...)
 function high_level_search!(milp_model::M, args...;kwargs...) where {M<:TaskGraphsMILP}
-    high_level_search_mod!(args...;milp_model=milp_model,kwargs...)
+    high_level_search!(args...;milp_model=milp_model,kwargs...)
 end
 
 export
     get_env_snapshot,
     prune_project_schedule,
+    splice_schedules!,
     trim_solution
 
 

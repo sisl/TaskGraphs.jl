@@ -167,9 +167,8 @@ let
                 costs = Float64[]
                 project_spec, problem_spec, robot_ICs, assignments, env_graph = f(;verbose=false);
                 for milp_model in [AssignmentMILP(),AdjacencyMILP(),SparseAdjacencyMILP()]
-                    solver = PC_TAPF_Solver(verbosity=0)
+                    solver = PC_TAPF_Solver(nbs_model=milp_model,verbosity=0)
                     solution, assignment, cost, env = high_level_search!(
-                        milp_model,
                         solver,
                         env_graph,
                         project_spec,
@@ -361,6 +360,7 @@ let
             project_spec, r0, s0, sF, dist_matrix);
 
 
+    #### solve initial problem
     solver = PC_TAPF_Solver(DEBUG=true,verbosity=1,LIMIT_A_star_iterations=5*nv(env_graph));
     (solution, assignment, cost, search_env), elapsed_time, byte_ct, gc_time, mem_ct = @timed high_level_search!(
         SparseAdjacencyMILP(), solver, env_graph, project_spec, problem_spec, robot_ICs, Gurobi.Optimizer;)
@@ -373,54 +373,24 @@ let
 
     t = 30
     t_arrival = t
+
+    #### Trim existing solution
+    # TODO maintain a base_schedule (for the sake of visualization) that chronicles the entire history of the factory
     trimmed_solution = trim_solution(search_env.env, solution, t)
     @test all([length(p) == get_cost(p)[1] for p in get_paths(trimmed_solution)])
-
+    #### Prune existing schedule
     new_schedule, new_cache = prune_project_schedule(project_schedule, cache, t; robot_positions=get_env_snapshot(solution,t))
-    # set_leaf_operation_nodes!(new_schedule)
-    # G = get_graph(new_schedule)
-    # # init planning cache with the existing solution
-    # t0 = map(v->get(cache.t0, get_vtx(project_schedule, get_vtx_id(new_schedule, v)), 0.0), vertices(G))
-    # new_cache = initialize_planning_cache(new_schedule;t0=t0)
-    # # identify active and fixed nodes
-    # active_vtxs = Set{Int}()
-    # fixed_vtxs = Set{Int}()
-    # for v in vertices(G)
-    #     if new_cache.tF[v] < t
-    #         push!(fixed_vtxs, v)
-    #     elseif new_cache.t0[v] <= t <= new_cache.tF[v] # test if vertex is eligible to be dropped
-    #         node_id = get_vtx_id(new_schedule,v)
-    #         push!(active_vtxs, v)
-    #         for e in edges(bfs_tree(G,v;dir=:in))
-    #             push!(fixed_vtxs, e.dst)
-    #         end
-    #     end
-    # end
-    # # set all fixed_vtxs to plan_path=false
-    # for v in fixed_vtxs
-    #     set_path_spec!(new_schedule,v,PathSpec(get_path_spec(new_schedule,v), plan_path=false, fixed=true))
-    # end
-    # # verify that all vertices following active_vtxs have a start time > 0
-    # let
-    #     s1 = map(v->new_cache.t0[v], collect(fixed_vtxs))
-    #     s2 = map(v->new_cache.t0[v], collect(active_vtxs))
-    #     s3 = map(v->new_cache.t0[v], collect(setdiff(collect(vertices(G)),union(fixed_vtxs,active_vtxs))))
-    #     @test all(s3 .> 0)
-    # end
 
     print_project_schedule(new_schedule,"new_schedule";mode=:leaf_aligned)
 
     #### Next Project schedule to splice in:
     def2 = project_list[2]
-    project_spec2, problem_spec2, _, _, _ = construct_task_graphs_problem(
-        def2, dist_matrix, shape_dict=factory_env.expanded_zones);
+    project_spec2, problem_spec2, _, _, _ = construct_task_graphs_problem(def2, dist_matrix, shape_dict=factory_env.expanded_zones);
     next_schedule = construct_partial_project_schedule(project_spec2,problem_spec2)
-    # next_schedule = construct_partial_project_schedule(def2.project_spec,problem_spec)
-    set_leaf_operation_nodes!(next_schedule)
 
     print_project_schedule(next_schedule,"next_schedule";mode=:leaf_aligned)
 
-    # remap object ids
+    # remap object ids in incoming project
     max_obj_id = maximum([get_id(id) for id in get_vtx_ids(project_schedule) if typeof(id) <: ObjectID])
     remap_object_ids!(next_schedule,max_obj_id)
 
@@ -433,22 +403,26 @@ let
     end
 
     # splice projects together!
-    for v in vertices(get_graph(next_schedule))
-        node_id = get_vtx_id(next_schedule, v)
-        add_to_schedule!(new_schedule, get_node_from_id(next_schedule, node_id), node_id)
-    end
-    for e in edges(get_graph(next_schedule))
-        node_id1 = get_vtx_id(next_schedule, e.src)
-        node_id2 = get_vtx_id(next_schedule, e.dst)
-        add_edge!(new_schedule, node_id1, node_id2)
-    end
-    set_leaf_operation_nodes!(new_schedule)
+    splice_schedules!(new_schedule,next_schedule)
+    # for v in vertices(get_graph(next_schedule))
+    #     node_id = get_vtx_id(next_schedule, v)
+    #     add_to_schedule!(new_schedule, get_node_from_id(next_schedule, node_id), node_id)
+    # end
+    # for e in edges(get_graph(next_schedule))
+    #     node_id1 = get_vtx_id(next_schedule, e.src)
+    #     node_id2 = get_vtx_id(next_schedule, e.dst)
+    #     add_edge!(new_schedule, node_id1, node_id2)
+    # end
+    # set_leaf_operation_nodes!(new_schedule)
     G = get_graph(new_schedule)
     # do this again because now we have more nodes
     t0 = map(v->get(new_cache.t0, v, t_arrival), vertices(G))
     new_cache = initialize_planning_cache(new_schedule;t0=t0)
 
     print_project_schedule(new_schedule,"spliced_schedule";mode=:leaf_aligned)
+
+    # The information relevant to replanning
+    new_schedule, new_cache, trimmed_solution
 
     new_schedule_copy = deepcopy(new_schedule)
 
