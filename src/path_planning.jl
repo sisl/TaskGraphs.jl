@@ -30,7 +30,7 @@ const Action = PCCBS.Action
 """
 struct PC_TAPF{L<:LowLevelSolution}
     env::GridFactoryEnvironment
-    schedule::ProjectSchedule
+    schedule::ProjectSchedule       # partial project schedule
     initial_solution::L             # initial condition
 end
 
@@ -414,33 +414,19 @@ function construct_search_env(schedule, problem_spec, env_graph;
         primary_objective=SumOfMakeSpans,
         extra_T=400
     )
-    # schedule = construct_project_schedule(project_spec, problem_spec, robot_ICs, assignments)
     cache = initialize_planning_cache(schedule)
-    # Paths stored as seperate chunks (will need to be concatenated before conflict checking)
     N = problem_spec.N                                          # number of robots
-    starts = map(i->PCCBS.State(),1:N) # no need to fill because we pull each goal directly from the path_spec
-    goals = map(i->PCCBS.State(),1:N) # no need to fill because we pull each goal directly from the path_spec
-    # NOTE: This particular setting of cost model is crucuial for good performance of A_start, because it encourages depth first search. If we were to replace them with SumOfTravelTime(), we would get worst-case exponentially slow breadth-first search!
+    # NOTE: This particular setting of cost model is crucial for good performance of A_star, because it encourages depth first search. If we were to replace them with SumOfTravelTime(), we would get worst-case exponentially slow breadth-first search!
     cost_model = construct_composite_cost_model(
         primary_objective(schedule,cache),
         HardConflictCost(env_graph,maximum(cache.tF)+extra_T, N),
         SumOfTravelDistance(),
         FullCostModel(sum,NullCost()) # SumOfTravelTime(),
     )
-    # ph = DefaultPerfectHeuristic(PerfectHeuristic(get_dist_matrix(env_graph)))
     ph = PerfectHeuristic(get_dist_matrix(env_graph))
-    heuristic_model = construct_composite_heuristic(
-        ph,
-        NullHeuristic(),
-        ph,
-        ph
-    )
-    # TODO should we remove this MAPF completely?
+    heuristic_model = construct_composite_heuristic(ph,NullHeuristic(),ph,ph)
     low_level_env = PCCBS.LowLevelEnv(
-        graph=env_graph,
-        cost_model=cost_model,
-        heuristic=heuristic_model
-        )
+        graph=env_graph, cost_model=cost_model, heuristic=heuristic_model)
 
     env = SearchEnv(schedule=schedule, cache=cache, env=low_level_env, problem_spec=problem_spec, num_agents=N)
     return env

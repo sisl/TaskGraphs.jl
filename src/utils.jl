@@ -15,77 +15,6 @@ using CRCBS
 # using ..TaskGraphsCore
 
 export
-    # validate,
-    exclude_solutions!,
-    cached_pickup_and_delivery_distances,
-    construct_task_graphs_problem
-
-# function get_station_precedence_dict(model::M) where {M<:JuMP.Model} end
-# function validate(path::Path, msg::String)
-#     @assert( !any(convert_to_vertex_lists(path) .== -1), msg )
-#     return true
-# end
-# function validate(path::Path, v::Int)
-#     validate(path, string("invalid path with -1 vtxs: v = ",v,", path = ",convert_to_vertex_lists(path)))
-# end
-# function validate(path::Path, v::Int, cbs_env)
-#     validate(path, string("v = ",v,", path = ",convert_to_vertex_lists(path),", goal: ",cbs_env.goal))
-# end
-# function validate(project_schedule::ProjectSchedule)
-#     G = get_graph(project_schedule)
-#     try
-#         @assert !is_cyclic(G) "is_cyclic(G)"
-#         for (id,node) in project_schedule.planning_nodes
-#             if typeof(node) <: COLLECT
-#                 @assert(get_location_id(node) != -1, string("get_location_id(node) != -1 for node id ", id))
-#             end
-#         end
-#         for v in vertices(G)
-#             node = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v))
-#             @assert( outdegree(G,v) >= sum([0, values(required_successors(node))...]) )
-#             @assert( indegree(G,v) >= sum([0, values(required_predecessors(node))...]) )
-#         end
-#     catch e
-#         # if typeof(e) <: AssertionError
-#         #     print(e.msg)
-#         # else
-#             throw(e)
-#         # end
-#         return false
-#     end
-#     return true
-# end
-# function validate(project_schedule::ProjectSchedule,paths::Vector{Vector{Int}},t0::Vector{Int},tF::Vector{Int})
-#     G = get_graph(project_schedule)
-#     for v in vertices(G)
-#         node = get_node_from_vtx(project_schedule, v)
-#         path_spec = get_path_spec(project_schedule, v)
-#         agent_id = path_spec.agent_id
-#         if agent_id != -1
-#             path = paths[agent_id]
-#             start_vtx = path_spec.start_vtx
-#             final_vtx = path_spec.final_vtx
-#             try
-#                 if start_vtx != -1
-#                     @assert(path[t0[v] + 1] == start_vtx, string("node: ",typeof(node), ", vtx: ",start_vtx, ", t+1: ",t0[v]+1,", path: ", path))
-#                 end
-#                 if final_vtx != -1
-#                     @assert(path[tF[v] + 1] == final_vtx, string("node: ",typeof(node), ", vtx: ",start_vtx, ", t+1: ",t0[v]+1,", path: ", path))
-#                 end
-#             catch e
-#                 # if typeof(e) <: AssertionError
-#                 #     print(e.msg)
-#                 # else
-#                     throw(e)
-#                 # end
-#                 return false
-#             end
-#         end
-#     end
-#     return true
-# end
-
-export
     remap_object_id,
     remap_object_ids!
 
@@ -118,6 +47,11 @@ function remap_object_ids!(project_schedule::ProjectSchedule,args...)
     project_schedule
 end
 
+export
+    # validate,
+    exclude_solutions!,
+    cached_pickup_and_delivery_distances,
+    construct_task_graphs_problem
 
 
 """
@@ -204,8 +138,6 @@ function construct_task_graphs_problem(
         robot_ICs[r+N] = ROBOT_AT(r+N,sF[r])
     end
 
-    Drs, Dss = cached_pickup_and_delivery_distances(r0,s0,sF,(v1,v2)->dist_matrix[v1,v2])
-
     delivery_graph = construct_delivery_graph(new_project_spec,M)
     # display(delivery_graph.tasks)
     G = delivery_graph.graph
@@ -222,8 +154,8 @@ function construct_task_graphs_problem(
         tr0_[i] = 0.0
     end
     root_node_groups = map(v->Set(get_input_ids(new_project_spec.operations[v])),collect(new_project_spec.root_nodes))
-    problem_spec = ProblemSpec(N=N,M=M,graph=G,D=dist_matrix,Drs=Drs,
-        Dss=Dss,Δt=Δt,tr0_=tr0_,to0_=to0_,root_nodes=root_node_groups,
+    problem_spec = ProblemSpec(N=N,M=M,graph=G,D=dist_matrix,
+        Δt=Δt,tr0_=tr0_,to0_=to0_,root_nodes=root_node_groups,
         cost_function=cost_function,
         Δt_collect=Δt_collect,Δt_deliver=Δt_deliver,r0=r0,s0=s0,sF=sF)
     # @show problem_spec.root_nodes
@@ -265,8 +197,6 @@ function construct_task_graphs_problem(
         robot_ICs[r+N] = ROBOT_AT(r+N,sF[r])
     end
 
-    Drs, Dss = cached_pickup_and_delivery_distances(r0,s0,sF,dist_function)
-
     delivery_graph = construct_delivery_graph(project_spec,M)
     # display(delivery_graph.tasks)
     G = delivery_graph.graph
@@ -283,8 +213,8 @@ function construct_task_graphs_problem(
         tr0_[i] = 0.0
     end
     root_node_groups = map(v->get_input_ids(project_spec.operations[v]),collect(project_spec.root_nodes))
-    problem_spec = ProblemSpec(N=N,M=M,graph=G,D=dist_matrix,Drs=Drs,
-        Dss=Dss,Δt=Δt_process,tr0_=tr0_,to0_=to0_,root_nodes=root_node_groups,
+    problem_spec = ProblemSpec(N=N,M=M,graph=G,D=dist_matrix,
+        Δt=Δt_process,tr0_=tr0_,to0_=to0_,root_nodes=root_node_groups,
         cost_function=cost_function,
         Δt_collect=Δt_collect,Δt_deliver=Δt_deliver,r0=r0,s0=s0,sF=sF)
     # @show problem_spec.root_nodes

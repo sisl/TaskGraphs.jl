@@ -110,8 +110,6 @@ export
     - N::Int - num robots
     - M::Int - num tasks
     - graph::G - delivery graph
-    - Drs::Matrix{Float64} - distance matrix robot initial locations -> pickup stations
-    - Dss::Matrix{Float64} - distance matrix piickup stations -> dropoff stations
     - Δt::Vector{Float64}  - durations of operations
     - tr0_::Dict{Int,Float64} - robot start times
     - to0_::Dict{Int,Float64} - object start times
@@ -127,8 +125,6 @@ export
     M::Int                  = 0 # num tasks
     graph::G                = DiGraph() # delivery graph
     D::T                    = zeros(0,0) # full distance matrix
-    Drs::Matrix{Float64}    = zeros(N+M,M) # distance matrix robot initial locations -> pickup stations
-    Dss::Matrix{Float64}    = zeros(M,M) # distance matrix pickup stations -> dropoff stations
     Δt::Vector{Float64}     = Vector{Float64}() # durations of operations
     Δt_collect::Vector{Float64} = zeros(M) # duration of COLLECT operations
     Δt_deliver::Vector{Float64} = zeros(M) # duration of DELIVER operations
@@ -1453,7 +1449,8 @@ export
     update_project_schedule!
 
 function add_job_shop_constraints!(schedule::P,spec::T,model::JuMP.Model) where {P<:ProjectSchedule,T<:ProblemSpec}
-    M = spec.M
+    # M = spec.M
+    M = length(get_object_ICs(schedule))
     s0 = spec.s0
     sF = spec.sF
     tor = Int.(round.(value.(model[:tor]))) # collect begin time
@@ -1500,18 +1497,15 @@ function add_job_shop_constraints!(milp_model::AssignmentMILP,schedule::ProjectS
 end
 
 """
+    `formulate_optimization_problem()`
+
     Express the TaskGraphs assignment problem as a MILP using the JuMP optimization
     framework.
-
-    `formulate_optimization_problem(G,Drs,Dss,Δt,to0_,tr0_,optimizer)`
 
     Inputs:
         `G` - graph with inverted tree structure that encodes dependencies
             between tasks
-        `Drs` - Drs[i,j] is distance from initial robot position i to pickup
-            station j
-        `Dss` - Dss[j,j] is distance from start station j to final station j (we
-            only care about the diagonal)
+        `D` - D[s₁,s₂] is distance from position s₁ to position s₂
         `Δt` - Δt[j] is the duraction of time that must elapse after all prereqs
             of task j have been satisfied before task j becomes available
         `Δt_collect` - Δt_collect[j] is the time required for a robot to pick up
@@ -1540,7 +1534,7 @@ end
     Outputs:
         `model` - the optimization model
 """
-function formulate_optimization_problem(N,M,G,D,Drs,Dss,Δt,Δt_collect,Δt_deliver,to0_,tr0_,root_nodes,weights,r0,s0,sF,nR,optimizer;
+function formulate_optimization_problem(N,M,G,D,Δt,Δt_collect,Δt_deliver,to0_,tr0_,root_nodes,weights,r0,s0,sF,nR,optimizer;
     TimeLimit=100,
     OutputFlag=0,
     Presolve = -1, # automatic setting (-1), off (0), conservative (1), or aggressive (2)
@@ -1555,8 +1549,7 @@ function formulate_optimization_problem(N,M,G,D,Drs,Dss,Δt,Δt_collect,Δt_deli
         OutputFlag=OutputFlag,
         Presolve=Presolve
         ))
-    # M = size(Dss,1)
-    # N = size(Drs,1)-M
+
     r0 = vcat(r0,sF) # combine to get dummy robot ``spawn'' locations too
     @variable(model, to0[1:M] >= 0.0) # object availability time
     @variable(model, tor[1:M] >= 0.0) # object robot arrival time
@@ -1582,7 +1575,7 @@ function formulate_optimization_problem(N,M,G,D,Drs,Dss,Δt,Δt_collect,Δt_deli
         @constraint(model, X[i,j] == 1)
     end
     # constraints
-    Mm = sum(D) # sum(Drs) + sum(Dss) # for big-M constraints
+    Mm = sum(D)
     for j in 1:M
         # constraint on task start time
         if !is_root_node(G,j)
@@ -1598,14 +1591,7 @@ function formulate_optimization_problem(N,M,G,D,Drs,Dss,Δt,Δt_collect,Δt_deli
             @constraint(model, X[j+N,v] == 0)
         end
         # lower bound on task completion time (task can't start until it's available).
-        # tof[j] = to0[j] + Dss[j,j] + slack[j]
         @constraint(model, tor[j] >= to0[j])
-        # @constraint(model, tof[j] >= tor[j] + Dss[j,j] + Δt_collect[j] + Δt_deliver[j])
-        # bound on task completion time (assigned robot must first complete delivery)
-        # Big M constraint (thanks Oriana!): When X[i,j] == 1, this constrains the final time
-        # to be no less than the time it takes for the delivery to be completed by robot i.
-        # When X[i,j] == 0, this constrains the final time to be greater than a large negative
-        # number (meaning that this is a trivial constraint)
         for i in 1:N+M
             @constraint(model, tor[j] - (tr0[i] + D[r0[i],s0[j]]) >= -Mm*(1 - X[i,j]))
         end
@@ -1677,8 +1663,6 @@ function formulate_optimization_problem(spec::T,optimizer;
         spec.M,
         spec.graph,
         spec.D,
-        spec.Drs,
-        spec.Dss,
         spec.Δt,
         spec.Δt_collect,
         spec.Δt_deliver,
@@ -2364,7 +2348,10 @@ function update_project_schedule!(milp_model::AssignmentMILP,
         assignment_matrix,
         DEBUG::Bool=false
     ) where {M<:TaskGraphsMILP,P<:ProjectSchedule,T<:ProblemSpec}
-    assignment_dict, assignments = get_assignment_dict(assignment_matrix,problem_spec.N,problem_spec.M)
+    N = length(get_robot_ICs(project_schedule))
+    M = length(get_object_ICs(project_schedule))
+    # assignment_dict, assignments = get_assignment_dict(assignment_matrix,problem_spec.N,problem_spec.M)
+    assignment_dict, assignments = get_assignment_dict(assignment_matrix,N,M)
     G = get_graph(project_schedule)
     adj_matrix = adjacency_matrix(G)
     for (robot_id, task_list) in assignment_dict
