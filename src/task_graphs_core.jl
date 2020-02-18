@@ -448,35 +448,6 @@ export
     # retrieve the portion of the path directly from the pre-existing solution.
     fixed               ::Bool          = false
 end
-# function PathSpec(
-#         spec::PathSpec,
-#         node_type=spec.node_type,
-#         start_vtx=spec.start_vtx,
-#         final_vtx=spec.final_vtx,
-#         min_path_duration=spec.min_path_duration,
-#         agent_id=spec.agent_id,
-#         object_id=spec.object_id,
-#         plan_path=spec.plan_path,
-#         tight=spec.tight,
-#         static=spec.static,
-#         free=spec.free,
-#         fixed=spec.fixed,
-#     )
-#
-#     PathSpec(
-#         node_type,
-#         start_vtx,
-#         final_vtx,
-#         min_path_duration,
-#         agent_id,
-#         object_id,
-#         plan_path,
-#         tight,
-#         static,
-#         free,
-#         fixed,
-#     )
-# end
 
 export
     ProjectSchedule,
@@ -1969,6 +1940,7 @@ function formulate_milp(milp_model::SparseAdjacencyMILP,project_schedule::Projec
         OutputFlag=0,
         Presolve=-1, # automatic setting (-1), off (0), conservative (1), or aggressive (2)
         t0_ = Dict{AbstractID,Float64}(), # dictionary of initial times. Default is empty
+        tF_ = Dict{AbstractID,Float64}(), # dictionary of initial times. Default is empty
         Mm = 10000, # for big M constraints
         cost_model = SumOfMakeSpans,
     )
@@ -1995,6 +1967,10 @@ function formulate_milp(milp_model::SparseAdjacencyMILP,project_schedule::Projec
     for (id,t) in t0_
         v = get_vtx(project_schedule, id)
         @constraint(model, t0[v] >= t)
+    end
+    for (id,t) in tF_
+        v = get_vtx(project_schedule, id)
+        @constraint(model, tF[v] >= t)
     end
     # Precedence constraints and duration constraints for existing nodes and edges
     for v in vertices(G)

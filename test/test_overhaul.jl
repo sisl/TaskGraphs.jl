@@ -240,8 +240,8 @@ let
 
     # generate random problem sequence
     Random.seed!(0)
-    N = 2
-    M = 3
+    N = 4
+    M = 6
     max_parents = 3
     depth_bias = 0.4
     Δt_min = 0
@@ -391,7 +391,8 @@ let
 
     model = formulate_milp(SparseAdjacencyMILP(),new_schedule,problem_spec;
         cost_model=SumOfMakeSpans,
-        t0_ = Dict{AbstractID,Int}(get_vtx_id(new_schedule, v)=>t0 for (v,t0) in enumerate(new_cache.t0))
+        t0_ = Dict{AbstractID,Int}(get_vtx_id(new_schedule, v)=>t0 for (v,t0) in enumerate(new_cache.t0)),
+        tF_ = Dict{AbstractID,Int}(get_vtx_id(new_schedule, v)=>tF for (v,tF) in enumerate(new_cache.tF))
         )
     optimize!(model)
     @test termination_status(model) == MOI.OPTIMAL
@@ -411,14 +412,12 @@ let
     #    end
     # end
 
-    print_project_schedule("updated_schedule",new_schedule,new_cache;mode=:leaf_aligned)
-
     # TODO Pass the final solution
     solver = PC_TAPF_Solver(
         nbs_model=SparseAdjacencyMILP(),
         DEBUG=true,
-        l1_verbosity=1,
-        l2_verbosity=1,
+        l1_verbosity=0,
+        l2_verbosity=0,
         l3_verbosity=0,
         l4_verbosity=0,
         LIMIT_A_star_iterations=5*nv(env_graph)
@@ -426,6 +425,11 @@ let
 
     base_search_env = construct_search_env(new_schedule_copy, problem_spec, env_graph;t0=new_cache.t0,tF=new_cache.tF)
     base_search_env = SearchEnv(base_search_env, base_solution=trimmed_solution)
+
+    print_project_schedule("updated_schedule",new_schedule,initialize_planning_cache(new_schedule;t0=new_cache.t0,tF=new_cache.tF);mode=:leaf_aligned)
+    for v in new_schedule.root_nodes
+        @show v, base_search_env.cache.tF[v]
+    end
 
     solution, assignment, cost, env  = high_level_search!(solver, base_search_env, Gurobi.Optimizer;
         cost_model=SumOfMakeSpans,

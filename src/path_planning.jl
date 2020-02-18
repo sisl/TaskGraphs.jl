@@ -941,6 +941,7 @@ export
 # function high_level_search!(solver::P, env_graph, project_schedule::ProjectSchedule, problem_spec,  optimizer;
 function high_level_search!(solver::P, base_search_env::SearchEnv,  optimizer;
         t0_ = Dict{AbstractID,Int}(get_vtx_id(base_search_env.schedule, v)=>t0 for (v,t0) in enumerate(base_search_env.cache.t0)),
+        tF_ = Dict{AbstractID,Int}(get_vtx_id(base_search_env.schedule, v)=>tF for (v,tF) in enumerate(base_search_env.cache.tF)),
         primary_objective=SumOfMakeSpans,
         kwargs...) where {P<:PC_TAPF_Solver}
 
@@ -956,9 +957,8 @@ function high_level_search!(solver::P, base_search_env::SearchEnv,  optimizer;
     best_solution   = default_solution(base_search_env)
     best_env        = SearchEnv()
     best_assignment = adjacency_matrix(get_graph(project_schedule))
-    # model = formulate_milp(milp_model,project_schedule,problem_spec;
     model = formulate_milp(solver.nbs_model,project_schedule,problem_spec;
-        cost_model=primary_objective,optimizer=optimizer,t0_=t0_,kwargs...) #TODO pass t0_ in replanning mode
+        cost_model=primary_objective,optimizer=optimizer,t0_=t0_,tF_=tF_,kwargs...) #TODO pass t0_ in replanning mode
 
     base_schedule = deepcopy(project_schedule)
 
@@ -1116,11 +1116,8 @@ function prune_project_schedule(project_schedule::ProjectSchedule,problem_spec::
             robot_id = get_robot_id(node)
             if haskey(robot_positions, robot_id)
                 replace_in_schedule!(new_schedule, robot_positions[robot_id], robot_id)
-                # Make sure the availability time is accurate
-                prev_vtx = inneighbors(get_graph(project_schedule),get_vtx(project_schedule,node_id))[1]
-                t0[get_vtx(new_schedule,robot_id)] = cache.tF[prev_vtx]
-                # # To ensure that
-                # set_path_spec!(new_schedule, v, PathSpec(get_path_spec(new_schedule,v),fixed=true,plan_path=false))
+                t0[get_vtx(new_schedule,robot_id)] = t
+                replace_in_schedule!(new_schedule, problem_spec, GO(robot_id, robot_positions[robot_id].x, node.x2), node_id) # TODO Make this less hacky
             end
             add_edge!(new_schedule, robot_id, node_id)
         end
@@ -1224,7 +1221,7 @@ function trim_solution(env, solution, T)
         )
         old_path = get_paths(solution)[agent_id]
         new_path = get_paths(trimmed_solution)[agent_id]
-        for t in 1:min(T, length(old_path))
+        for t in 1:max(1, min(T, length(old_path)))
             p = get_path_node(old_path,t)
             push!(new_path, p)
             new_path.cost = accumulate_cost(cbs_env, get_cost(new_path), get_transition_cost(cbs_env, p.s, p.a, p.sp))
