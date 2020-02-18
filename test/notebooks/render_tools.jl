@@ -652,11 +652,14 @@ function get_node_text(search_env::SearchEnv,graph,v,x,y,r)
     string(cache.t0[v_]," - ",cache.tF[v_],"\n",cache.local_slack[v_]," - ",cache.slack[v_])
 end
 
-function show_times(sched,v)
+function show_times(sched::ProjectSchedule,v)
     arr = process_schedule(sched)
     return string(map(a->string(a[v],","), arr[1:2])...)
 end
-function print_project_schedule(project_schedule,filename;mode=:root_aligned,verbose=true)
+function show_times(cache::PlanningCache,v)
+    return string(cache.t0[v],",",cache.tF[v])
+end
+function print_project_schedule(filename::String,project_schedule::ProjectSchedule,cache=initialize_planning_cache(project_schedule);mode=:root_aligned,verbose=true)
     rg = get_display_metagraph(project_schedule;
         f=(v,p)->string(v,",",get_path_spec(project_schedule,v).agent_id))
     plot_graph_bfs(rg;
@@ -665,13 +668,14 @@ function print_project_schedule(project_schedule,filename;mode=:root_aligned,ver
         color_function = (G,v,x,y,r)->get_prop(G,v,:color),
         text_function = (G,v,x,y,r)->string(
             title_string(get_node_from_id(project_schedule, get_vtx_id(project_schedule, v)),verbose),
-            "\n",show_times(project_schedule,v)
+            "\n",show_times(cache,v)
             )
     ) |> Compose.SVG(string(filename,".svg"))
     # `inkscape -z project_schedule1.svg -e project_schedule1.png`
     # OR: `for f in *.svg; do inkscape -z $f -e $f.png; done`
 end
-function print_project_schedule(project_schedule,model,filename;mode=:root_aligned,verbose=true)
+print_project_schedule(project_schedule::ProjectSchedule,filename::String;kwargs...) = print_project_schedule(filename,project_schedule)
+function print_project_schedule(project_schedule::ProjectSchedule,model,filename;mode=:root_aligned,verbose=true)
     rg = get_display_metagraph(project_schedule;
         f=(v,p)->string(v,",",get_path_spec(project_schedule,v).agent_id))
     plot_graph_bfs(rg;

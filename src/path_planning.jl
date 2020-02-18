@@ -958,7 +958,7 @@ function high_level_search!(solver::P, base_search_env::SearchEnv,  optimizer;
     best_assignment = adjacency_matrix(get_graph(project_schedule))
     # model = formulate_milp(milp_model,project_schedule,problem_spec;
     model = formulate_milp(solver.nbs_model,project_schedule,problem_spec;
-        cost_model=primary_objective,optimizer=optimizer,kwargs...) #TODO pass t0_ in replanning mode
+        cost_model=primary_objective,optimizer=optimizer,t0_=t0_,kwargs...) #TODO pass t0_ in replanning mode
 
     base_schedule = deepcopy(project_schedule)
 
@@ -999,7 +999,8 @@ function high_level_search!(solver::P, base_search_env::SearchEnv,  optimizer;
                         primary_objective=primary_objective,
                         t0 = base_search_env.cache.t0,
                         tF = base_search_env.cache.tF
-                        ) # TODO pass in t0_ here (maybe get it straight from model?)
+                        ) # TODO pass in previous solution
+                    env = SearchEnv(env,base_solution=base_search_env.base_solution)
                     pc_mapf = PC_MAPF(env);
                     ##### Call CBS Search Routine (LEVEL 2) #####
                     solution, cost = solve!(solver,pc_mapf);
@@ -1031,7 +1032,7 @@ end
 function high_level_search!(solver::PC_TAPF_Solver, env_graph, project_schedule::ProjectSchedule, problem_spec,  optimizer;
     kwargs...)
     base_search_env = construct_search_env(project_schedule,problem_spec,env_graph)
-    @show base_search_env.cache.t0
+    # @show base_search_env.cache.t0
     high_level_search!(solver, base_search_env, optimizer;
         kwargs...
     )
@@ -1071,7 +1072,7 @@ end
     them (except for ROBOT_AT nodes), and create new edges between the ROBOT_AT
     nodes and their first GO assignments.
 """
-function prune_project_schedule(project_schedule::ProjectSchedule,cache::PlanningCache,t;
+function prune_project_schedule(project_schedule::ProjectSchedule,problem_spec::ProblemSpec,cache::PlanningCache,t;
     robot_positions::Dict{RobotID,ROBOT_AT}=Dict{RobotID,ROBOT_AT}()
     )
     G = get_graph(project_schedule)
@@ -1081,8 +1082,8 @@ function prune_project_schedule(project_schedule::ProjectSchedule,cache::Plannin
         if cache.tF[v] <= t # test if vertex is eligible to be dropped
             node_id = get_vtx_id(project_schedule,v)
             node = get_node_from_id(project_schedule, node_id)
-            if typeof(node) <: Operation
-                @show node_id
+            if isa(node, Operation)
+                # @show node_id
                 push!(remove_set, v)
                 for e in edges(bfs_tree(G,v;dir=:in))
                     if !(typeof(get_vtx_id(project_schedule, e.dst)) <: RobotID)
@@ -1106,13 +1107,20 @@ function prune_project_schedule(project_schedule::ProjectSchedule,cache::Plannin
         add_edge!(new_schedule, id1, id2)
     end
     # draw new ROBOT_AT -> GO edges where necessary
+    G = get_graph(new_schedule)
+    t0 = map(v->get(cache.t0, get_vtx(project_schedule, get_vtx_id(new_schedule, v)), 0.0), vertices(G))
     for v in vertices(get_graph(new_schedule))
         node_id = get_vtx_id(new_schedule,v)
         node = get_node_from_id(new_schedule, node_id)
-        if typeof(node) <: GO && indegree(get_graph(new_schedule),v) == 0
+        if isa(node,GO) && indegree(get_graph(new_schedule),v) == 0
             robot_id = get_robot_id(node)
             if haskey(robot_positions, robot_id)
                 replace_in_schedule!(new_schedule, robot_positions[robot_id], robot_id)
+                # Make sure the availability time is accurate
+                prev_vtx = inneighbors(get_graph(project_schedule),get_vtx(project_schedule,node_id))[1]
+                t0[get_vtx(new_schedule,robot_id)] = cache.tF[prev_vtx]
+                # # To ensure that
+                # set_path_spec!(new_schedule, v, PathSpec(get_path_spec(new_schedule,v),fixed=true,plan_path=false))
             end
             add_edge!(new_schedule, robot_id, node_id)
         end
@@ -1122,21 +1130,21 @@ function prune_project_schedule(project_schedule::ProjectSchedule,cache::Plannin
     ################################################################3
     ################################################################3
     # init planning cache with the existing solution
-    G = get_graph(new_schedule)
-    t0 = map(v->get(cache.t0, get_vtx(project_schedule, get_vtx_id(new_schedule, v)), 0.0), vertices(G))
+    # G = get_graph(new_schedule)
+    # t0 = map(v->get(cache.t0, get_vtx(project_schedule, get_vtx_id(new_schedule, v)), 0.0), vertices(G))
     new_cache = initialize_planning_cache(new_schedule;t0=t0)
     # identify active and fixed nodes
     active_vtxs = Set{Int}()
     fixed_vtxs = Set{Int}()
     for v in vertices(G)
-        if new_cache.tF[v] < t
+        if new_cache.tF[v] + minimum(new_cache.local_slack[v]) <= t
             push!(fixed_vtxs, v)
-        elseif new_cache.t0[v] <= t <= new_cache.tF[v] # test if vertex is eligible to be dropped
+        elseif new_cache.t0[v] <= t < new_cache.tF[v] + minimum(new_cache.local_slack[v])
             node_id = get_vtx_id(new_schedule,v)
             push!(active_vtxs, v)
-            for e in edges(bfs_tree(G,v;dir=:in))
-                push!(fixed_vtxs, e.dst)
-            end
+            # for e in edges(bfs_tree(G,v;dir=:in))
+            #     push!(fixed_vtxs, e.dst)
+            # end
         end
     end
     # set all fixed_vtxs to plan_path=false
@@ -1144,18 +1152,51 @@ function prune_project_schedule(project_schedule::ProjectSchedule,cache::Plannin
         set_path_spec!(new_schedule,v,PathSpec(get_path_spec(new_schedule,v), plan_path=false, fixed=true))
     end
     # verify that all vertices following active_vtxs have a start time > 0
-    # s1 = map(v->new_cache.t0[v], collect(fixed_vtxs))
-    # s2 = map(v->new_cache.t0[v], collect(active_vtxs))
-    # s3 = map(v->new_cache.t0[v], collect(setdiff(collect(vertices(G)),union(fixed_vtxs,active_vtxs))))
-    # @assert all(s3 .> 0)
+    @assert all(map(v->new_cache.t0[v], collect(fixed_vtxs)) .<= t)
+    @assert all(map(v->new_cache.tF[v] + minimum(new_cache.local_slack[v]), collect(active_vtxs)) .>= t)
+    # Remove all "assignments" from schedule
+    # for v in active_vtxs
+    #     node_id = get_vtx_id(new_schedule,v)
+    #     node = get_node_from_id(new_schedule,node_id)
+    #     if isa(node,GO)
+    #         # replace destination id
+    #         new_node = GO(node,x2=StationID(-1))
+    #         replace_in_schedule!(new_schedule,new_node,node_id)
+    #         for v2 in outneighbors(G,v)
+    #             rem_edge!(G,v,v2)
+    #         end
+    #     end
+    # end
+    # for v in setdiff(Set(vertices(G)),union(fixed_vtxs,active_vtxs))
+    for v in setdiff(Set(vertices(G)),fixed_vtxs)
+        node_id = get_vtx_id(new_schedule,v)
+        node = get_node_from_id(new_schedule,node_id)
+        if isa(node, Union{AbstractRobotAction})
+            new_node = typeof(node)(node,r=RobotID(-1))
+            if isa(node,GO)
+                new_node = GO(new_node,x2=StationID(-1))
+                for v2 in outneighbors(G,v)
+                    rem_edge!(G,v,v2)
+                end
+            end
+            replace_in_schedule!(new_schedule,problem_spec,new_node,node_id)
+        elseif isa(node,TEAM_ACTION)
+            for i in 1:length(node.instructions)
+                n = node.instructions[i]
+                node.instructions[i] = typeof(n)(n,r=RobotID(-1))
+            end
+        end
+    end
+    propagate_valid_ids!(new_schedule,problem_spec)
 
     new_schedule, new_cache
 end
 
+
 function splice_schedules!(project_schedule::P,next_schedule::P) where {P<:ProjectSchedule}
     for v in vertices(get_graph(next_schedule))
         node_id = get_vtx_id(next_schedule, v)
-        add_to_schedule!(project_schedule, get_node_from_id(next_schedule, node_id), node_id)
+        add_to_schedule!(project_schedule, get_path_spec(next_schedule,v), get_node_from_id(next_schedule, node_id), node_id)
     end
     for e in edges(get_graph(next_schedule))
         node_id1 = get_vtx_id(next_schedule, e.src)

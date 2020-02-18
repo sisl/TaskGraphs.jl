@@ -21,6 +21,7 @@ export
 # utilities for remappingg object ids
 remap_object_id(x,args...) = x
 remap_object_id(id::ObjectID,max_obj_id)    = ObjectID(get_id(id) + max_obj_id)
+remap_object_id(spec::PathSpec,max_obj_id)  = PathSpec(spec,object_id=spec.object_id + max_obj_id)
 remap_object_id(node::OBJECT_AT,args...)    = OBJECT_AT(remap_object_id(get_object_id(node),args...), get_initial_location_id(node))
 remap_object_id(node::A,args...) where {A<:Union{CARRY,COLLECT,DEPOSIT}} = A(node,o=remap_object_id(get_object_id(node),args...))
 remap_object_id(node::TEAM_ACTION,args...) = TEAM_ACTION(node,instructions=map(i->remap_object_id(i,args...),node.instructions))
@@ -43,6 +44,9 @@ function remap_object_ids!(project_schedule::ProjectSchedule,args...)
             delete!(dict, k)
             dict[remap_object_id(k,args...)] = new_node
         end
+    end
+    for v in vertices(get_graph(project_schedule))
+        project_schedule.path_specs[v] = remap_object_id(project_schedule.path_specs[v],args...)
     end
     project_schedule
 end

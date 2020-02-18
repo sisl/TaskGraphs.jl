@@ -832,7 +832,9 @@ function validate(project_schedule::ProjectSchedule)
                 for v2 in outneighbors(G,v)
                     node2 = get_node_from_vtx(project_schedule, v2)
                     if isa(node2, Union{GO,COLLECT,CARRY,DEPOSIT})
-                        @assert( get_robot_id(node) == get_robot_id(node2), string("robot IDs do not match: ",string(node), " --> ", string(node2)))
+                        if length(union(resources_reserved(node),resources_reserved(node2))) == 0 # jb shop constraint
+                            @assert( get_robot_id(node) == get_robot_id(node2), string("robot IDs do not match: ",string(node), " --> ", string(node2)))
+                        end
                     end
                 end
             end
