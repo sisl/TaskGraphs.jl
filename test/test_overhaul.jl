@@ -329,7 +329,7 @@ let
 
     #### solve initial problem
     solver = PC_TAPF_Solver(nbs_model=SparseAdjacencyMILP(),DEBUG=true,verbosity=1,LIMIT_A_star_iterations=5*nv(env_graph));
-    (solution, assignment, cost, search_env), elapsed_time, byte_ct, gc_time, mem_ct = @timed high_level_search!(
+    (initial_solution, assignment, cost, search_env), elapsed_time, byte_ct, gc_time, mem_ct = @timed high_level_search!(
         solver, env_graph, project_spec, problem_spec, robot_ICs, Gurobi.Optimizer;)
 
     project_schedule = search_env.schedule
@@ -343,10 +343,10 @@ let
 
     #### Trim existing solution
     # TODO maintain a base_schedule (for the sake of visualization) that chronicles the entire history of the factory
-    trimmed_solution = trim_solution(search_env.env, solution, t)
+    trimmed_solution = trim_solution(search_env.env, initial_solution, t)
     @test all([length(p) == get_cost(p)[1] for p in get_paths(trimmed_solution)])
     #### Prune existing schedule
-    new_schedule, new_cache = prune_project_schedule(project_schedule, problem_spec, cache, t; robot_positions=get_env_snapshot(solution,t))
+    new_schedule, new_cache = prune_project_schedule(project_schedule, problem_spec, cache, t; robot_positions=get_env_snapshot(initial_solution,t))
     @show new_cache.t0
 
     print_project_schedule("new_schedule",new_schedule,new_cache;mode=:leaf_aligned)
@@ -412,6 +412,8 @@ let
     #    end
     # end
 
+    updated_cache = initialize_planning_cache(new_schedule;t0=deepcopy(new_cache.t0),tF=deepcopy(new_cache.tF))
+
     # TODO Pass the final solution
     solver = PC_TAPF_Solver(
         nbs_model=SparseAdjacencyMILP(),
@@ -423,10 +425,10 @@ let
         LIMIT_A_star_iterations=5*nv(env_graph)
         );
 
-    base_search_env = construct_search_env(new_schedule_copy, problem_spec, env_graph;t0=new_cache.t0,tF=new_cache.tF)
+    base_search_env = construct_search_env(new_schedule_copy, problem_spec, env_graph;t0=deepcopy(new_cache.t0),tF=deepcopy(new_cache.tF))
     base_search_env = SearchEnv(base_search_env, base_solution=trimmed_solution)
 
-    print_project_schedule("updated_schedule",new_schedule,initialize_planning_cache(new_schedule;t0=new_cache.t0,tF=new_cache.tF);mode=:leaf_aligned)
+    print_project_schedule("updated_schedule",new_schedule,initialize_planning_cache(new_schedule;t0=deepcopy(new_cache.t0),tF=deepcopy(new_cache.tF));mode=:leaf_aligned)
     for v in new_schedule.root_nodes
         @show v, base_search_env.cache.tF[v]
     end
@@ -436,7 +438,18 @@ let
     )
 
     print_project_schedule("final_schedule",env.schedule,env.cache;mode=:leaf_aligned)
-
+    for v in vertices(get_graph(env.schedule))
+        t0 = env.cache.t0[v]
+        tF = env.cache.tF[v]
+        t0_ = base_search_env.cache.t0[v]
+        tF_ = base_search_env.cache.tF[v]
+        if (t0 - t0_ != 0) || (tF - tF_ != 0)
+            node_id = get_vtx_id(env.schedule, v)
+            node = get_node_from_id(env.schedule)
+            @show node
+            @show v, t0-t0_, tF-tF_
+        end
+    end
     # robot_paths = convert_to_vertex_lists(solution)
     # object_paths, object_intervals = get_object_paths(solution,env)
     # tf = maximum(map(p->length(p),robot_paths))

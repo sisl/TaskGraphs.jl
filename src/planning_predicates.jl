@@ -271,6 +271,15 @@ get_initial_location_id(a::A) where {A<:Union{COLLECT,DEPOSIT,ROBOT_AT,OBJECT_AT
 get_destination_location_id(a::A) where {A<:Union{COLLECT,DEPOSIT,ROBOT_AT,OBJECT_AT}} 	= get_location_id(a)
 get_object_id(a::A) where {A<:Union{CARRY,COLLECT,DEPOSIT}}         					= a.o
 
+export
+	split_node
+
+function split_node(node::N,x::StationID) where {N<:Union{GO,CARRY}}
+	N(node, x2=x), N(node, x1=x)
+end
+function split_node(node::N,x::StationID) where {N<:Union{DEPOSIT,COLLECT}}
+	N(node, x=x), N(node, x=x)
+end
 
 export
 	TEAM_ACTION,
@@ -371,7 +380,9 @@ align_with_predecessor(node::GO,pred::GO) 				= GO(first_valid(node.r,pred.r), f
 align_with_predecessor(node::GO,pred::DEPOSIT) 			= GO(first_valid(node.r,pred.r), first_valid(node.x1,pred.x), node.x2)
 align_with_predecessor(node::COLLECT,pred::OBJECT_AT) 	= COLLECT(node.r, first_valid(node.o,pred.o), first_valid(node.x,pred.x))
 align_with_predecessor(node::COLLECT,pred::GO) 			= COLLECT(first_valid(node.r,pred.r), node.o, first_valid(node.x,pred.x2))
+align_with_predecessor(node::COLLECT,pred::COLLECT) 	= COLLECT(first_valid(node.r,pred.r), node.o, first_valid(node.x,pred.x))
 align_with_predecessor(node::CARRY,pred::COLLECT) 		= CARRY(first_valid(node.r,pred.r), first_valid(node.o,pred.o), first_valid(node.x1,pred.x), node.x2)
+align_with_predecessor(node::CARRY,pred::CARRY) 		= CARRY(first_valid(node.r,pred.r), first_valid(node.o,pred.o), first_valid(node.x1,pred.x2), node.x2)
 align_with_predecessor(node::DEPOSIT,pred::CARRY)		= DEPOSIT(first_valid(node.r,pred.r), first_valid(node.o,pred.o), first_valid(node.x,pred.x2))
 
 function align_with_predecessor(node::TEAM_ACTION,pred)

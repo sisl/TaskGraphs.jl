@@ -197,6 +197,10 @@ end
 function step_low_level!(solver::S) where {S<:PC_TAPF_Solver}
     # check_time(solver)
 end
+function step_low_level!(solver::S,schedule_node::N,t0,tF,args...) where {S<:PC_TAPF_Solver,N<:AbstractPlanningPredicate}
+    step_low_level!(solver)
+    log_info(1,solver.l3_verbosity,"LOW_LEVEL_SEARCH: planning for node ",string(schedule_node), " t0 = ", t0, ", tF = ",tF)
+end
 function exit_low_level!(solver::S) where {S<:PC_TAPF_Solver}
     check_time(solver)
 end
@@ -620,6 +624,7 @@ function plan_path!(solver::PC_TAPF_Solver, env::SearchEnv, node::N, schedule_no
         path = base_path
         extend_path!(cbs_env,path,cache.tF[v]) # NOTE looks like this might work out of the box for replanning. No need for node surgery
         cost = get_cost(path)
+        CRCBS.logger_exit_a_star!(solver, path, cost, true)
         solver.DEBUG ? validate(path,v) : nothing
     else # if typeof(schedule_node) <: Union{GO,CARRY}
         solver.DEBUG ? validate(base_path,v) : nothing
@@ -732,8 +737,10 @@ function plan_next_path!(solver::S, env::E, node::N;
         v = dequeue!(env.cache.node_queue)
         node_id = get_vtx_id(env.schedule,v)
         schedule_node = get_node_from_id(env.schedule,node_id)
+        step_low_level!(solver,schedule_node,env.cache.t0[v],env.cache.tF[v])
         if get_path_spec(env.schedule, v).plan_path == true
-            enter_a_star!(solver,schedule_node,env.cache.t0[v],env.cache.tF[v])
+            enter_a_star!(solver)
+            # enter_a_star!(solver,schedule_node,env.cache.t0[v],env.cache.tF[v])
             try
                 valid_flag = plan_path!(solver,env,node,schedule_node,v;
                     heuristic=heuristic,path_finder=path_finder)
@@ -791,7 +798,7 @@ function CRCBS.low_level_search!(
 
     reset_solution!(node,env.base_solution)
     while length(env.cache.node_queue) > 0
-        step_low_level!(solver)
+        # step_low_level!(solver)
         if !(plan_next_path!(solver,env,node;heuristic=heuristic,path_finder=path_finder))
             return false
         end
@@ -1061,7 +1068,7 @@ export
     get_env_snapshot
 """
 function get_env_snapshot(solution::S,t) where {S<:LowLevelSolution}
-    Dict(RobotID(i)=>ROBOT_AT(i, get_s(get_path_node(path,t)).vtx) for (i,path) in enumerate(get_paths(solution)))
+    Dict(RobotID(i)=>ROBOT_AT(i, get_sp(get_path_node(path,t)).vtx) for (i,path) in enumerate(get_paths(solution)))
 end
 
 """
@@ -1077,48 +1084,88 @@ function prune_project_schedule(project_schedule::ProjectSchedule,problem_spec::
     )
     G = get_graph(project_schedule)
     new_schedule = ProjectSchedule()
-    remove_set = Set{Int}()
+
+    active_vtxs = Set{Int}()
     for v in vertices(G)
-        if cache.tF[v] <= t # test if vertex is eligible to be dropped
-            node_id = get_vtx_id(project_schedule,v)
-            node = get_node_from_id(project_schedule, node_id)
-            if isa(node, Operation)
-                # @show node_id
-                push!(remove_set, v)
-                for e in edges(bfs_tree(G,v;dir=:in))
-                    if !(typeof(get_vtx_id(project_schedule, e.dst)) <: RobotID)
-                        push!(remove_set, e.dst)
-                    end
-                end
+        if cache.t0[v] <= t < cache.tF[v] + minimum(cache.local_slack[v])
+            push!(active_vtxs, v)
+        end
+    end
+    remove_set = Set{Int}()
+    for v in active_vtxs
+        if isa(get_node_from_vtx(project_schedule,v),Operation)
+            push!(remove_set, v)
+        end
+        for e in edges(bfs_tree(G,v;dir=:in))
+            if isa(get_node_from_vtx(project_schedule, e.dst),Operation)
+                push!(remove_set, e.dst)
             end
         end
     end
+    for v in collect(remove_set)
+        for e in edges(bfs_tree(G,v;dir=:in))
+            if !(isa(get_node_from_vtx(project_schedule, e.dst),ROBOT_AT))
+                push!(remove_set, e.dst)
+            end
+        end
+    end
+    # Construct new graph
     keep_vtxs = setdiff(Set{Int}(collect(vertices(G))), remove_set)
     # add all non-deleted nodes to new project schedule
     for v in keep_vtxs
         node_id = get_vtx_id(project_schedule,v)
         node = get_node_from_id(project_schedule, node_id)
-        add_to_schedule!(new_schedule,get_path_spec(project_schedule,v),node,node_id)
+        path_spec = get_path_spec(project_schedule,v)
+        add_to_schedule!(new_schedule,path_spec,node,node_id)
     end
     # add all edges between nodes that still exist
     for e in edges(get_graph(project_schedule))
-        id1 = get_vtx_id(project_schedule, e.src)
-        id2 = get_vtx_id(project_schedule, e.dst)
-        add_edge!(new_schedule, id1, id2)
+        add_edge!(new_schedule, get_vtx_id(project_schedule, e.src), get_vtx_id(project_schedule, e.dst))
     end
-    # draw new ROBOT_AT -> GO edges where necessary
+    # Split active nodes
     G = get_graph(new_schedule)
     t0 = map(v->get(cache.t0, get_vtx(project_schedule, get_vtx_id(new_schedule, v)), 0.0), vertices(G))
+    tF = map(v->get(cache.tF, get_vtx(project_schedule, get_vtx_id(new_schedule, v)), 0.0), vertices(G))
+    for v_ in active_vtxs
+        v = get_vtx(new_schedule, get_vtx_id(project_schedule, v_))
+        node_id = get_vtx_id(new_schedule,v)
+        node = get_node_from_id(new_schedule, node_id)
+        # if isa(node,Union{GO,CARRY,COLLECT,DEPOSIT}) # split
+        if isa(node,GO) # split
+            x = robot_positions[node.r].x
+            node1,node2 = split_node(node,x)
+            replace_in_schedule!(new_schedule,problem_spec,node1,node_id)
+            node_id2 = ActionID(get_unique_action_id())
+            add_to_schedule!(new_schedule,problem_spec,node2,node_id2)
+            # remap edges
+            v2 = get_vtx(new_schedule, node_id2)
+            for vp in outneighbors(G,v)
+                rem_edge!(G,v,vp)
+                add_edge!(G,v2,vp)
+            end
+            add_edge!(G,v,v2)
+            # fix start and end times
+            push!(t0,t)
+            push!(tF,tF[v])
+            tF[v] = t
+            # reset path specs
+            set_path_spec!(new_schedule,v,PathSpec(get_path_spec(new_schedule,v),fixed=true,plan_path=false,min_path_duration=tF[v]-t0[v]))
+            set_path_spec!(new_schedule,v2,PathSpec(get_path_spec(new_schedule,v2),min_path_duration=tF[v2]-t0[v2]))
+        end
+    end
+    # draw new ROBOT_AT -> GO edges where necessary
     for v in vertices(get_graph(new_schedule))
         node_id = get_vtx_id(new_schedule,v)
         node = get_node_from_id(new_schedule, node_id)
         if isa(node,GO) && indegree(get_graph(new_schedule),v) == 0
             robot_id = get_robot_id(node)
-            if haskey(robot_positions, robot_id)
-                replace_in_schedule!(new_schedule, robot_positions[robot_id], robot_id)
-                t0[get_vtx(new_schedule,robot_id)] = t
-                replace_in_schedule!(new_schedule, problem_spec, GO(robot_id, robot_positions[robot_id].x, node.x2), node_id) # TODO Make this less hacky
-            end
+            replace_in_schedule!(new_schedule, ROBOT_AT(robot_id, node.x1), robot_id)
+            t0[get_vtx(new_schedule,robot_id)] = t0[v]
+            # if haskey(robot_positions, robot_id)
+            #     replace_in_schedule!(new_schedule, robot_positions[robot_id], robot_id)
+            #     t0[get_vtx(new_schedule,robot_id)] = t
+            #     replace_in_schedule!(new_schedule, problem_spec, GO(robot_id, robot_positions[robot_id].x, node.x2), node_id) # TODO Make this less hacky
+            # end
             add_edge!(new_schedule, robot_id, node_id)
         end
     end
@@ -1127,9 +1174,7 @@ function prune_project_schedule(project_schedule::ProjectSchedule,problem_spec::
     ################################################################3
     ################################################################3
     # init planning cache with the existing solution
-    # G = get_graph(new_schedule)
-    # t0 = map(v->get(cache.t0, get_vtx(project_schedule, get_vtx_id(new_schedule, v)), 0.0), vertices(G))
-    new_cache = initialize_planning_cache(new_schedule;t0=t0)
+    new_cache = initialize_planning_cache(new_schedule;t0=t0,tF=tF)
     # identify active and fixed nodes
     active_vtxs = Set{Int}()
     fixed_vtxs = Set{Int}()
@@ -1137,11 +1182,7 @@ function prune_project_schedule(project_schedule::ProjectSchedule,problem_spec::
         if new_cache.tF[v] + minimum(new_cache.local_slack[v]) <= t
             push!(fixed_vtxs, v)
         elseif new_cache.t0[v] <= t < new_cache.tF[v] + minimum(new_cache.local_slack[v])
-            node_id = get_vtx_id(new_schedule,v)
             push!(active_vtxs, v)
-            # for e in edges(bfs_tree(G,v;dir=:in))
-            #     push!(fixed_vtxs, e.dst)
-            # end
         end
     end
     # set all fixed_vtxs to plan_path=false
@@ -1152,19 +1193,6 @@ function prune_project_schedule(project_schedule::ProjectSchedule,problem_spec::
     @assert all(map(v->new_cache.t0[v], collect(fixed_vtxs)) .<= t)
     @assert all(map(v->new_cache.tF[v] + minimum(new_cache.local_slack[v]), collect(active_vtxs)) .>= t)
     # Remove all "assignments" from schedule
-    # for v in active_vtxs
-    #     node_id = get_vtx_id(new_schedule,v)
-    #     node = get_node_from_id(new_schedule,node_id)
-    #     if isa(node,GO)
-    #         # replace destination id
-    #         new_node = GO(node,x2=StationID(-1))
-    #         replace_in_schedule!(new_schedule,new_node,node_id)
-    #         for v2 in outneighbors(G,v)
-    #             rem_edge!(G,v,v2)
-    #         end
-    #     end
-    # end
-    # for v in setdiff(Set(vertices(G)),union(fixed_vtxs,active_vtxs))
     for v in setdiff(Set(vertices(G)),fixed_vtxs)
         node_id = get_vtx_id(new_schedule,v)
         node = get_node_from_id(new_schedule,node_id)
