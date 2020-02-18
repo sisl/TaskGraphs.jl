@@ -2278,15 +2278,17 @@ function propagate_valid_ids!(project_schedule::ProjectSchedule,problem_spec::Pr
     @assert(is_cyclic(G) == false, "is_cyclic(G)") # string(sparse(adj_matrix))
     # Propagate valid IDs through the schedule
     for v in topological_sort(G)
-        node_id = get_vtx_id(project_schedule, v)
-        node = get_node_from_id(project_schedule, node_id)
-        for v2 in inneighbors(G,v)
-            node = align_with_predecessor(node,get_node_from_vtx(project_schedule, v2))
+        if !get_path_spec(project_schedule, v).fixed
+            node_id = get_vtx_id(project_schedule, v)
+            node = get_node_from_id(project_schedule, node_id)
+            for v2 in inneighbors(G,v)
+                node = align_with_predecessor(node,get_node_from_vtx(project_schedule, v2))
+            end
+            for v2 in outneighbors(G,v)
+                node = align_with_successor(node,get_node_from_vtx(project_schedule, v2))
+            end
+            replace_in_schedule!(project_schedule, problem_spec, node, node_id)
         end
-        for v2 in outneighbors(G,v)
-            node = align_with_successor(node,get_node_from_vtx(project_schedule, v2))
-        end
-        replace_in_schedule!(project_schedule, problem_spec, node, node_id)
     end
     # project_schedule
     return true

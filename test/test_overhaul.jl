@@ -361,9 +361,9 @@ let
 
 
     #### solve initial problem
-    solver = PC_TAPF_Solver(DEBUG=true,verbosity=1,LIMIT_A_star_iterations=5*nv(env_graph));
+    solver = PC_TAPF_Solver(nbs_model=SparseAdjacencyMILP(),DEBUG=true,verbosity=1,LIMIT_A_star_iterations=5*nv(env_graph));
     (solution, assignment, cost, search_env), elapsed_time, byte_ct, gc_time, mem_ct = @timed high_level_search!(
-        SparseAdjacencyMILP(), solver, env_graph, project_spec, problem_spec, robot_ICs, Gurobi.Optimizer;)
+        solver, env_graph, project_spec, problem_spec, robot_ICs, Gurobi.Optimizer;)
 
     project_schedule = search_env.schedule
     cache = search_env.cache
@@ -404,16 +404,11 @@ let
 
     # splice projects together!
     splice_schedules!(new_schedule,next_schedule)
-    # for v in vertices(get_graph(next_schedule))
-    #     node_id = get_vtx_id(next_schedule, v)
-    #     add_to_schedule!(new_schedule, get_node_from_id(next_schedule, node_id), node_id)
-    # end
-    # for e in edges(get_graph(next_schedule))
-    #     node_id1 = get_vtx_id(next_schedule, e.src)
-    #     node_id2 = get_vtx_id(next_schedule, e.dst)
-    #     add_edge!(new_schedule, node_id1, node_id2)
-    # end
-    # set_leaf_operation_nodes!(new_schedule)
+    for v in topological_sort(new_schedule.graph)
+       if get_path_spec(new_schedule, v).fixed
+           @show string(get_node_from_vtx(new_schedule,v))
+       end
+    end
     G = get_graph(new_schedule)
     # do this again because now we have more nodes
     t0 = map(v->get(new_cache.t0, v, t_arrival), vertices(G))
@@ -426,26 +421,31 @@ let
 
     new_schedule_copy = deepcopy(new_schedule)
 
-    model = formulate_milp(SparseAdjacencyMILP(),new_schedule,problem_spec;
-        t0_ = Dict{AbstractID,Int}(get_vtx_id(new_schedule, v)=>t0 for (v,t0) in enumerate(new_cache.t0))
-        )
-    optimize!(model)
-    @test termination_status(model) == MOI.OPTIMAL
-    @show Int(round(value(objective_function(model))))
-    adj_matrix = get_assignment_matrix(model)
-    # DEBUG something is wrong here
-    update_project_schedule!(new_schedule,problem_spec,adj_matrix)
-    @test validate(new_schedule)
-
-    print_project_schedule(new_schedule,"updated_schedule";mode=:leaf_aligned)
+    # model = formulate_milp(SparseAdjacencyMILP(),new_schedule,problem_spec;
+    #     t0_ = Dict{AbstractID,Int}(get_vtx_id(new_schedule, v)=>t0 for (v,t0) in enumerate(new_cache.t0))
+    #     )
+    # optimize!(model)
+    # @test termination_status(model) == MOI.OPTIMAL
+    # @show Int(round(value(objective_function(model))))
+    # adj_matrix = get_assignment_matrix(model)
+    # # DEBUG something is wrong here
+    # update_project_schedule!(new_schedule,problem_spec,adj_matrix)
+    # @test validate(new_schedule)
+    #
+    # print_project_schedule(new_schedule,"updated_schedule";mode=:leaf_aligned)
 
     # TODO Pass the final solution
-    solver = PC_TAPF_Solver(DEBUG=true,l1_verbosity=1,LIMIT_A_star_iterations=5*nv(env_graph));
-    solution, assignment, cost, env  = high_level_search!(solver, env_graph, new_schedule_copy, problem_spec, Gurobi.Optimizer;
+    solver = PC_TAPF_Solver(
+        nbs_model=SparseAdjacencyMILP(),
+        DEBUG=true,
+        l1_verbosity=1,LIMIT_A_star_iterations=5*nv(env_graph)
+        );
+
+    base_search_env = construct_search_env(new_schedule_copy, problem_spec, env_graph;t0=new_cache.t0,tF=new_cache.tF)
+    base_search_env = SearchEnv(base_search_env, base_solution=trimmed_solution)
+
+    solution, assignment, cost, env  = high_level_search!(solver, base_search_env, Gurobi.Optimizer;
         cost_model=SumOfMakeSpans,
-        # cost_model=MakeSpan,
-        milp_model=SparseAdjacencyMILP(),
-        t0_ = Dict{AbstractID,Int}(get_vtx_id(new_schedule, v)=>t0 for (v,t0) in enumerate(new_cache.t0))
     )
 
 

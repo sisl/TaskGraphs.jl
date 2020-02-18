@@ -16,8 +16,8 @@ using ..TaskGraphs
 
 
 export
-    PC_TAPF,
-    default_pc_tapf_solution
+    PC_TAPF
+    # default_pc_tapf_solution
 
 const State = PCCBS.State
 const Action = PCCBS.Action
@@ -34,20 +34,20 @@ struct PC_TAPF{L<:LowLevelSolution}
     initial_solution::L             # initial condition
 end
 
-function default_pc_tapf_solution(N::Int;extra_T=400)
-    c0 = (0.0, 0.0, 0.0, 0.0)
-    LowLevelSolution(
-        paths=map(i->Path{State,Action,typeof(c0)}(s0=State(),cost=c0),1:N),
-        cost_model = construct_composite_cost_model(
-                SumOfMakeSpans(Float64[0],Int64[1],Float64[1],Float64[0]),
-                HardConflictCost(DiGraph(10), 10+extra_T, N),
-                SumOfTravelDistance(),
-                FullCostModel(sum,NullCost())
-            ),
-        costs=map(i->c0,1:N),
-        cost=c0,
-    )
-end
+# function default_pc_tapf_solution(N::Int;extra_T=400)
+#     c0 = (0.0, 0.0, 0.0, 0.0)
+#     LowLevelSolution(
+#         paths=map(i->Path{State,Action,typeof(c0)}(s0=State(),cost=c0),1:N),
+#         cost_model = construct_composite_cost_model(
+#                 SumOfMakeSpans(Float64[0],Int64[1],Float64[1],Float64[0]),
+#                 HardConflictCost(DiGraph(10), 10+extra_T, N),
+#                 SumOfTravelDistance(),
+#                 FullCostModel(sum,NullCost())
+#             ),
+#         costs=map(i->c0,1:N),
+#         cost=c0,
+#     )
+# end
 
 function CRCBS.get_initial_solution(schedule::ProjectSchedule,env::E) where {E<:PCCBS.LowLevelEnv}
     starts = State[]
@@ -301,7 +301,7 @@ export
     reset_cache!,
     update_planning_cache!,
     repair_solution!,
-    default_pc_tapf_solution,
+    # default_pc_tapf_solution,
     plan_path!,
     plan_next_path!
 
@@ -438,9 +438,10 @@ end
 
 function construct_search_env(schedule, problem_spec, env_graph;
         primary_objective=SumOfMakeSpans,
-        extra_T=400
+        extra_T=400,
+        kwargs...
     )
-    cache = initialize_planning_cache(schedule)
+    cache = initialize_planning_cache(schedule;kwargs...)
     N = problem_spec.N                                          # number of robots
     # NOTE: This particular setting of cost model is crucial for good performance of A_star, because it encourages depth first search. If we were to replace them with SumOfTravelTime(), we would get worst-case exponentially slow breadth-first search!
     cost_model = construct_composite_cost_model(
@@ -542,14 +543,14 @@ function CRCBS.build_env(solver, env::E, node::N, schedule_node::T, v::Int,path_
         # log_info(0,solver,string("retrieving base path for node ",v," of type ",typeof(schedule_node)))
         base_path = get_paths(node.solution)[agent_id]
     else
-        # base_path = get_paths(node.solution)[agent_id]
+        base_path = get_paths(node.solution)[agent_id]
         # log_info(0,solver,string("initializing base path for node ",v," of type ",typeof(schedule_node)))
-        start_vtx = path_spec.start_vtx
-        base_path = Path{PCCBS.State,PCCBS.Action,get_cost_type(cbs_env)}(
-            s0=PCCBS.State(start_vtx, 0), # TODO fix start time
-            cost=get_initial_cost(cbs_env)
-            )
-        @assert get_final_state(get_paths(node.solution)[agent_id]) == get_final_state(base_path)
+        # start_vtx = path_spec.start_vtx
+        # base_path = Path{PCCBS.State,PCCBS.Action,get_cost_type(cbs_env)}(
+        #     s0=PCCBS.State(start_vtx, 0), # TODO fix start time
+        #     cost=get_initial_cost(cbs_env)
+        #     )
+        @assert PCCBS.State(path_spec.start_vtx, 0) == get_final_state(base_path)
     end
     # make sure base_path hits t0 constraint
     if get_end_index(base_path) < env.cache.t0[v]
@@ -937,18 +938,23 @@ export
     This is the modified version of high-level search that uses the adjacency
     matrix MILP formulation.
 """
-function high_level_search!(solver::P, env_graph, project_schedule::ProjectSchedule, problem_spec,  optimizer;
-        # milp_model=AdjacencyMILP(),
-        initial_solution=nothing,
+# function high_level_search!(solver::P, env_graph, project_schedule::ProjectSchedule, problem_spec,  optimizer;
+function high_level_search!(solver::P, base_search_env::SearchEnv,  optimizer;
+        t0_ = Dict{AbstractID,Int}(get_vtx_id(base_search_env.schedule, v)=>t0 for (v,t0) in enumerate(base_search_env.cache.t0)),
         primary_objective=SumOfMakeSpans,
         kwargs...) where {P<:PC_TAPF_Solver}
 
     enter_assignment!(solver)
     log_info(0,solver.l1_verbosity,string("HIGH LEVEL SEARCH: beginning search ..."))
 
+    project_schedule    = base_search_env.schedule
+    env_graph           = base_search_env.env.graph
+    problem_spec        = base_search_env.problem_spec
+
     lower_bound = 0.0
-    best_solution = default_pc_tapf_solution(problem_spec.N)
-    best_env    = SearchEnv()
+    # best_solution = default_pc_tapf_solution(problem_spec.N)
+    best_solution   = default_solution(base_search_env)
+    best_env        = SearchEnv()
     best_assignment = adjacency_matrix(get_graph(project_schedule))
     # model = formulate_milp(milp_model,project_schedule,problem_spec;
     model = formulate_milp(solver.nbs_model,project_schedule,problem_spec;
@@ -990,7 +996,10 @@ function high_level_search!(solver::P, env_graph, project_schedule::ProjectSched
                 project_schedule = deepcopy(base_schedule)
                 if update_project_schedule!(model,project_schedule,problem_spec,adj_matrix)
                     env = construct_search_env(project_schedule, problem_spec, env_graph;
-                        primary_objective=primary_objective); # TODO pass in t0_ here (maybe get it straight from model?)
+                        primary_objective=primary_objective,
+                        t0 = base_search_env.cache.t0,
+                        tF = base_search_env.cache.tF
+                        ) # TODO pass in t0_ here (maybe get it straight from model?)
                     pc_mapf = PC_MAPF(env);
                     ##### Call CBS Search Routine (LEVEL 2) #####
                     solution, cost = solve!(solver,pc_mapf);
@@ -1018,13 +1027,19 @@ function high_level_search!(solver::P, env_graph, project_schedule::ProjectSched
     log_info(-1,solver.l1_verbosity,string("HIGH LEVEL SEARCH: optimality gap = ",optimality_gap,". Returning best solution with cost ", solver.best_cost,"\n"))
     return best_solution, best_assignment, solver.best_cost, best_env, optimality_gap
 end
+
+function high_level_search!(solver::PC_TAPF_Solver, env_graph, project_schedule::ProjectSchedule, problem_spec,  optimizer;
+    kwargs...)
+    base_search_env = construct_search_env(project_schedule,problem_spec,env_graph)
+    @show base_search_env.cache.t0
+    high_level_search!(solver, base_search_env, optimizer;
+        kwargs...
+    )
+end
 function high_level_search!(solver::P, env_graph, project_spec::ProjectSpec, problem_spec,
         robot_ICs, optimizer;kwargs...) where {P<:PC_TAPF_Solver}
 
     project_schedule = construct_partial_project_schedule(project_spec,problem_spec,map(i->robot_ICs[i], 1:problem_spec.N))
-
-    search_env = construct_search_env(project_schedule,problem_spec,env_graph)
-
     high_level_search!(solver, env_graph, project_schedule, problem_spec, optimizer;
         kwargs...
     )
