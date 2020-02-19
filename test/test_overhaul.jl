@@ -439,6 +439,7 @@ let
     solution, assignment, cost, env  = high_level_search!(solver, base_search_env, Gurobi.Optimizer;
         cost_model=SumOfMakeSpans,
     )
+    @test validate(env.schedule, convert_to_vertex_lists(solution),env.cache.t0,env.cache.tF)
 
     print_project_schedule("final_schedule",env.schedule,env.cache;mode=:leaf_aligned)
     for v in vertices(get_graph(env.schedule))
