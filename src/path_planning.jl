@@ -1071,6 +1071,7 @@ function get_env_snapshot(solution::S,t) where {S<:LowLevelSolution}
     Dict(RobotID(i)=>ROBOT_AT(i, get_sp(get_path_node(path,t)).vtx) for (i,path) in enumerate(get_paths(solution)))
 end
 
+
 """
     `prune_project_schedule`
 
@@ -1161,11 +1162,6 @@ function prune_project_schedule(project_schedule::ProjectSchedule,problem_spec::
             robot_id = get_robot_id(node)
             replace_in_schedule!(new_schedule, ROBOT_AT(robot_id, node.x1), robot_id)
             t0[get_vtx(new_schedule,robot_id)] = t0[v]
-            # if haskey(robot_positions, robot_id)
-            #     replace_in_schedule!(new_schedule, robot_positions[robot_id], robot_id)
-            #     t0[get_vtx(new_schedule,robot_id)] = t
-            #     replace_in_schedule!(new_schedule, problem_spec, GO(robot_id, robot_positions[robot_id].x, node.x2), node_id) # TODO Make this less hacky
-            # end
             add_edge!(new_schedule, robot_id, node_id)
         end
     end

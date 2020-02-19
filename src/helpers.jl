@@ -434,20 +434,15 @@ end
 export
     get_object_paths
 
-function get_object_paths(solution,env)
-    schedule = env.schedule
-    cache = env.cache
+function get_object_paths(solution,schedule,cache)
     robot_paths = convert_to_vertex_lists(solution)
     tF = maximum(map(length, robot_paths))
-    # object_paths = map(j->Vector{Int}(),1:length(get_object_ICs(env.schedule)))
     object_paths = Vector{Vector{Int}}()
     object_intervals = Vector{Vector{Int}}()
     for v in vertices(schedule.graph)
         node = get_node_from_id(schedule,get_vtx_id(schedule,v))
         if isa(node, Union{CARRY,TEAM_ACTION{CARRY}})
             if isa(node, CARRY)
-                # path_spec = get_path_spec(schedule,v)
-                # agent_id = path_spec.agent_id
                 object_id = get_object_id(node)
                 agent_id_list = [get_id(get_robot_id(node))]
                 s0_list = [get_id(get_initial_location_id(node))]
@@ -457,39 +452,24 @@ function get_object_paths(solution,env)
                 agent_id_list = map(n->get_id(get_robot_id(n)), node.instructions)
                 s0_list = map(n->get_id(get_initial_location_id(n)), node.instructions)
                 sF_list = map(n->get_id(get_destination_location_id(n)), node.instructions)
-                # object_id = get_object_id(node.instructions[1])
-                # object_node = get_node_from_id(schedule, object_id)
-                # s0 = get_id(get_initial_location_id(object_node))
-                # agent_id = RobotID(-1)
-                # sF = s0
-                # for p_node in node.instructions
-                #     if get_id(get_initial_location_id(p_node)) == s0
-                #         agent_id = get_robot_id(p_node)
-                #         sF = get_id(get_destination_location_id(p_node))
-                #     end
-                # end
             end
             object_vtx = get_vtx(schedule,object_id)
             for (agent_id,s0,sF) in zip(agent_id_list,s0_list,sF_list)
                 if get_id(agent_id) != -1
-                    # for v2 in inneighbors(schedule.graph,v)
-                    #     node2 = get_node_from_id(schedule,get_vtx_id(schedule,v2))
-                    #     if typeof(node2) <: COLLECT
-                            # object_id = get_id(get_object_id(node2))
-                            # object_paths[get_id(object_id)] = [
-                            push!(object_paths,[
-                                map(t->s0,0:cache.t0[v]-1)...,
-                                map(t->robot_paths[agent_id][t],min(cache.t0[v]+1,tF):min(cache.tF[v]+1,tF,length(robot_paths[agent_id])))...,
-                                map(t->sF,min(cache.tF[v]+1,tF):tF)...
-                            ])
-                            push!(object_intervals,[cache.t0[object_vtx],cache.tF[v]+1])
-                    #     end
-                    # end
+                    push!(object_paths,[
+                        map(t->s0,0:cache.t0[v]-1)...,
+                        map(t->robot_paths[agent_id][t],min(cache.t0[v]+1,tF):min(cache.tF[v]+1,tF,length(robot_paths[agent_id])))...,
+                        map(t->sF,min(cache.tF[v]+1,tF):tF)...
+                    ])
+                    push!(object_intervals,[cache.t0[object_vtx],cache.tF[v]+1])
                 end
             end
         end
     end
     object_paths, object_intervals
+end
+function get_object_paths(solution,env)
+    get_object_paths(solution,env.schedule,env.cache)
 end
 
 end
