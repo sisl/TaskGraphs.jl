@@ -240,8 +240,8 @@ let
 
     # generate random problem sequence
     Random.seed!(0)
-    N = 4
-    M = 6
+    N = 10
+    M = 10
     max_parents = 3
     depth_bias = 0.4
     Δt_min = 0
@@ -338,6 +338,28 @@ let
 
     base_schedule = deepcopy(project_schedule)
     base_cache = deepcopy(search_env.cache)
+
+    # for plotting
+    robot_path_dict = Dict{Int,Vector{Int}}()
+    object_path_dict = Dict{Int,Vector{Vector{Int}}}()
+    object_interval_dict = Dict{Int,Vector{Int}}()
+
+    robot_paths = convert_to_vertex_lists(initial_solution)
+    for (i,path) in enumerate(robot_paths)
+        robot_path_dict[i] = path
+    end
+    object_paths, object_intervals, object_ids, path_idxs = get_object_paths(initial_solution,project_schedule,cache)
+    for (path,interval,id,idx) in zip(object_paths, object_intervals, object_ids, path_idxs)
+        if !haskey(object_path_dict,id)
+            object_path_dict[id] = Vector{Vector{Int}}()
+        end
+        if length(object_path_dict[id]) >= idx
+            object_path_dict[id][idx] = path
+        else
+            push!(object_path_dict[id], path)
+        end
+        object_interval_dict[id] = interval
+    end
 
     print_project_schedule("project_schedule",project_schedule,cache;mode=:leaf_aligned)
 
@@ -442,57 +464,88 @@ let
     @test validate(env.schedule, convert_to_vertex_lists(solution),env.cache.t0,env.cache.tF)
 
     print_project_schedule("final_schedule",env.schedule,env.cache;mode=:leaf_aligned)
-    for v in vertices(get_graph(env.schedule))
-        t0 = env.cache.t0[v]
-        tF = env.cache.tF[v]
-        t0_ = base_search_env.cache.t0[v]
-        tF_ = base_search_env.cache.tF[v]
-        if (t0 - t0_ != 0) || (tF - tF_ != 0)
-            node_id = get_vtx_id(env.schedule, v)
-            node = get_node_from_id(env.schedule)
-            @show node
-            @show v, t0-t0_, tF-tF_
-        end
-    end
+    # for v in vertices(get_graph(env.schedule))
+    #     t0 = env.cache.t0[v]
+    #     tF = env.cache.tF[v]
+    #     t0_ = base_search_env.cache.t0[v]
+    #     tF_ = base_search_env.cache.tF[v]
+    #     if (t0 - t0_ != 0) || (tF - tF_ != 0)
+    #         node_id = get_vtx_id(env.schedule, v)
+    #         node = get_node_from_id(env.schedule)
+    #         @show node
+    #         @show v, t0-t0_, tF-tF_
+    #     end
+    # end
 
-    # splice new schedule information into base schedule (for visualization purposes)
-    for v in vertices(get_graph(env.schedule))
-        node_id = get_vtx_id(env.schedule, v)
-        node = get_node_from_id(env.schedule, node_id)
-        if get_vtx(base_schedule, node_id) == -1 # not in original schedule
-            add_to_schedule!(base_schedule,get_path_spec(env.schedule,v),node,node_id)
-        else
-            replace_in_schedule!(base_schedule,get_path_spec(env.schedule,v),node,node_id)
-        end
-    end
-    for v in vertices(get_graph(base_schedule))
-        node_id = get_vtx_id(base_schedule, v)
-        for v2 in vertices(get_graph(base_schedule))
-            node_id2 = get_vtx_id(base_schedule, v2)
-            if get_vtx(env.schedule, node_id) != -1 && get_vtx(env.schedule, node_id2) != -1
-                rem_edge!(get_graph(base_schedule),v,v2)
-            end
-            # TODO how to remove the extraneous edges (e.g., when there is a "shortcut" from a ROBOT_AT to a GO node)
-        end
-    end
-    for e in edges(get_graph(env.schedule))
-        add_edge!(base_schedule, get_vtx_id(env.schedule, e.src), get_vtx_id(env.schedule, e.dst))
-    end
-    t0 = map(v->get(env.cache.t0,get_vtx(env.schedule,get_vtx_id(base_schedule,v)),get(base_cache.t0,v,0.0)), vertices(base_schedule))
-    tF = map(v->get(env.cache.tF,get_vtx(env.schedule,get_vtx_id(base_schedule,v)),get(base_cache.tF,v,0.0)), vertices(base_schedule))
-    full_cache=initialize_planning_cache(base_schedule;t0=t0,tF=tF)
-
-    print_project_schedule("full_schedule",base_schedule;mode=:leaf_aligned)
+    # # splice new schedule information into base schedule (for visualization purposes)
+    # for v in vertices(get_graph(env.schedule))
+    #     node_id = get_vtx_id(env.schedule, v)
+    #     node = get_node_from_id(env.schedule, node_id)
+    #     if get_vtx(base_schedule, node_id) == -1 # not in original schedule
+    #         add_to_schedule!(base_schedule,get_path_spec(env.schedule,v),node,node_id)
+    #     else
+    #         replace_in_schedule!(base_schedule,get_path_spec(env.schedule,v),node,node_id)
+    #     end
+    # end
+    # for v in vertices(get_graph(base_schedule))
+    #     node_id = get_vtx_id(base_schedule, v)
+    #     for v2 in vertices(get_graph(base_schedule))
+    #         node_id2 = get_vtx_id(base_schedule, v2)
+    #         if get_vtx(env.schedule, node_id) != -1 && get_vtx(env.schedule, node_id2) != -1
+    #             rem_edge!(get_graph(base_schedule),v,v2)
+    #         end
+    #         # TODO how to remove the extraneous edges (e.g., when there is a "shortcut" from a ROBOT_AT to a GO node)
+    #     end
+    # end
+    # for e in edges(get_graph(env.schedule))
+    #     add_edge!(base_schedule, get_vtx_id(env.schedule, e.src), get_vtx_id(env.schedule, e.dst))
+    # end
+    # t0 = map(v->get(env.cache.t0,get_vtx(env.schedule,get_vtx_id(base_schedule,v)),get(base_cache.t0,v,0.0)), vertices(base_schedule))
+    # tF = map(v->get(env.cache.tF,get_vtx(env.schedule,get_vtx_id(base_schedule,v)),get(base_cache.tF,v,0.0)), vertices(base_schedule))
+    # full_cache=initialize_planning_cache(base_schedule;t0=t0,tF=tF)
+    #
+    # print_project_schedule("full_schedule",base_schedule;mode=:leaf_aligned)
 
     robot_paths = convert_to_vertex_lists(solution)
-    object_paths, object_intervals = get_object_paths(solution,base_schedule,full_cache)
-    tf = maximum(map(p->length(p),robot_paths))
-    set_default_plot_size(24cm,24cm)
-    record_video(joinpath(VIDEO_DIR,string("replanning.webm")),
-        t->render_paths(t,robot_paths,object_paths;
-            object_intervals=object_intervals,
-            colors_vec=map(i->LCHab(60,80,200),1:length(robot_paths)),
-            show_paths=false);tf=tf)
+    for (i,path) in enumerate(robot_paths)
+        robot_path_dict[i] = path
+    end
+    for (id,interval) in object_interval_dict
+        @show id, interval
+    end
+    @show length(object_interval_dict)
+    object_paths, object_intervals, object_ids, path_idxs = get_object_paths(solution,env.schedule,env.cache)
+    for (path,interval,id,idx) in zip(object_paths, object_intervals, object_ids, path_idxs)
+        if !haskey(object_path_dict,id)
+            object_path_dict[id] = Vector{Vector{Int}}()
+        end
+        if length(object_path_dict[id]) >= idx
+            object_path_dict[id][idx] = path
+        else
+            push!(object_path_dict[id], path)
+        end
+        object_interval_dict[id] = interval
+    end
+    for (id,interval) in object_interval_dict
+        @show id, interval
+    end
+    object_paths = Vector{Vector{Int}}()
+    object_intervals = Vector{Vector{Int}}()
+    for (id,paths) in object_path_dict
+        for path in paths
+            push!(object_intervals, object_interval_dict[id])
+            push!(object_paths, path)
+        end
+    end
+
+    # Render video clip
+    # tf = maximum(map(p->length(p),robot_paths))
+    # set_default_plot_size(24cm,24cm)
+    # record_video(joinpath(VIDEO_DIR,string("replanning.webm")),
+    #     t->render_paths(t,robot_paths,object_paths;
+    #         object_intervals=object_intervals,
+    #         colors_vec=map(i->LCHab(60,80,200),1:length(robot_paths)),
+    #         show_paths=false);tf=tf)
 
 end
 

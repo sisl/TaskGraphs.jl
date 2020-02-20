@@ -1071,27 +1071,127 @@ function get_env_snapshot(solution::S,t) where {S<:LowLevelSolution}
     Dict(RobotID(i)=>ROBOT_AT(i, get_sp(get_path_node(path,t)).vtx) for (i,path) in enumerate(get_paths(solution)))
 end
 
+export
+    split_at_cutoff_time
 
 """
-    `prune_project_schedule`
-
-    Remove all vertices that have already been completed. The idea is to identify
-    all `Operation`s that are completed before `t`, remove all nodes upstream of
-    them (except for ROBOT_AT nodes), and create new edges between the ROBOT_AT
-    nodes and their first GO assignments.
+    get all vertices that "straddle" the query time t
 """
-function prune_project_schedule(project_schedule::ProjectSchedule,problem_spec::ProblemSpec,cache::PlanningCache,t;
-    robot_positions::Dict{RobotID,ROBOT_AT}=Dict{RobotID,ROBOT_AT}()
-    )
-    G = get_graph(project_schedule)
-    new_schedule = ProjectSchedule()
-
+function get_active_and_fixed_vtxs(project_schedule::ProjectSchedule,cache::PlanningCache,t)
     active_vtxs = Set{Int}()
-    for v in vertices(G)
-        if cache.t0[v] <= t < cache.tF[v] + minimum(cache.local_slack[v])
+    fixed_vtxs = Set{Int}()
+    for v in vertices(get_graph(project_schedule))
+        if cache.tF[v] + minimum(cache.local_slack[v]) <= t
+            push!(fixed_vtxs, v)
+        elseif cache.t0[v] <= t < cache.tF[v] + minimum(cache.local_slack[v])
             push!(active_vtxs, v)
         end
     end
+    @assert all(map(v->cache.tF[v] + minimum(cache.local_slack[v]), collect(active_vtxs)) .>= t)
+    active_vtxs, fixed_vtxs
+end
+
+"""
+    Split all GO nodes that "straddle" the cutoff time.
+"""
+function split_active_vtxs(project_schedule::ProjectSchedule,problem_spec::ProblemSpec,cache::PlanningCache,t;
+    robot_positions::Dict{RobotID,ROBOT_AT}=Dict{RobotID,ROBOT_AT}()
+    )
+    G = get_graph(project_schedule)
+    # identify nodes "cut" by timestep t
+    active_vtxs, fixed_vtxs = get_active_and_fixed_vtxs(project_schedule,cache,t)
+    # split active nodes
+    t0 = deepcopy(cache.t0)
+    tF = deepcopy(cache.tF)
+    for v in active_vtxs
+        node_id = get_vtx_id(project_schedule,v)
+        node = get_node_from_id(project_schedule, node_id)
+        # if isa(node,Union{GO,CARRY,COLLECT,DEPOSIT}) # split
+        if isa(node,GO) # split
+            x = robot_positions[node.r].x
+            node1,node2 = split_node(node,x)
+            replace_in_schedule!(project_schedule,problem_spec,node2,node_id) # active vertex is still active (needs planning)
+            split_id = ActionID(get_unique_action_id())
+            add_to_schedule!(project_schedule,problem_spec,node1,split_id) # split vertex is the inactive part
+            # remap edges
+            v2 = get_vtx(project_schedule, split_id)
+            for vp in outneighbors(G,v)
+                rem_edge!(G,v,vp)
+                add_edge!(G,v2,vp)
+            end
+            add_edge!(G,v,v2)
+            # fix start and end times
+            push!(t0,t)
+            push!(tF,tF[v])
+            tF[v] = t
+            # reset path specs
+            set_path_spec!(project_schedule,v,PathSpec(get_path_spec(project_schedule,v),min_path_duration=tF[v]-t0[v]))
+            set_path_spec!(project_schedule,v2,PathSpec(get_path_spec(project_schedule,v2),fixed=true,plan_path=false,min_path_duration=tF[v2]-t0[v2]))
+        end
+    end
+    new_cache = initialize_planning_cache(project_schedule;t0=t0,tF=tF)
+    project_schedule, new_cache, active_vtxs
+end
+
+"""
+    identify all nodes that end before the cutoff time, and change their path
+    spec so that the route planner will not actually plan a path for them.
+"""
+function fix_precutoff_nodes!(project_schedule::ProjectSchedule,problem_spec::ProblemSpec,cache::PlanningCache,t)
+    # active_vtxs = Set{Int}()
+    active_vtxs, fixed_vtxs = get_active_and_fixed_vtxs(project_schedule,cache,t)
+    # set all fixed_vtxs to plan_path=false
+    for v in fixed_vtxs
+        set_path_spec!(project_schedule,v,PathSpec(get_path_spec(project_schedule,v), plan_path=false, fixed=true))
+    end
+    # verify that all vertices following active_vtxs have a start time > 0
+    @assert all(map(v->cache.t0[v], collect(fixed_vtxs)) .<= t)
+    project_schedule
+end
+
+"""
+    Break all assignments that are eligible for replanning
+"""
+function break_assignments!(project_schedule::ProjectSchedule,problem_spec::ProblemSpec)
+    for v in vertices(project_schedule)
+        path_spec = get_path_spec(project_schedule.v)
+        if path_spec.fixed == true
+            continue
+        end
+        node_id = get_vtx_id(project_schedule,v)
+        node = get_node_from_id(project_schedule,node_id)
+        if isa(node, Union{AbstractRobotAction})
+            new_node = typeof(node)(node,r=RobotID(-1))
+            if isa(node,GO)
+                new_node = GO(new_node,x2=StationID(-1))
+                for v2 in outneighbors(G,v)
+                    rem_edge!(G,v,v2)
+                end
+            end
+            replace_in_schedule!(project_schedule,problem_spec,new_node,node_id)
+        elseif isa(node,TEAM_ACTION)
+            for i in 1:length(node.instructions)
+                n = node.instructions[i]
+                node.instructions[i] = typeof(n)(n,r=RobotID(-1))
+            end
+        end
+    end
+    propagate_valid_ids!(project_schedule,problem_spec)
+
+    project_schedule
+end
+
+"""
+    Prune schedule
+
+    remove nodes that don't need to be kept around any longer
+"""
+function prune_schedule(project_schedule::ProjectSchedule,problem_spec::ProblemSpec,cache::PlanningCache,t)
+    G = get_graph(project_schedule)
+    new_schedule = ProjectSchedule()
+    # identify nodes "cut" by timestep t
+    active_vtxs, fixed_vtxs = get_active_and_fixed_vtxs(project_schedule,cache,t)
+    # construct set of all nodes to prune out.
     remove_set = Set{Int}()
     for v in active_vtxs
         if isa(get_node_from_vtx(project_schedule,v),Operation)
@@ -1123,7 +1223,82 @@ function prune_project_schedule(project_schedule::ProjectSchedule,problem_spec::
     for e in edges(get_graph(project_schedule))
         add_edge!(new_schedule, get_vtx_id(project_schedule, e.src), get_vtx_id(project_schedule, e.dst))
     end
-    # Split active nodes
+    # initialize t0, tF
+    t0 = map(v->get(cache.t0, get_vtx(project_schedule, get_vtx_id(new_schedule, v)), 0.0), vertices(G))
+    tF = map(v->get(cache.tF, get_vtx(project_schedule, get_vtx_id(new_schedule, v)), 0.0), vertices(G))
+    # draw new ROBOT_AT -> GO edges where necessary
+    for v in vertices(get_graph(new_schedule))
+        node_id = get_vtx_id(new_schedule,v)
+        node = get_node_from_id(new_schedule, node_id)
+        if isa(node,GO) && indegree(get_graph(new_schedule),v) == 0
+            robot_id = get_robot_id(node)
+            replace_in_schedule!(new_schedule, ROBOT_AT(robot_id, node.x1), robot_id)
+            t0[get_vtx(new_schedule,robot_id)] = t0[v]
+            add_edge!(new_schedule, robot_id, node_id)
+        end
+    end
+    set_leaf_operation_nodes!(new_schedule)
+    # init planning cache with the existing solution
+    new_cache = initialize_planning_cache(new_schedule;t0=t0,tF=tF)
+
+    new_schedule, new_cache
+end
+
+
+"""
+    `prune_project_schedule`
+
+    Remove all vertices that have already been completed. The idea is to identify
+    all `Operation`s that are completed before `t`, remove all nodes upstream of
+    them (except for ROBOT_AT nodes), and create new edges between the ROBOT_AT
+    nodes and their first GO assignments.
+"""
+function prune_project_schedule(project_schedule::ProjectSchedule,problem_spec::ProblemSpec,cache::PlanningCache,t;
+    robot_positions::Dict{RobotID,ROBOT_AT}=Dict{RobotID,ROBOT_AT}()
+    )
+    G = get_graph(project_schedule)
+    new_schedule = ProjectSchedule()
+
+    # identify nodes "cut" by timestep t
+    active_vtxs = Set{Int}()
+    for v in vertices(G)
+        if cache.t0[v] <= t < cache.tF[v] + minimum(cache.local_slack[v])
+            push!(active_vtxs, v)
+        end
+    end
+    # construct set of all nodes to prune out.
+    remove_set = Set{Int}()
+    for v in active_vtxs
+        if isa(get_node_from_vtx(project_schedule,v),Operation)
+            push!(remove_set, v)
+        end
+        for e in edges(bfs_tree(G,v;dir=:in))
+            if isa(get_node_from_vtx(project_schedule, e.dst),Operation)
+                push!(remove_set, e.dst)
+            end
+        end
+    end
+    for v in collect(remove_set)
+        for e in edges(bfs_tree(G,v;dir=:in))
+            if !(isa(get_node_from_vtx(project_schedule, e.dst),ROBOT_AT))
+                push!(remove_set, e.dst)
+            end
+        end
+    end
+    # Construct new graph
+    keep_vtxs = setdiff(Set{Int}(collect(vertices(G))), remove_set)
+    # add all non-deleted nodes to new project schedule
+    for v in keep_vtxs
+        node_id = get_vtx_id(project_schedule,v)
+        node = get_node_from_id(project_schedule, node_id)
+        path_spec = get_path_spec(project_schedule,v)
+        add_to_schedule!(new_schedule,path_spec,node,node_id)
+    end
+    # add all edges between nodes that still exist
+    for e in edges(get_graph(project_schedule))
+        add_edge!(new_schedule, get_vtx_id(project_schedule, e.src), get_vtx_id(project_schedule, e.dst))
+    end
+    # split active nodes
     G = get_graph(new_schedule)
     t0 = map(v->get(cache.t0, get_vtx(project_schedule, get_vtx_id(new_schedule, v)), 0.0), vertices(G))
     tF = map(v->get(cache.tF, get_vtx(project_schedule, get_vtx_id(new_schedule, v)), 0.0), vertices(G))

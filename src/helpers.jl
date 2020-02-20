@@ -439,6 +439,8 @@ function get_object_paths(solution,schedule,cache)
     tF = maximum(map(length, robot_paths))
     object_paths = Vector{Vector{Int}}()
     object_intervals = Vector{Vector{Int}}()
+    object_ids = Int[]
+    path_idxs = Int[]
     for v in vertices(schedule.graph)
         node = get_node_from_id(schedule,get_vtx_id(schedule,v))
         if isa(node, Union{CARRY,TEAM_ACTION{CARRY}})
@@ -454,7 +456,7 @@ function get_object_paths(solution,schedule,cache)
                 sF_list = map(n->get_id(get_destination_location_id(n)), node.instructions)
             end
             object_vtx = get_vtx(schedule,object_id)
-            for (agent_id,s0,sF) in zip(agent_id_list,s0_list,sF_list)
+            for (idx,(agent_id,s0,sF)) in enumerate(zip(agent_id_list,s0_list,sF_list))
                 if get_id(agent_id) != -1
                     push!(object_paths,[
                         map(t->s0,0:cache.t0[v]-1)...,
@@ -462,11 +464,13 @@ function get_object_paths(solution,schedule,cache)
                         map(t->sF,min(cache.tF[v]+1,tF):tF)...
                     ])
                     push!(object_intervals,[cache.t0[object_vtx],cache.tF[v]+1])
+                    push!(object_ids, get_id(object_id))
+                    push!(path_idxs, idx)
                 end
             end
         end
     end
-    object_paths, object_intervals
+    object_paths, object_intervals, object_ids, path_idxs
 end
 function get_object_paths(solution,env)
     get_object_paths(solution,env.schedule,env.cache)
