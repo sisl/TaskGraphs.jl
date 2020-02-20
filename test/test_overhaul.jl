@@ -443,10 +443,10 @@ let
         DEBUG=true,
         l1_verbosity=0,
         l2_verbosity=2,
-        l3_verbosity=0,
-        l4_verbosity=0,
+        l3_verbosity=2,
+        l4_verbosity=3,
         LIMIT_assignment_iterations=2,
-        LIMIT_A_star_iterations=5*nv(env_graph)
+        LIMIT_A_star_iterations=1000
         );
 
     base_search_env = construct_search_env(new_schedule_copy, problem_spec, env_graph;t0=deepcopy(new_cache.t0),tF=deepcopy(new_cache.tF))
