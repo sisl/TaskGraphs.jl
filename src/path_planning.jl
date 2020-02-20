@@ -301,22 +301,28 @@ end
 
 export
     PlanningCache,
+    isps_queue_cost,
     initialize_planning_cache,
     reset_cache!,
     update_planning_cache!,
     repair_solution!,
-    # default_pc_tapf_solution,
     plan_path!,
     plan_next_path!
 
 @with_kw struct PlanningCache
     closed_set::Set{Int}    = Set{Int}()    # nodes that are completed
     active_set::Set{Int}    = Set{Int}()    # active nodes
-    node_queue::PriorityQueue{Int,Float64} = PriorityQueue{Int,Float64}() # active nodes prioritized by slack
+    node_queue::PriorityQueue{Int,Tuple{Float64,Float64}} = PriorityQueue{Int,Tuple{Float64,Float64}}() # active nodes prioritized by slack
     t0::Vector{Int}         = Vector{Int}()
     tF::Vector{Int}         = Vector{Int}()
     slack::Vector{Vector{Float64}}       = Vector{Vector{Float64}}()
     local_slack::Vector{Vector{Float64}} = Vector{Vector{Float64}}()
+end
+
+function isps_queue_cost(schedule::ProjectSchedule,cache::PlanningCache,v::Int)
+    path_spec = get_path_spec(schedule,v)
+    return (1.0*(path_spec.plan_path), minimum(cache.slack[v]))
+    # return (0.0, minimum(cache.slack[v]))
 end
 
 function initialize_planning_cache(schedule::ProjectSchedule;kwargs...)
@@ -325,7 +331,7 @@ function initialize_planning_cache(schedule::ProjectSchedule;kwargs...)
     for v in vertices(get_graph(schedule))
         if is_root_node(get_graph(schedule),v)
             push!(cache.active_set,v)
-            enqueue!(cache.node_queue,v=>minimum(cache.slack[v])) # need to store slack
+            enqueue!(cache.node_queue,v=>isps_queue_cost(schedule,cache,v)) # need to store slack
         end
     end
     cache
@@ -350,7 +356,7 @@ function reset_cache!(cache::PlanningCache,schedule::ProjectSchedule)
     for v in vertices(get_graph(schedule))
         if is_root_node(get_graph(schedule),v)
             push!(cache.active_set,v)
-            enqueue!(cache.node_queue,v=>minimum(cache.slack[v])) # need to store slack
+            enqueue!(cache.node_queue,v=>isps_queue_cost(schedule,cache,v)) # need to store slack
         end
     end
     cache
@@ -390,7 +396,7 @@ function update_planning_cache!(solver::M,cache::C,schedule::S,v::Int,path::P) w
     end
     # update priority queue
     for v2 in active_set
-        node_queue[v2] = minimum(cache.slack[v2])
+        node_queue[v2] = isps_queue_cost(schedule,cache,v2)
     end
     log_info(2,solver,"moved ",v," to closed set, moved ",activated_vtxs," to active set")
     log_info(3,solver,string("cache.tF[v] = ",cache.tF))
@@ -1037,10 +1043,12 @@ function high_level_search!(solver::P, base_search_env::SearchEnv,  optimizer;
 end
 
 function high_level_search!(solver::PC_TAPF_Solver, env_graph, project_schedule::ProjectSchedule, problem_spec,  optimizer;
+    primary_objective=SumOfMakeSpans,
     kwargs...)
-    base_search_env = construct_search_env(project_schedule,problem_spec,env_graph)
+    base_search_env = construct_search_env(project_schedule,problem_spec,env_graph;primary_objective=primary_objective)
     # @show base_search_env.cache.t0
     high_level_search!(solver, base_search_env, optimizer;
+        primary_objective=primary_objective,
         kwargs...
     )
 end
@@ -1326,7 +1334,7 @@ function prune_project_schedule(project_schedule::ProjectSchedule,problem_spec::
             tF[v] = t
             # reset path specs
             set_path_spec!(new_schedule,v,PathSpec(get_path_spec(new_schedule,v),fixed=true,plan_path=false,min_path_duration=tF[v]-t0[v]))
-            set_path_spec!(new_schedule,v2,PathSpec(get_path_spec(new_schedule,v2),min_path_duration=tF[v2]-t0[v2]))
+            set_path_spec!(new_schedule,v2,PathSpec(get_path_spec(new_schedule,v2),tight=true,min_path_duration=tF[v2]-t0[v2]))
         end
     end
     # draw new ROBOT_AT -> GO edges where necessary

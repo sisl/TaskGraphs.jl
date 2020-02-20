@@ -1515,7 +1515,9 @@ function formulate_optimization_problem(N,M,G,D,Δt,Δt_collect,Δt_deliver,to0_
     task_groups = Vector{Vector{Int}}(),
     shapes = [(1,1) for j in 1:M],
     assignments=Dict{Int64,Int64}(),
-    cost_model=MakeSpan
+    cost_model=MakeSpan,
+    t0_ = Dict(),
+    tF_ = Dict()
     )
 
     model = Model(with_optimizer(optimizer,
@@ -1733,6 +1735,7 @@ function formulate_schedule_milp(project_schedule::ProjectSchedule,problem_spec:
         OutputFlag=0,
         Presolve=-1, # automatic setting (-1), off (0), conservative (1), or aggressive (2)
         t0_ = Dict{AbstractID,Float64}(), # dictionary of initial times. Default is empty
+        tF_ = Dict{AbstractID,Float64}(), # dictionary of initial times. Default is empty
         Mm = 10000, # for big M constraints
         cost_model = SumOfMakeSpans,
     )
@@ -1755,6 +1758,10 @@ function formulate_schedule_milp(project_schedule::ProjectSchedule,problem_spec:
     for (id,t) in t0_
         v = get_vtx(project_schedule, id)
         @constraint(model, t0[v] >= t)
+    end
+    for (id,t) in tF_
+        v = get_vtx(project_schedule, id)
+        @constraint(model, tF[v] >= t)
     end
     # Precedence constraints and duration constraints for existing nodes and edges
     for v in vertices(G)
@@ -2046,6 +2053,7 @@ function formulate_milp(milp_model::SparseAdjacencyMILP,project_schedule::Projec
                 node2 = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v2))
                 common_resources = intersect(resources_reserved(node),resources_reserved(node2))
                 if length(common_resources) > 0
+                    println("MILP FORMULATION: adding a job shop constraint between ",v, " (",string(node),") and ", v2, "(",string(node2),")")
                     # @show common_resources
                     # Big M constraints
                     Xj[v,v2] = @variable(model, binary=true) #

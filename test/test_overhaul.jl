@@ -152,7 +152,6 @@ let
             end
         end
     end
-
 end
 
 # end
@@ -233,7 +232,6 @@ let
     env_id = 2
     env_filename = string(ENVIRONMENT_DIR,"/env_",env_id,".toml")
     factory_env = read_env(env_filename)
-    # env_graph = factory_env.graph
     env_graph = factory_env
     dist_matrix = get_dist_matrix(env_graph)
 
@@ -248,9 +246,9 @@ let
     Δt_max = 0
     task_sizes = (1=>1.0,2=>0.0,4=>0.0) # all single agent tasks for now
 
-################################################################################
-############################## Define Project List #############################
-################################################################################
+    ################################################################################
+    ############################## Define Project List #############################
+    ################################################################################
     stream_length = 10
     project_list = SimpleProblemDef[]
     for i in 1:stream_length
@@ -264,9 +262,9 @@ let
     arrival_interval = 50 # amount of timesteps between arrival of new projects in factory
     commit_threshold = 20 # give solver 20 timesteps to solve the new problem
 
-################################################################################
-############################## Simulate Replanning #############################
-################################################################################
+    ################################################################################
+    ############################## Simulate Replanning #############################
+    ################################################################################
     # solver = PC_TAPF_Solver(DEBUG=true,verbosity=1,LIMIT_A_star_iterations=5*nv(env_graph));
     # idx = 1
     # def = project_list[idx]
@@ -372,14 +370,14 @@ let
     @test all([length(p) == get_cost(p)[1] for p in get_paths(trimmed_solution)])
     #### Prune existing schedule
     new_schedule, new_cache = prune_project_schedule(project_schedule, problem_spec, cache, t; robot_positions=get_env_snapshot(initial_solution,t))
-    @show new_cache.t0
+    # @show new_cache.t0
 
     print_project_schedule("new_schedule",new_schedule,new_cache;mode=:leaf_aligned)
-    for v in topological_sort(new_schedule.graph)
-       if get_path_spec(new_schedule, v).fixed
-           @show string(get_node_from_vtx(new_schedule,v)), new_cache.t0[v],new_cache.tF[v]
-       end
-    end
+    # for v in topological_sort(new_schedule.graph)
+    #    if get_path_spec(new_schedule, v).fixed
+    #        @show string(get_node_from_vtx(new_schedule,v)), new_cache.t0[v],new_cache.tF[v]
+    #    end
+    # end
 
     #### Next Project schedule to splice in:
     def2 = project_list[2]
@@ -444,9 +442,10 @@ let
         nbs_model=SparseAdjacencyMILP(),
         DEBUG=true,
         l1_verbosity=0,
-        l2_verbosity=0,
+        l2_verbosity=2,
         l3_verbosity=0,
         l4_verbosity=0,
+        LIMIT_assignment_iterations=2,
         LIMIT_A_star_iterations=5*nv(env_graph)
         );
 
@@ -461,9 +460,9 @@ let
     solution, assignment, cost, env  = high_level_search!(solver, base_search_env, Gurobi.Optimizer;
         cost_model=SumOfMakeSpans,
     )
-    @test validate(env.schedule, convert_to_vertex_lists(solution),env.cache.t0,env.cache.tF)
 
     print_project_schedule("final_schedule",env.schedule,env.cache;mode=:leaf_aligned)
+    @test validate(env.schedule, convert_to_vertex_lists(solution),env.cache.t0,env.cache.tF)
     # for v in vertices(get_graph(env.schedule))
     #     t0 = env.cache.t0[v]
     #     tF = env.cache.tF[v]
@@ -510,10 +509,10 @@ let
     for (i,path) in enumerate(robot_paths)
         robot_path_dict[i] = path
     end
-    for (id,interval) in object_interval_dict
-        @show id, interval
-    end
-    @show length(object_interval_dict)
+    # for (id,interval) in object_interval_dict
+    #     @show id, interval
+    # end
+    # @show length(object_interval_dict)
     object_paths, object_intervals, object_ids, path_idxs = get_object_paths(solution,env.schedule,env.cache)
     for (path,interval,id,idx) in zip(object_paths, object_intervals, object_ids, path_idxs)
         if !haskey(object_path_dict,id)
@@ -526,9 +525,9 @@ let
         end
         object_interval_dict[id] = interval
     end
-    for (id,interval) in object_interval_dict
-        @show id, interval
-    end
+    # for (id,interval) in object_interval_dict
+    #     @show id, interval
+    # end
     object_paths = Vector{Vector{Int}}()
     object_intervals = Vector{Vector{Int}}()
     for (id,paths) in object_path_dict
