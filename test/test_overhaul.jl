@@ -231,15 +231,45 @@ end
 let
     env_id = 2
     env_filename = string(ENVIRONMENT_DIR,"/env_",env_id,".toml")
-    factory_env = read_env(env_filename)
+    # factory_env = read_env(env_filename)
+    factory_env = construct_regular_factory_world(;
+        n_obstacles_x=2,
+        n_obstacles_y=2,
+        obs_width = [2;2],
+        obs_offset = [2;2],
+        env_pad = [1;1],
+        env_offset = [1,1],
+        env_scale = 1 # this is essentially the robot diameter
+    )
     env_graph = factory_env
     dist_matrix = get_dist_matrix(env_graph)
 
 
+    # seed = 0
+    solver_template = PC_TAPF_Solver(
+        nbs_model=SparseAdjacencyMILP(),
+        DEBUG=true,
+        l1_verbosity=0,
+        l2_verbosity=2,
+        l3_verbosity=2,
+        l4_verbosity=1,
+        LIMIT_assignment_iterations=2,
+        LIMIT_A_star_iterations=1000
+        );
+
+
+    t = 10
+    t_arrival = t
+    seed = 0
+
+    # for seed in 0:50
+    #     @show seed
+    #     let
     # generate random problem sequence
-    Random.seed!(0)
-    N = 10
-    M = 10
+    Random.seed!(seed)
+    # seed = seed + 1
+    N = 2
+    M = 3
     max_parents = 3
     depth_bias = 0.4
     Δt_min = 0
@@ -361,9 +391,6 @@ let
 
     print_project_schedule("project_schedule",project_schedule,cache;mode=:leaf_aligned)
 
-    t = 30
-    t_arrival = t
-
     #### Trim existing solution
     # TODO maintain a base_schedule (for the sake of visualization) that chronicles the entire history of the factory
     trimmed_solution = trim_solution(search_env.env, initial_solution, t)
@@ -438,16 +465,7 @@ let
     updated_cache = initialize_planning_cache(new_schedule;t0=deepcopy(new_cache.t0),tF=deepcopy(new_cache.tF))
 
     # TODO Pass the final solution
-    solver = PC_TAPF_Solver(
-        nbs_model=SparseAdjacencyMILP(),
-        DEBUG=true,
-        l1_verbosity=0,
-        l2_verbosity=2,
-        l3_verbosity=2,
-        l4_verbosity=3,
-        LIMIT_assignment_iterations=2,
-        LIMIT_A_star_iterations=1000
-        );
+    solver = PC_TAPF_Solver(solver_template);
 
     base_search_env = construct_search_env(new_schedule_copy, problem_spec, env_graph;t0=deepcopy(new_cache.t0),tF=deepcopy(new_cache.tF))
     base_search_env = SearchEnv(base_search_env, base_solution=trimmed_solution)
@@ -503,7 +521,7 @@ let
     # tF = map(v->get(env.cache.tF,get_vtx(env.schedule,get_vtx_id(base_schedule,v)),get(base_cache.tF,v,0.0)), vertices(base_schedule))
     # full_cache=initialize_planning_cache(base_schedule;t0=t0,tF=tF)
     #
-    # print_project_schedule("full_schedule",base_schedule;mode=:leaf_aligned)
+    # # print_project_schedule("full_schedule",base_schedule;mode=:leaf_aligned)
 
     robot_paths = convert_to_vertex_lists(solution)
     for (i,path) in enumerate(robot_paths)
@@ -537,6 +555,8 @@ let
         end
     end
 
+    #     end
+    # end
     # Render video clip
     # tf = maximum(map(p->length(p),robot_paths))
     # set_default_plot_size(24cm,24cm)

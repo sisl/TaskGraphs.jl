@@ -197,9 +197,9 @@ end
 function step_low_level!(solver::S) where {S<:PC_TAPF_Solver}
     # check_time(solver)
 end
-function step_low_level!(solver::S,schedule_node::N,t0,tF,args...) where {S<:PC_TAPF_Solver,N<:AbstractPlanningPredicate}
+function step_low_level!(solver::S,schedule_node::N,t0,tF,plan_path,args...) where {S<:PC_TAPF_Solver,N<:AbstractPlanningPredicate}
     step_low_level!(solver)
-    log_info(1,solver.l3_verbosity,"LOW_LEVEL_SEARCH: planning for node ",string(schedule_node), " t0 = ", t0, ", tF = ",tF)
+    log_info(1,solver.l3_verbosity,"LOW_LEVEL_SEARCH: plan path = ",plan_path," -- node ", string(schedule_node), " t0 = ", t0, ", tF = ",tF)
 end
 function exit_low_level!(solver::S) where {S<:PC_TAPF_Solver}
     check_time(solver)
@@ -217,7 +217,7 @@ function exit_a_star!(solver::S,args...) where {S<:PC_TAPF_Solver}
     solver.num_A_star_iterations = 0
     check_time(solver)
 end
-function CRCBS.logger_step_a_star!(solver::PC_TAPF_Solver, path, s, q_cost)
+function CRCBS.logger_step_a_star!(solver::PC_TAPF_Solver, s, q_cost)
     solver.num_A_star_iterations += 1
     if solver.num_A_star_iterations > solver.LIMIT_A_star_iterations
         throw(SolverAstarMaxOutException(string("# MAX OUT: A* limit of ",solver.LIMIT_A_star_iterations," exceeded.")))
@@ -743,7 +743,7 @@ function plan_next_path!(solver::S, env::E, node::N;
         v = dequeue!(env.cache.node_queue)
         node_id = get_vtx_id(env.schedule,v)
         schedule_node = get_node_from_id(env.schedule,node_id)
-        step_low_level!(solver,schedule_node,env.cache.t0[v],env.cache.tF[v])
+        step_low_level!(solver,schedule_node,env.cache.t0[v],env.cache.tF[v],get_path_spec(env.schedule, v).plan_path)
         if get_path_spec(env.schedule, v).plan_path == true
             enter_a_star!(solver)
             # enter_a_star!(solver,schedule_node,env.cache.t0[v],env.cache.tF[v])
@@ -804,12 +804,12 @@ function CRCBS.low_level_search!(
 
     reset_solution!(node,env.base_solution)
     while length(env.cache.node_queue) > 0
-        # step_low_level!(solver)
         if !(plan_next_path!(solver,env,node;heuristic=heuristic,path_finder=path_finder))
             return false
         end
     end
-    log_info(0,solver.l3_verbosity,"LOW_LEVEL_SEARCH: Returning consistent path")
+    log_info(0,solver.l3_verbosity,"LOW_LEVEL_SEARCH: Returning consistent route plan with cost ", get_cost(node.solution))
+    log_info(1,solver.l3_verbosity,"LOW_LEVEL_SEARCH: max path length = ", maximum(map(p->length(p), convert_to_vertex_lists(node.solution))))
     return true
 end
 
@@ -852,7 +852,7 @@ CRCBS.initialize_root_node(pc_mapf::P) where {P<:PC_MAPF} = initialize_root_node
 CRCBS.default_solution(pc_mapf::M) where {M<:PC_MAPF} = default_solution(pc_mapf.env)
 CRCBS.initialize_child_search_node(node::N,pc_mapf::PC_MAPF) where {N<:ConstraintTreeNode} = initialize_child_search_node(node,pc_mapf.env)
 
-function CRCBS.check_termination_criteria(solver::S,env::E,cost_so_far,path,s) where {S<:PC_TAPF_Solver,E<:AbstractLowLevelEnv}
+function CRCBS.check_termination_criteria(solver::S,env::E,cost_so_far,s) where {S<:PC_TAPF_Solver,E<:AbstractLowLevelEnv}
     # solver.num_A_star_iterations += 1
     if solver.num_A_star_iterations > solver.LIMIT_A_star_iterations
         throw(SolverAstarMaxOutException(string("# MAX OUT: A* limit of ",solver.LIMIT_A_star_iterations," exceeded.")))

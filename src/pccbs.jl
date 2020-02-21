@@ -87,7 +87,7 @@ function CRCBS.is_goal(env::LowLevelEnv,s::State)
     return false
 end
 # check_termination_criteria
-CRCBS.check_termination_criteria(env::LowLevelEnv,cost,path,s) = false
+# CRCBS.check_termination_criteria(env::LowLevelEnv,cost,s) = false
 # wait
 CRCBS.wait(s::State) = Action(e=Edge(s.vtx,s.vtx))
 CRCBS.wait(env::LowLevelEnv,s::State) = Action(e=Edge(s.vtx,s.vtx))
@@ -164,14 +164,17 @@ function CRCBS.get_transition_cost(env::E,c::TravelDistance,s::State,a::Action,s
     return (s.vtx == sp.vtx) ? 0.0 : 1.0
 end
 # violates_constraints
-function CRCBS.violates_constraints(env::LowLevelEnv, path, s::State, a::Action, sp::State)
-    t = length(path) + 1
+function CRCBS.violates_constraints(env::LowLevelEnv, s::State, a::Action, sp::State)
+    t = sp.t
     if StateConstraint(get_agent_id(env.constraints),PathNode(s,a,sp),t) in env.constraints.state_constraints
         return true
     elseif ActionConstraint(get_agent_id(env.constraints),PathNode(s,a,sp),t) in env.constraints.action_constraints
         return true
     end
     return false
+end
+function CRCBS.violates_constraints(env::LowLevelEnv, path, s::State, a::Action, sp::State)
+    violates_constraints(env,s,a,sp)
 end
 
 ################################################################################
