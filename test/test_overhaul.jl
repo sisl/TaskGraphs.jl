@@ -231,16 +231,16 @@ end
 let
     env_id = 2
     env_filename = string(ENVIRONMENT_DIR,"/env_",env_id,".toml")
-    # factory_env = read_env(env_filename)
-    factory_env = construct_regular_factory_world(;
-        n_obstacles_x=2,
-        n_obstacles_y=2,
-        obs_width = [2;2],
-        obs_offset = [2;2],
-        env_pad = [1;1],
-        env_offset = [1,1],
-        env_scale = 1 # this is essentially the robot diameter
-    )
+    factory_env = read_env(env_filename)
+    # factory_env = construct_regular_factory_world(;
+    #     n_obstacles_x=2,
+    #     n_obstacles_y=2,
+    #     obs_width = [2;2],
+    #     obs_offset = [2;2],
+    #     env_pad = [1;1],
+    #     env_offset = [1,1],
+    #     env_scale = 1 # this is essentially the robot diameter
+    # )
     env_graph = factory_env
     dist_matrix = get_dist_matrix(env_graph)
 
@@ -250,9 +250,9 @@ let
         nbs_model=SparseAdjacencyMILP(),
         DEBUG=true,
         l1_verbosity=0,
-        l2_verbosity=2,
-        l3_verbosity=2,
-        l4_verbosity=1,
+        l2_verbosity=0,
+        l3_verbosity=0,
+        l4_verbosity=0,
         LIMIT_assignment_iterations=2,
         LIMIT_A_star_iterations=1000
         );
@@ -268,8 +268,8 @@ let
     # generate random problem sequence
     Random.seed!(seed)
     # seed = seed + 1
-    N = 2
-    M = 3
+    N = 10
+    M = 10
     max_parents = 3
     depth_bias = 0.4
     Δt_min = 0
@@ -523,6 +523,8 @@ let
     #
     # # print_project_schedule("full_schedule",base_schedule;mode=:leaf_aligned)
 
+
+
     robot_paths = convert_to_vertex_lists(solution)
     for (i,path) in enumerate(robot_paths)
         robot_path_dict[i] = path
@@ -558,13 +560,13 @@ let
     #     end
     # end
     # Render video clip
-    # tf = maximum(map(p->length(p),robot_paths))
-    # set_default_plot_size(24cm,24cm)
-    # record_video(joinpath(VIDEO_DIR,string("replanning.webm")),
-    #     t->render_paths(t,robot_paths,object_paths;
-    #         object_intervals=object_intervals,
-    #         colors_vec=map(i->LCHab(60,80,200),1:length(robot_paths)),
-    #         show_paths=false);tf=tf)
+    tf = maximum(map(p->length(p),robot_paths))
+    set_default_plot_size(24cm,24cm)
+    record_video(joinpath(VIDEO_DIR,string("replanning.webm")),
+        t->render_paths(t,robot_paths,object_paths;
+            object_intervals=object_intervals,
+            colors_vec=map(i->LCHab(60,80,200),1:length(robot_paths)),
+            show_paths=false);tf=tf)
 
 end
 

@@ -380,10 +380,13 @@ align_with_predecessor(node::GO,pred::GO) 				= GO(first_valid(node.r,pred.r), f
 align_with_predecessor(node::GO,pred::DEPOSIT) 			= GO(first_valid(node.r,pred.r), first_valid(node.x1,pred.x), node.x2)
 align_with_predecessor(node::COLLECT,pred::OBJECT_AT) 	= COLLECT(node.r, first_valid(node.o,pred.o), first_valid(node.x,pred.x))
 align_with_predecessor(node::COLLECT,pred::GO) 			= COLLECT(first_valid(node.r,pred.r), node.o, first_valid(node.x,pred.x2))
-align_with_predecessor(node::COLLECT,pred::COLLECT) 	= COLLECT(first_valid(node.r,pred.r), node.o, first_valid(node.x,pred.x))
 align_with_predecessor(node::CARRY,pred::COLLECT) 		= CARRY(first_valid(node.r,pred.r), first_valid(node.o,pred.o), first_valid(node.x1,pred.x), node.x2)
 align_with_predecessor(node::CARRY,pred::CARRY) 		= CARRY(first_valid(node.r,pred.r), first_valid(node.o,pred.o), first_valid(node.x1,pred.x2), node.x2)
 align_with_predecessor(node::DEPOSIT,pred::CARRY)		= DEPOSIT(first_valid(node.r,pred.r), first_valid(node.o,pred.o), first_valid(node.x,pred.x2))
+
+# NOTE job shop constraints were wreaking havoc with id propagation between COLLECT nodes and DEPOSIT nodes! Hence the alignment functions have been removed
+# align_with_predecessor(node::COLLECT,pred::COLLECT) 	= COLLECT(node.r, node.o, first_valid(node.x,pred.x))
+# align_with_predecessor(node::DEPOSIT,pred::DEPOSIT) 	= DEPOSIT(node.r, node.o, first_valid(node.x,pred.x))
 
 function align_with_predecessor(node::TEAM_ACTION,pred)
 	for i in 1:length(node.instructions)
@@ -420,6 +423,21 @@ align_with_successor(node::GO,succ::COLLECT) 			= GO(first_valid(node.r,succ.r),
 align_with_successor(node::GO,succ::GO) 				= GO(first_valid(node.r,succ.r), node.x1, first_valid(node.x2,succ.x1))
 
 
+export
+	validate_edge
+
+# (n1) --> (n2)
+validate_edge(n1,n2) = true
+validate_edge(n1::N1,n2::N2) where {N1<:Union{ROBOT_AT,OBJECT_AT},N2<:Union{ROBOT_AT,OBJECT_AT}} = false
+validate_edge(n1::ROBOT_AT,		n2::GO			) = (n1.x 	== n2.x1) && (n1.r == n2.r)
+validate_edge(n1::GO,			n2::GO			) = (n1.x2 	== n2.x1) && (n1.r == n2.r)
+validate_edge(n1::GO,			n2::COLLECT		) = (n1.x2 	== n2.x ) && (n1.r == n2.r)
+validate_edge(n1::COLLECT,		n2::CARRY		) = (n1.x 	== n2.x1) && (n1.o == n2.o)
+validate_edge(n1::CARRY,		n2::COLLECT		) = false
+validate_edge(n1::CARRY,		n2::DEPOSIT		) = (n1.x2 	== n2.x) && (n1.o == n2.o)
+validate_edge(n1::DEPOSIT,		n2::CARRY		) = false
+validate_edge(n1::DEPOSIT,		n2::GO			) = (n1.x 	== n2.x1)
+validate_edge(n1::N,n2::N) where {N<:Union{COLLECT,DEPOSIT}} = (n1.x == n2.x) # job shop edges are valid
 
 
 """

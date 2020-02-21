@@ -795,6 +795,11 @@ function validate(project_schedule::ProjectSchedule)
                 @assert(get_location_id(node) != -1, string("get_location_id(node) != -1 for node id ", id))
             end
         end
+        for e in edges(G)
+            node1 = get_node_from_id(project_schedule, get_vtx_id(project_schedule, e.src))
+            node2 = get_node_from_id(project_schedule, get_vtx_id(project_schedule, e.dst))
+            @assert(validate_edge(node1,node2), string(" INVALID EDGE: ", string(node1), " --> ",string(node2)))
+        end
         for v in vertices(G)
             node = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v))
             @assert( outdegree(G,v) >= sum([0, values(required_successors(node))...]) , string("node = ", string(node), " outdegree = ",outdegree(G,v), " "))
@@ -803,7 +808,7 @@ function validate(project_schedule::ProjectSchedule)
                 for v2 in outneighbors(G,v)
                     node2 = get_node_from_vtx(project_schedule, v2)
                     if isa(node2, Union{GO,COLLECT,CARRY,DEPOSIT})
-                        if length(union(resources_reserved(node),resources_reserved(node2))) == 0 # jb shop constraint
+                        if length(intersect(resources_reserved(node),resources_reserved(node2))) == 0 # job shop constraint
                             @assert( get_robot_id(node) == get_robot_id(node2), string("robot IDs do not match: ",string(node), " --> ", string(node2)))
                         end
                     end
@@ -814,7 +819,7 @@ function validate(project_schedule::ProjectSchedule)
         if typeof(e) <: AssertionError
             print(e.msg)
         else
-            # throw(e)
+            throw(e)
         end
         return false
     end
@@ -2264,7 +2269,7 @@ function propagate_valid_ids!(project_schedule::ProjectSchedule,problem_spec::Pr
     @assert(is_cyclic(G) == false, "is_cyclic(G)") # string(sparse(adj_matrix))
     # Propagate valid IDs through the schedule
     for v in topological_sort(G)
-        if !get_path_spec(project_schedule, v).fixed
+        # if !get_path_spec(project_schedule, v).fixed
             node_id = get_vtx_id(project_schedule, v)
             node = get_node_from_id(project_schedule, node_id)
             for v2 in inneighbors(G,v)
@@ -2273,8 +2278,13 @@ function propagate_valid_ids!(project_schedule::ProjectSchedule,problem_spec::Pr
             for v2 in outneighbors(G,v)
                 node = align_with_successor(node,get_node_from_vtx(project_schedule, v2))
             end
-            replace_in_schedule!(project_schedule, problem_spec, node, node_id)
-        end
+            path_spec = get_path_spec(project_schedule, v)
+            if path_spec.fixed
+                replace_in_schedule!(project_schedule, path_spec, node, node_id)
+            else
+                replace_in_schedule!(project_schedule, problem_spec, node, node_id)
+            end
+        # end
     end
     # project_schedule
     return true
