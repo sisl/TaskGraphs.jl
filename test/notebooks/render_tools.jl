@@ -175,6 +175,7 @@ function visualize_env(vtxs,pickup_vtxs,dropoff_vtxs,t=0;
         pickup_color= "light blue",
         dropoff_color="pink",
         active_object_color="black",
+        active_object_colors=map(i->"black",object_paths),
         completed_object_color="gray",
         inactive_object_color="gray",
         show_paths=true
@@ -224,13 +225,13 @@ function visualize_env(vtxs,pickup_vtxs,dropoff_vtxs,t=0;
         )
     end
     object_layers = []
-    for (p,interval) in zip(object_paths,object_intervals)
+    for (i,(p,interval)) in enumerate(zip(object_paths,object_intervals))
         if interval[1] > t
             object_color = inactive_object_color
         elseif interval[2] < t
             object_color = completed_object_color
         else
-            object_color = active_object_color
+            object_color = active_object_colors[i]
         end
         if length(p) > 0 && interval[2] > t
             interpolate(p[min(t1,length(p))],p[min(t1+1,length(p))],t1-(t+1))
@@ -303,7 +304,7 @@ function record_video(outfile_name,render_function;
 end
 
 render_env(t) = visualize_env(factory_env,t;robot_vtxs=r0,object_vtxs=s0,paths=paths,search_patterns=[],goals=[])
-render_paths(t,robot_paths,object_paths=[];kwargs...) = visualize_env(factory_env,t;robot_paths=robot_paths,object_paths=object_paths,kwargs...)
+render_paths(t,factory_env,robot_paths,object_paths=[];kwargs...) = visualize_env(factory_env,t;robot_paths=robot_paths,object_paths=object_paths,kwargs...)
 render_both(t,paths1,paths2) = hstack(render_paths(t,paths1),render_paths(t,paths2))
 
 

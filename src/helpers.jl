@@ -476,4 +476,39 @@ function get_object_paths(solution,env)
     get_object_paths(solution,env.schedule,env.cache)
 end
 
+export
+    fill_object_path_dicts!,
+    convert_to_path_vectors
+
+function fill_object_path_dicts!(solution,project_schedule,cache;
+        object_path_dict = Dict{Int,Vector{Vector{Int}}}(),
+        object_interval_dict = Dict{Int,Vector{Int}}()
+    )
+    object_paths, object_intervals, object_ids, path_idxs = get_object_paths(solution,project_schedule,cache)
+    for (path,interval,id,idx) in zip(object_paths, object_intervals, object_ids, path_idxs)
+        if !haskey(object_path_dict,id)
+            object_path_dict[id] = Vector{Vector{Int}}()
+        end
+        if length(object_path_dict[id]) >= idx
+            object_path_dict[id][idx] = path
+        else
+            push!(object_path_dict[id], path)
+        end
+        object_interval_dict[id] = interval
+    end
+    object_path_dict, object_interval_dict
+end
+
+function convert_to_path_vectors(object_path_dict, object_interval_dict)
+    object_paths = Vector{Vector{Int}}()
+    object_intervals = Vector{Vector{Int}}()
+    for (id,paths) in object_path_dict
+        for path in paths
+            push!(object_intervals, object_interval_dict[id])
+            push!(object_paths, path)
+        end
+    end
+    object_paths, object_intervals
+end
+
 end
