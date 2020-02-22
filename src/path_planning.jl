@@ -141,6 +141,9 @@ function log_info(limit::Int,solver::S,msg...) where {S<:PC_TAPF_Solver}
     log_info(limit,solver.verbosity,msg...)
 end
 
+export
+    reset_solver!
+
 function reset_solver!(solver::S) where {S<:PC_TAPF_Solver}
     solver.num_assignment_iterations = 0
     solver.num_CBS_iterations = 0

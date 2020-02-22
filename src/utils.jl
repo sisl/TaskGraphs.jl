@@ -50,6 +50,10 @@ function remap_object_ids!(project_schedule::ProjectSchedule,args...)
     end
     project_schedule
 end
+function remap_object_ids!(new_schedule::ProjectSchedule,old_schedule::ProjectSchedule)
+    max_obj_id = maximum([get_id(id) for id in get_vtx_ids(old_schedule) if typeof(id) <: ObjectID])
+    remap_object_ids!(new_schedule,max_obj_id)
+end
 
 export
     # validate,

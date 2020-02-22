@@ -11,6 +11,17 @@ using Printf
 
 interpolate(a,b,t) = (1 - t)*a + t*b
 
+function gen_object_colors(n)
+  cs = distinguishable_colors(n,
+      [colorant"#FE4365", colorant"#eca25c"], # seed colors
+      lchoices=Float64[58, 45, 72.5, 90],     # lightness choices
+      transform=c -> deuteranopic(c, 0.1),    # color transform
+      cchoices=Float64[20,40],                # chroma choices
+      hchoices=[75,51,35,120,180,210,270,310] # hue choices
+  )
+
+  convert(Vector{Color}, cs)
+end
 
 function get_grid_world_layer(vtxs,color,cw)
     if length(vtxs) > 0
@@ -175,7 +186,9 @@ function visualize_env(vtxs,pickup_vtxs,dropoff_vtxs,t=0;
         pickup_color= "light blue",
         dropoff_color="pink",
         active_object_color="black",
-        active_object_colors=map(i->"black",object_paths),
+        project_idxs=map(i->1,object_paths),
+        proj_colors_vec = gen_object_colors(maximum(project_idxs)),
+        active_object_colors=map(idx->proj_colors_vec[idx],project_idxs),
         completed_object_color="gray",
         inactive_object_color="gray",
         show_paths=true
