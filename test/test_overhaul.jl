@@ -291,7 +291,7 @@ let
 
     arrival_interval    = 50 # new project requests arrive every `arrival_interval` timesteps
     warning_time        = 20 # the project request arrives in the command center `warning_time` timesteps before the relevant objects become available
-    commit_threshold    = 20 # freeze the current plan (route plan and schedule) at `t_arrival` + `commit_threshold`
+    commit_threshold    = 5 # freeze the current plan (route plan and schedule) at `t_arrival` + `commit_threshold`
     greedy_commit_threshold = 5 # a tentative plan (computed with a fast heuristic) may take effect at t = t_arrival + greedy_commit_threshold--just in case the solver fails
 
     ################################################################################
@@ -310,15 +310,12 @@ let
     object_interval_dict = Dict{Int,Vector{Int}}()
 
     solver = PC_TAPF_Solver(solver_template);
+    (solution, _, cost, search_env), elapsed_time, byte_ct, gc_time, mem_ct = @timed high_level_search!(
+        solver, base_search_env, Gurobi.Optimizer;primary_objective=primary_objective)
+
     while idx < length(project_list)
-        # plan for current project
-        # reset_solver!(solver)
-        solver = PC_TAPF_Solver(solver_template);
-        (solution, _, cost, search_env), elapsed_time, byte_ct, gc_time, mem_ct = @timed high_level_search!(
-            solver, base_search_env, Gurobi.Optimizer;primary_objective=primary_objective)
         project_schedule = search_env.schedule
         cache = search_env.cache
-        # plan for current project
         idx += 1
         t_request = arrival_interval * (idx - 1)
         t_arrival = t_request + warning_time
@@ -338,7 +335,7 @@ let
         end
         # Freeze solution and schedule at t_commit
         trimmed_solution = trim_solution(search_env.env, solution, t_commit) # TODO handle the condition where t_commit > length(solution)
-        new_schedule, new_cache = prune_project_schedule(project_schedule, problem_spec, cache, t_commit; robot_positions=get_env_snapshot(initial_solution,t_commit))
+        new_schedule, new_cache = prune_project_schedule(project_schedule, problem_spec, cache, t_commit; robot_positions=get_env_snapshot(solution,t_commit))
         # splice projects together!
         splice_schedules!(new_schedule,next_schedule)
         t0 = map(v->get(new_cache.t0, v, t_arrival), vertices(get_graph(new_schedule)))
@@ -346,8 +343,34 @@ let
         base_search_env = construct_search_env(new_schedule, problem_spec, env_graph;t0=t0,tF=tF)
         base_search_env = SearchEnv(base_search_env, base_solution=trimmed_solution)
         # TODO Plot the output to make sure that the loop has no bugs
+        # plan for current project
+        # reset_solver!(solver)
+        solver = PC_TAPF_Solver(solver_template);
+        (solution, _, cost, search_env), elapsed_time, byte_ct, gc_time, mem_ct = @timed high_level_search!(
+            solver, base_search_env, Gurobi.Optimizer;primary_objective=primary_objective)
     end
 
+    robot_paths = convert_to_vertex_lists(solution)
+    object_path_dict, object_interval_dict = fill_object_path_dicts!(solution,search_env.schedule,search_env.cache;
+            object_path_dict = object_path_dict,
+            object_interval_dict = object_interval_dict
+        )
+    object_paths, object_intervals = convert_to_path_vectors(object_path_dict, object_interval_dict)
+    project_idxs = map(k->project_ids[k], sort(collect(keys(project_ids))))
+
+    @show project_ids
+    @show project_idxs
+    @show project_idxs
+
+    # Render video clip
+    tf = maximum(map(p->length(p),robot_paths))
+    set_default_plot_size(24cm,24cm)
+    record_video(joinpath(VIDEO_DIR,string("replanning2.webm")),
+        t->render_paths(t,factory_env,robot_paths,object_paths;
+            object_intervals=object_intervals,
+            colors_vec=map(i->LCHab(60,80,200),1:length(robot_paths)),
+            project_idxs=project_idxs,
+            show_paths=false);tf=tf)
 
     # def1 = project_list[1]
     #
@@ -480,7 +503,7 @@ let
     # #     end
     # # end
 
-
+    #
     # robot_paths = convert_to_vertex_lists(solution)
     # object_path_dict, object_interval_dict = fill_object_path_dicts!(solution,env.schedule,env.cache;
     #         object_path_dict = object_path_dict,
@@ -488,33 +511,8 @@ let
     #     )
     # object_paths, object_intervals = convert_to_path_vectors(object_path_dict, object_interval_dict)
     # project_idxs = map(k->project_ids[k], sort(collect(keys(project_ids))))
-    # color_options = ["black","brown"]
-    # active_object_colors = map(k->color_options[project_ids[k]], sort(collect(keys(project_ids))))
-    # object_paths, object_intervals, object_ids, path_idxs = get_object_paths(solution,env.schedule,env.cache)
-    # for (path,interval,id,idx) in zip(object_paths, object_intervals, object_ids, path_idxs)
-    #     if !haskey(object_path_dict,id)
-    #         object_path_dict[id] = Vector{Vector{Int}}()
-    #     end
-    #     if length(object_path_dict[id]) >= idx
-    #         object_path_dict[id][idx] = path
-    #     else
-    #         push!(object_path_dict[id], path)
-    #     end
-    #     object_interval_dict[id] = interval
-    # end
-    # object_paths = Vector{Vector{Int}}()
-    # object_intervals = Vector{Vector{Int}}()
-    # for (id,paths) in object_path_dict
-    #     for path in paths
-    #         push!(object_intervals, object_interval_dict[id])
-    #         push!(object_paths, path)
-    #     end
-    # end
-
-    #     end
-    # end
-
-    # Render video clip
+    #
+    # # Render video clip
     # tf = maximum(map(p->length(p),robot_paths))
     # set_default_plot_size(24cm,24cm)
     # record_video(joinpath(VIDEO_DIR,string("replanning2.webm")),

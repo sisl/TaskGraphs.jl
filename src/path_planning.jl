@@ -1268,7 +1268,6 @@ function prune_project_schedule(project_schedule::ProjectSchedule,problem_spec::
     robot_positions::Dict{RobotID,ROBOT_AT}=Dict{RobotID,ROBOT_AT}()
     )
     G = get_graph(project_schedule)
-    new_schedule = ProjectSchedule()
 
     # identify nodes "cut" by timestep t
     active_vtxs = Set{Int}()
@@ -1297,6 +1296,7 @@ function prune_project_schedule(project_schedule::ProjectSchedule,problem_spec::
         end
     end
     # Construct new graph
+    new_schedule = ProjectSchedule()
     keep_vtxs = setdiff(Set{Int}(collect(vertices(G))), remove_set)
     # add all non-deleted nodes to new project schedule
     for v in keep_vtxs
@@ -1314,7 +1314,11 @@ function prune_project_schedule(project_schedule::ProjectSchedule,problem_spec::
     t0 = map(v->get(cache.t0, get_vtx(project_schedule, get_vtx_id(new_schedule, v)), 0.0), vertices(G))
     tF = map(v->get(cache.tF, get_vtx(project_schedule, get_vtx_id(new_schedule, v)), 0.0), vertices(G))
     for v_ in active_vtxs
+        # @show v_, get_vtx_id(project_schedule,v_)
         v = get_vtx(new_schedule, get_vtx_id(project_schedule, v_))
+        if v < 0
+            continue
+        end
         node_id = get_vtx_id(new_schedule,v)
         node = get_node_from_id(new_schedule, node_id)
         # if isa(node,Union{GO,CARRY,COLLECT,DEPOSIT}) # split

@@ -502,7 +502,8 @@ end
 function convert_to_path_vectors(object_path_dict, object_interval_dict)
     object_paths = Vector{Vector{Int}}()
     object_intervals = Vector{Vector{Int}}()
-    for (id,paths) in object_path_dict
+    for id in sort(collect(keys(object_path_dict)))
+        paths = object_path_dict[id]
         for path in paths
             push!(object_intervals, object_interval_dict[id])
             push!(object_paths, path)
