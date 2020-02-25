@@ -279,7 +279,7 @@ let
     ################################################################################
     ############################## Define Project List #############################
     ################################################################################
-    stream_length = 2
+    stream_length = 5
     project_list = SimpleProblemDef[]
     for i in 1:stream_length
         r0,s0,sF = get_random_problem_instantiation(N,M,get_pickup_zones(factory_env),get_dropoff_zones(factory_env),
@@ -291,7 +291,7 @@ let
 
     arrival_interval    = 50 # new project requests arrive every `arrival_interval` timesteps
     warning_time        = 20 # the project request arrives in the command center `warning_time` timesteps before the relevant objects become available
-    commit_threshold    = 5 # freeze the current plan (route plan and schedule) at `t_arrival` + `commit_threshold`
+    commit_threshold    = 205 # freeze the current plan (route plan and schedule) at `t_arrival` + `commit_threshold`
     greedy_commit_threshold = 5 # a tentative plan (computed with a fast heuristic) may take effect at t = t_arrival + greedy_commit_threshold--just in case the solver fails
 
     ################################################################################
@@ -360,17 +360,16 @@ let
 
     @show project_ids
     @show project_idxs
-    @show project_idxs
 
     # Render video clip
-    tf = maximum(map(p->length(p),robot_paths))
-    set_default_plot_size(24cm,24cm)
-    record_video(joinpath(VIDEO_DIR,string("replanning2.webm")),
-        t->render_paths(t,factory_env,robot_paths,object_paths;
-            object_intervals=object_intervals,
-            colors_vec=map(i->LCHab(60,80,200),1:length(robot_paths)),
-            project_idxs=project_idxs,
-            show_paths=false);tf=tf)
+    # tf = maximum(map(p->length(p),robot_paths))
+    # set_default_plot_size(24cm,24cm)
+    # record_video(joinpath(VIDEO_DIR,string("replanning3.webm")),
+    #     t->render_paths(t,factory_env,robot_paths,object_paths;
+    #         object_intervals=object_intervals,
+    #         colors_vec=map(i->LCHab(60,80,200),1:length(robot_paths)),
+    #         project_idxs=project_idxs,
+    #         show_paths=false);tf=tf)
 
     # def1 = project_list[1]
     #

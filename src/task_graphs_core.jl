@@ -1254,7 +1254,7 @@ function process_schedule(schedule::P; t0=zeros(Int,get_num_vtxs(schedule)),
 
     solution_graph = get_graph(schedule)
     traversal = topological_sort_by_dfs(solution_graph)
-    n_roots = length(schedule.root_nodes)
+    n_roots = max(length(schedule.root_nodes),1)
     slack = map(i->Inf*ones(n_roots), vertices(solution_graph))
     local_slack = map(i->Inf*ones(n_roots), vertices(solution_graph))
     # True terminal nodes
