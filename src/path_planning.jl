@@ -70,6 +70,7 @@ export
     PrioritizedPlannerISPSModel,
     AbstractPathFinderModel,
     AStarPathFinderModel,
+    PrioritizedAStarModel,
     PC_TAPF_Solver
 
 abstract type AbstractCBSModel end
@@ -80,7 +81,7 @@ abstract type AbstractISPSModel end
 end
 abstract type AbstractPathFinderModel end
 struct AStarPathFinderModel <: AbstractPathFinderModel end
-struct PrioritizeAStarModel <: AbstractPathFinderModel end
+struct PrioritizedAStarModel <: AbstractPathFinderModel end
 
 @with_kw mutable struct PC_TAPF_Solver{M,C,I,A,T} <: AbstractMAPFSolver
     # TODO parameterize by MILP Solver, CBS solver, ISPS solver, A_star solver
@@ -468,7 +469,7 @@ function construct_a_star_cost_model(a_star_model, schedule, cache, problem_spec
     heuristic_model = construct_composite_heuristic(ph,NullHeuristic(),ph,ph)
     cost_model, heuristic_model
 end
-function construct_a_star_cost_model(a_star_model::PrioritizeAStarModel, schedule, cache, problem_spec, env_graph; extra_T=400, primary_objective=SumOfMakeSpans)
+function construct_a_star_cost_model(a_star_model::PrioritizedAStarModel, schedule, cache, problem_spec, env_graph; extra_T=400, primary_objective=SumOfMakeSpans)
     N = problem_spec.N
     cost_model = construct_composite_cost_model(
         HardConflictCost(env_graph,maximum(cache.tF)+extra_T, N),
@@ -1391,7 +1392,6 @@ function replan(solver, replan_model, env_graph, search_env, problem_spec, solut
     cache = search_env.cache
     # Freeze solution and schedule at t_commit
     t_commit = get_commit_time(replan_model, search_env, t_request, commit_threshold)
-    trimmed_solution = trim_solution(search_env, solution, t_commit) # TODO handle the condition where t_commit > length(solution)
     # Update operating schedule
     new_schedule, new_cache = prune_schedule(project_schedule,problem_spec,cache,t_commit)
     # split active nodes
@@ -1406,7 +1406,8 @@ function replan(solver, replan_model, env_graph, search_env, problem_spec, solut
     splice_schedules!(new_schedule,next_schedule)
     t0 = map(v->get(new_cache.t0, v, t_arrival), vertices(get_graph(new_schedule)))
     tF = map(v->get(new_cache.tF, v, t_arrival), vertices(get_graph(new_schedule)))
-    base_search_env = construct_search_env(solver,new_schedule, problem_spec, env_graph;t0=t0,tF=tF)
+    base_search_env = construct_search_env(solver, new_schedule, problem_spec, env_graph;t0=t0,tF=tF)
+    trimmed_solution = trim_solution(base_search_env, solution, t_commit)
     base_search_env = SearchEnv(base_search_env, base_solution=trimmed_solution)
 end
 

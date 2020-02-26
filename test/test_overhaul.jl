@@ -255,6 +255,23 @@ let
         LIMIT_assignment_iterations=5,
         LIMIT_A_star_iterations=8000
         );
+    fallback_solver_template = PC_TAPF_Solver(
+        nbs_model=GreedyAssignment(),
+        astar_model = PrioritizedAStarModel(),
+        DEBUG=true,
+        l1_verbosity=2,
+        l2_verbosity=1,
+        l3_verbosity=0,
+        l4_verbosity=0,
+        LIMIT_assignment_iterations=1,
+        LIMIT_A_star_iterations=8000
+        );
+
+    # replan_model = MergeAndBalance()
+    replan_model = ReassignFreeRobots()
+    # replan_model = DeferUntilCompletion()
+    fallback_replan_model = ReassignFreeRobots()
+
     primary_objective = SumOfMakeSpans
 
     t = 10
@@ -296,6 +313,9 @@ let
     ################################################################################
     ############################## Simulate Replanning #############################
     ################################################################################
+
+    solver = PC_TAPF_Solver(solver_template);
+    fallback_solver = PC_TAPF_Solver(fallback_solver_template);
     idx = 1
     def = project_list[idx]
     project_spec, problem_spec, _, _, robot_ICs = construct_task_graphs_problem(def, dist_matrix);
@@ -308,10 +328,6 @@ let
     object_path_dict = Dict{Int,Vector{Vector{Int}}}()
     object_interval_dict = Dict{Int,Vector{Int}}()
 
-    # replan_model = MergeAndBalance()
-    replan_model = ReassignFreeRobots()
-    # replan_model = DeferUntilCompletion()
-    solver = PC_TAPF_Solver(solver_template);
     (solution, _, cost, search_env), elapsed_time, byte_ct, gc_time, mem_ct = @timed high_level_search!(
         solver, base_search_env, Gurobi.Optimizer;primary_objective=primary_objective)
 
@@ -335,6 +351,10 @@ let
         for (object_id, pred) in get_object_ICs(next_schedule)
             project_ids[get_id(object_id)] = idx
         end
+        # Fallback
+        fallback_search_env = replan(fallback_solver, fallback_replan_model, env_graph, search_env, problem_spec, solution, next_schedule, t_request, t_arrival; commit_threshold=commit_threshold)
+        reset_solver!(fallback_solver)
+        @timed high_level_search!(fallback_solver, fallback_search_env, Gurobi.Optimizer;primary_objective=primary_objective)
         # Replanning outer loop
         base_search_env = replan(solver, replan_model, env_graph, search_env, problem_spec, solution, next_schedule, t_request, t_arrival; commit_threshold=commit_threshold)
         print_project_schedule(string("schedule",idx,"B"),base_search_env.schedule;mode=:leaf_aligned)
@@ -362,156 +382,6 @@ let
     # tf = maximum(map(p->length(p),robot_paths))
     # set_default_plot_size(24cm,24cm)
     # record_video(joinpath(VIDEO_DIR,string("replanning4.webm")),
-    #     t->render_paths(t,factory_env,robot_paths,object_paths;
-    #         object_intervals=object_intervals,
-    #         colors_vec=map(i->LCHab(60,80,200),1:length(robot_paths)),
-    #         project_idxs=project_idxs,
-    #         show_paths=false);tf=tf)
-
-    # def1 = project_list[1]
-    #
-    # project_spec, r0, s0, sF = def1.project_spec,def1.r0,def1.s0,def1.sF
-    # project_spec, problem_spec, object_ICs, object_FCs, robot_ICs = construct_task_graphs_problem(
-    #         project_spec, r0, s0, sF, dist_matrix);
-    #
-    # partial_schedule = construct_partial_project_schedule(project_spec,problem_spec,robot_ICs)
-    # print_project_schedule("partial_schedule",partial_schedule;mode=:leaf_aligned)
-    # base_search_env = construct_search_env(solver,partial_schedule,problem_spec,env_graph;primary_objective=primary_objective)
-    #
-    # #### solve initial problem
-    # solver = PC_TAPF_Solver(solver_template);
-    # (initial_solution, assignment, cost, search_env), elapsed_time, byte_ct, gc_time, mem_ct = @timed high_level_search!(
-    #     solver, base_search_env, Gurobi.Optimizer;primary_objective=primary_objective)
-    #
-    # project_schedule = search_env.schedule
-    # cache = search_env.cache
-    # @test validate(project_schedule)
-    #
-    # # NOTE for plotting
-    # object_path_dict, object_interval_dict = fill_object_path_dicts!(initial_solution,project_schedule,cache)
-    # project_ids = Dict(k=>1 for (k,v) in object_path_dict)
-    #
-    # print_project_schedule("project_schedule",project_schedule,cache;mode=:leaf_aligned)
-    #
-    # #### Trim existing solution
-    # trimmed_solution = trim_solution(search_env.env, initial_solution, t)
-    # @test all([length(p) == get_cost(p)[1] for p in get_paths(trimmed_solution)])
-    # #### Prune existing schedule
-    # new_schedule, new_cache = prune_project_schedule(project_schedule, problem_spec, cache, t; robot_positions=get_env_snapshot(initial_solution,t))
-    # # @show new_cache.t0
-    #
-    # print_project_schedule("new_schedule",new_schedule,new_cache;mode=:leaf_aligned)
-    # # for v in topological_sort(new_schedule.graph)
-    # #    if get_path_spec(new_schedule, v).fixed
-    # #        @show string(get_node_from_vtx(new_schedule,v)), new_cache.t0[v],new_cache.tF[v]
-    # #    end
-    # # end
-    #
-    # #### Next Project schedule to splice in:
-    # def2 = project_list[2]
-    # project_spec2, problem_spec2, _, _, _ = construct_task_graphs_problem(def2, dist_matrix, shape_dict=factory_env.expanded_zones);
-    # next_schedule = construct_partial_project_schedule(project_spec2,problem_spec2)
-    #
-    # print_project_schedule("next_schedule",next_schedule;mode=:leaf_aligned)
-    #
-    # # remap object ids in incoming project
-    # max_obj_id = maximum([get_id(id) for id in get_vtx_ids(project_schedule) if typeof(id) <: ObjectID])
-    # remap_object_ids!(next_schedule,max_obj_id)
-    # for (object_id, pred) in get_object_ICs(next_schedule)
-    #     project_ids[get_id(object_id)] = 2
-    # end
-    #
-    # print_project_schedule("next_schedule_remapped",next_schedule;mode=:leaf_aligned)
-    #
-    # let
-    #     s1 = Set{AbstractID}(new_schedule.vtx_ids)
-    #     s2 = Set{AbstractID}(next_schedule.vtx_ids)
-    #     @test length(s1) + length(s2) == length(union(s1,s2))
-    # end
-    #
-    # # splice projects together!
-    # splice_schedules!(new_schedule,next_schedule)
-    # G = get_graph(new_schedule)
-    # # do this again because now we have more nodes
-    # t0 = map(v->get(new_cache.t0, v, t_arrival), vertices(G))
-    # new_cache = initialize_planning_cache(new_schedule;t0=t0)
-    #
-    # print_project_schedule("spliced_schedule",new_schedule,new_cache;mode=:leaf_aligned)
-    #
-    # # The information relevant to replanning
-    # new_schedule, new_cache, trimmed_solution
-    #
-    # new_schedule_copy = deepcopy(new_schedule)
-    #
-    # model = formulate_milp(SparseAdjacencyMILP(),new_schedule,problem_spec;
-    #     cost_model=SumOfMakeSpans,
-    #     t0_ = Dict{AbstractID,Int}(get_vtx_id(new_schedule, v)=>t0 for (v,t0) in enumerate(new_cache.t0)),
-    #     tF_ = Dict{AbstractID,Int}(get_vtx_id(new_schedule, v)=>tF for (v,tF) in enumerate(new_cache.tF))
-    #     )
-    # optimize!(model)
-    # @test termination_status(model) == MOI.OPTIMAL
-    # @show Int(round(value(objective_function(model))))
-    # adj_matrix = get_assignment_matrix(model)
-    # # DEBUG something is wrong here
-    # # for v in topological_sort(new_schedule.graph)
-    # #    if get_path_spec(new_schedule, v).fixed
-    # #        @show string(get_node_from_vtx(new_schedule,v))
-    # #    end
-    # # end
-    # update_project_schedule!(new_schedule,problem_spec,adj_matrix)
-    # @test validate(new_schedule)
-    # # for v in topological_sort(new_schedule.graph)
-    # #    if get_path_spec(new_schedule, v).fixed
-    # #        @show string(get_node_from_vtx(new_schedule,v))
-    # #    end
-    # # end
-    #
-    # updated_cache = initialize_planning_cache(new_schedule;t0=deepcopy(new_cache.t0),tF=deepcopy(new_cache.tF))
-    #
-    # # TODO Pass the final solution
-    # # reset_solver!(solver)
-    # solver = PC_TAPF_Solver(solver_template);
-    #
-    # base_search_env = construct_search_env(solver,new_schedule_copy, problem_spec, env_graph;t0=deepcopy(new_cache.t0),tF=deepcopy(new_cache.tF))
-    # base_search_env = SearchEnv(base_search_env, base_solution=trimmed_solution)
-    #
-    # print_project_schedule("updated_schedule",new_schedule,initialize_planning_cache(new_schedule;t0=deepcopy(new_cache.t0),tF=deepcopy(new_cache.tF));mode=:leaf_aligned)
-    # for v in new_schedule.root_nodes
-    #     @show v, base_search_env.cache.tF[v]
-    # end
-    #
-    # solution, assignment, cost, env  = high_level_search!(solver, base_search_env, Gurobi.Optimizer;
-    #     cost_model=SumOfMakeSpans,
-    # )
-    #
-    # print_project_schedule("final_schedule",env.schedule,env.cache;mode=:leaf_aligned)
-    # @test validate(env.schedule, convert_to_vertex_lists(solution),env.cache.t0,env.cache.tF)
-    # # for v in vertices(get_graph(env.schedule))
-    # #     t0 = env.cache.t0[v]
-    # #     tF = env.cache.tF[v]
-    # #     t0_ = base_search_env.cache.t0[v]
-    # #     tF_ = base_search_env.cache.tF[v]
-    # #     if (t0 - t0_ != 0) || (tF - tF_ != 0)
-    # #         node_id = get_vtx_id(env.schedule, v)
-    # #         node = get_node_from_id(env.schedule)
-    # #         @show node
-    # #         @show v, t0-t0_, tF-tF_
-    # #     end
-    # # end
-
-    #
-    # robot_paths = convert_to_vertex_lists(solution)
-    # object_path_dict, object_interval_dict = fill_object_path_dicts!(solution,env.schedule,env.cache;
-    #         object_path_dict = object_path_dict,
-    #         object_interval_dict = object_interval_dict
-    #     )
-    # object_paths, object_intervals = convert_to_path_vectors(object_path_dict, object_interval_dict)
-    # project_idxs = map(k->project_ids[k], sort(collect(keys(project_ids))))
-    #
-    # # Render video clip
-    # tf = maximum(map(p->length(p),robot_paths))
-    # set_default_plot_size(24cm,24cm)
-    # record_video(joinpath(VIDEO_DIR,string("replanning2.webm")),
     #     t->render_paths(t,factory_env,robot_paths,object_paths;
     #         object_intervals=object_intervals,
     #         colors_vec=map(i->LCHab(60,80,200),1:length(robot_paths)),

@@ -1323,11 +1323,13 @@ end
 end
 @with_kw struct AdjacencyMILP <: TaskGraphsMILP
     model::JuMP.Model = Model()
+    job_shop::Bool=false
 end
 @with_kw struct SparseAdjacencyMILP <: TaskGraphsMILP
     model::JuMP.Model = Model()
     Xa::SparseMatrixCSC{VariableRef,Int} = SparseMatrixCSC{VariableRef,Int}(0,0,ones(Int,1),Int[],VariableRef[]) # assignment adjacency matrix
     Xj::SparseMatrixCSC{VariableRef,Int} = SparseMatrixCSC{VariableRef,Int}(0,0,ones(Int,1),Int[],VariableRef[]) # job shop adjacency matrix
+    job_shop::Bool=false
 end
 JuMP.optimize!(model::M) where {M<:TaskGraphsMILP}          = optimize!(model.model)
 JuMP.termination_status(model::M) where {M<:TaskGraphsMILP} = termination_status(model.model)
@@ -1955,7 +1957,7 @@ function formulate_milp(milp_model::SparseAdjacencyMILP,project_schedule::Projec
         tF_ = Dict{AbstractID,Float64}(), # dictionary of initial times. Default is empty
         Mm = 10000, # for big M constraints
         cost_model = SumOfMakeSpans,
-        job_shop=true
+        job_shop=milp_model.job_shop
     )
 
     model = Model(with_optimizer(optimizer,
@@ -2025,7 +2027,7 @@ function formulate_milp(milp_model::SparseAdjacencyMILP,project_schedule::Projec
                 end
             end
         end
-        if potential_match == false
+        if potential_match == false && job_shop == false
             @constraint(model, tF[v] == t0[v] + Δt[v]) # adding this constraint may provide some speedup
         end
     end
@@ -2096,7 +2098,7 @@ function formulate_milp(milp_model::SparseAdjacencyMILP,project_schedule::Projec
     # sparsity_cost = @expression(model, (0.5/(nv(G)^2))*sum(X)) # cost term to encourage sparse X. Otherwise the solver may add pointless edges
     # @objective(model, Min, cost1 + sparsity_cost)
     @objective(model, Min, cost1)
-    SparseAdjacencyMILP(model,Xa,Xj) #, job_shop_variables
+    SparseAdjacencyMILP(model,Xa,Xj, milp_model.job_shop) #, job_shop_variables
 end
 
 export
