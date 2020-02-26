@@ -72,7 +72,7 @@ let
         initialize_toy_problem_7,
         initialize_toy_problem_8,
         ])
-        for cost_model in [SumOfMakeSpans, MakeSpan]
+        for cost_model in [MakeSpan, SumOfMakeSpans]
             costs = Float64[]
             schedules = ProjectSchedule[]
             project_spec, problem_spec, robot_ICs, assignments, env_graph = f(;verbose=false);
@@ -85,7 +85,6 @@ let
                 cost = Int(round(value(objective_function(model))))
                 adj_matrix = get_assignment_matrix(model)
                 update_project_schedule!(milp_model,schedule,problem_spec,adj_matrix)
-                @test validate(schedule)
                 push!(costs, cost)
                 push!(schedules, schedule)
                 @test validate(schedule)
@@ -93,11 +92,11 @@ let
 
                 # Check that it matches low_level_search
                 solver = PC_TAPF_Solver(verbosity=0)
-                env = construct_search_env(schedule, problem_spec, env_graph;primary_objective=cost_model)
+                env = construct_search_env(solver, schedule, problem_spec, env_graph;primary_objective=cost_model)
                 pc_mapf = PC_MAPF(env)
                 constraint_node = initialize_root_node(pc_mapf)
                 low_level_search!(solver,pc_mapf,constraint_node)
-                # @show i, f, obj_val1, constraint_node.cost
+                @show i, f, milp_model, cost_model, cost, constraint_node.cost
                 @test constraint_node.cost[1] == cost
                 @test validate(env.schedule)
             end
@@ -301,7 +300,7 @@ let
     def = project_list[idx]
     project_spec, problem_spec, _, _, robot_ICs = construct_task_graphs_problem(def, dist_matrix);
     partial_schedule = construct_partial_project_schedule(project_spec,problem_spec,robot_ICs)
-    base_search_env = construct_search_env(partial_schedule,problem_spec,env_graph;primary_objective=primary_objective)
+    base_search_env = construct_search_env(solver,partial_schedule,problem_spec,env_graph;primary_objective=primary_objective)
     project_ids = Dict{Int,Int}()
     for (object_id, pred) in get_object_ICs(partial_schedule)
         project_ids[get_id(object_id)] = idx
@@ -337,7 +336,7 @@ let
             project_ids[get_id(object_id)] = idx
         end
         # Replanning outer loop
-        base_search_env = replan(replan_model, env_graph, search_env, problem_spec, solution, next_schedule, t_request, t_arrival; commit_threshold=commit_threshold)
+        base_search_env = replan(solver, replan_model, env_graph, search_env, problem_spec, solution, next_schedule, t_request, t_arrival; commit_threshold=commit_threshold)
         print_project_schedule(string("schedule",idx,"B"),base_search_env.schedule;mode=:leaf_aligned)
         # plan for current project
         reset_solver!(solver)
@@ -377,7 +376,7 @@ let
     #
     # partial_schedule = construct_partial_project_schedule(project_spec,problem_spec,robot_ICs)
     # print_project_schedule("partial_schedule",partial_schedule;mode=:leaf_aligned)
-    # base_search_env = construct_search_env(partial_schedule,problem_spec,env_graph;primary_objective=primary_objective)
+    # base_search_env = construct_search_env(solver,partial_schedule,problem_spec,env_graph;primary_objective=primary_objective)
     #
     # #### solve initial problem
     # solver = PC_TAPF_Solver(solver_template);
@@ -473,7 +472,7 @@ let
     # # reset_solver!(solver)
     # solver = PC_TAPF_Solver(solver_template);
     #
-    # base_search_env = construct_search_env(new_schedule_copy, problem_spec, env_graph;t0=deepcopy(new_cache.t0),tF=deepcopy(new_cache.tF))
+    # base_search_env = construct_search_env(solver,new_schedule_copy, problem_spec, env_graph;t0=deepcopy(new_cache.t0),tF=deepcopy(new_cache.tF))
     # base_search_env = SearchEnv(base_search_env, base_solution=trimmed_solution)
     #
     # print_project_schedule("updated_schedule",new_schedule,initialize_planning_cache(new_schedule;t0=deepcopy(new_cache.t0),tF=deepcopy(new_cache.tF));mode=:leaf_aligned)

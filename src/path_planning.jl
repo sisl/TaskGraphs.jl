@@ -63,6 +63,13 @@ function CRCBS.get_initial_solution(schedule::ProjectSchedule,env::E) where {E<:
 end
 
 export
+    AbstractCBSModel,
+    DefaultCBSModel,
+    AbstractISPSModel,
+    DefaultISPSModel,
+    PrioritizedPlannerISPSModel,
+    AbstractPathFinderModel,
+    AStarPathFinderModel,
     PC_TAPF_Solver
 
 abstract type AbstractCBSModel end
@@ -73,6 +80,7 @@ abstract type AbstractISPSModel end
 end
 abstract type AbstractPathFinderModel end
 struct AStarPathFinderModel <: AbstractPathFinderModel end
+struct PrioritizeAStarModel <: AbstractPathFinderModel end
 
 @with_kw mutable struct PC_TAPF_Solver{M,C,I,A,T} <: AbstractMAPFSolver
     # TODO parameterize by MILP Solver, CBS solver, ISPS solver, A_star solver
@@ -448,14 +456,8 @@ function CRCBS.MakeSpan(schedule::S,cache::C) where {S<:ProjectSchedule,C<:Plann
         cache.tF[schedule.root_nodes])
 end
 
-function construct_search_env(schedule, problem_spec, env_graph;
-        primary_objective=SumOfMakeSpans,
-        extra_T=400,
-        kwargs...
-    )
-    cache = initialize_planning_cache(schedule;kwargs...)
-    N = problem_spec.N                                          # number of robots
-    # NOTE: This particular setting of cost model is crucial for good performance of A_star, because it encourages depth first search. If we were to replace them with SumOfTravelTime(), we would get worst-case exponentially slow breadth-first search!
+function construct_a_star_cost_model(a_star_model, schedule, cache, problem_spec, env_graph; extra_T=400, primary_objective=SumOfMakeSpans)
+    N = problem_spec.N
     cost_model = construct_composite_cost_model(
         primary_objective(schedule,cache),
         HardConflictCost(env_graph,maximum(cache.tF)+extra_T, N),
@@ -464,6 +466,39 @@ function construct_search_env(schedule, problem_spec, env_graph;
     )
     ph = PerfectHeuristic(get_dist_matrix(env_graph))
     heuristic_model = construct_composite_heuristic(ph,NullHeuristic(),ph,ph)
+    cost_model, heuristic_model
+end
+function construct_a_star_cost_model(a_star_model::PrioritizeAStarModel, schedule, cache, problem_spec, env_graph; extra_T=400, primary_objective=SumOfMakeSpans)
+    N = problem_spec.N
+    cost_model = construct_composite_cost_model(
+        HardConflictCost(env_graph,maximum(cache.tF)+extra_T, N),
+        primary_objective(schedule,cache),
+        SumOfTravelDistance(),
+        FullCostModel(sum,NullCost()) # SumOfTravelTime(),
+    )
+    ph = PerfectHeuristic(get_dist_matrix(env_graph))
+    heuristic_model = construct_composite_heuristic(NullHeuristic(),ph,ph,ph)
+    cost_model, heuristic_model
+end
+construct_a_star_cost_model(solver::PC_TAPF_Solver, args...; kwargs...) = construct_a_star_cost_model(solver.astar_model, args...; kwargs...)
+
+function construct_search_env(solver,schedule, problem_spec, env_graph;
+        primary_objective=SumOfMakeSpans,
+        extra_T=400,
+        kwargs...
+    )
+    cache = initialize_planning_cache(schedule;kwargs...)
+    N = problem_spec.N                                          # number of robots
+    # NOTE: This particular setting of cost model is crucial for good performance of A_star, because it encourages depth first search. If we were to replace them with SumOfTravelTime(), we would get worst-case exponentially slow breadth-first search!
+    # cost_model = construct_composite_cost_model(
+    #     primary_objective(schedule,cache),
+    #     HardConflictCost(env_graph,maximum(cache.tF)+extra_T, N),
+    #     SumOfTravelDistance(),
+    #     FullCostModel(sum,NullCost()) # SumOfTravelTime(),
+    # )
+    # ph = PerfectHeuristic(get_dist_matrix(env_graph))
+    # heuristic_model = construct_composite_heuristic(ph,NullHeuristic(),ph,ph)
+    cost_model, heuristic_model = construct_a_star_cost_model(solver, schedule, cache, problem_spec, env_graph; primary_objective=primary_objective, extra_T=extra_T)
     low_level_env = PCCBS.LowLevelEnv(
         graph=env_graph, cost_model=cost_model, heuristic=heuristic_model)
     base_solution = get_initial_solution(schedule,low_level_env)
@@ -472,9 +507,9 @@ function construct_search_env(schedule, problem_spec, env_graph;
         problem_spec=problem_spec, num_agents=N, base_solution=base_solution)
     return search_env
 end
-function construct_search_env(project_spec, problem_spec, robot_ICs, assignments, env_graph;kwargs...)
+function construct_search_env(solver,project_spec, problem_spec, robot_ICs, assignments, env_graph;kwargs...)
     schedule = construct_project_schedule(project_spec, problem_spec, robot_ICs, assignments)
-    construct_search_env(schedule, problem_spec, env_graph;kwargs...)
+    construct_search_env(solver,schedule, problem_spec, env_graph;kwargs...)
 end
 
 update_cost_model!(model::C,env::S) where {C,S<:SearchEnv} = nothing
@@ -1005,7 +1040,7 @@ function high_level_search!(solver::P, base_search_env::SearchEnv,  optimizer;
                 adj_matrix = get_assignment_matrix(model);
                 project_schedule = deepcopy(base_schedule)
                 if update_project_schedule!(model,project_schedule,problem_spec,adj_matrix)
-                    env = construct_search_env(project_schedule, problem_spec, env_graph;
+                    env = construct_search_env(solver,project_schedule, problem_spec, env_graph;
                         primary_objective=primary_objective,
                         t0 = base_search_env.cache.t0,
                         tF = base_search_env.cache.tF
@@ -1042,7 +1077,7 @@ end
 function high_level_search!(solver::PC_TAPF_Solver, env_graph, project_schedule::ProjectSchedule, problem_spec,  optimizer;
     primary_objective=SumOfMakeSpans,
     kwargs...)
-    base_search_env = construct_search_env(project_schedule,problem_spec,env_graph;primary_objective=primary_objective)
+    base_search_env = construct_search_env(solver,project_schedule,problem_spec,env_graph;primary_objective=primary_objective)
     # @show base_search_env.cache.t0
     high_level_search!(solver, base_search_env, optimizer;
         primary_objective=primary_objective,
@@ -1351,7 +1386,7 @@ get_commit_time(replan_model::DeferUntilCompletion, search_env, args...) = maxim
 break_assignments!(replan_model::ReplannerModel,args...) = break_assignments!(args...)
 break_assignments!(replan_model::ReassignFreeRobots,args...) = nothing
 
-function replan(replan_model, env_graph, search_env, problem_spec, solution, next_schedule, t_request, t_arrival; commit_threshold=5)
+function replan(solver, replan_model, env_graph, search_env, problem_spec, solution, next_schedule, t_request, t_arrival; commit_threshold=5)
     project_schedule = search_env.schedule
     cache = search_env.cache
     # Freeze solution and schedule at t_commit
@@ -1371,7 +1406,7 @@ function replan(replan_model, env_graph, search_env, problem_spec, solution, nex
     splice_schedules!(new_schedule,next_schedule)
     t0 = map(v->get(new_cache.t0, v, t_arrival), vertices(get_graph(new_schedule)))
     tF = map(v->get(new_cache.tF, v, t_arrival), vertices(get_graph(new_schedule)))
-    base_search_env = construct_search_env(new_schedule, problem_spec, env_graph;t0=t0,tF=tF)
+    base_search_env = construct_search_env(solver,new_schedule, problem_spec, env_graph;t0=t0,tF=tF)
     base_search_env = SearchEnv(base_search_env, base_solution=trimmed_solution)
 end
 

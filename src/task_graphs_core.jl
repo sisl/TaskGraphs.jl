@@ -1953,8 +1953,9 @@ function formulate_milp(milp_model::SparseAdjacencyMILP,project_schedule::Projec
         Presolve=-1, # automatic setting (-1), off (0), conservative (1), or aggressive (2)
         t0_ = Dict{AbstractID,Float64}(), # dictionary of initial times. Default is empty
         tF_ = Dict{AbstractID,Float64}(), # dictionary of initial times. Default is empty
-        Mm = 100000, # for big M constraints
+        Mm = 10000, # for big M constraints
         cost_model = SumOfMakeSpans,
+        job_shop=true
     )
 
     model = Model(with_optimizer(optimizer,
@@ -2051,21 +2052,23 @@ function formulate_milp(milp_model::SparseAdjacencyMILP,project_schedule::Projec
     # We use the big M method here as well to tightly enforce the binary constraints.
     # job_shop_variables = Dict{Tuple{Int,Int},JuMP.VariableRef}();
     Xj = SparseMatrixCSC{VariableRef,Int}(nv(G),nv(G),ones(Int,nv(G)+1),Int[],VariableRef[])
-    for v in 1:nv(G)
-        node = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v))
-        for v2 in non_upstream_vertices[v] #v+1:nv(G)
-            if v2 > v && ~(v in upstream_vertices[v2]) && ~(has_edge(G,v,v2) || has_edge(G,v2,v))
-                node2 = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v2))
-                common_resources = intersect(resources_reserved(node),resources_reserved(node2))
-                if length(common_resources) > 0
-                    println("MILP FORMULATION: adding a job shop constraint between ",v, " (",string(node),") and ", v2, " (",string(node2),")")
-                    # @show common_resources
-                    # Big M constraints
-                    Xj[v,v2] = @variable(model, binary=true) #
-                    Xj[v2,v] = @variable(model, binary=true) # need both directions to have a valid adjacency matrix
-                    @constraint(model, Xj[v,v2] + Xj[v2,v] == 1)
-                    @constraint(model, t0[v2] - tF[v] >= -Mm*(1 - Xj[v,v2]))
-                    @constraint(model, t0[v] - tF[v2] >= -Mm*(1 - Xj[v2,v]))
+    if job_shop
+        for v in 1:nv(G)
+            node = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v))
+            for v2 in non_upstream_vertices[v] #v+1:nv(G)
+                if v2 > v && ~(v in upstream_vertices[v2]) && ~(has_edge(G,v,v2) || has_edge(G,v2,v))
+                    node2 = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v2))
+                    common_resources = intersect(resources_reserved(node),resources_reserved(node2))
+                    if length(common_resources) > 0
+                        println("MILP FORMULATION: adding a job shop constraint between ",v, " (",string(node),") and ", v2, " (",string(node2),")")
+                        # @show common_resources
+                        # Big M constraints
+                        Xj[v,v2] = @variable(model, binary=true) #
+                        Xj[v2,v] = @variable(model, binary=true) # need both directions to have a valid adjacency matrix
+                        @constraint(model, Xj[v,v2] + Xj[v2,v] == 1)
+                        @constraint(model, t0[v2] - tF[v] >= -Mm*(1 - Xj[v,v2]))
+                        @constraint(model, t0[v] - tF[v2] >= -Mm*(1 - Xj[v2,v]))
+                    end
                 end
             end
         end
