@@ -989,14 +989,9 @@ function high_level_search!(solver::P, base_search_env::SearchEnv,  optimizer;
             optimal = (termination_status(model) == MathOptInterface.OPTIMAL);
             feasible = (primal_status(model) == MOI.FEASIBLE_POINT) # TODO use this!
             if !feasible
-                log_info(0,solver.l1_verbosity,string("HIGH LEVEL SEARCH: Task assignment failed. Returning best solution so far.\n",
+                log_info(0,solver.l1_verbosity,string("HIGH LEVEL SEARCH: Task assignment infeasible. Returning best solution so far.\n",
                     " * optimality gap = ", solver.best_cost[1] - lower_bound))
                 break
-            # elseif solver.num_assignment_iterations > solver.LIMIT_assignment_iterations
-            #     log_info(0,solver,string("HIGH LEVEL SEARCH: MILP iterations exceeded limit of ",
-            #     solver.LIMIT_assignment_iterations,". Returning best solution so far.\n",
-            #         " * optimality gap = ", solver.best_cost[1] - lower_bound))
-            #     break
             end
             if optimal
                 lower_bound = max(lower_bound, Int(round(value(objective_function(model)))) )
@@ -1108,15 +1103,7 @@ function trim_solution(search_env, solution, T)
             extend_path!(cbs_env,new_path,T)
         end
     end
-    cost = trimmed_solution.cost
-    trimmed_solution.cost = solution.cost
-    # agent_id = get_path_spec(schedule, v).agent_id
-    # set_solution_path!(node.solution, path, agent_id)
-    # set_path_cost!(node.solution, cost, agent_id)
-    # # update
-    # update_env!(solver,env,v,path)
-    # node.solution.cost = aggregate_costs(get_cost_model(env.env),get_path_costs(node.solution))
-    # NOTE: the solution cost is not yet set (requires an updated cost model to do it effectively)
+    # trimmed_solution.cost = solution.cost
     trimmed_solution
 end
 
@@ -1358,12 +1345,11 @@ struct ReassignFreeRobots   <: ReplannerModel end
 struct MergeAndBalance      <: ReplannerModel end
 struct FallBackPlanner      <: ReplannerModel end
 
-function get_commit_time(replan_model, search_env, t_request, commit_threshold)
-    t_commit = t_request + commit_threshold
-end
-function get_commit_time(replan_model::DeferUntilCompletion, search_env, args...)
-    t_commit = maximum(search_env.cache.tF)
-end
+get_commit_time(replan_model, search_env, t_request, commit_threshold) = t_request + commit_threshold
+get_commit_time(replan_model::DeferUntilCompletion, search_env, args...) = maximum(search_env.cache.tF)
+
+break_assignments!(replan_model::ReplannerModel,args...) = break_assignments!(args...)
+break_assignments!(replan_model::ReassignFreeRobots,args...) = nothing
 
 function replan(replan_model, env_graph, search_env, problem_spec, solution, next_schedule, t_request, t_arrival; commit_threshold=5)
     project_schedule = search_env.schedule
@@ -1371,9 +1357,6 @@ function replan(replan_model, env_graph, search_env, problem_spec, solution, nex
     # Freeze solution and schedule at t_commit
     t_commit = get_commit_time(replan_model, search_env, t_request, commit_threshold)
     trimmed_solution = trim_solution(search_env, solution, t_commit) # TODO handle the condition where t_commit > length(solution)
-    @show get_cost(trimmed_solution)
-    m = maximum(p->length(p), get_paths(trimmed_solution))
-    @show m 
     # Update operating schedule
     new_schedule, new_cache = prune_schedule(project_schedule,problem_spec,cache,t_commit)
     # split active nodes
@@ -1382,7 +1365,7 @@ function replan(replan_model, env_graph, search_env, problem_spec, solution, nex
     # freeze nodes that terminate before cutoff time
     fix_precutoff_nodes!(new_schedule,problem_spec,new_cache,t_commit)
     # Remove all "assignments" from schedule
-    break_assignments!(new_schedule,problem_spec)
+    break_assignments!(replan_model,new_schedule,problem_spec)
     new_cache = initialize_planning_cache(new_schedule;t0=new_cache.t0,tF=min.(new_cache.tF,t_commit))
     # splice projects together!
     splice_schedules!(new_schedule,next_schedule)

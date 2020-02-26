@@ -249,12 +249,12 @@ let
     solver_template = PC_TAPF_Solver(
         nbs_model=SparseAdjacencyMILP(),
         DEBUG=true,
-        l1_verbosity=0,
-        l2_verbosity=0,
+        l1_verbosity=2,
+        l2_verbosity=1,
         l3_verbosity=0,
         l4_verbosity=0,
-        LIMIT_assignment_iterations=2,
-        LIMIT_A_star_iterations=1000
+        LIMIT_assignment_iterations=5,
+        LIMIT_A_star_iterations=8000
         );
     primary_objective = SumOfMakeSpans
 
@@ -309,7 +309,8 @@ let
     object_path_dict = Dict{Int,Vector{Vector{Int}}}()
     object_interval_dict = Dict{Int,Vector{Int}}()
 
-    replan_model = MergeAndBalance()
+    # replan_model = MergeAndBalance()
+    replan_model = ReassignFreeRobots()
     # replan_model = DeferUntilCompletion()
     solver = PC_TAPF_Solver(solver_template);
     (solution, _, cost, search_env), elapsed_time, byte_ct, gc_time, mem_ct = @timed high_level_search!(
@@ -319,8 +320,9 @@ let
         project_schedule = search_env.schedule
         cache = search_env.cache
         idx += 1
-        t_request = arrival_interval * (idx - 1)
-        t_arrival = t_request + warning_time
+        print_project_schedule(string("schedule",idx,"A"),project_schedule;mode=:leaf_aligned)
+        t_request = arrival_interval * (idx - 1) # time when request reaches command center
+        t_arrival = t_request + warning_time # time when objects become available
         # load next project
         def = project_list[idx]
         project_spec, problem_spec, _, _, _ = construct_task_graphs_problem(def, dist_matrix);
@@ -334,23 +336,16 @@ let
         for (object_id, pred) in get_object_ICs(next_schedule)
             project_ids[get_id(object_id)] = idx
         end
-        # # Freeze solution and schedule at t_commit
-        # t_commit = t_request + commit_threshold
-        # trimmed_solution = trim_solution(search_env.env, solution, t_commit) # TODO handle the condition where t_commit > length(solution)
-        # new_schedule, new_cache = prune_project_schedule(project_schedule, problem_spec, cache, t_commit; robot_positions=get_env_snapshot(solution,t_commit))
-        # # splice projects together!
-        # splice_schedules!(new_schedule,next_schedule)
-        # t0 = map(v->get(new_cache.t0, v, t_arrival), vertices(get_graph(new_schedule)))
-        # tF = map(v->get(new_cache.tF, v, t_arrival), vertices(get_graph(new_schedule)))
-        # base_search_env = construct_search_env(new_schedule, problem_spec, env_graph;t0=t0,tF=tF)
-        # base_search_env = SearchEnv(base_search_env, base_solution=trimmed_solution)
+        # Replanning outer loop
         base_search_env = replan(replan_model, env_graph, search_env, problem_spec, solution, next_schedule, t_request, t_arrival; commit_threshold=commit_threshold)
-        # TODO Plot the output to make sure that the loop has no bugs
+        print_project_schedule(string("schedule",idx,"B"),base_search_env.schedule;mode=:leaf_aligned)
         # plan for current project
-        # reset_solver!(solver)
-        solver = PC_TAPF_Solver(solver_template);
-        (solution, _, cost, search_env), elapsed_time, byte_ct, gc_time, mem_ct = @timed high_level_search!(
+        reset_solver!(solver)
+        (solution, _, cost, search_env, _), elapsed_time, byte_ct, gc_time, mem_ct = @timed high_level_search!(
             solver, base_search_env, Gurobi.Optimizer;primary_objective=primary_objective)
+        m = maximum(map(p->length(p), get_paths(solution)))
+        @show m
+
     end
 
     robot_paths = convert_to_vertex_lists(solution)
@@ -361,8 +356,8 @@ let
     object_paths, object_intervals = convert_to_path_vectors(object_path_dict, object_interval_dict)
     project_idxs = map(k->project_ids[k], sort(collect(keys(project_ids))))
 
-    @show project_ids
-    @show project_idxs
+    # @show project_ids
+    # @show project_idxs
 
     # Render video clip
     # tf = maximum(map(p->length(p),robot_paths))

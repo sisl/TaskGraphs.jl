@@ -1953,7 +1953,7 @@ function formulate_milp(milp_model::SparseAdjacencyMILP,project_schedule::Projec
         Presolve=-1, # automatic setting (-1), off (0), conservative (1), or aggressive (2)
         t0_ = Dict{AbstractID,Float64}(), # dictionary of initial times. Default is empty
         tF_ = Dict{AbstractID,Float64}(), # dictionary of initial times. Default is empty
-        Mm = 10000, # for big M constraints
+        Mm = 100000, # for big M constraints
         cost_model = SumOfMakeSpans,
     )
 
@@ -2054,11 +2054,11 @@ function formulate_milp(milp_model::SparseAdjacencyMILP,project_schedule::Projec
     for v in 1:nv(G)
         node = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v))
         for v2 in non_upstream_vertices[v] #v+1:nv(G)
-            if v2 > v
+            if v2 > v && ~(v in upstream_vertices[v2]) && ~(has_edge(G,v,v2) || has_edge(G,v2,v))
                 node2 = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v2))
                 common_resources = intersect(resources_reserved(node),resources_reserved(node2))
                 if length(common_resources) > 0
-                    println("MILP FORMULATION: adding a job shop constraint between ",v, " (",string(node),") and ", v2, "(",string(node2),")")
+                    println("MILP FORMULATION: adding a job shop constraint between ",v, " (",string(node),") and ", v2, " (",string(node2),")")
                     # @show common_resources
                     # Big M constraints
                     Xj[v,v2] = @variable(model, binary=true) #
