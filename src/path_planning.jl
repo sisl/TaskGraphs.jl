@@ -321,17 +321,10 @@ export
     slack::Vector{Vector{Float64}}       = Vector{Vector{Float64}}()
     local_slack::Vector{Vector{Float64}} = Vector{Vector{Float64}}()
 end
-function empty_min(arr::Vector{T}) where {T}
-    if length(arr) == 0
-        return T(0)
-    else
-        return minimum(arr)
-    end
-end
+
 function isps_queue_cost(schedule::ProjectSchedule,cache::PlanningCache,v::Int)
     path_spec = get_path_spec(schedule,v)
     return (1.0*(path_spec.plan_path), minimum(cache.slack[v]))
-    # return (0.0, minimum(cache.slack[v]))
 end
 
 function initialize_planning_cache(schedule::ProjectSchedule;kwargs...)
@@ -1076,8 +1069,6 @@ end
 
 export
     get_env_snapshot,
-    prune_project_schedule,
-    splice_schedules!,
     trim_solution
 
 
@@ -1088,13 +1079,55 @@ function get_env_snapshot(solution::S,t) where {S<:LowLevelSolution}
     Dict(RobotID(i)=>ROBOT_AT(i, get_sp(get_path_node(path,t)).vtx) for (i,path) in enumerate(get_paths(solution)))
 end
 
+"""
+    `trim_solution`
+
+    construct a trimmed solution that stops at a certain time step
+"""
+function trim_solution(search_env, solution, T)
+    N = length(get_paths(solution))
+    env = search_env.env
+    trimmed_solution = get_initial_solution(MAPF(env, map(i->PCCBS.State(),1:N),map(i->PCCBS.State(),1:N)))
+    for agent_id in 1:N
+        cbs_env = typeof(env)(
+            graph = env.graph,
+            agent_idx = agent_id,
+            cost_model = get_cost_model(env),
+            heuristic = get_heuristic_model(env)
+        )
+        old_path = get_paths(solution)[agent_id]
+        new_path = get_paths(trimmed_solution)[agent_id]
+        for t in 1:max(1, min(T, length(old_path)))
+            p = get_path_node(old_path,t)
+            push!(new_path, p)
+            new_path.cost = accumulate_cost(cbs_env, get_cost(new_path), get_transition_cost(cbs_env, p.s, p.a, p.sp))
+            set_path_cost!(trimmed_solution, new_path.cost, agent_id)
+        end
+        if T > length(new_path)
+            println("Extending path in trim_solution. Agent id = ",agent_id)
+            extend_path!(cbs_env,new_path,T)
+        end
+    end
+    cost = trimmed_solution.cost
+    trimmed_solution.cost = solution.cost
+    # agent_id = get_path_spec(schedule, v).agent_id
+    # set_solution_path!(node.solution, path, agent_id)
+    # set_path_cost!(node.solution, cost, agent_id)
+    # # update
+    # update_env!(solver,env,v,path)
+    # node.solution.cost = aggregate_costs(get_cost_model(env.env),get_path_costs(node.solution))
+    # NOTE: the solution cost is not yet set (requires an updated cost model to do it effectively)
+    trimmed_solution
+end
+
 export
     get_active_and_fixed_vtxs,
     split_active_vtxs!,
     fix_precutoff_nodes!,
     break_assignments!,
     prune_schedule,
-    split_at_cutoff_time
+    prune_project_schedule,
+    splice_schedules!
 
 """
     get all vertices that "straddle" the query time t
@@ -1271,7 +1304,6 @@ function prune_schedule(project_schedule::ProjectSchedule,problem_spec::ProblemS
     new_schedule, new_cache
 end
 
-
 """
     `prune_project_schedule`
 
@@ -1295,7 +1327,9 @@ function prune_project_schedule(project_schedule::ProjectSchedule,problem_spec::
     new_schedule, new_cache
 end
 
-
+"""
+    Merge next_schedule into project_schedule
+"""
 function splice_schedules!(project_schedule::P,next_schedule::P) where {P<:ProjectSchedule}
     for v in vertices(get_graph(next_schedule))
         node_id = get_vtx_id(next_schedule, v)
@@ -1310,36 +1344,52 @@ function splice_schedules!(project_schedule::P,next_schedule::P) where {P<:Proje
     project_schedule
 end
 
-"""
-    `trim_solution`
+export
+    ReplannerModel,
+    DeferUntilCompletion,
+    ReassignFreeRobots,
+    MergeAndBalance,
+    FallBackPlanner,
+    replan
 
-    construct a trimmed solution that stops at a certain time step
-"""
-function trim_solution(env, solution, T)
-    N = length(get_paths(solution))
-    trimmed_solution = get_initial_solution(MAPF(env, map(i->PCCBS.State(),1:N),map(i->PCCBS.State(),1:N)))
-    for agent_id in 1:N
-        cbs_env = typeof(env)(
-            graph = env.graph,
-            agent_idx = agent_id,
-            cost_model = get_cost_model(env),
-            heuristic = get_heuristic_model(env)
-        )
-        old_path = get_paths(solution)[agent_id]
-        new_path = get_paths(trimmed_solution)[agent_id]
-        for t in 1:max(1, min(T, length(old_path)))
-            p = get_path_node(old_path,t)
-            push!(new_path, p)
-            new_path.cost = accumulate_cost(cbs_env, get_cost(new_path), get_transition_cost(cbs_env, p.s, p.a, p.sp))
-            set_path_cost!(trimmed_solution, new_path.cost, agent_id)
-        end
-        if T > length(new_path)
-            println("Extending path in trim_solution. Agent id = ",agent_id)
-            extend_path!(cbs_env,new_path,T)
-        end
-    end
-    # NOTE: the solution cost is not yet set (requires an updated cost model to do it effectively)
-    trimmed_solution
+abstract type ReplannerModel end
+struct DeferUntilCompletion <: ReplannerModel end
+struct ReassignFreeRobots   <: ReplannerModel end
+struct MergeAndBalance      <: ReplannerModel end
+struct FallBackPlanner      <: ReplannerModel end
+
+function get_commit_time(replan_model, search_env, t_request, commit_threshold)
+    t_commit = t_request + commit_threshold
+end
+function get_commit_time(replan_model::DeferUntilCompletion, search_env, args...)
+    t_commit = maximum(search_env.cache.tF)
+end
+
+function replan(replan_model, env_graph, search_env, problem_spec, solution, next_schedule, t_request, t_arrival; commit_threshold=5)
+    project_schedule = search_env.schedule
+    cache = search_env.cache
+    # Freeze solution and schedule at t_commit
+    t_commit = get_commit_time(replan_model, search_env, t_request, commit_threshold)
+    trimmed_solution = trim_solution(search_env, solution, t_commit) # TODO handle the condition where t_commit > length(solution)
+    @show get_cost(trimmed_solution)
+    m = maximum(p->length(p), get_paths(trimmed_solution))
+    @show m 
+    # Update operating schedule
+    new_schedule, new_cache = prune_schedule(project_schedule,problem_spec,cache,t_commit)
+    # split active nodes
+    robot_positions=get_env_snapshot(solution,t_commit)
+    new_schedule, new_cache = split_active_vtxs!(new_schedule,problem_spec,new_cache,t_commit;robot_positions=robot_positions)
+    # freeze nodes that terminate before cutoff time
+    fix_precutoff_nodes!(new_schedule,problem_spec,new_cache,t_commit)
+    # Remove all "assignments" from schedule
+    break_assignments!(new_schedule,problem_spec)
+    new_cache = initialize_planning_cache(new_schedule;t0=new_cache.t0,tF=min.(new_cache.tF,t_commit))
+    # splice projects together!
+    splice_schedules!(new_schedule,next_schedule)
+    t0 = map(v->get(new_cache.t0, v, t_arrival), vertices(get_graph(new_schedule)))
+    tF = map(v->get(new_cache.tF, v, t_arrival), vertices(get_graph(new_schedule)))
+    base_search_env = construct_search_env(new_schedule, problem_spec, env_graph;t0=t0,tF=tF)
+    base_search_env = SearchEnv(base_search_env, base_solution=trimmed_solution)
 end
 
 

@@ -291,7 +291,7 @@ let
 
     arrival_interval    = 50 # new project requests arrive every `arrival_interval` timesteps
     warning_time        = 20 # the project request arrives in the command center `warning_time` timesteps before the relevant objects become available
-    commit_threshold    = 205 # freeze the current plan (route plan and schedule) at `t_arrival` + `commit_threshold`
+    commit_threshold    = 5 # freeze the current plan (route plan and schedule) at `t_arrival` + `commit_threshold`
     greedy_commit_threshold = 5 # a tentative plan (computed with a fast heuristic) may take effect at t = t_arrival + greedy_commit_threshold--just in case the solver fails
 
     ################################################################################
@@ -309,6 +309,8 @@ let
     object_path_dict = Dict{Int,Vector{Vector{Int}}}()
     object_interval_dict = Dict{Int,Vector{Int}}()
 
+    replan_model = MergeAndBalance()
+    # replan_model = DeferUntilCompletion()
     solver = PC_TAPF_Solver(solver_template);
     (solution, _, cost, search_env), elapsed_time, byte_ct, gc_time, mem_ct = @timed high_level_search!(
         solver, base_search_env, Gurobi.Optimizer;primary_objective=primary_objective)
@@ -319,7 +321,6 @@ let
         idx += 1
         t_request = arrival_interval * (idx - 1)
         t_arrival = t_request + warning_time
-        t_commit = t_request + commit_threshold
         # load next project
         def = project_list[idx]
         project_spec, problem_spec, _, _, _ = construct_task_graphs_problem(def, dist_matrix);
@@ -333,15 +334,17 @@ let
         for (object_id, pred) in get_object_ICs(next_schedule)
             project_ids[get_id(object_id)] = idx
         end
-        # Freeze solution and schedule at t_commit
-        trimmed_solution = trim_solution(search_env.env, solution, t_commit) # TODO handle the condition where t_commit > length(solution)
-        new_schedule, new_cache = prune_project_schedule(project_schedule, problem_spec, cache, t_commit; robot_positions=get_env_snapshot(solution,t_commit))
-        # splice projects together!
-        splice_schedules!(new_schedule,next_schedule)
-        t0 = map(v->get(new_cache.t0, v, t_arrival), vertices(get_graph(new_schedule)))
-        tF = map(v->get(new_cache.tF, v, t_arrival), vertices(get_graph(new_schedule)))
-        base_search_env = construct_search_env(new_schedule, problem_spec, env_graph;t0=t0,tF=tF)
-        base_search_env = SearchEnv(base_search_env, base_solution=trimmed_solution)
+        # # Freeze solution and schedule at t_commit
+        # t_commit = t_request + commit_threshold
+        # trimmed_solution = trim_solution(search_env.env, solution, t_commit) # TODO handle the condition where t_commit > length(solution)
+        # new_schedule, new_cache = prune_project_schedule(project_schedule, problem_spec, cache, t_commit; robot_positions=get_env_snapshot(solution,t_commit))
+        # # splice projects together!
+        # splice_schedules!(new_schedule,next_schedule)
+        # t0 = map(v->get(new_cache.t0, v, t_arrival), vertices(get_graph(new_schedule)))
+        # tF = map(v->get(new_cache.tF, v, t_arrival), vertices(get_graph(new_schedule)))
+        # base_search_env = construct_search_env(new_schedule, problem_spec, env_graph;t0=t0,tF=tF)
+        # base_search_env = SearchEnv(base_search_env, base_solution=trimmed_solution)
+        base_search_env = replan(replan_model, env_graph, search_env, problem_spec, solution, next_schedule, t_request, t_arrival; commit_threshold=commit_threshold)
         # TODO Plot the output to make sure that the loop has no bugs
         # plan for current project
         # reset_solver!(solver)
@@ -364,7 +367,7 @@ let
     # Render video clip
     # tf = maximum(map(p->length(p),robot_paths))
     # set_default_plot_size(24cm,24cm)
-    # record_video(joinpath(VIDEO_DIR,string("replanning3.webm")),
+    # record_video(joinpath(VIDEO_DIR,string("replanning4.webm")),
     #     t->render_paths(t,factory_env,robot_paths,object_paths;
     #         object_intervals=object_intervals,
     #         colors_vec=map(i->LCHab(60,80,200),1:length(robot_paths)),
