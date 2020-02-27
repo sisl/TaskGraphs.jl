@@ -2207,12 +2207,13 @@ function JuMP.optimize!(model::GreedyAssignment)
         end
     end
 
+    assigned_outgoing = Set{Int}()
     iters = 0
     satisfied_set = Set{Int}()
     while length(required_incoming) > 0 && iters < 100
         iters += 1
         @assert length(available_outgoing) > 0
-
+        println(string([get_node_from_vtx(project_schedule,v) for v in available_outgoing]))
         for v in traversal
             node = get_node_from_vtx(project_schedule, v)
             if !(v in satisfied_set) && isa(node,Union{COLLECT,TEAM_ACTION{COLLECT}})
@@ -2227,6 +2228,7 @@ function JuMP.optimize!(model::GreedyAssignment)
                         end
                         add_edge!(G,vtx,v2)
                         setdiff!(available_outgoing, vtx)
+                        push!(assigned_outgoing, vtx)
                     end
                 end
                 push!(satisfied_set, v)
@@ -2236,6 +2238,7 @@ function JuMP.optimize!(model::GreedyAssignment)
                 end
                 for v3 in outneighbors(G,v2)
                     if isa(get_node_from_vtx(project_schedule, v3), GO)
+                        @assert !(v3 in assigned_outgoing)
                         push!(available_outgoing, v3)
                     end
                 end
@@ -2262,7 +2265,17 @@ function JuMP.optimize!(model::GreedyAssignment)
         # end
     end
     set_leaf_operation_nodes!(project_schedule)
+    # for e in edges(get_graph(project_schedule))
+    #     node1 = get_node_from_vtx(project_schedule,e.src)
+    #     node2 = get_node_from_vtx(project_schedule,e.dst)
+    #     @assert validate_edge(node1,node2)
+    # end
     update_project_schedule!(project_schedule,problem_spec,adjacency_matrix(G))
+    for e in edges(get_graph(project_schedule))
+        node1 = get_node_from_vtx(project_schedule,e.src)
+        node2 = get_node_from_vtx(project_schedule,e.dst)
+        @assert validate_edge(node1,node2)
+    end
     model
 end
 

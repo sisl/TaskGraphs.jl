@@ -248,7 +248,7 @@ let
     solver_template = PC_TAPF_Solver(
         nbs_model=SparseAdjacencyMILP(),
         DEBUG=true,
-        l1_verbosity=2,
+        l1_verbosity=1,
         l2_verbosity=1,
         l3_verbosity=0,
         l4_verbosity=0,
@@ -259,11 +259,11 @@ let
         nbs_model=GreedyAssignment(),
         astar_model = PrioritizedAStarModel(),
         DEBUG=true,
-        l1_verbosity=2,
+        l1_verbosity=1,
         l2_verbosity=1,
         l3_verbosity=0,
         l4_verbosity=0,
-        LIMIT_assignment_iterations=1,
+        LIMIT_assignment_iterations=2,
         LIMIT_A_star_iterations=8000
         );
 
@@ -305,10 +305,11 @@ let
         push!(project_list, SimpleProblemDef(project_spec,r0,s0,sF,shapes))
     end
 
-    arrival_interval    = 50 # new project requests arrive every `arrival_interval` timesteps
-    warning_time        = 20 # the project request arrives in the command center `warning_time` timesteps before the relevant objects become available
-    commit_threshold    = 5 # freeze the current plan (route plan and schedule) at `t_arrival` + `commit_threshold`
-    greedy_commit_threshold = 5 # a tentative plan (computed with a fast heuristic) may take effect at t = t_arrival + greedy_commit_threshold--just in case the solver fails
+    arrival_interval            = 50 # new project requests arrive every `arrival_interval` timesteps
+    warning_time                = 20 # the project request arrives in the command center `warning_time` timesteps before the relevant objects become available
+    commit_threshold            = 5 # freeze the current plan (route plan and schedule) at `t_arrival` + `commit_threshold`
+    fallback_commit_threshold   = 2 # commit threshold for fallback planner
+    greedy_commit_threshold     = 5 # a tentative plan (computed with a fast heuristic) may take effect at t = t_arrival + greedy_commit_threshold--just in case the solver fails
 
     ################################################################################
     ############################## Simulate Replanning #############################
@@ -352,15 +353,20 @@ let
             project_ids[get_id(object_id)] = idx
         end
         # Fallback
-        fallback_search_env = replan(fallback_solver, fallback_replan_model, env_graph, search_env, problem_spec, solution, next_schedule, t_request, t_arrival; commit_threshold=commit_threshold)
+        fallback_search_env = replan(fallback_solver, fallback_replan_model, search_env, env_graph, problem_spec, solution, next_schedule, t_request, t_arrival;
+            commit_threshold=fallback_commit_threshold)
         reset_solver!(fallback_solver)
-        @timed high_level_search!(fallback_solver, fallback_search_env, Gurobi.Optimizer;primary_objective=primary_objective)
+        (fallback_solution, _, fallback_cost, fallback_search_env, _), fallback_elapsed_time, _, _, _ = @timed high_level_search!(
+            fallback_solver, fallback_search_env, Gurobi.Optimizer;primary_objective=primary_objective)
         # Replanning outer loop
-        base_search_env = replan(solver, replan_model, env_graph, search_env, problem_spec, solution, next_schedule, t_request, t_arrival; commit_threshold=commit_threshold)
+        # TODO update fall_back plan
+        base_search_env = replan(solver, replan_model, search_env, env_graph, problem_spec, solution, next_schedule, t_request, t_arrival; commit_threshold=commit_threshold)
+        # base_search_env = replan(solver, replan_model, fallback_search_env, env_graph, problem_spec, fallback_solution, nothing, t_request, t_arrival;
+        #     commit_threshold=commit_threshold)
         print_project_schedule(string("schedule",idx,"B"),base_search_env.schedule;mode=:leaf_aligned)
         # plan for current project
         reset_solver!(solver)
-        (solution, _, cost, search_env, _), elapsed_time, byte_ct, gc_time, mem_ct = @timed high_level_search!(
+        (solution, _, cost, search_env, _), elapsed_time, _, _, _ = @timed high_level_search!(
             solver, base_search_env, Gurobi.Optimizer;primary_objective=primary_objective)
         m = maximum(map(p->length(p), get_paths(solution)))
         @show m

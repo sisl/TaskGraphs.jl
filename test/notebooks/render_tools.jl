@@ -681,7 +681,7 @@ function print_project_schedule(filename::String,project_schedule::ProjectSchedu
         shape_function = (G,v,x,y,r)->Compose.circle(x,y,r),
         color_function = (G,v,x,y,r)->get_prop(G,v,:color),
         text_function = (G,v,x,y,r)->string(
-            v," - ",title_string(get_node_from_id(project_schedule, get_vtx_id(project_schedule, v)),verbose),
+            title_string(get_node_from_id(project_schedule, get_vtx_id(project_schedule, v)),verbose),
             "\n",show_times(cache,v)
             )
     ) |> Compose.SVG(string(filename,".svg"))
