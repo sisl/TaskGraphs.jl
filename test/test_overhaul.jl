@@ -112,7 +112,46 @@ let
         end
     end
 end
+# Test GreedyAssignment
+let
 
+    for (i, f) in enumerate([
+        initialize_toy_problem_1,
+        initialize_toy_problem_2,
+        initialize_toy_problem_3,
+        initialize_toy_problem_5,
+        initialize_toy_problem_5,
+        initialize_toy_problem_6,
+        initialize_toy_problem_7,
+        initialize_toy_problem_8,
+        ])
+        for cost_model in [MakeSpan, SumOfMakeSpans]
+            project_spec, problem_spec, robot_ICs, assignments, env_graph = f(;verbose=false);
+            for milp_model in [GreedyAssignment()]
+                # MILP formulations alone
+                schedule = construct_partial_project_schedule(project_spec,problem_spec,map(i->robot_ICs[i], 1:problem_spec.N))
+                model = formulate_milp(milp_model,schedule,problem_spec;cost_model=cost_model)
+                optimize!(model)
+                @test termination_status(model) == MOI.OPTIMAL
+                cost = Int(round(value(objective_function(model))))
+                adj_matrix = get_assignment_matrix(model)
+                update_project_schedule!(milp_model,schedule,problem_spec,adj_matrix)
+                @test validate(schedule)
+                @test cost != Inf
+
+                # Check that it matches low_level_search
+                solver = PC_TAPF_Solver(verbosity=0)
+                env = construct_search_env(solver, schedule, problem_spec, env_graph;primary_objective=cost_model)
+                pc_mapf = PC_MAPF(env)
+                constraint_node = initialize_root_node(pc_mapf)
+                low_level_search!(solver,pc_mapf,constraint_node)
+                @show i, f, milp_model, cost_model, cost, constraint_node.cost
+                @test get_primary_cost(solver,constraint_node.cost) == cost
+                @test validate(env.schedule)
+            end
+        end
+    end
+end
 # Test that the full planning stack works with the new model and returns the same final cost
 let
 
@@ -226,7 +265,7 @@ end
 #     ##
 # end
 
-# Pruning projects - for REPLANNING
+# for REPLANNING
 let
     env_id = 2
     env_filename = string(ENVIRONMENT_DIR,"/env_",env_id,".toml")
@@ -360,9 +399,8 @@ let
             fallback_solver, fallback_search_env, Gurobi.Optimizer;primary_objective=primary_objective)
         # Replanning outer loop
         # TODO update fall_back plan
-        base_search_env = replan(solver, replan_model, search_env, env_graph, problem_spec, solution, next_schedule, t_request, t_arrival; commit_threshold=commit_threshold)
-        # base_search_env = replan(solver, replan_model, fallback_search_env, env_graph, problem_spec, fallback_solution, nothing, t_request, t_arrival;
-        #     commit_threshold=commit_threshold)
+        # base_search_env = replan(solver, replan_model, search_env, env_graph, problem_spec, solution, next_schedule, t_request, t_arrival; commit_threshold=commit_threshold)
+        base_search_env = replan(solver, replan_model, fallback_search_env, env_graph, problem_spec, fallback_solution, nothing, t_request, t_arrival;commit_threshold=commit_threshold)
         print_project_schedule(string("schedule",idx,"B"),base_search_env.schedule;mode=:leaf_aligned)
         # plan for current project
         reset_solver!(solver)

@@ -116,6 +116,9 @@ struct PrioritizedAStarModel <: AbstractPathFinderModel end
     DEBUG                       ::Bool = false
 end
 
+export
+    get_primary_cost
+    
 get_primary_cost(model,cost)                        = cost[1]
 get_primary_cost(model::PrioritizedAStarModel,cost) = cost[2]
 get_primary_cost(solver::PC_TAPF_Solver,args...)    = get_primary_cost(solver.astar_model,args...)

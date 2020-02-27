@@ -2150,40 +2150,129 @@ function formulate_milp(milp_model::GreedyAssignment,project_schedule::ProjectSc
     end
     model
 end
-function JuMP.optimize!(model::GreedyAssignment)
+# function JuMP.optimize!(model::GreedyAssignment)
+#
+#     project_schedule    = model.schedule
+#     problem_spec        = model.problem_spec
+#     G                   = get_graph(project_schedule);
+#     (missing_successors, missing_predecessors, n_eligible_successors, n_eligible_predecessors,
+#         n_required_successors, n_required_predecessors, upstream_vertices, non_upstream_vertices) = preprocess_project_schedule(project_schedule)
+#     downstream_vertices = map(v->[v, map(e->e.dst,collect(edges(bfs_tree(G,v;dir=:out))))...], vertices(G))
+#     upstream_vertices = map(v->[v, map(e->e.dst,collect(edges(bfs_tree(G,v;dir=:in))))...], vertices(G))
+#
+#     traversal = topological_sort(G)
+#     available_outgoing = Set{Int}(vertices(G))
+#     required_incoming = Set{Int}()
+#
+#     for v in traversal
+#         if outdegree(G,v) >= n_eligible_successors[v]
+#             setdiff!(available_outgoing, v)
+#         end
+#         if indegree(G,v) < n_required_predecessors[v] # NOTE: Trying this out to save time on formulation
+#             for v2 in downstream_vertices[v]
+#                 if v2 != v
+#                     setdiff!(available_outgoing, v2)
+#                 end
+#             end
+#             push!(required_incoming, v)
+#         end
+#     end
+#
+#     @show length(available_outgoing)
+#     println(string([string(get_node_from_vtx(project_schedule,v)) for v in available_outgoing]...))
+#     @show length(required_incoming)
+#     println(string([string(get_node_from_vtx(project_schedule,v)) for v in required_incoming]...))
+#
+#     # construct distance matrix
+#     D = Inf * ones(nv(G),nv(G))
+#     for v in vertices(G)
+#         if outdegree(G,v) < n_eligible_successors[v] # NOTE: Trying this out to save time on formulation
+#             node = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v))
+#             for v2 in non_upstream_vertices[v] # for v2 in vertices(G)
+#                 if indegree(G,v2) < n_eligible_predecessors[v2]
+#                     node2 = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v2))
+#                     for (template, val) in missing_successors[v]
+#                         if !matches_template(template, typeof(node2)) # possible to add an edge
+#                             continue
+#                         end
+#                         for (template2, val2) in missing_predecessors[v2]
+#                             if !matches_template(template2, typeof(node)) # possible to add an edge
+#                                 continue
+#                             end
+#                             if (val > 0 && val2 > 0)
+#                                 new_node = align_with_successor(node,node2)
+#                                 D[v,v2] = generate_path_spec(project_schedule,problem_spec,new_node).min_path_duration
+#                             end
+#                         end
+#                     end
+#                 end
+#             end
+#         end
+#     end
+#
+#
+#     # downstream_vertices = Dict(v=>[v, map(e->e.dst,collect(edges(bfs_tree(G,v;dir=:out))))...] for v in available_outgoing)
+#     # upstream_vertices = Dict(v=>[v, map(e->e.dst,collect(edges(bfs_tree(G,v;dir=:out))))...] for v in required_incoming)
+#
+#     assigned_outgoing = Set{Int}()
+#     iters = 0
+#     satisfied_set = Set{Int}()
+#     while length(required_incoming) > 0 && iters < 100
+#         iters += 1
+#         @assert length(available_outgoing) > 0
+#         println(string([string(get_node_from_vtx(project_schedule,v)) for v in available_outgoing]...))
+#         @show length(available_outgoing)
+#         # for v in traversal
+#         for v in topological_sort(G)
+#             node = get_node_from_vtx(project_schedule, v)
+#             if !(v in satisfied_set) && isa(node,Union{COLLECT,TEAM_ACTION{COLLECT}})
+#                 for v2 in [v, inneighbors(G,v)...]
+#                     if indegree(G,v2) < n_required_predecessors[v2]
+#                         # add possible input
+#                         vtx = -1
+#                         for v_ in available_outgoing
+#                             if D[v_,v2] < get(D, (vtx,v2), Inf)
+#                                 vtx = v_
+#                             end
+#                         end
+#                         add_edge!(G,vtx,v2)
+#                         setdiff!(available_outgoing, vtx)
+#                         push!(assigned_outgoing, vtx)
+#                     end
+#                 end
+#                 push!(satisfied_set, v)
+#                 v2 = v
+#                 while !isa(get_node_from_vtx(project_schedule, v2),Union{DEPOSIT,TEAM_ACTION{DEPOSIT}})
+#                     @assert outdegree(G,v2) == 1
+#                     v2 = outneighbors(G,v2)[1]
+#                     @assert isa(get_node_from_vtx(project_schedule, v2),Union{DEPOSIT,CARRY})
+#                 end
+#                 for v3 in outneighbors(G,v2)
+#                     if isa(get_node_from_vtx(project_schedule, v3), GO) && !(v3 in assigned_outgoing)
+#                         push!(available_outgoing, v3)
+#                     end
+#                 end
+#                 break
+#             end
+#         end
+#     end
+#     set_leaf_operation_nodes!(project_schedule)
+#     update_project_schedule!(project_schedule,problem_spec,adjacency_matrix(G))
+#     for e in edges(get_graph(project_schedule))
+#         node1 = get_node_from_vtx(project_schedule,e.src)
+#         node2 = get_node_from_vtx(project_schedule,e.dst)
+#         @assert validate_edge(node1,node2)
+#     end
+#     model
+# end
 
-    project_schedule    = model.schedule
-    problem_spec        = model.problem_spec
+function construct_schedule_distance_matrix(project_schedule,problem_spec)
     G                   = get_graph(project_schedule);
     (missing_successors, missing_predecessors, n_eligible_successors, n_eligible_predecessors,
         n_required_successors, n_required_predecessors, upstream_vertices, non_upstream_vertices) = preprocess_project_schedule(project_schedule)
-    downstream_vertices = map(v->[v, map(e->e.dst,collect(edges(bfs_tree(G,v;dir=:out))))...], vertices(G))
-
-    traversal = topological_sort(G)
-    available_outgoing = Set{Int}(vertices(G))
-    required_incoming = Set{Int}()
-
-    for v in traversal
-        if indegree(G,v) < n_required_predecessors[v] # NOTE: Trying this out to save time on formulation
-            for v2 in downstream_vertices[v]
-                if v2 != v
-                    # setdiff!(required_incoming, v2)
-                    setdiff!(available_outgoing, v2)
-                end
-            end
-            push!(required_incoming, v)
-        # else
-        #     setdiff!(required_incoming, v)
-        end
-        if outdegree(G,v) >= n_eligible_successors[v]
-            setdiff!(available_outgoing, v)
-        end
-    end
-
-    # construct distance matrix
     D = Inf * ones(nv(G),nv(G))
     for v in vertices(G)
-        if outdegree(G,v) < n_eligible_successors[v] # NOTE: Trying this out to save time on formulation
+        if outdegree(G,v) < n_eligible_successors[v]
             node = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v))
             for v2 in non_upstream_vertices[v] # for v2 in vertices(G)
                 if indegree(G,v2) < n_eligible_predecessors[v2]
@@ -2206,76 +2295,71 @@ function JuMP.optimize!(model::GreedyAssignment)
             end
         end
     end
+    D
+end
 
-    assigned_outgoing = Set{Int}()
-    iters = 0
-    satisfied_set = Set{Int}()
-    while length(required_incoming) > 0 && iters < 100
-        iters += 1
-        @assert length(available_outgoing) > 0
-        println(string([get_node_from_vtx(project_schedule,v) for v in available_outgoing]))
-        for v in traversal
-            node = get_node_from_vtx(project_schedule, v)
-            if !(v in satisfied_set) && isa(node,Union{COLLECT,TEAM_ACTION{COLLECT}})
-                for v2 in [v, inneighbors(G,v)...]
-                    if indegree(G,v2) < n_required_predecessors[v2]
-                        # add possible input
-                        vtx = -1
-                        for v_ in available_outgoing
-                            if D[v_,v2] < get(D, (vtx,v2), Inf)
-                                vtx = v_
-                            end
-                        end
-                        add_edge!(G,vtx,v2)
-                        setdiff!(available_outgoing, vtx)
-                        push!(assigned_outgoing, vtx)
-                    end
-                end
-                push!(satisfied_set, v)
-                v2 = v
-                while !isa(get_node_from_vtx(project_schedule, v2),Union{DEPOSIT,TEAM_ACTION{DEPOSIT}})
-                    v2 = outneighbors(G,v2)[1]
-                end
-                for v3 in outneighbors(G,v2)
-                    if isa(get_node_from_vtx(project_schedule, v3), GO)
-                        @assert !(v3 in assigned_outgoing)
-                        push!(available_outgoing, v3)
-                    end
-                end
-                break
+function update_greedy_sets!(model,G,C,Ai,Ao,v,n_required_predecessors,n_eligible_successors)
+    if indegree(G,v) >= n_required_predecessors[v]
+        push!(C,v)
+        for v2 in inneighbors(G,v)
+            if !(v2 in C)
+                setdiff!(C,v)
             end
         end
+    else
+        push!(Ai,v)
+        for v2 in inneighbors(G,v)
+            if !(v2 in C)
+                setdiff!(Ai,v)
+            end
+        end
+    end
+    if (outdegree(G,v) < n_eligible_successors[v]) && (v in C)
+        push!(Ao,v)
+    end
+end
 
-        # union!(available_outgoing, vertices(G))
-        # union!(required_incoming, vertices(G))
-        # for v in topological_sort(G)
-        #     if indegree(G,v) < n_required_predecessors[v] # NOTE: Trying this out to save time on formulation
-        #         for v2 in downstream_vertices[v]
-        #             if v2 != v
-        #                 setdiff!(required_incoming, v2)
-        #                 setdiff!(available_outgoing, v2)
-        #             end
-        #         end
-        #     else
-        #         setdiff!(required_incoming, v)
-        #     end
-        #     if !(outdegree(G,v) < n_eligible_successors[v])
-        #         setdiff!(available_outgoing, v)
-        #     end
-        # end
+function select_next_edge(model,D,Ao,Ai)
+    c = Inf
+    a = -1
+    b = -2
+    for v in sort(collect(Ao))
+        for v2 in sort(collect(Ai))
+            if D[v,v2] < c
+                c = D[v,v2]
+                a = v
+                b = v2
+            end
+        end
+    end
+    a,b
+end
+
+function JuMP.optimize!(model::GreedyAssignment)
+
+    project_schedule    = model.schedule
+    problem_spec        = model.problem_spec
+    G                   = get_graph(project_schedule);
+    (_, _, n_eligible_successors, _, _, n_required_predecessors, _, _) = preprocess_project_schedule(project_schedule)
+    D = construct_schedule_distance_matrix(project_schedule,problem_spec)
+
+    C = Set{Int}()
+    Ai = Set{Int}()
+    Ao = Set{Int}()
+    for v in topological_sort(G)
+        update_greedy_sets!(model,G,C,Ai,Ao,v,n_required_predecessors,n_eligible_successors)
+    end
+    while length(C) < nv(G)
+        v,v2 = select_next_edge(model,D,Ao,Ai)
+        setdiff!(Ao,v)
+        setdiff!(Ai,v2)
+        add_edge!(G,v,v2)
+        for v in topological_sort(G)
+            update_greedy_sets!(model,G,C,Ai,Ao,v,n_required_predecessors,n_eligible_successors)
+        end
     end
     set_leaf_operation_nodes!(project_schedule)
-    # for e in edges(get_graph(project_schedule))
-    #     node1 = get_node_from_vtx(project_schedule,e.src)
-    #     node2 = get_node_from_vtx(project_schedule,e.dst)
-    #     @assert validate_edge(node1,node2)
-    # end
     update_project_schedule!(project_schedule,problem_spec,adjacency_matrix(G))
-    for e in edges(get_graph(project_schedule))
-        node1 = get_node_from_vtx(project_schedule,e.src)
-        node2 = get_node_from_vtx(project_schedule,e.dst)
-        @assert validate_edge(node1,node2)
-    end
     model
 end
 
