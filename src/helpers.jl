@@ -480,7 +480,7 @@ export
     fill_object_path_dicts!,
     convert_to_path_vectors
 
-function fill_object_path_dicts!(solution,project_schedule,cache;
+function fill_object_path_dicts!(solution,project_schedule,cache,
         object_path_dict = Dict{Int,Vector{Vector{Int}}}(),
         object_interval_dict = Dict{Int,Vector{Int}}()
     )

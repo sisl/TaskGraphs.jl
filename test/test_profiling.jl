@@ -182,3 +182,106 @@ let
     end
 
 end
+
+# REPLANNING
+let
+
+    base_solver_configs = [
+        Dict(
+        :nbs_time_limit=>8,
+        :env_id=>2,
+        :OutputFlag => 0,
+        :Presolve => -1,
+        ),
+    ]
+    replan_configs = [
+        Dict(:replan_model=>MergeAndBalance(),),
+        Dict(:replan_model=>Oracle(),),
+        Dict(:replan_model=>ReassignFreeRobots(),),
+        Dict(:replan_model=>DeferUntilCompletion(),),
+    ]
+    fallback_configs = [
+        Dict(:fallback_model=>ReassignFreeRobots(),),
+    ]
+    solver_configs = Dict[]
+    for dicts in Base.Iterators.product(base_solver_configs,replan_configs,fallback_configs)
+        push!(solver_configs,merge(dicts...))
+    end
+    base_configs = [
+        Dict(
+            :warning_time=>20,
+            :commit_threshold=>10,
+            :fallback_commit_threshold=>5,
+            :num_trials => 4,
+            :max_parents => 3,
+            :depth_bias => 0.4,
+            :dt_min => 0,
+            :dt_max => 0,
+            :dt_collect => 0,
+            :dt_deliver => 0,
+            :task_sizes => (1=>1.0,2=>0.0,4=>0.0),
+            )
+    ]
+    stream_configs = [
+        Dict(:N=>30, :M=>10, :num_projects=>10, :arrival_interval=>40, ),
+        Dict(:N=>30, :M=>15, :num_projects=>10, :arrival_interval=>50, ),
+        Dict(:N=>30, :M=>20, :num_projects=>10, :arrival_interval=>60, ),
+        Dict(:N=>30, :M=>25, :num_projects=>10, :arrival_interval=>70, ),
+        Dict(:N=>30, :M=>30, :num_projects=>10, :arrival_interval=>80, ),
+    ]
+    problem_configs = Dict[]
+    for dicts in Base.Iterators.product(base_configs,stream_configs)
+        push!(problem_configs,merge(dicts...))
+    end
+
+    solver_template = PC_TAPF_Solver(
+        nbs_model                   = SparseAdjacencyMILP(),
+        DEBUG                       = true,
+        l1_verbosity                = 1,
+        l2_verbosity                = 1,
+        l3_verbosity                = 0,
+        l4_verbosity                = 0,
+        LIMIT_assignment_iterations = 10,
+        LIMIT_A_star_iterations     = 8000
+        );
+    fallback_solver_template = PC_TAPF_Solver(
+        nbs_model                   = GreedyAssignment(),
+        astar_model                 = PrioritizedAStarModel(),
+        DEBUG                       = true,
+        l1_verbosity                = 1,
+        l2_verbosity                = 1,
+        l3_verbosity                = 0,
+        l4_verbosity                = 0,
+        LIMIT_assignment_iterations = 2,
+        LIMIT_A_star_iterations     = 8000
+        );
+
+
+    base_dir            = joinpath(EXPERIMENT_DIR,"replanning")
+    base_problem_dir    = joinpath(base_dir,"problem_instances")
+    base_results_dir    = joinpath(base_dir,"results")
+
+    # run_replanner_profiling(:write;
+    #     problem_configs=problem_configs,
+    #     base_problem_dir=base_problem_dir,
+    #     )
+    modes = [:solve]
+    for solver_config in solver_configs
+        replanner_model = get(solver_config,:replan_model,  MergeAndBalance())
+        fallback_model  = get(solver_config,:fallback_model,ReassignFreeRobots())
+        results_dir     = get(solver_config,:results_dir,   joinpath(
+            base_results_dir, string(typeof(replanner_model),"-",typeof(fallback_model))))
+        for mode in modes
+            run_replanner_profiling(mode;
+                solver_config=solver_config,
+                problem_configs=problem_configs,
+                base_problem_dir=base_problem_dir,
+                base_results_dir=results_dir,
+                solver_template=solver_template,
+                fallback_solver_template=fallback_solver_template,
+                primary_objective = SumOfMakeSpans,
+                )
+        end
+    end
+
+end

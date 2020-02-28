@@ -126,8 +126,9 @@ let
         initialize_toy_problem_8,
         ])
         for cost_model in [MakeSpan, SumOfMakeSpans]
+            costs = Float64[]
             project_spec, problem_spec, robot_ICs, assignments, env_graph = f(;verbose=false);
-            for milp_model in [GreedyAssignment()]
+            for milp_model in [SparseAdjacencyMILP(),GreedyAssignment()]
                 # MILP formulations alone
                 schedule = construct_partial_project_schedule(project_spec,problem_spec,map(i->robot_ICs[i], 1:problem_spec.N))
                 model = formulate_milp(milp_model,schedule,problem_spec;cost_model=cost_model)
@@ -138,6 +139,7 @@ let
                 update_project_schedule!(milp_model,schedule,problem_spec,adj_matrix)
                 @test validate(schedule)
                 @test cost != Inf
+                push!(costs, cost)
 
                 # Check that it matches low_level_search
                 solver = PC_TAPF_Solver(verbosity=0)
@@ -149,6 +151,7 @@ let
                 @test get_primary_cost(solver,constraint_node.cost) == cost
                 @test validate(env.schedule)
             end
+            @show costs
         end
     end
 end
@@ -282,6 +285,7 @@ let
     env_graph = factory_env
     dist_matrix = get_dist_matrix(env_graph)
 
+    # Experimental params
 
     # seed = 0
     solver_template = PC_TAPF_Solver(
@@ -313,27 +317,21 @@ let
 
     primary_objective = SumOfMakeSpans
 
-    t = 10
-    t_arrival = t
+    ################################################################################
+    ############################## Define Project List #############################
+    ################################################################################
     seed = 0
-
-    # for seed in 0:50
-    #     @show seed
-    #     let
-    # generate random problem sequence
     Random.seed!(seed)
     # seed = seed + 1
-    N = 10
-    M = 10
+    # N = 10
+    # M = 10
+    N = 4
+    M = 6
     max_parents = 3
     depth_bias = 0.4
     Δt_min = 0
     Δt_max = 0
     task_sizes = (1=>1.0,2=>0.0,4=>0.0) # all single agent tasks for now
-
-    ################################################################################
-    ############################## Define Project List #############################
-    ################################################################################
     stream_length = 5
     project_list = SimpleProblemDef[]
     for i in 1:stream_length
@@ -344,11 +342,10 @@ let
         push!(project_list, SimpleProblemDef(project_spec,r0,s0,sF,shapes))
     end
 
-    arrival_interval            = 50 # new project requests arrive every `arrival_interval` timesteps
+    arrival_interval            = 30 # new project requests arrive every `arrival_interval` timesteps
     warning_time                = 20 # the project request arrives in the command center `warning_time` timesteps before the relevant objects become available
     commit_threshold            = 5 # freeze the current plan (route plan and schedule) at `t_arrival` + `commit_threshold`
-    fallback_commit_threshold   = 2 # commit threshold for fallback planner
-    greedy_commit_threshold     = 5 # a tentative plan (computed with a fast heuristic) may take effect at t = t_arrival + greedy_commit_threshold--just in case the solver fails
+    fallback_commit_threshold   = 2 # a tentative plan (computed with a fast heuristic) may take effect at t = t_arrival + fallback_commit_threshold--just in case the solver fails
 
     ################################################################################
     ############################## Simulate Replanning #############################
@@ -356,11 +353,14 @@ let
 
     solver = PC_TAPF_Solver(solver_template);
     fallback_solver = PC_TAPF_Solver(fallback_solver_template);
+
     idx = 1
     def = project_list[idx]
     project_spec, problem_spec, _, _, robot_ICs = construct_task_graphs_problem(def, dist_matrix);
     partial_schedule = construct_partial_project_schedule(project_spec,problem_spec,robot_ICs)
     base_search_env = construct_search_env(solver,partial_schedule,problem_spec,env_graph;primary_objective=primary_objective)
+
+    # store solution for plotting
     project_ids = Dict{Int,Int}()
     for (object_id, pred) in get_object_ICs(partial_schedule)
         project_ids[get_id(object_id)] = idx
@@ -368,14 +368,15 @@ let
     object_path_dict = Dict{Int,Vector{Vector{Int}}}()
     object_interval_dict = Dict{Int,Vector{Int}}()
 
+    print_project_schedule(string("schedule",idx,"B"),base_search_env.schedule;mode=:leaf_aligned)
     (solution, _, cost, search_env), elapsed_time, byte_ct, gc_time, mem_ct = @timed high_level_search!(
         solver, base_search_env, Gurobi.Optimizer;primary_objective=primary_objective)
+    print_project_schedule(string("schedule",idx,"C"),search_env.schedule;mode=:leaf_aligned)
 
     while idx < length(project_list)
         project_schedule = search_env.schedule
         cache = search_env.cache
         idx += 1
-        print_project_schedule(string("schedule",idx,"A"),project_schedule;mode=:leaf_aligned)
         t_request = arrival_interval * (idx - 1) # time when request reaches command center
         t_arrival = t_request + warning_time # time when objects become available
         # load next project
@@ -383,20 +384,18 @@ let
         project_spec, problem_spec, _, _, _ = construct_task_graphs_problem(def, dist_matrix);
         next_schedule = construct_partial_project_schedule(project_spec,problem_spec)
         remap_object_ids!(next_schedule,project_schedule)
+        print_project_schedule(string("next_schedule",idx),next_schedule;mode=:leaf_aligned)
         # store solution for plotting
-        object_path_dict, object_interval_dict = fill_object_path_dicts!(solution,project_schedule,cache;
-            object_path_dict = object_path_dict,
-            object_interval_dict = object_interval_dict
-        )
+        object_path_dict, object_interval_dict = fill_object_path_dicts!(solution,project_schedule,cache,object_path_dict,object_interval_dict)
         for (object_id, pred) in get_object_ICs(next_schedule)
             project_ids[get_id(object_id)] = idx
         end
         # Fallback
-        fallback_search_env = replan(fallback_solver, fallback_replan_model, search_env, env_graph, problem_spec, solution, next_schedule, t_request, t_arrival;
-            commit_threshold=fallback_commit_threshold)
+        fallback_search_env = replan(fallback_solver, fallback_replan_model, search_env, env_graph, problem_spec, solution, next_schedule, t_request, t_arrival;commit_threshold=fallback_commit_threshold)
         reset_solver!(fallback_solver)
         (fallback_solution, _, fallback_cost, fallback_search_env, _), fallback_elapsed_time, _, _, _ = @timed high_level_search!(
             fallback_solver, fallback_search_env, Gurobi.Optimizer;primary_objective=primary_objective)
+        print_project_schedule(string("schedule",idx,"A"),fallback_search_env.schedule;mode=:leaf_aligned)
         # Replanning outer loop
         # TODO update fall_back plan
         # base_search_env = replan(solver, replan_model, search_env, env_graph, problem_spec, solution, next_schedule, t_request, t_arrival; commit_threshold=commit_threshold)
@@ -404,25 +403,21 @@ let
         print_project_schedule(string("schedule",idx,"B"),base_search_env.schedule;mode=:leaf_aligned)
         # plan for current project
         reset_solver!(solver)
-        (solution, _, cost, search_env, _), elapsed_time, _, _, _ = @timed high_level_search!(
-            solver, base_search_env, Gurobi.Optimizer;primary_objective=primary_objective)
+        (solution, _, cost, search_env, _), elapsed_time, _, _, _ = @timed high_level_search!(solver, base_search_env, Gurobi.Optimizer;primary_objective=primary_objective)
+        print_project_schedule(string("schedule",idx,"C"),search_env.schedule;mode=:leaf_aligned)
         m = maximum(map(p->length(p), get_paths(solution)))
         @show m
-
     end
 
     robot_paths = convert_to_vertex_lists(solution)
-    object_path_dict, object_interval_dict = fill_object_path_dicts!(solution,search_env.schedule,search_env.cache;
-            object_path_dict = object_path_dict,
-            object_interval_dict = object_interval_dict
-        )
+    object_path_dict, object_interval_dict = fill_object_path_dicts!(solution,search_env.schedule,search_env.cache,object_path_dict,object_interval_dict)
     object_paths, object_intervals = convert_to_path_vectors(object_path_dict, object_interval_dict)
     project_idxs = map(k->project_ids[k], sort(collect(keys(project_ids))))
 
     # @show project_ids
     # @show project_idxs
 
-    # Render video clip
+    # # Render video clip
     # tf = maximum(map(p->length(p),robot_paths))
     # set_default_plot_size(24cm,24cm)
     # record_video(joinpath(VIDEO_DIR,string("replanning4.webm")),

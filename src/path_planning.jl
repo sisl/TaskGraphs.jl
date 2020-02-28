@@ -118,7 +118,7 @@ end
 
 export
     get_primary_cost
-    
+
 get_primary_cost(model,cost)                        = cost[1]
 get_primary_cost(model::PrioritizedAStarModel,cost) = cost[2]
 get_primary_cost(solver::PC_TAPF_Solver,args...)    = get_primary_cost(solver.astar_model,args...)
@@ -996,7 +996,7 @@ function high_level_search!(solver::P, base_search_env::SearchEnv,  optimizer;
         kwargs...) where {P<:PC_TAPF_Solver}
 
     enter_assignment!(solver)
-    log_info(0,solver.l1_verbosity,string("HIGH LEVEL SEARCH: beginning search ..."))
+    log_info(0,solver.l1_verbosity,string("HIGH LEVEL SEARCH: beginning search with ",typeof(solver.nbs_model)," ..."))
 
     project_schedule    = base_search_env.schedule
     env_graph           = base_search_env.env.graph
@@ -1373,6 +1373,7 @@ export
     DeferUntilCompletion,
     ReassignFreeRobots,
     MergeAndBalance,
+    Oracle,
     FallBackPlanner,
     replan
 
@@ -1380,16 +1381,18 @@ abstract type ReplannerModel end
 struct DeferUntilCompletion <: ReplannerModel end
 struct ReassignFreeRobots   <: ReplannerModel end
 struct MergeAndBalance      <: ReplannerModel end
+struct Oracle               <: ReplannerModel end
 struct FallBackPlanner      <: ReplannerModel end
 struct NullReplanner        <: ReplannerModel end
 
 get_commit_time(replan_model, search_env, t_request, commit_threshold) = t_request + commit_threshold
+get_commit_time(replan_model::Oracle, search_env, t_request, args...) = t_request
 get_commit_time(replan_model::DeferUntilCompletion, search_env, args...) = maximum(search_env.cache.tF)
 
 break_assignments!(replan_model::ReplannerModel,args...) = break_assignments!(args...)
 break_assignments!(replan_model::ReassignFreeRobots,args...) = nothing
 
-function replan(solver, replan_model, search_env, env_graph, problem_spec, solution, next_schedule, t_request, t_arrival; commit_threshold=5)
+function replan(solver, replan_model, search_env, env_graph, problem_spec, solution, next_schedule, t_request, t_arrival; commit_threshold=5,kwargs...)
     project_schedule = search_env.schedule
     cache = search_env.cache
     # Freeze solution and schedule at t_commit

@@ -33,7 +33,8 @@ export
     profile_full_solver,
     read_assignment,
     read_sparse_matrix,
-    run_profiling
+    run_profiling,
+    run_replanner_profiling
 
 
 function read_assignment(toml_dict::Dict)
@@ -332,6 +333,133 @@ function profile_full_solver(solver, project_spec, problem_spec, robot_ICs, env_
     results_dict["cost"] = collect(cost)
     results_dict
 end
+function compile_solver_results(solver, solution, cost, search_env, optimality_gap, elapsed_time)
+    optimal = (optimality_gap <= 0)
+    feasible = true
+    if cost[1] == Inf
+        cost = [-1 for c in cost]
+        feasible = false
+    end
+    if optimality_gap == Inf
+        optimality_gap = 10000
+    end
+    dict = TOML.parse(solver)
+    dict["time"] = elapsed_time
+    dict["optimality_gap"] = Int(optimality_gap)
+    dict["optimal"] = optimal
+    dict["feasible"] = feasible
+    dict["cost"] = collect(cost)
+    dict
+end
+function profile_replanning(replan_model, fallback_replan_model, solver, fallback_solver, project_list, env_graph, dist_matrix, solver_config,problem_config;
+        primary_objective=SumOfMakeSpans, kwargs...
+    )
+    arrival_interval            = problem_config[:arrival_interval] # new project requests arrive every `arrival_interval` timesteps
+    warning_time                = problem_config[:warning_time] # the project request arrives in the command center `warning_time` timesteps before the relevant objects become available
+    commit_threshold            = problem_config[:commit_threshold] # freeze the current plan (route plan and schedule) at `t_arrival` + `commit_threshold`
+    fallback_commit_threshold   = problem_config[:fallback_commit_threshold] # a tentative plan (computed with a fast heuristic) may take effect at t = t_arrival + fallback_commit_threshold--just in case the solver fails
+
+    local_results = map(p->Dict{String,Any}(),project_list)
+    final_times = map(p->Dict{AbstractID,Int}(),project_list)
+
+    idx = 1
+    t_arrival = 0
+    def = project_list[idx]
+    project_spec, problem_spec, _, _, robot_ICs = construct_task_graphs_problem(def, dist_matrix;
+        Δt_collect=map(i->get(problem_config,:dt_collect,0), def.s0),
+        Δt_deliver=map(i->get(problem_config,:dt_deliver,0), def.s0),
+        cost_function=primary_objective,
+        task_shapes=def.shapes,
+        shape_dict=env_graph.expanded_zones,
+        );
+    partial_schedule = construct_partial_project_schedule(project_spec,problem_spec,robot_ICs)
+    base_search_env = construct_search_env(solver,partial_schedule,problem_spec,env_graph;primary_objective=primary_objective)
+
+    # store solution for plotting
+    project_ids = Dict{Int,Int}()
+    for (object_id, pred) in get_object_ICs(partial_schedule)
+        project_ids[get_id(object_id)] = idx
+    end
+    object_path_dict = Dict{Int,Vector{Vector{Int}}}()
+    object_interval_dict = Dict{Int,Vector{Int}}()
+
+    # print_project_schedule(string("schedule",idx,"B"),base_search_env.schedule;mode=:leaf_aligned)
+    (solution, _, cost, search_env, optimality_gap), elapsed_time, byte_ct, gc_time, mem_ct = @timed high_level_search!(
+        solver, base_search_env, Gurobi.Optimizer;primary_objective=primary_objective,kwargs...)
+    # print_project_schedule(string("schedule",idx,"C"),search_env.schedule;mode=:leaf_aligned)
+    local_results[idx] = compile_solver_results(solver, solution, cost, search_env, optimality_gap, elapsed_time)
+    merge!(final_times[idx], Dict{AbstractID,Int}(get_vtx_id(partial_schedule,v)=>t_arrival for v in vertices(partial_schedule)))
+
+    while idx < length(project_list)
+        project_schedule = search_env.schedule
+        cache = search_env.cache
+        idx += 1
+        t_request = arrival_interval * (idx - 1) # time when request reaches command center
+        t_arrival = t_request + warning_time # time when objects become available
+        # load next project
+        def = project_list[idx]
+        project_spec, problem_spec, _, _, _ = construct_task_graphs_problem(def, dist_matrix;
+            Δt_collect=map(i->get(problem_config,:dt_collect,0), def.s0),
+            Δt_deliver=map(i->get(problem_config,:dt_deliver,0), def.s0),
+            cost_function=primary_objective,
+            task_shapes=def.shapes,
+            shape_dict=env_graph.expanded_zones
+        )
+        next_schedule = construct_partial_project_schedule(project_spec,problem_spec)
+        remap_object_ids!(next_schedule,project_schedule)
+        # print_project_schedule(string("next_schedule",idx),next_schedule;mode=:leaf_aligned)
+        # store solution for plotting
+        object_path_dict, object_interval_dict = fill_object_path_dicts!(solution,project_schedule,cache,object_path_dict,object_interval_dict)
+        for (object_id, pred) in get_object_ICs(next_schedule)
+            project_ids[get_id(object_id)] = idx
+        end
+        # Fallback
+        fallback_search_env = replan(fallback_solver, fallback_replan_model, search_env, env_graph, problem_spec, solution, next_schedule, t_request, t_arrival;commit_threshold=fallback_commit_threshold)
+        reset_solver!(fallback_solver)
+        (fallback_solution, _, fallback_cost, fallback_search_env, _), fallback_elapsed_time, _, _, _ = @timed high_level_search!(
+            fallback_solver, fallback_search_env, Gurobi.Optimizer;primary_objective=primary_objective)
+        # print_project_schedule(string("schedule",idx,"A"),fallback_search_env.schedule;mode=:leaf_aligned)
+        # Replanning outer loop
+        base_search_env = replan(solver, replan_model, search_env, env_graph, problem_spec, solution, next_schedule, t_request, t_arrival; commit_threshold=commit_threshold,kwargs...)
+        # base_search_env = replan(solver, replan_model, fallback_search_env, env_graph, problem_spec, fallback_solution, nothing, t_request, t_arrival;commit_threshold=commit_threshold)
+        # print_project_schedule(string("schedule",idx,"B"),base_search_env.schedule;mode=:leaf_aligned)
+        # plan for current project
+        reset_solver!(solver)
+        (solution, _, cost, search_env, optimality_gap), elapsed_time, _, _, _ = @timed high_level_search!(solver, base_search_env, Gurobi.Optimizer;primary_objective=primary_objective,kwargs...)
+        # print_project_schedule(string("schedule",idx,"C"),search_env.schedule;mode=:leaf_aligned)
+        # m = maximum(map(p->length(p), get_paths(solution)))
+        # @show m
+
+        local_results[idx] = compile_solver_results(solver, solution, cost, search_env, optimality_gap, elapsed_time)
+        merge!(final_times[idx], Dict{AbstractID,Int}(get_vtx_id(next_schedule,v)=>0 for v in vertices(next_schedule)))
+        for i in 1:idx
+            for node_id in keys(final_times[i])
+                v = get_vtx(search_env.schedule,node_id)
+                final_times[i][node_id] = max(final_times[i][node_id], get(search_env.cache.tF, v, -1))
+            end
+        end
+    end
+    results_dict = Dict{String,Any}()
+    println("DONE REPLANNING")
+    results_dict["time"]                = map(i->local_results[i]["time"], 1:length(project_list))
+    results_dict["optimality_gap"]      = map(i->local_results[i]["optimality_gap"], 1:length(project_list))
+    results_dict["optimal"]             = map(i->local_results[i]["optimal"], 1:length(project_list))
+    results_dict["feasible"]            = map(i->local_results[i]["feasible"], 1:length(project_list))
+    results_dict["cost"]                = map(i->local_results[i]["cost"], 1:length(project_list))
+
+    println("COMPUTING MAKESPANS")
+    results_dict["makespans"]           = map(dict->maximum(collect(values(dict))),final_times)
+
+    object_path_dict, object_interval_dict = fill_object_path_dicts!(solution,search_env.schedule,search_env.cache,object_path_dict,object_interval_dict)
+    object_paths, object_intervals = convert_to_path_vectors(object_path_dict, object_interval_dict)
+
+    println("SAVING PATHS")
+    results_dict["robot_paths"]         = convert_to_vertex_lists(solution)
+    results_dict["object_paths"]        = object_paths
+    results_dict["object_intervals"]    = object_intervals
+    results_dict["project_idxs"]        = map(k->project_ids[k], sort(collect(keys(project_ids))))
+    results_dict
+end
 
 
 function run_profiling(MODE=:nothing;
@@ -375,6 +503,36 @@ function run_profiling(MODE=:nothing;
             problem_filename = joinpath(problem_dir,string("problem",problem_id,".toml"))
             config_filename = joinpath(problem_dir,string("config",problem_id,".toml"))
             if MODE == :write
+                # initialize a random problem
+                if !isdir(problem_dir)
+                    mkdir(problem_dir)
+                end
+                if isfile(problem_filename)
+                    println("file ",problem_filename," already exists. Skipping ...")
+                    continue # don't overwrite existing files
+                end
+                r0,s0,sF = get_random_problem_instantiation(N,M,get_pickup_zones(factory_env),get_dropoff_zones(factory_env),
+                        get_free_zones(factory_env))
+                project_spec = construct_random_project_spec(M,s0,sF;max_parents=max_parents,depth_bias=depth_bias,Δt_min=Δt_min,Δt_max=Δt_max)
+                shapes = choose_random_object_sizes(M,Dict(task_sizes...))
+                problem_def = SimpleProblemDef(project_spec,r0,s0,sF,shapes)
+                # Save the problem
+                open(problem_filename, "w") do io
+                    TOML.print(io, TOML.parse(problem_def))
+                end
+                open(config_filename, "w") do io
+                    TOML.print(io, Dict(
+                        "N"=>N,
+                        "M"=>M,
+                        "max_parents"=>max_parents,
+                        "depth_bias"=>depth_bias,
+                        "min_process_time"=>Δt_min,
+                        "max_process_time"=>Δt_max,
+                        "env_id"=>env_id
+                        )
+                    )
+                end
+            elseif MODE == :write_replanning_problems
                 # initialize a random problem
                 if !isdir(problem_dir)
                     mkdir(problem_dir)
@@ -469,6 +627,127 @@ function run_profiling(MODE=:nothing;
     end
 end
 
+function run_replanner_profiling(MODE=:nothing;
+        solver_config=Dict(),
+        base_problem_dir = get(solver_config,:problem_dir, PROBLEM_DIR),
+        base_results_dir = get(solver_config,:results_dir, RESULTS_DIR),
+        replanner_model = get(solver_config,:replan_model,  MergeAndBalance()),
+        fallback_model  = get(solver_config,:fallback_model,ReassignFreeRobots()),
+        env_id =  get(solver_config,:env_id,2),
+        problem_configs=Vector{Dict}(),
+        solver_template=PC_TAPF_Solver(),
+        fallback_solver_template = PC_TAPF_Solver(),
+        TimeLimit       = get(solver_config,:nbs_time_limit, solver_template.time_limit),
+        OutputFlag      = get(solver_config,:OutputFlag,    0),
+        Presolve        = get(solver_config,:Presolve,      -1),
+        initial_problem_id = 1,
+        primary_objective=SumOfMakeSpans
+    )
+    # solver profiling
+    env_filename = string(ENVIRONMENT_DIR,"/env_",env_id,".toml")
+    factory_env = read_env(env_filename)
+    env_graph = factory_env
+    dist_matrix = get_dist_matrix(env_graph)
+    dist_mtx_map = DistMatrixMap(factory_env.vtx_map,factory_env.vtxs)
+
+    Random.seed!(1)
+    folder_id = initial_problem_id-1;
+    # run tests and push results into table
+    for problem_config in problem_configs
+        num_trials          = get(problem_config,:num_trials,1)
+        max_parents         = get(problem_config,:max_parents,3)
+        depth_bias          = get(problem_config,:depth_bias,0.4)
+        dt_min              = get(problem_config,:dt_min,0)
+        dt_max              = get(problem_config,:dt_max,0)
+        dt_collect          = get(problem_config,:dt_collect,0)
+        dt_deliver          = get(problem_config,:dt_deliver,0)
+        task_sizes          = get(problem_config,:task_sizes,(1=>1.0,2=>0.0,4=>0.0))
+        N                   = get(problem_config,:N,30)
+        M                   = get(problem_config,:M,10)
+        num_projects        = get(problem_config,:num_projects,10)
+        arrival_interval    = get(problem_config,:arrival_interval,40)
+        for trial in 1:num_trials
+        # try
+            folder_id += 1 # moved this to the beginning so it doesn't get skipped
+            problem_dir = joinpath(base_problem_dir,string("stream",folder_id))
+
+            if MODE == :write
+                if !isdir(problem_dir)
+                    mkpath(problem_dir)
+                end
+                # for problem_id in
+                for problem_id in 1:num_projects
+                    problem_filename = joinpath(problem_dir,string("problem",problem_id,".toml"))
+                    config_filename = joinpath(problem_dir,string("config",problem_id,".toml"))
+                    if isfile(problem_filename)
+                        println("file ",problem_filename," already exists. Skipping ...")
+                        continue # don't overwrite existing files
+                    end
+                    # initialize a random problem
+                    r0,s0,sF = get_random_problem_instantiation(N,M,get_pickup_zones(factory_env),get_dropoff_zones(factory_env),get_free_zones(factory_env))
+                    project_spec = construct_random_project_spec(M,s0,sF;max_parents=max_parents,depth_bias=depth_bias,Δt_min=dt_min,Δt_max=dt_max)
+                    shapes = choose_random_object_sizes(M,Dict(task_sizes...))
+                    problem_def = SimpleProblemDef(project_spec,r0,s0,sF,shapes)
+                    # Save the problem
+                    open(problem_filename, "w") do io
+                        TOML.print(io, TOML.parse(problem_def))
+                    end
+                    open(config_filename, "w") do io
+                        TOML.print(io, Dict(
+                            "N"=>N,
+                            "M"=>M,
+                            "max_parents"=>max_parents,
+                            "depth_bias"=>depth_bias,
+                            "min_process_time"=>dt_min,
+                            "max_process_time"=>dt_max,
+                            "env_id"=>env_id
+                            )
+                        )
+                    end
+                end
+            elseif mode != nothing
+                subdir = joinpath(base_results_dir,string("stream",folder_id))
+                results_filename = joinpath(subdir,string("results",folder_id,".toml"))
+                if !isdir(subdir)
+                    mkpath(subdir)
+                end
+                if isfile(results_filename)
+                    println("file ",results_filename," already exists. Skipping ...")
+                    continue # don't overwrite existing files
+                end
+                project_list = SimpleProblemDef[]
+                for problem_id in 1:num_projects
+                    problem_filename = joinpath(problem_dir,string("problem",problem_id,".toml"))
+                    config_filename = joinpath(problem_dir,string("config",problem_id,".toml"))
+                    # config_filename = joinpath(problem_dir,string("config",problem_id,".toml"))
+                    problem_def = read_problem_def(problem_filename)
+                    push!(project_list, problem_def)
+                end
+                # problem_spec = ProblemSpec(problem_spec, D=dist_mtx_map)
+
+                solver          = PC_TAPF_Solver(solver_template,start_time=time());
+                fallback_solver = PC_TAPF_Solver(fallback_solver_template,start_time=time());
+
+                results_dict = profile_replanning(replanner_model,fallback_model,solver, fallback_solver, project_list, env_graph, dist_matrix, solver_config,problem_config;
+                    primary_objective=primary_objective,TimeLimit=TimeLimit,OutputFlag=OutputFlag,Presolve=Presolve
+                    )
+
+                println("PROFILER: ",typeof(solver.nbs_model)," --- ",string(MODE), " --- Solved problem ",folder_id," in ",results_dict["time"]," seconds! \n\n")
+                # print the results
+                open(results_filename, "w") do io
+                    TOML.print(io, results_dict)
+                end
+            end
+        # catch e
+        #     if typeof(e) <: AssertionError
+        #         println(e.msg)
+        #     else
+        #         throw(e)
+        #     end
+        # end
+        end
+    end
+end
 
 
 end
