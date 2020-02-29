@@ -333,7 +333,7 @@ function profile_full_solver(solver, project_spec, problem_spec, robot_ICs, env_
     results_dict["cost"] = collect(cost)
     results_dict
 end
-function compile_solver_results(solver, solution, cost, search_env, optimality_gap, elapsed_time)
+function compile_solver_results(solver, solution, cost, search_env, optimality_gap, elapsed_time, t_arrival)
     optimal = (optimality_gap <= 0)
     feasible = true
     if cost[1] == Inf
@@ -345,6 +345,7 @@ function compile_solver_results(solver, solution, cost, search_env, optimality_g
     end
     dict = TOML.parse(solver)
     dict["time"] = elapsed_time
+    dict["arrival_time"] = t_arrival
     dict["optimality_gap"] = Int(optimality_gap)
     dict["optimal"] = optimal
     dict["feasible"] = feasible
@@ -387,8 +388,14 @@ function profile_replanning(replan_model, fallback_model, solver, fallback_solve
     (solution, _, cost, search_env, optimality_gap), elapsed_time, byte_ct, gc_time, mem_ct = @timed high_level_search!(
         solver, base_search_env, Gurobi.Optimizer;primary_objective=primary_objective,kwargs...)
     # print_project_schedule(string("schedule",idx,"C"),search_env.schedule;mode=:leaf_aligned)
-    local_results[idx] = compile_solver_results(solver, solution, cost, search_env, optimality_gap, elapsed_time)
-    merge!(final_times[idx], Dict{AbstractID,Int}(get_vtx_id(partial_schedule,v)=>t_arrival for v in vertices(partial_schedule)))
+    local_results[idx] = compile_solver_results(solver, solution, cost, search_env, optimality_gap, elapsed_time, t_arrival)
+    merge!(final_times[idx], Dict{AbstractID,Int}(OperationID(k)=>t_arrival for k in keys(get_operations(partial_schedule))))
+    for i in 1:idx
+        for node_id in keys(final_times[i])
+            v = get_vtx(search_env.schedule,node_id)
+            final_times[i][node_id] = max(final_times[i][node_id], get(search_env.cache.tF, v, -1))
+        end
+    end
 
     while idx < length(project_list)
         project_schedule = search_env.schedule
@@ -417,23 +424,39 @@ function profile_replanning(replan_model, fallback_model, solver, fallback_solve
         println("Computing Fallback plan at idx = ",idx)
         fallback_search_env = replan(fallback_solver, fallback_model, search_env, env_graph, problem_spec, solution, next_schedule, t_request, t_arrival;commit_threshold=fallback_commit_threshold)
         reset_solver!(fallback_solver)
-        (fallback_solution, _, fallback_cost, fallback_search_env, _), fallback_elapsed_time, _, _, _ = @timed high_level_search!(
+        (fallback_solution, _, fallback_cost, fallback_search_env, fallback_optimality_gap), fallback_elapsed_time, _, _, _ = @timed high_level_search!(
             fallback_solver, fallback_search_env, Gurobi.Optimizer;primary_objective=primary_objective,kwargs...)
-        # print_project_schedule(string("schedule",idx,"A"),fallback_search_env.schedule;mode=:leaf_aligned)
+
+        # print_project_schedule(string("schedule",idx,"A"),fallback_search_env;mode=:leaf_aligned)
         # Replanning outer loop
         base_search_env = replan(solver, replan_model, search_env, env_graph, problem_spec, solution, next_schedule, t_request, t_arrival; commit_threshold=commit_threshold,kwargs...)
         # base_search_env = replan(solver, replan_model, fallback_search_env, env_graph, problem_spec, fallback_solution, nothing, t_request, t_arrival;commit_threshold=commit_threshold)
-        # print_project_schedule(string("schedule",idx,"B"),base_search_env.schedule;mode=:leaf_aligned)
+        # print_project_schedule(string("schedule",idx,"B"),base_search_env;mode=:leaf_aligned)
         # plan for current project
         println("Computing plan at idx = ",idx)
         reset_solver!(solver)
         (solution, _, cost, search_env, optimality_gap), elapsed_time, _, _, _ = @timed high_level_search!(solver, base_search_env, Gurobi.Optimizer;primary_objective=primary_objective,kwargs...)
-        # print_project_schedule(string("schedule",idx,"C"),search_env.schedule;mode=:leaf_aligned)
+        # print_project_schedule(string("schedule",idx,"C"),search_env;mode=:leaf_aligned)
         # m = maximum(map(p->length(p), get_paths(solution)))
-        # @show m
+        # @show
 
-        local_results[idx] = compile_solver_results(solver, solution, cost, search_env, optimality_gap, elapsed_time)
-        merge!(final_times[idx], Dict{AbstractID,Int}(get_vtx_id(next_schedule,v)=>0 for v in vertices(next_schedule)))
+        fallback_results = compile_solver_results(fallback_solver, fallback_solution, fallback_cost, fallback_search_env, fallback_optimality_gap, fallback_elapsed_time, t_arrival)
+        local_results[idx] = compile_solver_results(solver, solution, cost, search_env, optimality_gap, elapsed_time, t_arrival)
+        merge!(local_results[idx],Dict(string("fallback_",k)=>v for (k,v) in fallback_results))
+        # Switch to fallback if necessary
+        if (elapsed_time > commit_threshold) || ~local_results[idx]["feasible"]
+            if local_results[idx]["feasible"]
+                println("TIMEOUT! Using feasible solver output",idx)
+            elseif local_results[idx]["fallback_feasible"]
+                println("TIMEOUT! Solver failed to find feasible solution. Resorting to fallback plan on ",idx)
+                solution = fallback_solution
+                search_env = fallback_search_env
+            else
+                println("TIMEOUT! No feasible solution found by fallback solver or regular solver. Terminating...",idx)
+                break
+            end
+        end
+        merge!(final_times[idx], Dict{AbstractID,Int}(OperationID(k)=>t_arrival for k in keys(get_operations(next_schedule))))
         for i in 1:idx
             for node_id in keys(final_times[i])
                 v = get_vtx(search_env.schedule,node_id)
@@ -442,15 +465,20 @@ function profile_replanning(replan_model, fallback_model, solver, fallback_solve
         end
     end
     results_dict = Dict{String,Any}()
-    println("DONE REPLANNING")
-    results_dict["time"]                = map(i->local_results[i]["time"], 1:length(project_list))
-    results_dict["optimality_gap"]      = map(i->local_results[i]["optimality_gap"], 1:length(project_list))
-    results_dict["optimal"]             = map(i->local_results[i]["optimal"], 1:length(project_list))
-    results_dict["feasible"]            = map(i->local_results[i]["feasible"], 1:length(project_list))
-    results_dict["cost"]                = map(i->local_results[i]["cost"], 1:length(project_list))
+    println("DONE REPLANNING - Aggregating results")
+
+    results_dict["time"]                = map(i->local_results[i]["time"], 1:idx)
+    results_dict["optimality_gap"]      = map(i->local_results[i]["optimality_gap"], 1:idx)
+    results_dict["optimal"]             = map(i->local_results[i]["optimal"], 1:idx)
+    results_dict["feasible"]            = map(i->local_results[i]["feasible"], 1:idx)
+    results_dict["cost"]                = map(i->local_results[i]["cost"], 1:idx)
+    results_dict["arrival_time"]        = map(i->local_results[i]["arrival_time"], 1:idx)
 
     println("COMPUTING MAKESPANS")
-    results_dict["makespans"]           = map(dict->maximum(collect(values(dict))),final_times)
+    results_dict["final_time"]         = map(dict->maximum(collect(values(dict))),final_times)
+    results_dict["makespans"]          = [b-a for (a,b) in zip(results_dict["arrival_time"],results_dict["final_time"])]
+
+    @show results_dict["makespans"]
 
     object_path_dict, object_interval_dict = fill_object_path_dicts!(solution,search_env.schedule,search_env.cache,object_path_dict,object_interval_dict)
     object_paths, object_intervals = convert_to_path_vectors(object_path_dict, object_interval_dict)
@@ -643,7 +671,8 @@ function run_replanner_profiling(MODE=:nothing;
         OutputFlag      = get(solver_config,:OutputFlag,    0),
         Presolve        = get(solver_config,:Presolve,      -1),
         initial_problem_id = 1,
-        primary_objective=SumOfMakeSpans
+        primary_objective=SumOfMakeSpans,
+        time_out_buffer=1
     )
     # solver profiling
     env_filename = string(ENVIRONMENT_DIR,"/env_",env_id,".toml")
@@ -727,11 +756,19 @@ function run_replanner_profiling(MODE=:nothing;
                 end
                 # problem_spec = ProblemSpec(problem_spec, D=dist_mtx_map)
 
-                solver          = PC_TAPF_Solver(solver_template,start_time=time());
-                fallback_solver = PC_TAPF_Solver(fallback_solver_template,start_time=time());
+                solver = PC_TAPF_Solver(solver_template,
+                    time_limit=get(problem_config,:commit_threshold, solver_template.time_limit) - time_out_buffer,
+                    start_time=time());
+                fallback_solver = PC_TAPF_Solver(fallback_solver_template,
+                    time_limit=get(problem_config,:fallback_commit_threshold, solver_template.time_limit) - time_out_buffer,
+                    start_time=time());
+                TimeLimit = solver.time_limit - get(solver_config,:route_planning_buffer, 2)
 
                 results_dict = profile_replanning(replan_model,fallback_model,solver, fallback_solver, project_list, env_graph, dist_matrix, solver_config,problem_config;
-                    primary_objective=primary_objective,TimeLimit=TimeLimit,OutputFlag=OutputFlag,Presolve=Presolve
+                        primary_objective=primary_objective,
+                        TimeLimit=TimeLimit,
+                        OutputFlag=OutputFlag,
+                        Presolve=Presolve
                     )
 
                 println("PROFILER: ",typeof(solver.nbs_model)," --- ",string(MODE), " --- Solved problem ",folder_id," in ",results_dict["time"]," seconds! \n\n")

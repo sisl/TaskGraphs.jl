@@ -189,6 +189,7 @@ let
     base_solver_configs = [
         Dict(
         :nbs_time_limit=>8,
+        :route_planning_buffer=>2,
         :env_id=>2,
         :OutputFlag => 0,
         :Presolve => -1,
@@ -211,7 +212,7 @@ let
         Dict(
             :warning_time=>20,
             :commit_threshold=>10,
-            :fallback_commit_threshold=>5,
+            :fallback_commit_threshold=>10,
             :num_trials => 4,
             :max_parents => 3,
             :depth_bias => 0.4,

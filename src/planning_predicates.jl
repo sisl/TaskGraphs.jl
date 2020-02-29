@@ -318,10 +318,14 @@ end
 # end
 
 export
+	required_predecessors,
+	required_successors,
+	num_required_predecessors,
+	num_required_successors,
     eligible_successors,
     eligible_predecessors,
-    required_predecessors,
-    required_successors,
+	num_eligible_predecessors,
+	num_eligible_successors,
 	matches_template,
     resources_reserved,
 	align_with_predecessor,
@@ -342,11 +346,42 @@ required_successors(node::OBJECT_AT)    = Dict(COLLECT=>1)
 required_predecessors(node::ROBOT_AT)   = Dict()
 required_successors(node::ROBOT_AT)     = Dict(GO=>1)
 
+function num_required_predecessors(node)
+	n = 1
+	for (key,val) in required_predecessors(node)
+		n += val
+	end
+	n
+end
+function num_required_successors(node)
+	n = 1
+	for (key,val) in required_successors(node)
+		n += val
+	end
+	n
+end
+
 eligible_predecessors(node) 			= required_predecessors(node)
 eligible_successors(node) 				= required_successors(node)
 
 eligible_successors(node::GO)           = Dict((GO,TEAM_ACTION{COLLECT},TEAM_ACTION{GO},COLLECT)=>1)
 eligible_predecessors(node::OBJECT_AT)  = Dict(Operation=>1)
+
+
+function num_eligible_predecessors(node)
+	n = 1
+	for (key,val) in eligible_predecessors(node)
+		n += val
+	end
+	n
+end
+function num_eligible_successors(node)
+	n = 1
+	for (key,val) in eligible_successors(node)
+		n += val
+	end
+	n
+end
 
 # required_predecessors(node::LARGE_OBJECT_AT)  = Dict()
 required_predecessors(node::TEAM_ACTION{GO})        = Dict(GO=>length(node.instructions))

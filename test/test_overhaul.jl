@@ -429,6 +429,7 @@ let
 
 end
 
+# for REPLANNING
 let
     reset_operation_id_counter!()
     reset_action_id_counter!()
@@ -488,7 +489,7 @@ let
         l3_verbosity                = 0,
         l4_verbosity                = 0,
         LIMIT_assignment_iterations = 10,
-        LIMIT_A_star_iterations     = 8000
+        LIMIT_A_star_iterations     = 16000
         );
     fallback_solver_template = PC_TAPF_Solver(
         nbs_model                   = GreedyAssignment(),
@@ -499,7 +500,7 @@ let
         l3_verbosity                = 0,
         l4_verbosity                = 0,
         LIMIT_assignment_iterations = 2,
-        LIMIT_A_star_iterations     = 8000
+        LIMIT_A_star_iterations     = 16000
         );
 
 
