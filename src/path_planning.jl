@@ -1271,10 +1271,11 @@ function prune_schedule(project_schedule::ProjectSchedule,problem_spec::ProblemS
     G = get_graph(project_schedule)
 
     # identify nodes "cut" by timestep
-    active_vtxs, _ = get_active_and_fixed_vtxs(project_schedule,cache,t)
+    active_vtxs, fixed_vtxs = get_active_and_fixed_vtxs(project_schedule,cache,t)
     # construct set of all nodes to prune out.
     remove_set = Set{Int}()
     for v in active_vtxs
+    # for v in fixed_vtxs
         if isa(get_node_from_vtx(project_schedule,v),Operation)
             push!(remove_set, v)
         end
@@ -1305,6 +1306,7 @@ function prune_schedule(project_schedule::ProjectSchedule,problem_spec::ProblemS
     for e in edges(get_graph(project_schedule))
         add_edge!(new_schedule, get_vtx_id(project_schedule, e.src), get_vtx_id(project_schedule, e.dst))
     end
+    @assert sanity_check(new_schedule,string(" in prune_schedule() at t = ",t,":\n",[string(string(get_node_from_vtx(project_schedule,v))," - t0 = ",cache.t0[v]," - tF = ",cache.tF[v]," - local_slack = ",cache.local_slack[v],"\n") for v in active_vtxs]...))
     # Initialize new cache
     G = get_graph(new_schedule)
     t0 = map(v->get(cache.t0, get_vtx(project_schedule, get_vtx_id(new_schedule, v)), 0.0), vertices(G))
@@ -1323,6 +1325,7 @@ function prune_schedule(project_schedule::ProjectSchedule,problem_spec::ProblemS
     set_leaf_operation_nodes!(new_schedule)
     # init planning cache with the existing solution
     new_cache = initialize_planning_cache(new_schedule;t0=t0,tF=tF)
+
 
     new_schedule, new_cache
 end
@@ -1395,20 +1398,25 @@ break_assignments!(replan_model::ReassignFreeRobots,args...) = nothing
 function replan(solver, replan_model, search_env, env_graph, problem_spec, solution, next_schedule, t_request, t_arrival; commit_threshold=5,kwargs...)
     project_schedule = search_env.schedule
     cache = search_env.cache
+    @assert sanity_check(project_schedule," in replan()")
     # Freeze solution and schedule at t_commit
     t_commit = get_commit_time(replan_model, search_env, t_request, commit_threshold)
     # Update operating schedule
     new_schedule, new_cache = prune_schedule(project_schedule,problem_spec,cache,t_commit)
+    @assert sanity_check(new_schedule," after prune_schedule()")
     # split active nodes
     robot_positions=get_env_snapshot(solution,t_commit)
     new_schedule, new_cache = split_active_vtxs!(new_schedule,problem_spec,new_cache,t_commit;robot_positions=robot_positions)
+    @assert sanity_check(new_schedule," after split_active_vtxs!()")
     # freeze nodes that terminate before cutoff time
     fix_precutoff_nodes!(new_schedule,problem_spec,new_cache,t_commit)
     # Remove all "assignments" from schedule
     break_assignments!(replan_model,new_schedule,problem_spec)
+    @assert sanity_check(new_schedule," after break_assignments!()")
     new_cache = initialize_planning_cache(new_schedule;t0=new_cache.t0,tF=min.(new_cache.tF,t_commit))
     # splice projects together!
     splice_schedules!(new_schedule,next_schedule)
+    @assert sanity_check(new_schedule," after splice_schedules!()")
     t0 = map(v->get(new_cache.t0, v, t_arrival), vertices(get_graph(new_schedule)))
     tF = map(v->get(new_cache.tF, v, t_arrival), vertices(get_graph(new_schedule)))
     base_search_env = construct_search_env(solver, new_schedule, search_env.problem_spec, env_graph;t0=t0,tF=tF)

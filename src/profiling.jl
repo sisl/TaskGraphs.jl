@@ -351,7 +351,7 @@ function compile_solver_results(solver, solution, cost, search_env, optimality_g
     dict["cost"] = collect(cost)
     dict
 end
-function profile_replanning(replan_model, fallback_replan_model, solver, fallback_solver, project_list, env_graph, dist_matrix, solver_config,problem_config;
+function profile_replanning(replan_model, fallback_model, solver, fallback_solver, project_list, env_graph, dist_matrix, solver_config,problem_config;
         primary_objective=SumOfMakeSpans, kwargs...
     )
     arrival_interval            = problem_config[:arrival_interval] # new project requests arrive every `arrival_interval` timesteps
@@ -414,16 +414,18 @@ function profile_replanning(replan_model, fallback_replan_model, solver, fallbac
             project_ids[get_id(object_id)] = idx
         end
         # Fallback
-        fallback_search_env = replan(fallback_solver, fallback_replan_model, search_env, env_graph, problem_spec, solution, next_schedule, t_request, t_arrival;commit_threshold=fallback_commit_threshold)
+        println("Computing Fallback plan at idx = ",idx)
+        fallback_search_env = replan(fallback_solver, fallback_model, search_env, env_graph, problem_spec, solution, next_schedule, t_request, t_arrival;commit_threshold=fallback_commit_threshold)
         reset_solver!(fallback_solver)
         (fallback_solution, _, fallback_cost, fallback_search_env, _), fallback_elapsed_time, _, _, _ = @timed high_level_search!(
-            fallback_solver, fallback_search_env, Gurobi.Optimizer;primary_objective=primary_objective)
+            fallback_solver, fallback_search_env, Gurobi.Optimizer;primary_objective=primary_objective,kwargs...)
         # print_project_schedule(string("schedule",idx,"A"),fallback_search_env.schedule;mode=:leaf_aligned)
         # Replanning outer loop
         base_search_env = replan(solver, replan_model, search_env, env_graph, problem_spec, solution, next_schedule, t_request, t_arrival; commit_threshold=commit_threshold,kwargs...)
         # base_search_env = replan(solver, replan_model, fallback_search_env, env_graph, problem_spec, fallback_solution, nothing, t_request, t_arrival;commit_threshold=commit_threshold)
         # print_project_schedule(string("schedule",idx,"B"),base_search_env.schedule;mode=:leaf_aligned)
         # plan for current project
+        println("Computing plan at idx = ",idx)
         reset_solver!(solver)
         (solution, _, cost, search_env, optimality_gap), elapsed_time, _, _, _ = @timed high_level_search!(solver, base_search_env, Gurobi.Optimizer;primary_objective=primary_objective,kwargs...)
         # print_project_schedule(string("schedule",idx,"C"),search_env.schedule;mode=:leaf_aligned)
@@ -631,7 +633,7 @@ function run_replanner_profiling(MODE=:nothing;
         solver_config=Dict(),
         base_problem_dir = get(solver_config,:problem_dir, PROBLEM_DIR),
         base_results_dir = get(solver_config,:results_dir, RESULTS_DIR),
-        replanner_model = get(solver_config,:replan_model,  MergeAndBalance()),
+        replan_model = get(solver_config,:replan_model,  MergeAndBalance()),
         fallback_model  = get(solver_config,:fallback_model,ReassignFreeRobots()),
         env_id =  get(solver_config,:env_id,2),
         problem_configs=Vector{Dict}(),
@@ -707,7 +709,7 @@ function run_replanner_profiling(MODE=:nothing;
                 end
             elseif mode != nothing
                 subdir = joinpath(base_results_dir,string("stream",folder_id))
-                results_filename = joinpath(subdir,string("results",folder_id,".toml"))
+                results_filename = joinpath(subdir,string("results.toml"))
                 if !isdir(subdir)
                     mkpath(subdir)
                 end
@@ -728,7 +730,7 @@ function run_replanner_profiling(MODE=:nothing;
                 solver          = PC_TAPF_Solver(solver_template,start_time=time());
                 fallback_solver = PC_TAPF_Solver(fallback_solver_template,start_time=time());
 
-                results_dict = profile_replanning(replanner_model,fallback_model,solver, fallback_solver, project_list, env_graph, dist_matrix, solver_config,problem_config;
+                results_dict = profile_replanning(replan_model,fallback_model,solver, fallback_solver, project_list, env_graph, dist_matrix, solver_config,problem_config;
                     primary_objective=primary_objective,TimeLimit=TimeLimit,OutputFlag=OutputFlag,Presolve=Presolve
                     )
 

@@ -9,95 +9,95 @@ initial_conditions = [[1, 373], [2, 264], [3, 108], [4, 75], [5, 203], [6, 528],
 pre = [[28, 111], [29, 551], [27, 119]]
 post = [[30, 520]]
 station_id = 30
-id = 17375
+id = 1803
 dt = 0
 [[operations]]
 pre = [[26, 342]]
 post = [[29, 124]]
 station_id = 29
-id = 17376
+id = 1804
 dt = 0
 [[operations]]
-pre = [[24, 531], [25, 336]]
+pre = [[25, 336], [24, 531]]
 post = [[28, 233]]
 station_id = 28
-id = 17377
+id = 1805
 dt = 0
 [[operations]]
 pre = [[23, 482]]
 post = [[24, 489]]
 station_id = 24
-id = 17378
+id = 1806
 dt = 0
 [[operations]]
-pre = [[22, 506], [21, 476], [20, 271]]
+pre = [[21, 476], [22, 506], [20, 271]]
 post = [[26, 57]]
 station_id = 26
-id = 17379
+id = 1807
 dt = 0
 [[operations]]
 pre = [[19, 94], [18, 226]]
 post = [[27, 112]]
 station_id = 27
-id = 17380
+id = 1808
 dt = 0
 [[operations]]
 pre = [[17, 387]]
 post = [[25, 270]]
 station_id = 25
-id = 17381
+id = 1809
 dt = 0
 [[operations]]
 pre = [[16, 239]]
 post = [[23, 100]]
 station_id = 23
-id = 17382
+id = 1810
 dt = 0
 [[operations]]
-pre = [[14, 411], [15, 125]]
+pre = [[15, 125], [14, 411]]
 post = [[18, 248]]
 station_id = 18
-id = 17383
+id = 1811
 dt = 0
 [[operations]]
-pre = [[11, 234], [12, 557], [13, 99]]
+pre = [[11, 234], [13, 99], [12, 557]]
 post = [[19, 483]]
 station_id = 19
-id = 17384
+id = 1812
 dt = 0
 [[operations]]
-pre = [[10, 202], [9, 545], [8, 222]]
+pre = [[8, 222], [10, 202], [9, 545]]
 post = [[22, 416]]
 station_id = 22
-id = 17385
+id = 1813
 dt = 0
 [[operations]]
-pre = [[7, 56], [6, 277]]
+pre = [[6, 277], [7, 56]]
 post = [[20, 538]]
 station_id = 20
-id = 17386
+id = 1814
 dt = 0
 [[operations]]
-pre = [[4, 214], [3, 348], [5, 510]]
+pre = [[4, 214], [5, 510], [3, 348]]
 post = [[16, 215]]
 station_id = 16
-id = 17387
+id = 1815
 dt = 0
 [[operations]]
 pre = [[2, 62]]
 post = [[14, 136]]
 station_id = 14
-id = 17388
+id = 1816
 dt = 0
 [[operations]]
 pre = [[1, 539]]
 post = [[21, 229]]
 station_id = 21
-id = 17389
+id = 1817
 dt = 0
 [[operations]]
 pre = [[30, 405]]
 post = []
 station_id = -1
-id = 17390
+id = 1818
 dt = 0

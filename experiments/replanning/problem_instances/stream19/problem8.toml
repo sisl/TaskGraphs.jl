@@ -9,95 +9,95 @@ initial_conditions = [[1, 544], [2, 365], [3, 252], [4, 81], [5, 112], [6, 384],
 pre = [[29, 119]]
 post = [[30, 118]]
 station_id = 30
-id = 17566
+id = 1994
 dt = 0
 [[operations]]
-pre = [[27, 259], [26, 277], [28, 82]]
+pre = [[28, 82], [27, 259], [26, 277]]
 post = [[29, 404]]
 station_id = 29
-id = 17567
+id = 1995
 dt = 0
 [[operations]]
-pre = [[23, 239], [25, 230], [24, 366]]
+pre = [[24, 366], [25, 230], [23, 239]]
 post = [[28, 528]]
 station_id = 28
-id = 17568
+id = 1996
 dt = 0
 [[operations]]
 pre = [[22, 251]]
 post = [[24, 93]]
 station_id = 24
-id = 17569
+id = 1997
 dt = 0
 [[operations]]
 pre = [[21, 362]]
 post = [[23, 361]]
 station_id = 23
-id = 17570
+id = 1998
 dt = 0
 [[operations]]
-pre = [[20, 476], [19, 202], [18, 417]]
+pre = [[19, 202], [20, 476], [18, 417]]
 post = [[25, 225]]
 station_id = 25
-id = 17571
+id = 1999
 dt = 0
 [[operations]]
 pre = [[17, 208]]
 post = [[27, 100]]
 station_id = 27
-id = 17572
+id = 2000
 dt = 0
 [[operations]]
 pre = [[16, 234]]
 post = [[26, 355]]
 station_id = 26
-id = 17573
+id = 2001
 dt = 0
 [[operations]]
 pre = [[15, 74], [14, 527]]
 post = [[22, 248]]
 station_id = 22
-id = 17574
+id = 2002
 dt = 0
 [[operations]]
 pre = [[13, 387]]
 post = [[19, 505]]
 station_id = 19
-id = 17575
+id = 2003
 dt = 0
 [[operations]]
-pre = [[10, 482], [12, 247], [11, 214]]
+pre = [[11, 214], [12, 247], [10, 482]]
 post = [[17, 63]]
 station_id = 17
-id = 17576
+id = 2004
 dt = 0
 [[operations]]
-pre = [[9, 557], [8, 94]]
+pre = [[8, 94], [9, 557]]
 post = [[21, 538]]
 station_id = 21
-id = 17577
+id = 2005
 dt = 0
 [[operations]]
-pre = [[7, 196], [5, 56], [6, 370]]
+pre = [[5, 56], [7, 196], [6, 370]]
 post = [[14, 136]]
 station_id = 14
-id = 17578
+id = 2006
 dt = 0
 [[operations]]
-pre = [[2, 68], [4, 222], [3, 86]]
+pre = [[3, 86], [4, 222], [2, 68]]
 post = [[16, 477]]
 station_id = 16
-id = 17579
+id = 2007
 dt = 0
 [[operations]]
 pre = [[1, 131]]
 post = [[15, 233]]
 station_id = 15
-id = 17580
+id = 2008
 dt = 0
 [[operations]]
 pre = [[30, 137]]
 post = []
 station_id = -1
-id = 17581
+id = 2009
 dt = 0

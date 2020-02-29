@@ -6,56 +6,56 @@ shapes = [[1, 1], [1, 1], [1, 1], [1, 1], [1, 1], [1, 1], [1, 1], [1, 1], [1, 1]
 initial_conditions = [[1, 81], [2, 203], [3, 495], [4, 221], [5, 124], [6, 524], [7, 513], [8, 85], [9, 244], [10, 63], [11, 252], [12, 343], [13, 276], [14, 355], [15, 501]]
 
 [[operations]]
-pre = [[13, 131], [14, 222], [12, 277]]
+pre = [[14, 222], [12, 277], [13, 131]]
 post = [[15, 501]]
 station_id = 15
-id = 16005
+id = 433
 dt = 0
 [[operations]]
 pre = [[11, 94]]
 post = [[12, 343]]
 station_id = 12
-id = 16006
+id = 434
 dt = 0
 [[operations]]
 pre = [[10, 56], [9, 379]]
 post = [[11, 252]]
 station_id = 11
-id = 16007
+id = 435
 dt = 0
 [[operations]]
-pre = [[7, 387], [8, 391]]
+pre = [[8, 391], [7, 387]]
 post = [[14, 355]]
 station_id = 14
-id = 16008
+id = 436
 dt = 0
 [[operations]]
 pre = [[6, 366]]
 post = [[7, 513]]
 station_id = 7
-id = 16009
+id = 437
 dt = 0
 [[operations]]
-pre = [[3, 374], [4, 226], [5, 243]]
+pre = [[3, 374], [5, 243], [4, 226]]
 post = [[13, 276]]
 station_id = 13
-id = 16010
+id = 438
 dt = 0
 [[operations]]
 pre = [[2, 557]]
 post = [[9, 244]]
 station_id = 9
-id = 16011
+id = 439
 dt = 0
 [[operations]]
 pre = [[1, 259]]
 post = [[8, 85]]
 station_id = 8
-id = 16012
+id = 440
 dt = 0
 [[operations]]
 pre = [[15, 82]]
 post = []
 station_id = -1
-id = 16013
+id = 441
 dt = 0

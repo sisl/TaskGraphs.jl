@@ -9,101 +9,101 @@ initial_conditions = [[1, 252], [2, 203], [3, 233], [4, 532], [5, 225], [6, 85],
 pre = [[29, 259]]
 post = [[30, 112]]
 station_id = 30
-id = 17582
+id = 2010
 dt = 0
 [[operations]]
-pre = [[28, 531], [26, 411], [27, 68]]
+pre = [[27, 68], [26, 411], [28, 531]]
 post = [[29, 209]]
 station_id = 29
-id = 17583
+id = 2011
 dt = 0
 [[operations]]
 pre = [[25, 374]]
 post = [[27, 221]]
 station_id = 27
-id = 17584
+id = 2012
 dt = 0
 [[operations]]
-pre = [[24, 370], [22, 82], [23, 56]]
+pre = [[22, 82], [23, 56], [24, 370]]
 post = [[25, 365]]
 station_id = 25
-id = 17585
+id = 2013
 dt = 0
 [[operations]]
 pre = [[21, 137], [20, 214]]
 post = [[28, 404]]
 station_id = 28
-id = 17586
+id = 2014
 dt = 0
 [[operations]]
-pre = [[17, 494], [19, 131], [18, 417]]
+pre = [[19, 131], [17, 494], [18, 417]]
 post = [[23, 392]]
 station_id = 23
-id = 17587
+id = 2015
 dt = 0
 [[operations]]
 pre = [[16, 527]]
 post = [[22, 63]]
 station_id = 22
-id = 17588
+id = 2016
 dt = 0
 [[operations]]
 pre = [[15, 230], [14, 482]]
 post = [[16, 215]]
 station_id = 16
-id = 17589
+id = 2017
 dt = 0
 [[operations]]
-pre = [[13, 86], [12, 222], [11, 523]]
+pre = [[12, 222], [13, 86], [11, 523]]
 post = [[21, 69]]
 station_id = 21
-id = 17590
+id = 2018
 dt = 0
 [[operations]]
-pre = [[10, 488], [9, 271]]
+pre = [[9, 271], [10, 488]]
 post = [[20, 104]]
 station_id = 20
-id = 17591
+id = 2019
 dt = 0
 [[operations]]
 pre = [[8, 226]]
 post = [[26, 483]]
 station_id = 26
-id = 17592
+id = 2020
 dt = 0
 [[operations]]
 pre = [[7, 90], [6, 342]]
 post = [[24, 495]]
 station_id = 24
-id = 17593
+id = 2021
 dt = 0
 [[operations]]
 pre = [[5, 383]]
 post = [[19, 513]]
 station_id = 19
-id = 17594
+id = 2022
 dt = 0
 [[operations]]
 pre = [[4, 239]]
 post = [[17, 276]]
 station_id = 17
-id = 17595
+id = 2023
 dt = 0
 [[operations]]
 pre = [[2, 502], [3, 405]]
 post = [[15, 509]]
 station_id = 15
-id = 17596
+id = 2024
 dt = 0
 [[operations]]
 pre = [[1, 247]]
 post = [[14, 477]]
 station_id = 14
-id = 17597
+id = 2025
 dt = 0
 [[operations]]
 pre = [[30, 103]]
 post = []
 station_id = -1
-id = 17598
+id = 2026
 dt = 0

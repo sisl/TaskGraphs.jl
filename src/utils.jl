@@ -34,6 +34,7 @@ function remap_object_ids!(node::Operation,args...)
     union!(node.post, new_post)
     node
 end
+remap_object_id(node::Operation,args...)    = remap_object_ids!(deepcopy(node),args...)
 function remap_object_ids!(project_schedule::ProjectSchedule,args...)
     for i in 1:length(project_schedule.vtx_ids)
         project_schedule.vtx_ids[i] = remap_object_id(project_schedule.vtx_ids[i],args...)
@@ -48,6 +49,7 @@ function remap_object_ids!(project_schedule::ProjectSchedule,args...)
     for v in vertices(get_graph(project_schedule))
         project_schedule.path_specs[v] = remap_object_id(project_schedule.path_specs[v],args...)
     end
+    @assert sanity_check(project_schedule," after remap_object_ids!()")
     project_schedule
 end
 function remap_object_ids!(new_schedule::ProjectSchedule,old_schedule::ProjectSchedule)

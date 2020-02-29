@@ -6,86 +6,86 @@ shapes = [[1, 1], [1, 1], [1, 1], [1, 1], [1, 1], [1, 1], [1, 1], [1, 1], [1, 1]
 initial_conditions = [[1, 483], [2, 89], [3, 270], [4, 252], [5, 100], [6, 544], [7, 404], [8, 369], [9, 215], [10, 365], [11, 57], [12, 501], [13, 229], [14, 380], [15, 538], [16, 477], [17, 355], [18, 509], [19, 524], [20, 63], [21, 124], [22, 343], [23, 225], [24, 349], [25, 118]]
 
 [[operations]]
-pre = [[24, 527], [23, 370]]
+pre = [[23, 370], [24, 527]]
 post = [[25, 118]]
 station_id = 25
-id = 16656
+id = 1084
 dt = 0
 [[operations]]
 pre = [[21, 230], [22, 137]]
 post = [[24, 349]]
 station_id = 24
-id = 16657
+id = 1085
 dt = 0
 [[operations]]
 pre = [[19, 362], [20, 488]]
 post = [[23, 225]]
 station_id = 23
-id = 16658
+id = 1086
 dt = 0
 [[operations]]
 pre = [[18, 99]]
 post = [[20, 63]]
 station_id = 20
-id = 16659
+id = 1087
 dt = 0
 [[operations]]
 pre = [[16, 531], [17, 90]]
 post = [[18, 509]]
 station_id = 18
-id = 16660
+id = 1088
 dt = 0
 [[operations]]
 pre = [[15, 411]]
 post = [[22, 343]]
 station_id = 22
-id = 16661
+id = 1089
 dt = 0
 [[operations]]
 pre = [[14, 374]]
 post = [[21, 124]]
 station_id = 21
-id = 16662
+id = 1090
 dt = 0
 [[operations]]
-pre = [[12, 348], [13, 476]]
+pre = [[13, 476], [12, 348]]
 post = [[19, 524]]
 station_id = 19
-id = 16663
+id = 1091
 dt = 0
 [[operations]]
 pre = [[10, 545], [11, 342]]
 post = [[17, 355]]
 station_id = 17
-id = 16664
+id = 1092
 dt = 0
 [[operations]]
-pre = [[9, 259], [8, 557]]
+pre = [[8, 557], [9, 259]]
 post = [[15, 538]]
 station_id = 15
-id = 16665
+id = 1093
 dt = 0
 [[operations]]
-pre = [[7, 383], [5, 265], [6, 119]]
+pre = [[7, 383], [6, 119], [5, 265]]
 post = [[13, 229]]
 station_id = 13
-id = 16666
+id = 1094
 dt = 0
 [[operations]]
-pre = [[2, 196], [3, 417], [4, 523]]
+pre = [[2, 196], [4, 523], [3, 417]]
 post = [[14, 380]]
 station_id = 14
-id = 16667
+id = 1095
 dt = 0
 [[operations]]
 pre = [[1, 387]]
 post = [[6, 544]]
 station_id = 6
-id = 16668
+id = 1096
 dt = 0
 [[operations]]
 pre = [[25, 506]]
 post = []
 station_id = -1
-id = 16669
+id = 1097
 dt = 0

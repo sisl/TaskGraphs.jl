@@ -774,7 +774,8 @@ function get_task_sequences(N::Int,M::Int,assignments)
 end
 
 export
-    validate
+    validate,
+    sanity_check
 
 function validate(path::Path, msg::String)
     @assert( !any(convert_to_vertex_lists(path) .== -1), msg )
@@ -785,6 +786,42 @@ function validate(path::Path, v::Int)
 end
 function validate(path::Path, v::Int, cbs_env)
     validate(path, string("v = ",v,", path = ",convert_to_vertex_lists(path),", goal: ",cbs_env.goal))
+end
+function sanity_check(project_schedule::ProjectSchedule,append_string="")
+    G = get_graph(project_schedule)
+    try
+        @assert !is_cyclic(G) "is_cyclic(G)"
+        for (id,node) in project_schedule.planning_nodes
+            if typeof(node) <: COLLECT
+                @assert(get_location_id(node) != -1, string("get_location_id(node) != -1 for node id ", id))
+            end
+        end
+        for v in vertices(G)
+            node = get_node_from_vtx(project_schedule, v)
+            if isa(node,Operation)
+                input_ids = Set(map(o->get_id(get_object_id(o)),collect(node.pre)))
+                for v2 in inneighbors(G,v)
+                    node2 = get_node_from_vtx(project_schedule, v2)
+                    @assert(get_id(get_object_id(node2)) in input_ids, string(string(node2), " should not be an inneighbor of ",string(node), " whose inputs should be ",input_ids))
+                end
+                @assert(
+                    indegree(G,v) == length(node.pre),
+                    string("Operation ",string(node),
+                        " needs edges from objects ",collect(input_ids),
+                        " but only has edges from objects ",map(v2->get_id(get_object_id(get_node_from_vtx(project_schedule, v2))),inneighbors(G,v))
+                    )
+                    )
+            end
+        end
+    catch e
+        if typeof(e) <: AssertionError
+            print(string(e.msg, append_string))
+        else
+            throw(e)
+        end
+        return false
+    end
+    return true
 end
 function validate(project_schedule::ProjectSchedule)
     G = get_graph(project_schedule)
@@ -1937,7 +1974,7 @@ function formulate_schedule_milp(project_schedule::ProjectSchedule,problem_spec:
     sparsity_cost = @expression(model, (0.5/(nv(G)^2))*sum(X)) # cost term to encourage sparse X. Otherwise the solver may add pointless edges
     @objective(model, Min, cost1 + sparsity_cost)
     # @objective(model, Min, cost1 )
-    AdjacencyMILP(model) #, job_shop_variables
+    AdjacencyMILP(model=model) #, job_shop_variables
 end
 function formulate_milp(milp_model::AdjacencyMILP,project_schedule::ProjectSchedule,problem_spec::ProblemSpec;
     optimizer=Gurobi.Optimizer,
@@ -2274,7 +2311,8 @@ function construct_schedule_distance_matrix(project_schedule,problem_spec)
     for v in vertices(G)
         if outdegree(G,v) < n_eligible_successors[v]
             node = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v))
-            for v2 in non_upstream_vertices[v] # for v2 in vertices(G)
+            # for v2 in vertices(G)
+            for v2 in non_upstream_vertices[v]
                 if indegree(G,v2) < n_eligible_predecessors[v2]
                     node2 = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v2))
                     for (template, val) in missing_successors[v]
@@ -2333,6 +2371,16 @@ function select_next_edge(model,D,Ao,Ai)
         end
     end
     a,b
+    if a < 0 || b < 0
+        println("DEBUGGING edge selection for model ",typeof(model))
+        for v in Ai
+            node = get_node_from_vtx(model.schedule,v)
+            println(string("node ",string(node), " needs assignment"))
+            @show required_predecessors(node)
+            @show indegree(model.schedule,v)
+        end
+    end
+    a,b
 end
 
 function JuMP.optimize!(model::GreedyAssignment)
@@ -2349,7 +2397,8 @@ function JuMP.optimize!(model::GreedyAssignment)
     for v in topological_sort(G)
         update_greedy_sets!(model,G,C,Ai,Ao,v,n_required_predecessors,n_eligible_successors)
     end
-    while length(C) < nv(G)
+    # while length(C) < nv(G)
+    while length(Ai) > 0
         v,v2 = select_next_edge(model,D,Ao,Ai)
         setdiff!(Ao,v)
         setdiff!(Ai,v2)

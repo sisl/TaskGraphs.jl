@@ -6,86 +6,86 @@ shapes = [[1, 1], [1, 1], [1, 1], [1, 1], [1, 1], [1, 1], [1, 1], [1, 1], [1, 1]
 initial_conditions = [[1, 136], [2, 524], [3, 410], [4, 388], [5, 361], [6, 100], [7, 233], [8, 264], [9, 489], [10, 477], [11, 93], [12, 483], [13, 520], [14, 258], [15, 538], [16, 221], [17, 392], [18, 528], [19, 209], [20, 112], [21, 505], [22, 270], [23, 556], [24, 365], [25, 244]]
 
 [[operations]]
-pre = [[24, 379], [23, 251]]
+pre = [[23, 251], [24, 379]]
 post = [[25, 244]]
 station_id = 25
-id = 16961
+id = 1389
 dt = 0
 [[operations]]
 pre = [[21, 510], [22, 391]]
 post = [[23, 556]]
 station_id = 23
-id = 16962
+id = 1390
 dt = 0
 [[operations]]
 pre = [[20, 259]]
 post = [[24, 365]]
 station_id = 24
-id = 16963
+id = 1391
 dt = 0
 [[operations]]
-pre = [[17, 239], [19, 411], [18, 342]]
+pre = [[18, 342], [17, 239], [19, 411]]
 post = [[20, 112]]
 station_id = 20
-id = 16964
+id = 1392
 dt = 0
 [[operations]]
 pre = [[16, 111]]
 post = [[17, 392]]
 station_id = 17
-id = 16965
+id = 1393
 dt = 0
 [[operations]]
-pre = [[13, 502], [15, 399], [14, 56]]
+pre = [[13, 502], [14, 56], [15, 399]]
 post = [[22, 270]]
 station_id = 22
-id = 16966
+id = 1394
 dt = 0
 [[operations]]
 pre = [[12, 417]]
 post = [[19, 209]]
 station_id = 19
-id = 16967
+id = 1395
 dt = 0
 [[operations]]
-pre = [[9, 494], [10, 68], [11, 336]]
+pre = [[10, 68], [9, 494], [11, 336]]
 post = [[21, 505]]
 station_id = 21
-id = 16968
+id = 1396
 dt = 0
 [[operations]]
 pre = [[8, 476]]
 post = [[15, 538]]
 station_id = 15
-id = 16969
+id = 1397
 dt = 0
 [[operations]]
 pre = [[6, 234], [5, 247], [7, 86]]
 post = [[18, 528]]
 station_id = 18
-id = 16970
+id = 1398
 dt = 0
 [[operations]]
 pre = [[4, 506]]
 post = [[16, 221]]
 station_id = 16
-id = 16971
+id = 1399
 dt = 0
 [[operations]]
 pre = [[2, 531], [3, 222]]
 post = [[12, 483]]
 station_id = 12
-id = 16972
+id = 1400
 dt = 0
 [[operations]]
 pre = [[1, 366]]
 post = [[14, 258]]
 station_id = 14
-id = 16973
+id = 1401
 dt = 0
 [[operations]]
 pre = [[25, 271]]
 post = []
 station_id = -1
-id = 16974
+id = 1402
 dt = 0

@@ -9,41 +9,41 @@ initial_conditions = [[1, 550], [2, 57], [3, 380], [4, 388], [5, 108], [6, 556],
 pre = [[9, 222], [8, 506]]
 post = [[10, 215]]
 station_id = 10
-id = 15802
+id = 230
 dt = 0
 [[operations]]
-pre = [[7, 523], [6, 342]]
+pre = [[6, 342], [7, 523]]
 post = [[8, 505]]
 station_id = 8
-id = 15803
+id = 231
 dt = 0
 [[operations]]
 pre = [[5, 125]]
 post = [[9, 528]]
 station_id = 9
-id = 15804
+id = 232
 dt = 0
 [[operations]]
 pre = [[4, 234]]
 post = [[6, 556]]
 station_id = 6
-id = 15805
+id = 233
 dt = 0
 [[operations]]
 pre = [[2, 370], [3, 519]]
 post = [[7, 264]]
 station_id = 7
-id = 15806
+id = 234
 dt = 0
 [[operations]]
 pre = [[1, 488]]
 post = [[5, 108]]
 station_id = 5
-id = 15807
+id = 235
 dt = 0
 [[operations]]
 pre = [[10, 545]]
 post = []
 station_id = -1
-id = 15808
+id = 236
 dt = 0

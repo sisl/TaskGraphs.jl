@@ -688,6 +688,7 @@ function print_project_schedule(filename::String,project_schedule::ProjectSchedu
     # `inkscape -z project_schedule1.svg -e project_schedule1.png`
     # OR: `for f in *.svg; do inkscape -z $f -e $f.png; done`
 end
+print_project_schedule(filename::String,search_env::SearchEnv;kwargs...) = print_project_schedule(filename,search_env.schedule,search_env.cache;kwargs...)
 print_project_schedule(project_schedule::ProjectSchedule,filename::String;kwargs...) = print_project_schedule(filename,project_schedule)
 function print_project_schedule(project_schedule::ProjectSchedule,model,filename;mode=:root_aligned,verbose=true)
     rg = get_display_metagraph(project_schedule;

@@ -6,38 +6,38 @@ shapes = [[1, 1], [1, 1], [1, 1], [1, 1], [1, 1], [1, 1], [1, 1], [1, 1], [1, 1]
 initial_conditions = [[1, 398], [2, 538], [3, 495], [4, 404], [5, 118], [6, 63], [7, 483], [8, 75], [9, 513], [10, 349]]
 
 [[operations]]
-pre = [[9, 374], [8, 202]]
+pre = [[8, 202], [9, 374]]
 post = [[10, 349]]
 station_id = 10
-id = 15749
+id = 177
 dt = 0
 [[operations]]
 pre = [[7, 277]]
 post = [[9, 513]]
 station_id = 9
-id = 15750
+id = 178
 dt = 0
 [[operations]]
 pre = [[5, 259], [6, 411]]
 post = [[8, 75]]
 station_id = 8
-id = 15751
+id = 179
 dt = 0
 [[operations]]
 pre = [[3, 557], [4, 387]]
 post = [[7, 483]]
 station_id = 7
-id = 15752
+id = 180
 dt = 0
 [[operations]]
 pre = [[2, 86], [1, 399]]
 post = [[3, 495]]
 station_id = 3
-id = 15753
+id = 181
 dt = 0
 [[operations]]
 pre = [[10, 119]]
 post = []
 station_id = -1
-id = 15754
+id = 182
 dt = 0

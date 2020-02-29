@@ -9,71 +9,71 @@ initial_conditions = [[1, 85], [2, 528], [3, 369], [4, 244], [5, 225], [6, 349],
 pre = [[23, 411], [24, 557]]
 post = [[25, 544]]
 station_id = 25
-id = 17029
+id = 1457
 dt = 0
 [[operations]]
 pre = [[22, 82], [21, 482]]
 post = [[24, 100]]
 station_id = 24
-id = 17030
+id = 1458
 dt = 0
 [[operations]]
-pre = [[20, 265], [19, 391]]
+pre = [[19, 391], [20, 265]]
 post = [[21, 380]]
 station_id = 21
-id = 17031
+id = 1459
 dt = 0
 [[operations]]
 pre = [[18, 510]]
 post = [[20, 104]]
 station_id = 20
-id = 17032
+id = 1460
 dt = 0
 [[operations]]
-pre = [[17, 103], [16, 514]]
+pre = [[16, 514], [17, 103]]
 post = [[23, 483]]
 station_id = 23
-id = 17033
+id = 1461
 dt = 0
 [[operations]]
 pre = [[14, 342], [15, 519]]
 post = [[18, 130]]
 station_id = 18
-id = 17034
+id = 1462
 dt = 0
 [[operations]]
-pre = [[11, 399], [12, 68], [13, 234]]
+pre = [[12, 68], [13, 234], [11, 399]]
 post = [[17, 197]]
 station_id = 17
-id = 17035
+id = 1463
 dt = 0
 [[operations]]
 pre = [[9, 545], [10, 119], [8, 362]]
 post = [[19, 63]]
 station_id = 19
-id = 17036
+id = 1464
 dt = 0
 [[operations]]
-pre = [[5, 387], [7, 551], [6, 86]]
+pre = [[6, 86], [5, 387], [7, 551]]
 post = [[22, 136]]
 station_id = 22
-id = 17037
+id = 1465
 dt = 0
 [[operations]]
 pre = [[4, 226]]
 post = [[16, 75]]
 station_id = 16
-id = 17038
+id = 1466
 dt = 0
 [[operations]]
-pre = [[3, 111], [1, 107], [2, 488]]
+pre = [[2, 488], [3, 111], [1, 107]]
 post = [[14, 489]]
 station_id = 14
-id = 17039
+id = 1467
 dt = 0
 [[operations]]
 pre = [[25, 208]]
 post = []
 station_id = -1
-id = 17040
+id = 1468
 dt = 0

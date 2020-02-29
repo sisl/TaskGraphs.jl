@@ -261,10 +261,12 @@ let
     base_problem_dir    = joinpath(base_dir,"problem_instances")
     base_results_dir    = joinpath(base_dir,"results")
 
-    # run_replanner_profiling(:write;
-    #     problem_configs=problem_configs,
-    #     base_problem_dir=base_problem_dir,
-    #     )
+    reset_operation_id_counter!()
+    reset_action_id_counter!()
+    run_replanner_profiling(:write;
+        problem_configs=problem_configs,
+        base_problem_dir=base_problem_dir,
+        )
     modes = [:solve]
     for solver_config in solver_configs
         replanner_model = get(solver_config,:replan_model,  MergeAndBalance())
@@ -272,6 +274,8 @@ let
         results_dir     = get(solver_config,:results_dir,   joinpath(
             base_results_dir, string(typeof(replanner_model),"-",typeof(fallback_model))))
         for mode in modes
+            reset_operation_id_counter!()
+            reset_action_id_counter!()
             run_replanner_profiling(mode;
                 solver_config=solver_config,
                 problem_configs=problem_configs,

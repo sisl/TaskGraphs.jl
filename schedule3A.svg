@@ -3,7 +3,7 @@
      xmlns:xlink="http://www.w3.org/1999/xlink"
      xmlns:gadfly="http://www.gadflyjl.org/ns"
      version="1.2"
-     width="1060mm" height="140mm" viewBox="0 0 1060 140"
+     width="1340mm" height="390mm" viewBox="0 0 1340 390"
      stroke="none"
      fill="#000000"
      stroke-width="0.3"
@@ -14,1276 +14,3052 @@
     <path d="M0,0 L15,3.5 L0,7 z" stroke="context-stroke" fill="context-stroke"/>
   </marker>
 </defs>
-<g stroke="#000000" id="img-b3eb81ab-1">
-  <g transform="translate(30,20)">
+<g stroke="#000000" id="img-b5c49787-1">
+  <g transform="translate(30,380)">
     <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
   </g>
-  <g transform="translate(30,110)">
+  <g transform="translate(30,210)">
     <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
   </g>
-  <g transform="translate(30,50)">
+  <g transform="translate(1310,232.93)">
+    <path fill="none" d="M-6.23,-1.88 L 6.23 1.88" class="primitive"/>
+  </g>
+  <g transform="translate(1310,226.9)">
+    <path fill="none" d="M-6.23,1.88 L 6.23 -1.88" class="primitive"/>
+  </g>
+  <g transform="translate(1290,229.91)">
     <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
   </g>
-  <g transform="translate(1030,57.19)">
-    <path fill="none" d="M-7.17,-4.25 L 7.17 4.25" class="primitive"/>
-  </g>
-  <g transform="translate(1030,45.31)">
-    <path fill="none" d="M-7.17,4.25 L 7.17 -4.25" class="primitive"/>
-  </g>
-  <g transform="translate(1010,51.25)">
+  <g transform="translate(1270,229.91)">
     <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
   </g>
-  <g transform="translate(990,51.25)">
-    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  <g transform="translate(660,298.92)">
+    <path fill="none" d="M-495.81,80.4 L 495.81 -80.4" class="primitive"/>
   </g>
-  <g transform="translate(620,85.62)">
-    <path fill="none" d="M-155.96,33.51 L 155.96 -33.51" class="primitive"/>
-  </g>
-  <g transform="translate(450,122.5)">
-    <path fill="none" d="M-6.06,1.52 L 6.06 -1.52" class="primitive"/>
-  </g>
-  <g transform="translate(590,85.62)">
-    <path fill="none" d="M-146.1,38.35 L 146.1 -38.35" class="primitive"/>
-  </g>
-  <g transform="translate(430,125)">
-    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
-  </g>
-  <g transform="translate(410,125)">
-    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
-  </g>
-  <g transform="translate(670,40)">
-    <path fill="none" d="M-8.37,10.46 L 8.37 -10.46" class="primitive"/>
-  </g>
-  <g transform="translate(650,56.25)">
-    <path fill="none" d="M-6.48,2.43 L 6.48 -2.43" class="primitive"/>
-  </g>
-  <g transform="translate(690,53.12)">
-    <path fill="none" d="M-45.76,6.29 L 45.76 -6.29" class="primitive"/>
-  </g>
-  <g transform="translate(630,60)">
-    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
-  </g>
-  <g transform="translate(610,60)">
-    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
-  </g>
-  <g transform="translate(730,24.38)">
-    <path fill="none" d="M-6.27,1.96 L 6.27 -1.96" class="primitive"/>
-  </g>
-  <g transform="translate(730,36.88)">
-    <path fill="none" d="M-7.93,-7.43 L 7.93 7.43" class="primitive"/>
-  </g>
-  <g transform="translate(710,27.5)">
-    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
-  </g>
-  <g transform="translate(690,27.5)">
-    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
-  </g>
-  <g transform="translate(860,57.19)">
-    <path fill="none" d="M-16.22,4.81 L 16.22 -4.81" class="primitive"/>
-  </g>
-  <g transform="translate(830,57.19)">
-    <path fill="none" d="M-7.17,-4.25 L 7.17 4.25" class="primitive"/>
-  </g>
-  <g transform="translate(830,45.31)">
-    <path fill="none" d="M-7.17,4.25 L 7.17 -4.25" class="primitive"/>
-  </g>
-  <g transform="translate(810,51.25)">
-    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
-  </g>
-  <g transform="translate(790,51.25)">
-    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
-  </g>
-  <g transform="translate(960,57.19)">
-    <path fill="none" d="M-16.22,4.81 L 16.22 -4.81" class="primitive"/>
-  </g>
-  <g transform="translate(930,57.19)">
-    <path fill="none" d="M-7.17,-4.25 L 7.17 4.25" class="primitive"/>
-  </g>
-  <g transform="translate(930,45.31)">
-    <path fill="none" d="M-7.17,4.25 L 7.17 -4.25" class="primitive"/>
-  </g>
-  <g transform="translate(910,51.25)">
-    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
-  </g>
-  <g transform="translate(890,51.25)">
-    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
-  </g>
-  <g transform="translate(970,45.31)">
-    <path fill="none" d="M-7.17,-4.25 L 7.17 4.25" class="primitive"/>
-  </g>
-  <g transform="translate(870,45.31)">
-    <path fill="none" d="M-7.17,-4.25 L 7.17 4.25" class="primitive"/>
-  </g>
-  <g transform="translate(770,48.75)">
+  <g transform="translate(150,377.5)">
     <path fill="none" d="M-6.06,-1.52 L 6.06 1.52" class="primitive"/>
   </g>
-  <g transform="translate(220,117.5)">
-    <path fill="none" d="M-175.62,-7.32 L 175.62 7.32" class="primitive"/>
+  <g transform="translate(150,372.5)">
+    <path fill="none" d="M-6.06,1.52 L 6.06 -1.52" class="primitive"/>
   </g>
-  <g transform="translate(320,55)">
-    <path fill="none" d="M-275.6,-4.92 L 275.6 4.92" class="primitive"/>
-  </g>
-  <g transform="translate(360,23.75)">
-    <path fill="none" d="M-315.6,-3.7 L 315.6 3.7" class="primitive"/>
-  </g>
-  <g transform="translate(750,46.25)">
+  <g transform="translate(130,375)">
     <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
   </g>
-  <g transform="translate(850,39.38)">
+  <g transform="translate(110,375)">
     <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
   </g>
-  <g transform="translate(950,39.38)">
+  <g transform="translate(560,297.36)">
+    <path fill="none" d="M-296.04,71.68 L 296.04 -71.68" class="primitive"/>
+  </g>
+  <g transform="translate(250,367.5)">
+    <path fill="none" d="M-6.06,-1.52 L 6.06 1.52" class="primitive"/>
+  </g>
+  <g transform="translate(250,362.5)">
+    <path fill="none" d="M-6.06,1.52 L 6.06 -1.52" class="primitive"/>
+  </g>
+  <g transform="translate(230,365)">
     <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
   </g>
-  <g transform="translate(200,32.5)">
-    <path fill="none" d="M-135.6,-2.42 L 135.6 2.42" class="primitive"/>
+  <g transform="translate(210,365)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
   </g>
-  <g transform="translate(130,87.5)">
+  <g transform="translate(710,364.73)">
+    <path fill="none" d="M-6.31,2.05 L 6.31 -2.05" class="primitive"/>
+  </g>
+  <g transform="translate(710,373.71)">
+    <path fill="none" d="M-7.11,-4.08 L 7.11 4.08" class="primitive"/>
+  </g>
+  <g transform="translate(690,367.97)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(670,367.97)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(230,255)">
+    <path fill="none" d="M-9.45,-37.82 L 9.45 37.82" class="primitive"/>
+  </g>
+  <g transform="translate(470,297.23)">
+    <path fill="none" d="M-246.32,-81.02 L 246.32 81.02" class="primitive"/>
+  </g>
+  <g transform="translate(210,215)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(190,215)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(810,207.36)">
+    <path fill="none" d="M-6.6,2.72 L 6.6 -2.72" class="primitive"/>
+  </g>
+  <g transform="translate(810,215.61)">
+    <path fill="none" d="M-6.6,-2.72 L 6.6 2.72" class="primitive"/>
+  </g>
+  <g transform="translate(790,211.48)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(770,211.48)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(910,221.42)">
+    <path fill="none" d="M-6.33,2.1 L 6.33 -2.1" class="primitive"/>
+  </g>
+  <g transform="translate(910,228.04)">
+    <path fill="none" d="M-6.33,-2.1 L 6.33 2.1" class="primitive"/>
+  </g>
+  <g transform="translate(890,224.73)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(870,224.73)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(1010,193.72)">
+    <path fill="none" d="M-6.2,1.8 L 6.2 -1.8" class="primitive"/>
+  </g>
+  <g transform="translate(1010,199.53)">
+    <path fill="none" d="M-6.2,-1.8 L 6.2 1.8" class="primitive"/>
+  </g>
+  <g transform="translate(990,196.62)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(970,196.62)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(1110,204.73)">
+    <path fill="none" d="M-6.13,1.66 L 6.13 -1.66" class="primitive"/>
+  </g>
+  <g transform="translate(1110,210.13)">
+    <path fill="none" d="M-6.13,-1.66 L 6.13 1.66" class="primitive"/>
+  </g>
+  <g transform="translate(1090,207.43)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(1070,207.43)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(1210,215.24)">
+    <path fill="none" d="M-6.1,1.59 L 6.1 -1.59" class="primitive"/>
+  </g>
+  <g transform="translate(1210,220.44)">
+    <path fill="none" d="M-6.1,-1.59 L 6.1 1.59" class="primitive"/>
+  </g>
+  <g transform="translate(1190,217.84)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(1170,217.84)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(1250,226.48)">
+    <path fill="none" d="M-6.37,-2.19 L 6.37 2.19" class="primitive"/>
+  </g>
+  <g transform="translate(1150,215.34)">
+    <path fill="none" d="M-6.06,-1.52 L 6.06 1.52" class="primitive"/>
+  </g>
+  <g transform="translate(1050,204.93)">
+    <path fill="none" d="M-6.06,-1.52 L 6.06 1.52" class="primitive"/>
+  </g>
+  <g transform="translate(950,213.98)">
+    <path fill="none" d="M-8.78,15.25 L 8.78 -15.25" class="primitive"/>
+  </g>
+  <g transform="translate(850,222.23)">
+    <path fill="none" d="M-6.06,-1.52 L 6.06 1.52" class="primitive"/>
+  </g>
+  <g transform="translate(750,295.47)">
+    <path fill="none" d="M-9.74,81.79 L 9.74 -81.79" class="primitive"/>
+  </g>
+  <g transform="translate(470,363.98)">
+    <path fill="none" d="M-185.6,-3.89 L 185.6 3.89" class="primitive"/>
+  </g>
+  <g transform="translate(110,212.5)">
+    <path fill="none" d="M-65.61,-2.34 L 65.61 2.34" class="primitive"/>
+  </g>
+  <g transform="translate(190,367.5)">
+    <path fill="none" d="M-6.06,1.52 L 6.06 -1.52" class="primitive"/>
+  </g>
+  <g transform="translate(70,377.5)">
     <path fill="none" d="M-25.66,2.14 L 25.66 -2.14" class="primitive"/>
   </g>
-  <g transform="translate(110,77.5)">
+  <g transform="translate(170,370)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(270,360)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(730,379.45)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(830,219.73)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(930,231.35)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(1030,202.43)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(1130,212.84)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(1230,223.04)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(140,362.5)">
+    <path fill="none" d="M-55.62,-2.32 L 55.62 2.32" class="primitive"/>
+  </g>
+  <g transform="translate(520,193.31)">
+    <path fill="none" d="M-435.6,-3.28 L 435.6 3.28" class="primitive"/>
+  </g>
+  <g transform="translate(420,205.74)">
+    <path fill="none" d="M-335.6,-5.67 L 335.6 5.67" class="primitive"/>
+  </g>
+  <g transform="translate(90,372.5)">
     <path fill="none" d="M-6.06,-1.52 L 6.06 1.52" class="primitive"/>
   </g>
-  <g transform="translate(110,72.5)">
+  <g transform="translate(330,355.47)">
+    <path fill="none" d="M-245.6,-5.37 L 245.6 5.37" class="primitive"/>
+  </g>
+  <g transform="translate(270,345.62)">
+    <path fill="none" d="M-105.74,13.82 L 105.74 -13.82" class="primitive"/>
+  </g>
+  <g transform="translate(280,346.56)">
+    <path fill="none" d="M-195.61,-6.42 L 195.61 6.42" class="primitive"/>
+  </g>
+  <g transform="translate(130,285)">
+    <path fill="none" d="M-45.69,-4.57 L 45.69 4.57" class="primitive"/>
+  </g>
+  <g transform="translate(180,313.75)">
+    <path fill="none" d="M-95.61,-3.59 L 95.61 3.59" class="primitive"/>
+  </g>
+  <g transform="translate(170,272.5)">
+    <path fill="none" d="M-9.62,55.31 L 9.62 -55.31" class="primitive"/>
+  </g>
+  <g transform="translate(110,15)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(30,130)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(70,310)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(50,60)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(310,317.5)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(70,267.5)">
     <path fill="none" d="M-6.06,1.52 L 6.06 -1.52" class="primitive"/>
   </g>
-  <g transform="translate(130,97.5)">
-    <path fill="none" d="M-105.6,2.4 L 105.6 -2.4" class="primitive"/>
+  <g transform="translate(30,370)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(50,280)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(30,190)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(180,303.75)">
+    <path fill="none" d="M-55.78,-8.13 L 55.78 8.13" class="primitive"/>
+  </g>
+  <g transform="translate(130,292.5)">
+    <path fill="none" d="M-6.06,1.52 L 6.06 -1.52" class="primitive"/>
+  </g>
+  <g transform="translate(150,360)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(70,130)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(50,370)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(50,40)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(30,350)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(30,340)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(50,160)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(250,312.5)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(50,270)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(30,140)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(430,339.69)">
+    <path fill="none" d="M-7.76,-6.54 L 7.76 6.54" class="primitive"/>
+  </g>
+  <g transform="translate(430,327.81)">
+    <path fill="none" d="M-6.37,2.19 L 6.37 -2.19" class="primitive"/>
+  </g>
+  <g transform="translate(30,330)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(30,310)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
   </g>
   <g transform="translate(30,70)">
     <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
   </g>
-  <g transform="translate(410,107.5)">
-    <path fill="none" d="M-6.06,1.52 L 6.06 -1.52" class="primitive"/>
-  </g>
-  <g transform="translate(330,105)">
+  <g transform="translate(50,100)">
     <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
   </g>
-  <g transform="translate(250,95)">
+  <g transform="translate(90,15)">
     <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
   </g>
-  <g transform="translate(350,35)">
+  <g transform="translate(30,270)">
     <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
   </g>
-  <g transform="translate(90,75)">
+  <g transform="translate(30,170)">
     <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
   </g>
-  <g transform="translate(310,102.5)">
-    <path fill="none" d="M-6.06,-1.52 L 6.06 1.52" class="primitive"/>
-  </g>
-  <g transform="translate(330,82.5)">
-    <path fill="none" d="M-146.06,-36.52 L 146.06 36.52" class="primitive"/>
-  </g>
-  <g transform="translate(190,42.5)">
-    <path fill="none" d="M-6.06,1.52 L 6.06 -1.52" class="primitive"/>
-  </g>
-  <g transform="translate(130,80)">
+  <g transform="translate(50,190)">
     <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
   </g>
-  <g transform="translate(530,55)">
+  <g transform="translate(50,200)">
     <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
   </g>
-  <g transform="translate(70,75)">
+  <g transform="translate(600,263.72)">
+    <path fill="none" d="M-455.73,55.76 L 455.73 -55.76" class="primitive"/>
+  </g>
+  <g transform="translate(450,348.12)">
     <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
   </g>
-  <g transform="translate(150,82.5)">
-    <path fill="none" d="M-6.06,-1.52 L 6.06 1.52" class="primitive"/>
-  </g>
-  <g transform="translate(450,105)">
+  <g transform="translate(70,120)">
     <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
   </g>
-  <g transform="translate(50,10)">
+  <g transform="translate(30,280)">
     <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
   </g>
-  <g transform="translate(40,77.5)">
-    <path fill="none" d="M-15.73,1.97 L 15.73 -1.97" class="primitive"/>
-  </g>
-  <g transform="translate(570,50)">
-    <path fill="none" d="M-6.89,3.44 L 6.89 -3.44" class="primitive"/>
-  </g>
-  <g transform="translate(570,60)">
-    <path fill="none" d="M-6.89,-3.44 L 6.89 3.44" class="primitive"/>
-  </g>
-  <g transform="translate(170,45)">
+  <g transform="translate(50,20)">
     <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
   </g>
-  <g transform="translate(190,85)">
+  <g transform="translate(30,20)">
     <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
   </g>
-  <g transform="translate(50,90)">
+  <g transform="translate(70,150)">
     <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
   </g>
-  <g transform="translate(470,102.5)">
-    <path fill="none" d="M-6.06,1.52 L 6.06 -1.52" class="primitive"/>
+  <g transform="translate(650,368.44)">
+    <path fill="none" d="M-5.62,0.26 L 5.62 -0.26" class="primitive"/>
   </g>
-  <g transform="translate(470,112.5)">
-    <path fill="none" d="M-7.56,-5.67 L 7.56 5.67" class="primitive"/>
-  </g>
-  <g transform="translate(590,62.5)">
-    <path fill="none" d="M-6.06,1.52 L 6.06 -1.52" class="primitive"/>
-  </g>
-  <g transform="translate(130,57.5)">
-    <path fill="none" d="M-8.37,10.46 L 8.37 -10.46" class="primitive"/>
-  </g>
-  <g transform="translate(270,95)">
+  <g transform="translate(50,80)">
     <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
   </g>
-  <g transform="translate(290,97.5)">
-    <path fill="none" d="M-6.06,-1.52 L 6.06 1.52" class="primitive"/>
-  </g>
-  <g transform="translate(290,92.5)">
-    <path fill="none" d="M-6.06,1.52 L 6.06 -1.52" class="primitive"/>
-  </g>
-  <g transform="translate(50,72.5)">
-    <path fill="none" d="M-6.06,-1.52 L 6.06 1.52" class="primitive"/>
-  </g>
-  <g transform="translate(390,100)">
+  <g transform="translate(90,325)">
     <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(70,200)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(50,360)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(70,170)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(70,180)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(110,265)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(30,220)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(570,362.5)">
+    <path fill="none" d="M-5.8,0.91 L 5.8 -0.91" class="primitive"/>
   </g>
   <g transform="translate(50,30)">
     <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
   </g>
-  <g transform="translate(410,102.5)">
+  <g transform="translate(70,17.5)">
+    <path fill="none" d="M-6.06,1.52 L 6.06 -1.52" class="primitive"/>
+  </g>
+  <g transform="translate(70,297.5)">
+    <path fill="none" d="M-6.06,1.52 L 6.06 -1.52" class="primitive"/>
+  </g>
+  <g transform="translate(70,40)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(90,295)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(50,220)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(410,331.25)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(90,225)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(50,227.5)">
+    <path fill="none" d="M-25.66,2.14 L 25.66 -2.14" class="primitive"/>
+  </g>
+  <g transform="translate(30,180)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(210,290)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(70,340)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(190,290)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(550,364.06)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(630,364.92)">
+    <path fill="none" d="M-6.56,-2.61 L 6.56 2.61" class="primitive"/>
+  </g>
+  <g transform="translate(630,356.95)">
+    <path fill="none" d="M-6.56,2.61 L 6.56 -2.61" class="primitive"/>
+  </g>
+  <g transform="translate(30,100)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(30,40)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(510,353.12)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(50,130)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(70,30)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(50,70)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(70,222.5)">
     <path fill="none" d="M-6.06,-1.52 L 6.06 1.52" class="primitive"/>
   </g>
-  <g transform="translate(90,90)">
+  <g transform="translate(30,200)">
     <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
   </g>
-  <g transform="translate(30,90)">
+  <g transform="translate(110,225)">
     <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
   </g>
-  <g transform="translate(350,105)">
+  <g transform="translate(70,190)">
     <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
   </g>
-  <g transform="translate(430,105)">
+  <g transform="translate(70,80)">
     <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
   </g>
-  <g transform="translate(370,75)">
-    <path fill="none" d="M-9.45,-37.82 L 9.45 37.82" class="primitive"/>
-  </g>
-  <g transform="translate(150,45)">
-    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
-  </g>
-  <g transform="translate(310,90)">
-    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
-  </g>
-  <g transform="translate(370,102.5)">
-    <path fill="none" d="M-6.06,1.52 L 6.06 -1.52" class="primitive"/>
-  </g>
-  <g transform="translate(370,117.5)">
-    <path fill="none" d="M-8.37,-10.46 L 8.37 10.46" class="primitive"/>
-  </g>
-  <g transform="translate(210,82.5)">
-    <path fill="none" d="M-6.06,1.52 L 6.06 -1.52" class="primitive"/>
-  </g>
-  <g transform="translate(210,87.5)">
-    <path fill="none" d="M-6.06,-1.52 L 6.06 1.52" class="primitive"/>
-  </g>
-  <g transform="translate(170,82.5)">
-    <path fill="none" d="M-145.79,-21.87 L 145.79 21.87" class="primitive"/>
-  </g>
-  <g transform="translate(230,92.5)">
-    <path fill="none" d="M-6.06,-1.52 L 6.06 1.52" class="primitive"/>
-  </g>
-  <g transform="translate(390,112.5)">
-    <path fill="none" d="M-6.06,1.52 L 6.06 -1.52" class="primitive"/>
-  </g>
-  <g transform="translate(430,117.5)">
-    <path fill="none" d="M-45.62,-2.28 L 45.62 2.28" class="primitive"/>
-  </g>
-  <g transform="translate(70,90)">
-    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
-  </g>
-  <g transform="translate(390,127.5)">
-    <path fill="none" d="M-6.06,1.52 L 6.06 -1.52" class="primitive"/>
-  </g>
-  <g transform="translate(490,120)">
+  <g transform="translate(90,245)">
     <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
   </g>
   <g transform="translate(30,30)">
     <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
   </g>
-  <g transform="translate(330,62.5)">
+  <g transform="translate(30,80)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(50,250)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(50,180)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(30,50)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(70,327.5)">
+    <path fill="none" d="M-6.06,1.52 L 6.06 -1.52" class="primitive"/>
+  </g>
+  <g transform="translate(530,347.66)">
+    <path fill="none" d="M-7.03,3.85 L 7.03 -3.85" class="primitive"/>
+  </g>
+  <g transform="translate(530,358.59)">
+    <path fill="none" d="M-7.03,-3.85 L 7.03 3.85" class="primitive"/>
+  </g>
+  <g transform="translate(470,350.62)">
+    <path fill="none" d="M-6.06,-1.52 L 6.06 1.52" class="primitive"/>
+  </g>
+  <g transform="translate(70,247.5)">
+    <path fill="none" d="M-6.06,1.52 L 6.06 -1.52" class="primitive"/>
+  </g>
+  <g transform="translate(150,345)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(70,60)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(30,120)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(50,340)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(50,330)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(50,322.5)">
+    <path fill="none" d="M-25.66,-2.14 L 25.66 2.14" class="primitive"/>
+  </g>
+  <g transform="translate(850,277.14)">
+    <path fill="none" d="M-405.71,46.74 L 405.71 -46.74" class="primitive"/>
+  </g>
+  <g transform="translate(110,325)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(350,326.25)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(50,242.5)">
+    <path fill="none" d="M-25.66,-2.14 L 25.66 2.14" class="primitive"/>
+  </g>
+  <g transform="translate(590,360.94)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(70,370)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(50,170)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(490,353.12)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(70,160)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(150,330)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(290,317.5)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(30,60)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(30,110)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(110,245)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(50,12.5)">
+    <path fill="none" d="M-25.66,-2.14 L 25.66 2.14" class="primitive"/>
+  </g>
+  <g transform="translate(50,50)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(50,150)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(280,296.56)">
+    <path fill="none" d="M-156.3,-50.37 L 156.3 50.37" class="primitive"/>
+  </g>
+  <g transform="translate(130,287.5)">
+    <path fill="none" d="M-9.49,-40.32 L 9.49 40.32" class="primitive"/>
+  </g>
+  <g transform="translate(30,250)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(50,262.5)">
+    <path fill="none" d="M-25.66,-2.14 L 25.66 2.14" class="primitive"/>
+  </g>
+  <g transform="translate(70,350)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(50,350)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(130,292.5)">
+    <path fill="none" d="M-9.21,-25.34 L 9.21 25.34" class="primitive"/>
+  </g>
+  <g transform="translate(130,305)">
+    <path fill="none" d="M-9.45,-37.82 L 9.45 37.82" class="primitive"/>
+  </g>
+  <g transform="translate(70,280)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(50,140)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(390,331.25)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(70,100)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(90,265)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(70,70)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(50,310)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(50,90)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(280,286.56)">
+    <path fill="none" d="M-156.51,-60.22 L 156.51 60.22" class="primitive"/>
+  </g>
+  <g transform="translate(130,222.5)">
+    <path fill="none" d="M-6.06,1.52 L 6.06 -1.52" class="primitive"/>
+  </g>
+  <g transform="translate(330,321.88)">
+    <path fill="none" d="M-6.69,-2.93 L 6.69 2.93" class="primitive"/>
+  </g>
+  <g transform="translate(330,313.12)">
+    <path fill="none" d="M-6.69,2.93 L 6.69 -2.93" class="primitive"/>
+  </g>
+  <g transform="translate(170,317.5)">
     <path fill="none" d="M-9.21,25.34 L 9.21 -25.34" class="primitive"/>
   </g>
-  <g transform="translate(80,42.5)">
-    <path fill="none" d="M-55.62,-2.32 L 55.62 2.32" class="primitive"/>
-  </g>
-  <g transform="translate(170,85)">
+  <g transform="translate(50,120)">
     <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
   </g>
-  <g transform="translate(550,55)">
+  <g transform="translate(50,110)">
     <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
   </g>
-  <g transform="translate(510,87.5)">
-    <path fill="none" d="M-9.33,30.33 L 9.33 -30.33" class="primitive"/>
-  </g>
-  <g transform="translate(30,10)">
+  <g transform="translate(30,300)">
     <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
   </g>
-  <g transform="translate(360,47.5)">
-    <path fill="none" d="M-155.62,-7.29 L 155.62 7.29" class="primitive"/>
+  <g transform="translate(30,150)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
   </g>
+  <g transform="translate(70,50)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(30,90)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(30,160)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(270,315)">
+    <path fill="none" d="M-6.06,-1.52 L 6.06 1.52" class="primitive"/>
+  </g>
+  <g transform="translate(70,360)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(230,301.25)">
+    <path fill="none" d="M-8.21,-9.24 L 8.21 9.24" class="primitive"/>
+  </g>
+  <g transform="translate(230,286.25)">
+    <path fill="none" d="M-6.48,2.43 L 6.48 -2.43" class="primitive"/>
+  </g>
+  <g transform="translate(70,90)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(50,300)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(30,360)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(610,360.94)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(130,342.5)">
+    <path fill="none" d="M-8.79,-15.38 L 8.79 15.38" class="primitive"/>
+  </g>
+  <g transform="translate(130,335)">
+    <path fill="none" d="M-8.03,-8.03 L 8.03 8.03" class="primitive"/>
+  </g>
+  <g transform="translate(50,292.5)">
+    <path fill="none" d="M-25.66,-2.14 L 25.66 2.14" class="primitive"/>
+  </g>
+  <g transform="translate(110,295)">
+    <path fill="none" d="M-5.6,0 L 5.6 0" class="primitive"/>
+  </g>
+  <g transform="translate(370,328.75)">
+    <path fill="none" d="M-6.06,-1.52 L 6.06 1.52" class="primitive"/>
+  </g>
+  <g transform="translate(130,162.5)">
+    <path fill="none" d="M-9.85,-145.3 L 9.85 145.3" class="primitive"/>
+  </g>
+  <g transform="translate(130,157.5)">
+    <path fill="none" d="M-9.85,-140.3 L 9.85 140.3" class="primitive"/>
+  </g>
+</g>
+<g fill="#FF0000" id="img-b5c49787-2">
+  <g transform="translate(20,380)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#FF0000" id="img-b5c49787-3">
+  <g transform="translate(20,210)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
 </g>
-<g fill="#FF0000" id="img-b3eb81ab-2">
-  <g transform="translate(20,20)">
+<g fill="#00FFFF" id="img-b5c49787-4">
+  <g transform="translate(1320,235.95)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#FF0000" id="img-b3eb81ab-3">
-  <g transform="translate(20,110)">
+<g fill="#00FFFF" id="img-b5c49787-5">
+  <g transform="translate(1300,229.91)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#FF0000" id="img-b3eb81ab-4">
-  <g transform="translate(20,50)">
+<g fill="#00FFFF" id="img-b5c49787-6">
+  <g transform="translate(1280,229.91)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#00FFFF" id="img-b3eb81ab-5">
-  <g transform="translate(1040,63.12)">
+<g fill="#00FFFF" id="img-b5c49787-7">
+  <g transform="translate(1260,229.91)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#00FFFF" id="img-b3eb81ab-6">
-  <g transform="translate(1020,51.25)">
+<g fill="#00FFFF" id="img-b5c49787-8">
+  <g transform="translate(160,380)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#00FFFF" id="img-b3eb81ab-7">
-  <g transform="translate(1000,51.25)">
+<g fill="#00FFFF" id="img-b5c49787-9">
+  <g transform="translate(140,375)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#00FFFF" id="img-b3eb81ab-8">
-  <g transform="translate(980,51.25)">
+<g fill="#00FFFF" id="img-b5c49787-10">
+  <g transform="translate(120,375)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#00FFFF" id="img-b3eb81ab-9">
-  <g transform="translate(460,120)">
+<g fill="#00FFFF" id="img-b5c49787-11">
+  <g transform="translate(100,375)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#00FFFF" id="img-b3eb81ab-10">
-  <g transform="translate(440,125)">
+<g fill="#00FFFF" id="img-b5c49787-12">
+  <g transform="translate(260,370)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#00FFFF" id="img-b3eb81ab-11">
-  <g transform="translate(420,125)">
+<g fill="#00FFFF" id="img-b5c49787-13">
+  <g transform="translate(240,365)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#00FFFF" id="img-b3eb81ab-12">
-  <g transform="translate(400,125)">
+<g fill="#00FFFF" id="img-b5c49787-14">
+  <g transform="translate(220,365)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#00FFFF" id="img-b3eb81ab-13">
-  <g transform="translate(660,52.5)">
+<g fill="#00FFFF" id="img-b5c49787-15">
+  <g transform="translate(200,365)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#00FFFF" id="img-b3eb81ab-14">
-  <g transform="translate(640,60)">
+<g fill="#00FFFF" id="img-b5c49787-16">
+  <g transform="translate(720,361.48)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#00FFFF" id="img-b3eb81ab-15">
-  <g transform="translate(620,60)">
+<g fill="#00FFFF" id="img-b5c49787-17">
+  <g transform="translate(700,367.97)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#00FFFF" id="img-b3eb81ab-16">
-  <g transform="translate(600,60)">
+<g fill="#00FFFF" id="img-b5c49787-18">
+  <g transform="translate(680,367.97)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#00FFFF" id="img-b3eb81ab-17">
-  <g transform="translate(740,21.25)">
+<g fill="#00FFFF" id="img-b5c49787-19">
+  <g transform="translate(660,367.97)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#00FFFF" id="img-b3eb81ab-18">
-  <g transform="translate(720,27.5)">
+<g fill="#00FFFF" id="img-b5c49787-20">
+  <g transform="translate(240,295)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#00FFFF" id="img-b3eb81ab-19">
-  <g transform="translate(700,27.5)">
+<g fill="#00FFFF" id="img-b5c49787-21">
+  <g transform="translate(220,215)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#00FFFF" id="img-b3eb81ab-20">
-  <g transform="translate(680,27.5)">
+<g fill="#00FFFF" id="img-b5c49787-22">
+  <g transform="translate(200,215)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#00FFFF" id="img-b3eb81ab-21">
-  <g transform="translate(840,63.12)">
+<g fill="#00FFFF" id="img-b5c49787-23">
+  <g transform="translate(180,215)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#00FFFF" id="img-b3eb81ab-22">
-  <g transform="translate(820,51.25)">
+<g fill="#00FFFF" id="img-b5c49787-24">
+  <g transform="translate(820,203.24)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#00FFFF" id="img-b3eb81ab-23">
-  <g transform="translate(800,51.25)">
+<g fill="#00FFFF" id="img-b5c49787-25">
+  <g transform="translate(800,211.48)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#00FFFF" id="img-b3eb81ab-24">
-  <g transform="translate(780,51.25)">
+<g fill="#00FFFF" id="img-b5c49787-26">
+  <g transform="translate(780,211.48)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#00FFFF" id="img-b3eb81ab-25">
-  <g transform="translate(940,63.12)">
+<g fill="#00FFFF" id="img-b5c49787-27">
+  <g transform="translate(760,211.48)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#00FFFF" id="img-b3eb81ab-26">
-  <g transform="translate(920,51.25)">
+<g fill="#00FFFF" id="img-b5c49787-28">
+  <g transform="translate(920,218.11)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#00FFFF" id="img-b3eb81ab-27">
-  <g transform="translate(900,51.25)">
+<g fill="#00FFFF" id="img-b5c49787-29">
+  <g transform="translate(900,224.73)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#00FFFF" id="img-b3eb81ab-28">
-  <g transform="translate(880,51.25)">
+<g fill="#00FFFF" id="img-b5c49787-30">
+  <g transform="translate(880,224.73)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#FFA500" id="img-b3eb81ab-29">
-  <g transform="translate(960,39.38)">
+<g fill="#00FFFF" id="img-b5c49787-31">
+  <g transform="translate(860,224.73)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#FFA500" id="img-b3eb81ab-30">
-  <g transform="translate(860,39.38)">
+<g fill="#00FFFF" id="img-b5c49787-32">
+  <g transform="translate(1020,190.81)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#FFA500" id="img-b3eb81ab-31">
-  <g transform="translate(760,46.25)">
+<g fill="#00FFFF" id="img-b5c49787-33">
+  <g transform="translate(1000,196.62)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#FFA500" id="img-b3eb81ab-32">
-  <g transform="translate(40,110)">
+<g fill="#00FFFF" id="img-b5c49787-34">
+  <g transform="translate(980,196.62)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#FFA500" id="img-b3eb81ab-33">
-  <g transform="translate(40,50)">
+<g fill="#00FFFF" id="img-b5c49787-35">
+  <g transform="translate(960,196.62)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#FFA500" id="img-b3eb81ab-34">
-  <g transform="translate(40,20)">
+<g fill="#00FFFF" id="img-b5c49787-36">
+  <g transform="translate(1120,202.03)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#FF0000" id="img-b3eb81ab-35">
-  <g transform="translate(1040,39.38)">
+<g fill="#00FFFF" id="img-b5c49787-37">
+  <g transform="translate(1100,207.43)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#FF0000" id="img-b3eb81ab-36">
-  <g transform="translate(740,46.25)">
+<g fill="#00FFFF" id="img-b5c49787-38">
+  <g transform="translate(1080,207.43)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#FF0000" id="img-b3eb81ab-37">
-  <g transform="translate(840,39.38)">
+<g fill="#00FFFF" id="img-b5c49787-39">
+  <g transform="translate(1060,207.43)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#FF0000" id="img-b3eb81ab-38">
-  <g transform="translate(940,39.38)">
+<g fill="#00FFFF" id="img-b5c49787-40">
+  <g transform="translate(1220,212.63)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#00FFFF" id="img-b3eb81ab-39">
-  <g transform="translate(60,10)">
+<g fill="#00FFFF" id="img-b5c49787-41">
+  <g transform="translate(1200,217.84)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#00FFFF" id="img-b3eb81ab-40">
-  <g transform="translate(60,30)">
+<g fill="#00FFFF" id="img-b5c49787-42">
+  <g transform="translate(1180,217.84)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#00FFFF" id="img-b3eb81ab-41">
-  <g transform="translate(100,90)">
+<g fill="#00FFFF" id="img-b5c49787-43">
+  <g transform="translate(1160,217.84)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#00FFFF" id="img-b3eb81ab-42">
-  <g transform="translate(100,75)">
+<g fill="#FFA500" id="img-b5c49787-44">
+  <g transform="translate(1240,223.04)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#FF0000" id="img-b3eb81ab-43">
-  <g transform="translate(220,80)">
+<g fill="#FFA500" id="img-b5c49787-45">
+  <g transform="translate(1140,212.84)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#FF0000" id="img-b3eb81ab-44">
-  <g transform="translate(580,45)">
+<g fill="#FFA500" id="img-b5c49787-46">
+  <g transform="translate(1040,202.43)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#00FFFF" id="img-b3eb81ab-45">
-  <g transform="translate(480,100)">
+<g fill="#FFA500" id="img-b5c49787-47">
+  <g transform="translate(940,231.35)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#FFA500" id="img-b3eb81ab-46">
-  <g transform="translate(20,100)">
+<g fill="#FFA500" id="img-b5c49787-48">
+  <g transform="translate(840,219.73)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#00FF00" id="img-b3eb81ab-47">
-  <g transform="translate(20,70)">
+<g fill="#FFA500" id="img-b5c49787-49">
+  <g transform="translate(740,379.45)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#00FFFF" id="img-b3eb81ab-48">
-  <g transform="translate(400,110)">
+<g fill="#FFA500" id="img-b5c49787-50">
+  <g transform="translate(280,360)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#00FFFF" id="img-b3eb81ab-49">
-  <g transform="translate(320,105)">
+<g fill="#FFA500" id="img-b5c49787-51">
+  <g transform="translate(40,210)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#00FFFF" id="img-b3eb81ab-50">
-  <g transform="translate(240,95)">
+<g fill="#FFA500" id="img-b5c49787-52">
+  <g transform="translate(180,370)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#00FFFF" id="img-b3eb81ab-51">
-  <g transform="translate(340,35)">
+<g fill="#FFA500" id="img-b5c49787-53">
+  <g transform="translate(40,380)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#00FFFF" id="img-b3eb81ab-52">
-  <g transform="translate(80,75)">
+<g fill="#FF0000" id="img-b5c49787-54">
+  <g transform="translate(1320,223.88)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#00FFFF" id="img-b3eb81ab-53">
-  <g transform="translate(300,100)">
+<g fill="#FF0000" id="img-b5c49787-55">
+  <g transform="translate(160,370)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#00FFFF" id="img-b3eb81ab-54">
-  <g transform="translate(180,45)">
+<g fill="#FF0000" id="img-b5c49787-56">
+  <g transform="translate(260,360)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#FF0000" id="img-b3eb81ab-55">
-  <g transform="translate(120,80)">
+<g fill="#FF0000" id="img-b5c49787-57">
+  <g transform="translate(720,379.45)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#00FFFF" id="img-b3eb81ab-56">
-  <g transform="translate(520,55)">
+<g fill="#FF0000" id="img-b5c49787-58">
+  <g transform="translate(820,219.73)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#00FFFF" id="img-b3eb81ab-57">
-  <g transform="translate(60,75)">
+<g fill="#FF0000" id="img-b5c49787-59">
+  <g transform="translate(920,231.35)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#FFA500" id="img-b3eb81ab-58">
-  <g transform="translate(140,80)">
+<g fill="#FF0000" id="img-b5c49787-60">
+  <g transform="translate(1020,202.43)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#00FFFF" id="img-b3eb81ab-59">
-  <g transform="translate(440,105)">
+<g fill="#FF0000" id="img-b5c49787-61">
+  <g transform="translate(1120,212.84)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#00FFFF" id="img-b3eb81ab-60">
-  <g transform="translate(40,10)">
+<g fill="#FF0000" id="img-b5c49787-62">
+  <g transform="translate(1220,223.04)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#FFA500" id="img-b3eb81ab-61">
-  <g transform="translate(20,80)">
+<g fill="#00FFFF" id="img-b5c49787-63">
+  <g transform="translate(80,180)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#00FFFF" id="img-b3eb81ab-62">
-  <g transform="translate(560,55)">
+<g fill="#00FFFF" id="img-b5c49787-64">
+  <g transform="translate(80,360)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#00FFFF" id="img-b3eb81ab-63">
-  <g transform="translate(160,45)">
+<g fill="#00FFFF" id="img-b5c49787-65">
+  <g transform="translate(80,170)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#00FFFF" id="img-b3eb81ab-64">
-  <g transform="translate(180,85)">
+<g fill="#00FFFF" id="img-b5c49787-66">
+  <g transform="translate(80,190)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#00FFFF" id="img-b3eb81ab-65">
-  <g transform="translate(40,90)">
+<g fill="#00FFFF" id="img-b5c49787-67">
+  <g transform="translate(80,200)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#00FFFF" id="img-b3eb81ab-66">
-  <g transform="translate(460,105)">
+<g fill="#00FFFF" id="img-b5c49787-68">
+  <g transform="translate(80,160)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#00FFFF" id="img-b3eb81ab-67">
-  <g transform="translate(580,65)">
+<g fill="#00FFFF" id="img-b5c49787-69">
+  <g transform="translate(80,150)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#00FFFF" id="img-b3eb81ab-68">
-  <g transform="translate(120,70)">
+<g fill="#00FFFF" id="img-b5c49787-70">
+  <g transform="translate(60,140)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#00FFFF" id="img-b3eb81ab-69">
-  <g transform="translate(260,95)">
+<g fill="#00FFFF" id="img-b5c49787-71">
+  <g transform="translate(80,130)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#00FFFF" id="img-b3eb81ab-70">
-  <g transform="translate(280,95)">
+<g fill="#00FFFF" id="img-b5c49787-72">
+  <g transform="translate(80,120)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#00FFFF" id="img-b3eb81ab-71">
-  <g transform="translate(40,70)">
+<g fill="#00FFFF" id="img-b5c49787-73">
+  <g transform="translate(80,370)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#FF0000" id="img-b3eb81ab-72">
-  <g transform="translate(380,100)">
+<g fill="#00FFFF" id="img-b5c49787-74">
+  <g transform="translate(60,110)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#00FFFF" id="img-b3eb81ab-73">
-  <g transform="translate(40,30)">
+<g fill="#00FFFF" id="img-b5c49787-75">
+  <g transform="translate(80,100)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#FFA500" id="img-b3eb81ab-74">
-  <g transform="translate(400,100)">
+<g fill="#00FFFF" id="img-b5c49787-76">
+  <g transform="translate(80,350)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#00FFFF" id="img-b3eb81ab-75">
+<g fill="#00FFFF" id="img-b5c49787-77">
   <g transform="translate(80,90)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#00FF00" id="img-b3eb81ab-76">
-  <g transform="translate(20,90)">
+<g fill="#00FFFF" id="img-b5c49787-78">
+  <g transform="translate(80,80)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#00FFFF" id="img-b3eb81ab-77">
-  <g transform="translate(340,105)">
+<g fill="#00FFFF" id="img-b5c49787-79">
+  <g transform="translate(80,70)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#00FFFF" id="img-b3eb81ab-78">
-  <g transform="translate(420,105)">
+<g fill="#00FFFF" id="img-b5c49787-80">
+  <g transform="translate(160,360)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#00FFFF" id="img-b3eb81ab-79">
-  <g transform="translate(360,35)">
+<g fill="#00FFFF" id="img-b5c49787-81">
+  <g transform="translate(80,60)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#00FFFF" id="img-b3eb81ab-80">
-  <g transform="translate(140,45)">
+<g fill="#00FFFF" id="img-b5c49787-82">
+  <g transform="translate(80,50)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#FF0000" id="img-b3eb81ab-81">
-  <g transform="translate(300,90)">
+<g fill="#00FFFF" id="img-b5c49787-83">
+  <g transform="translate(80,40)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#00FFFF" id="img-b3eb81ab-82">
-  <g transform="translate(360,105)">
+<g fill="#00FFFF" id="img-b5c49787-84">
+  <g transform="translate(80,340)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#00FFFF" id="img-b3eb81ab-83">
-  <g transform="translate(200,85)">
+<g fill="#00FFFF" id="img-b5c49787-85">
+  <g transform="translate(80,30)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#FFA500" id="img-b3eb81ab-84">
-  <g transform="translate(20,60)">
+<g fill="#00FFFF" id="img-b5c49787-86">
+  <g transform="translate(80,280)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#00FFFF" id="img-b3eb81ab-85">
-  <g transform="translate(220,90)">
+<g fill="#00FFFF" id="img-b5c49787-87">
+  <g transform="translate(80,310)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#00FFFF" id="img-b3eb81ab-86">
-  <g transform="translate(380,115)">
+<g fill="#00FFFF" id="img-b5c49787-88">
+  <g transform="translate(160,330)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#00FFFF" id="img-b3eb81ab-87">
-  <g transform="translate(60,90)">
+<g fill="#00FFFF" id="img-b5c49787-89">
+  <g transform="translate(100,15)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#00FFFF" id="img-b3eb81ab-88">
-  <g transform="translate(380,130)">
+<g fill="#00FF00" id="img-b5c49787-90">
+  <g transform="translate(20,130)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#FF0000" id="img-b3eb81ab-89">
-  <g transform="translate(480,120)">
+<g fill="#00FFFF" id="img-b5c49787-91">
+  <g transform="translate(60,310)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#00FF00" id="img-b3eb81ab-90">
-  <g transform="translate(20,30)">
+<g fill="#00FFFF" id="img-b5c49787-92">
+  <g transform="translate(40,60)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#FFA500" id="img-b3eb81ab-91">
-  <g transform="translate(320,90)">
+<g fill="#00FFFF" id="img-b5c49787-93">
+  <g transform="translate(300,317.5)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#FFA500" id="img-b3eb81ab-92">
+<g fill="#00FFFF" id="img-b5c49787-94">
+  <g transform="translate(60,270)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FF00" id="img-b5c49787-95">
+  <g transform="translate(20,370)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FFFF" id="img-b5c49787-96">
+  <g transform="translate(40,280)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FF00" id="img-b5c49787-97">
+  <g transform="translate(20,190)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FFFF" id="img-b5c49787-98">
+  <g transform="translate(120,295)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FFFF" id="img-b5c49787-99">
+  <g transform="translate(140,360)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FFFF" id="img-b5c49787-100">
+  <g transform="translate(60,130)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FFFF" id="img-b5c49787-101">
+  <g transform="translate(40,370)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FFFF" id="img-b5c49787-102">
+  <g transform="translate(40,40)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FF00" id="img-b5c49787-103">
+  <g transform="translate(20,350)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FF00" id="img-b5c49787-104">
+  <g transform="translate(20,340)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FFFF" id="img-b5c49787-105">
+  <g transform="translate(40,160)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#FF0000" id="img-b5c49787-106">
+  <g transform="translate(240,312.5)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FFFF" id="img-b5c49787-107">
+  <g transform="translate(40,270)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FF00" id="img-b5c49787-108">
+  <g transform="translate(20,140)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FFFF" id="img-b5c49787-109">
+  <g transform="translate(420,331.25)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FF00" id="img-b5c49787-110">
+  <g transform="translate(20,330)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FF00" id="img-b5c49787-111">
+  <g transform="translate(20,310)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FFFF" id="img-b5c49787-112">
+  <g transform="translate(240,282.5)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FF00" id="img-b5c49787-113">
+  <g transform="translate(20,70)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FFFF" id="img-b5c49787-114">
+  <g transform="translate(40,100)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FFFF" id="img-b5c49787-115">
+  <g transform="translate(80,15)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FF00" id="img-b5c49787-116">
+  <g transform="translate(20,270)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FF00" id="img-b5c49787-117">
+  <g transform="translate(20,170)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FFFF" id="img-b5c49787-118">
+  <g transform="translate(40,190)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FFFF" id="img-b5c49787-119">
+  <g transform="translate(40,200)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FFFF" id="img-b5c49787-120">
+  <g transform="translate(140,320)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#FF0000" id="img-b5c49787-121">
+  <g transform="translate(140,310)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#FF0000" id="img-b5c49787-122">
+  <g transform="translate(440,348.12)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FFFF" id="img-b5c49787-123">
+  <g transform="translate(60,120)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FF00" id="img-b5c49787-124">
+  <g transform="translate(20,280)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FFFF" id="img-b5c49787-125">
+  <g transform="translate(40,20)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FF00" id="img-b5c49787-126">
+  <g transform="translate(20,20)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FFFF" id="img-b5c49787-127">
+  <g transform="translate(60,150)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FFFF" id="img-b5c49787-128">
+  <g transform="translate(640,368.91)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FFFF" id="img-b5c49787-129">
+  <g transform="translate(40,80)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FFFF" id="img-b5c49787-130">
+  <g transform="translate(80,325)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FFFF" id="img-b5c49787-131">
+  <g transform="translate(60,200)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FFFF" id="img-b5c49787-132">
+  <g transform="translate(40,360)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FFFF" id="img-b5c49787-133">
+  <g transform="translate(60,170)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FFFF" id="img-b5c49787-134">
+  <g transform="translate(60,180)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FFFF" id="img-b5c49787-135">
+  <g transform="translate(100,265)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FF00" id="img-b5c49787-136">
+  <g transform="translate(20,220)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#FFA500" id="img-b5c49787-137">
+  <g transform="translate(560,364.06)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FFFF" id="img-b5c49787-138">
+  <g transform="translate(40,30)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FFFF" id="img-b5c49787-139">
+  <g transform="translate(60,20)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FFFF" id="img-b5c49787-140">
+  <g transform="translate(60,300)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FFFF" id="img-b5c49787-141">
+  <g transform="translate(60,40)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FFFF" id="img-b5c49787-142">
+  <g transform="translate(80,295)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FFFF" id="img-b5c49787-143">
+  <g transform="translate(40,220)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FFFF" id="img-b5c49787-144">
+  <g transform="translate(540,342.19)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FFFF" id="img-b5c49787-145">
+  <g transform="translate(400,331.25)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FFFF" id="img-b5c49787-146">
+  <g transform="translate(80,225)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#FFA500" id="img-b5c49787-147">
+  <g transform="translate(20,230)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FF00" id="img-b5c49787-148">
+  <g transform="translate(20,180)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FFFF" id="img-b5c49787-149">
+  <g transform="translate(200,290)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FFFF" id="img-b5c49787-150">
+  <g transform="translate(60,340)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FFFF" id="img-b5c49787-151">
+  <g transform="translate(180,290)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#FF0000" id="img-b5c49787-152">
+  <g transform="translate(540,364.06)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FFFF" id="img-b5c49787-153">
+  <g transform="translate(620,360.94)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FF00" id="img-b5c49787-154">
+  <g transform="translate(20,100)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FF00" id="img-b5c49787-155">
   <g transform="translate(20,40)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#00FFFF" id="img-b3eb81ab-93">
-  <g transform="translate(160,85)">
+<g fill="#00FFFF" id="img-b5c49787-156">
+  <g transform="translate(500,353.12)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#00FFFF" id="img-b3eb81ab-94">
-  <g transform="translate(540,55)">
+<g fill="#00FFFF" id="img-b5c49787-157">
+  <g transform="translate(40,130)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#FFA500" id="img-b3eb81ab-95">
-  <g transform="translate(500,120)">
+<g fill="#00FFFF" id="img-b5c49787-158">
+  <g transform="translate(60,30)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#00FF00" id="img-b3eb81ab-96">
+<g fill="#00FFFF" id="img-b5c49787-159">
+  <g transform="translate(40,70)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FFFF" id="img-b5c49787-160">
+  <g transform="translate(60,220)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FF00" id="img-b5c49787-161">
+  <g transform="translate(20,200)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FFFF" id="img-b5c49787-162">
+  <g transform="translate(100,225)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FFFF" id="img-b5c49787-163">
+  <g transform="translate(60,190)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FFFF" id="img-b5c49787-164">
+  <g transform="translate(60,80)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FFFF" id="img-b5c49787-165">
+  <g transform="translate(80,245)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#FF0000" id="img-b5c49787-166">
+  <g transform="translate(640,352.97)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FF00" id="img-b5c49787-167">
+  <g transform="translate(20,30)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FF00" id="img-b5c49787-168">
+  <g transform="translate(20,80)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FFFF" id="img-b5c49787-169">
+  <g transform="translate(40,250)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FFFF" id="img-b5c49787-170">
+  <g transform="translate(40,180)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FF00" id="img-b5c49787-171">
+  <g transform="translate(20,50)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FFFF" id="img-b5c49787-172">
+  <g transform="translate(60,330)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FFFF" id="img-b5c49787-173">
+  <g transform="translate(520,353.12)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#FFA500" id="img-b5c49787-174">
+  <g transform="translate(460,348.12)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FFFF" id="img-b5c49787-175">
+  <g transform="translate(60,250)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#FF0000" id="img-b5c49787-176">
+  <g transform="translate(140,345)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FFFF" id="img-b5c49787-177">
+  <g transform="translate(60,60)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FF00" id="img-b5c49787-178">
+  <g transform="translate(20,120)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FFFF" id="img-b5c49787-179">
+  <g transform="translate(40,340)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FFFF" id="img-b5c49787-180">
+  <g transform="translate(40,330)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FFFF" id="img-b5c49787-181">
+  <g transform="translate(140,300)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#FFA500" id="img-b5c49787-182">
+  <g transform="translate(20,320)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FFFF" id="img-b5c49787-183">
+  <g transform="translate(440,324.38)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FFFF" id="img-b5c49787-184">
+  <g transform="translate(100,325)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#FF0000" id="img-b5c49787-185">
+  <g transform="translate(340,326.25)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#FFA500" id="img-b5c49787-186">
+  <g transform="translate(20,240)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FFFF" id="img-b5c49787-187">
+  <g transform="translate(580,360.94)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FFFF" id="img-b5c49787-188">
+  <g transform="translate(60,370)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FFFF" id="img-b5c49787-189">
+  <g transform="translate(40,170)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FFFF" id="img-b5c49787-190">
+  <g transform="translate(480,353.12)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FFFF" id="img-b5c49787-191">
+  <g transform="translate(60,160)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FFFF" id="img-b5c49787-192">
+  <g transform="translate(140,330)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FFFF" id="img-b5c49787-193">
+  <g transform="translate(280,317.5)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FF00" id="img-b5c49787-194">
+  <g transform="translate(20,60)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FF00" id="img-b5c49787-195">
+  <g transform="translate(20,110)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FFFF" id="img-b5c49787-196">
+  <g transform="translate(100,245)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#FFA500" id="img-b5c49787-197">
   <g transform="translate(20,10)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g fill="#00FFFF" id="img-b3eb81ab-97">
-  <g transform="translate(200,40)">
+<g fill="#00FFFF" id="img-b5c49787-198">
+  <g transform="translate(40,50)">
     <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
 </g>
-<g font-family="futura" font-size="3.53" stroke="#000000" id="img-b3eb81ab-98">
-  <g transform="translate(20,20)">
-    <g class="primitive">
-      <text text-anchor="middle" dy="-0.25em">op450<tspan x="0" dy="1.2em">0,0</tspan></text>
-    </g>
+<g fill="#00FFFF" id="img-b5c49787-199">
+  <g transform="translate(40,150)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
-  <g transform="translate(20,110)">
-    <g class="primitive">
-      <text text-anchor="middle" dy="-0.25em">op449<tspan x="0" dy="1.2em">0,0</tspan></text>
-    </g>
+</g>
+<g fill="#00FFFF" id="img-b5c49787-200">
+  <g transform="translate(120,245)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
-  <g transform="translate(20,50)">
-    <g class="primitive">
-      <text text-anchor="middle" dy="-0.25em">op448<tspan x="0" dy="1.2em">0,0</tspan></text>
-    </g>
+</g>
+<g fill="#00FF00" id="img-b5c49787-201">
+  <g transform="translate(20,250)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
-  <g transform="translate(1040,63.12)">
-    <g class="primitive">
-      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">1,362,-1</tspan><tspan x="0" dy="1.2em">242,242</tspan></text>
-    </g>
+</g>
+<g fill="#FFA500" id="img-b5c49787-202">
+  <g transform="translate(20,260)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
-  <g transform="translate(1020,51.25)">
-    <g class="primitive">
-      <text text-anchor="middle" dy="-0.85em">deposit<tspan x="0" dy="1.2em">1,18,362</tspan><tspan x="0" dy="1.2em">242,242</tspan></text>
-    </g>
+</g>
+<g fill="#00FFFF" id="img-b5c49787-203">
+  <g transform="translate(140,290)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
-  <g transform="translate(1000,51.25)">
-    <g class="primitive">
-      <text text-anchor="middle" dy="-0.85em">carry<tspan x="0" dy="1.2em">1,18,362</tspan><tspan x="0" dy="1.2em">234,242</tspan></text>
-    </g>
+</g>
+<g fill="#00FFFF" id="img-b5c49787-204">
+  <g transform="translate(60,350)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
-  <g transform="translate(980,51.25)">
-    <g class="primitive">
-      <text text-anchor="middle" dy="-0.85em">collect<tspan x="0" dy="1.2em">1,18,197</tspan><tspan x="0" dy="1.2em">234,234</tspan></text>
-    </g>
+</g>
+<g fill="#00FFFF" id="img-b5c49787-205">
+  <g transform="translate(40,350)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
-  <g transform="translate(460,120)">
-    <g class="primitive">
-      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">1,247,244</tspan><tspan x="0" dy="1.2em">155,158</tspan></text>
-    </g>
+</g>
+<g fill="#00FFFF" id="img-b5c49787-206">
+  <g transform="translate(120,265)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
-  <g transform="translate(440,125)">
-    <g class="primitive">
-      <text text-anchor="middle" dy="-0.85em">deposit<tspan x="0" dy="1.2em">1,15,247</tspan><tspan x="0" dy="1.2em">155,155</tspan></text>
-    </g>
+</g>
+<g fill="#00FFFF" id="img-b5c49787-207">
+  <g transform="translate(60,280)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
-  <g transform="translate(420,125)">
-    <g class="primitive">
-      <text text-anchor="middle" dy="-0.85em">carry<tspan x="0" dy="1.2em">1,15,247</tspan><tspan x="0" dy="1.2em">137,155</tspan></text>
-    </g>
+</g>
+<g fill="#00FFFF" id="img-b5c49787-208">
+  <g transform="translate(40,140)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
-  <g transform="translate(400,125)">
-    <g class="primitive">
-      <text text-anchor="middle" dy="-0.85em">collect<tspan x="0" dy="1.2em">1,15,57</tspan><tspan x="0" dy="1.2em">137,137</tspan></text>
-    </g>
+</g>
+<g fill="#00FFFF" id="img-b5c49787-209">
+  <g transform="translate(380,331.25)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
-  <g transform="translate(660,52.5)">
-    <g class="primitive">
-      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">2,239,221</tspan><tspan x="0" dy="1.2em">167,168</tspan></text>
-    </g>
+</g>
+<g fill="#00FFFF" id="img-b5c49787-210">
+  <g transform="translate(60,100)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
-  <g transform="translate(640,60)">
-    <g class="primitive">
-      <text text-anchor="middle" dy="-0.85em">deposit<tspan x="0" dy="1.2em">2,14,239</tspan><tspan x="0" dy="1.2em">167,167</tspan></text>
-    </g>
+</g>
+<g fill="#00FFFF" id="img-b5c49787-211">
+  <g transform="translate(80,265)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
-  <g transform="translate(620,60)">
-    <g class="primitive">
-      <text text-anchor="middle" dy="-0.85em">carry<tspan x="0" dy="1.2em">2,14,239</tspan><tspan x="0" dy="1.2em">149,167</tspan></text>
-    </g>
+</g>
+<g fill="#00FFFF" id="img-b5c49787-212">
+  <g transform="translate(140,220)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
-  <g transform="translate(600,60)">
-    <g class="primitive">
-      <text text-anchor="middle" dy="-0.85em">collect<tspan x="0" dy="1.2em">2,14,349</tspan><tspan x="0" dy="1.2em">149,149</tspan></text>
-    </g>
+</g>
+<g fill="#00FFFF" id="img-b5c49787-213">
+  <g transform="translate(60,70)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
-  <g transform="translate(740,21.25)">
-    <g class="primitive">
-      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">2,510,-1</tspan><tspan x="0" dy="1.2em">195,195</tspan></text>
-    </g>
+</g>
+<g fill="#00FFFF" id="img-b5c49787-214">
+  <g transform="translate(40,310)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
   </g>
-  <g transform="translate(720,27.5)">
-    <g class="primitive">
-      <text text-anchor="middle" dy="-0.85em">deposit<tspan x="0" dy="1.2em">2,13,510</tspan><tspan x="0" dy="1.2em">195,195</tspan></text>
-    </g>
-  </g>
-  <g transform="translate(700,27.5)">
-    <g class="primitive">
-      <text text-anchor="middle" dy="-0.85em">carry<tspan x="0" dy="1.2em">2,13,510</tspan><tspan x="0" dy="1.2em">168,195</tspan></text>
-    </g>
-  </g>
-  <g transform="translate(680,27.5)">
-    <g class="primitive">
-      <text text-anchor="middle" dy="-0.85em">collect<tspan x="0" dy="1.2em">2,13,221</tspan><tspan x="0" dy="1.2em">168,168</tspan></text>
-    </g>
-  </g>
-  <g transform="translate(840,63.12)">
-    <g class="primitive">
-      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">1,111,108</tspan><tspan x="0" dy="1.2em">210,213</tspan></text>
-    </g>
-  </g>
-  <g transform="translate(820,51.25)">
-    <g class="primitive">
-      <text text-anchor="middle" dy="-0.85em">deposit<tspan x="0" dy="1.2em">1,16,111</tspan><tspan x="0" dy="1.2em">210,210</tspan></text>
-    </g>
-  </g>
-  <g transform="translate(800,51.25)">
-    <g class="primitive">
-      <text text-anchor="middle" dy="-0.85em">carry<tspan x="0" dy="1.2em">1,16,111</tspan><tspan x="0" dy="1.2em">195,210</tspan></text>
-    </g>
-  </g>
-  <g transform="translate(780,51.25)">
-    <g class="primitive">
-      <text text-anchor="middle" dy="-0.85em">collect<tspan x="0" dy="1.2em">1,16,244</tspan><tspan x="0" dy="1.2em">195,195</tspan></text>
-    </g>
-  </g>
-  <g transform="translate(940,63.12)">
-    <g class="primitive">
-      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">1,62,197</tspan><tspan x="0" dy="1.2em">223,234</tspan></text>
-    </g>
-  </g>
-  <g transform="translate(920,51.25)">
-    <g class="primitive">
-      <text text-anchor="middle" dy="-0.85em">deposit<tspan x="0" dy="1.2em">1,17,62</tspan><tspan x="0" dy="1.2em">223,223</tspan></text>
-    </g>
-  </g>
-  <g transform="translate(900,51.25)">
-    <g class="primitive">
-      <text text-anchor="middle" dy="-0.85em">carry<tspan x="0" dy="1.2em">1,17,62</tspan><tspan x="0" dy="1.2em">213,223</tspan></text>
-    </g>
-  </g>
-  <g transform="translate(880,51.25)">
-    <g class="primitive">
-      <text text-anchor="middle" dy="-0.85em">collect<tspan x="0" dy="1.2em">1,17,108</tspan><tspan x="0" dy="1.2em">213,213</tspan></text>
-    </g>
-  </g>
-  <g transform="translate(960,39.38)">
-    <g class="primitive">
-      <text text-anchor="middle" dy="-0.25em">O18-197<tspan x="0" dy="1.2em">223,223</tspan></text>
-    </g>
-  </g>
-  <g transform="translate(860,39.38)">
-    <g class="primitive">
-      <text text-anchor="middle" dy="-0.25em">O17-108<tspan x="0" dy="1.2em">210,210</tspan></text>
-    </g>
-  </g>
-  <g transform="translate(760,46.25)">
-    <g class="primitive">
-      <text text-anchor="middle" dy="-0.25em">O16-244<tspan x="0" dy="1.2em">195,195</tspan></text>
-    </g>
-  </g>
-  <g transform="translate(40,110)">
-    <g class="primitive">
-      <text text-anchor="middle" dy="-0.25em">O15-57<tspan x="0" dy="1.2em">0,0</tspan></text>
-    </g>
-  </g>
-  <g transform="translate(40,50)">
-    <g class="primitive">
-      <text text-anchor="middle" dy="-0.25em">O14-349<tspan x="0" dy="1.2em">0,0</tspan></text>
-    </g>
-  </g>
-  <g transform="translate(40,20)">
-    <g class="primitive">
-      <text text-anchor="middle" dy="-0.25em">O13-221<tspan x="0" dy="1.2em">0,0</tspan></text>
-    </g>
-  </g>
-  <g transform="translate(1040,39.38)">
-    <g class="primitive">
-      <text text-anchor="middle" dy="-0.25em">op447<tspan x="0" dy="1.2em">242,242</tspan></text>
-    </g>
-  </g>
-  <g transform="translate(740,46.25)">
-    <g class="primitive">
-      <text text-anchor="middle" dy="-0.25em">op446<tspan x="0" dy="1.2em">195,195</tspan></text>
-    </g>
-  </g>
-  <g transform="translate(840,39.38)">
-    <g class="primitive">
-      <text text-anchor="middle" dy="-0.25em">op445<tspan x="0" dy="1.2em">210,210</tspan></text>
-    </g>
-  </g>
-  <g transform="translate(940,39.38)">
-    <g class="primitive">
-      <text text-anchor="middle" dy="-0.25em">op444<tspan x="0" dy="1.2em">223,223</tspan></text>
-    </g>
-  </g>
-  <g transform="translate(60,10)">
-    <g class="primitive">
-      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">3,545,-1</tspan><tspan x="0" dy="1.2em">7,7</tspan></text>
-    </g>
-  </g>
-  <g transform="translate(60,30)">
-    <g class="primitive">
-      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">4,221,221</tspan><tspan x="0" dy="1.2em">23,23</tspan></text>
-    </g>
-  </g>
-  <g transform="translate(100,90)">
-    <g class="primitive">
-      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">1,509,509</tspan><tspan x="0" dy="1.2em">44,44</tspan></text>
-    </g>
-  </g>
-  <g transform="translate(100,75)">
-    <g class="primitive">
-      <text text-anchor="middle" dy="-0.85em">deposit<tspan x="0" dy="1.2em">2,5,277</tspan><tspan x="0" dy="1.2em">22,22</tspan></text>
-    </g>
-  </g>
-  <g transform="translate(220,80)">
-    <g class="primitive">
-      <text text-anchor="middle" dy="-0.25em">op434<tspan x="0" dy="1.2em">56,56</tspan></text>
-    </g>
-  </g>
-  <g transform="translate(580,45)">
-    <g class="primitive">
-      <text text-anchor="middle" dy="-0.25em">op440<tspan x="0" dy="1.2em">143,143</tspan></text>
-    </g>
-  </g>
-  <g transform="translate(480,100)">
-    <g class="primitive">
-      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">4,510,-1</tspan><tspan x="0" dy="1.2em">131,131</tspan></text>
-    </g>
-  </g>
-  <g transform="translate(20,100)">
-    <g class="primitive">
-      <text text-anchor="middle" dy="-0.25em">O8-380<tspan x="0" dy="1.2em">0,0</tspan></text>
-    </g>
-  </g>
-  <g transform="translate(20,70)">
-    <g class="primitive">
-      <text text-anchor="middle" dy="-0.25em">R2-196<tspan x="0" dy="1.2em">0,0</tspan></text>
-    </g>
-  </g>
-  <g transform="translate(400,110)">
-    <g class="primitive">
-      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">4,502,505</tspan><tspan x="0" dy="1.2em">110,113</tspan></text>
-    </g>
-  </g>
-  <g transform="translate(320,105)">
-    <g class="primitive">
-      <text text-anchor="middle" dy="-0.85em">collect<tspan x="0" dy="1.2em">1,7,63</tspan><tspan x="0" dy="1.2em">109,109</tspan></text>
-    </g>
-  </g>
-  <g transform="translate(240,95)">
-    <g class="primitive">
-      <text text-anchor="middle" dy="-0.85em">collect<tspan x="0" dy="1.2em">1,8,380</tspan><tspan x="0" dy="1.2em">64,64</tspan></text>
-    </g>
-  </g>
-  <g transform="translate(340,35)">
-    <g class="primitive">
-      <text text-anchor="middle" dy="-0.85em">collect<tspan x="0" dy="1.2em">4,9,221</tspan><tspan x="0" dy="1.2em">95,95</tspan></text>
-    </g>
-  </g>
-  <g transform="translate(80,75)">
-    <g class="primitive">
-      <text text-anchor="middle" dy="-0.85em">carry<tspan x="0" dy="1.2em">2,5,277</tspan><tspan x="0" dy="1.2em">1,22</tspan></text>
-    </g>
-  </g>
-  <g transform="translate(300,100)">
-    <g class="primitive">
-      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">1,94,63</tspan><tspan x="0" dy="1.2em">95,109</tspan></text>
-    </g>
-  </g>
-  <g transform="translate(180,45)">
-    <g class="primitive">
-      <text text-anchor="middle" dy="-0.85em">deposit<tspan x="0" dy="1.2em">2,10,374</tspan><tspan x="0" dy="1.2em">29,29</tspan></text>
-    </g>
-  </g>
-  <g transform="translate(120,80)">
-    <g class="primitive">
-      <text text-anchor="middle" dy="-0.25em">op430<tspan x="0" dy="1.2em">22,22</tspan></text>
-    </g>
-  </g>
-  <g transform="translate(520,55)">
-    <g class="primitive">
-      <text text-anchor="middle" dy="-0.85em">collect<tspan x="0" dy="1.2em">2,12,355</tspan><tspan x="0" dy="1.2em">131,131</tspan></text>
-    </g>
-  </g>
-  <g transform="translate(60,75)">
-    <g class="primitive">
-      <text text-anchor="middle" dy="-0.85em">collect<tspan x="0" dy="1.2em">2,5,197</tspan><tspan x="0" dy="1.2em">1,1</tspan></text>
-    </g>
-  </g>
-  <g transform="translate(140,80)">
-    <g class="primitive">
-      <text text-anchor="middle" dy="-0.25em">O6-509<tspan x="0" dy="1.2em">22,22</tspan></text>
-    </g>
-  </g>
-  <g transform="translate(440,105)">
-    <g class="primitive">
-      <text text-anchor="middle" dy="-0.85em">carry<tspan x="0" dy="1.2em">4,11,510</tspan><tspan x="0" dy="1.2em">120,131</tspan></text>
-    </g>
-  </g>
-  <g transform="translate(40,10)">
-    <g class="primitive">
-      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">3,545,545</tspan><tspan x="0" dy="1.2em">0,7</tspan></text>
-    </g>
-  </g>
-  <g transform="translate(20,80)">
-    <g class="primitive">
-      <text text-anchor="middle" dy="-0.25em">O5-197<tspan x="0" dy="1.2em">0,0</tspan></text>
-    </g>
-  </g>
-  <g transform="translate(560,55)">
-    <g class="primitive">
-      <text text-anchor="middle" dy="-0.85em">deposit<tspan x="0" dy="1.2em">2,12,247</tspan><tspan x="0" dy="1.2em">143,143</tspan></text>
-    </g>
-  </g>
-  <g transform="translate(160,45)">
-    <g class="primitive">
-      <text text-anchor="middle" dy="-0.85em">carry<tspan x="0" dy="1.2em">2,10,374</tspan><tspan x="0" dy="1.2em">24,29</tspan></text>
-    </g>
-  </g>
-  <g transform="translate(180,85)">
-    <g class="primitive">
-      <text text-anchor="middle" dy="-0.85em">carry<tspan x="0" dy="1.2em">1,6,539</tspan><tspan x="0" dy="1.2em">44,56</tspan></text>
-    </g>
-  </g>
+</g>
+<g fill="#00FFFF" id="img-b5c49787-215">
   <g transform="translate(40,90)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FFFF" id="img-b5c49787-216">
+  <g transform="translate(120,225)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FFFF" id="img-b5c49787-217">
+  <g transform="translate(320,317.5)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#FFA500" id="img-b5c49787-218">
+  <g transform="translate(160,345)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FFFF" id="img-b5c49787-219">
+  <g transform="translate(40,120)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FFFF" id="img-b5c49787-220">
+  <g transform="translate(40,110)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FF00" id="img-b5c49787-221">
+  <g transform="translate(20,300)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FF00" id="img-b5c49787-222">
+  <g transform="translate(20,150)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FFFF" id="img-b5c49787-223">
+  <g transform="translate(60,50)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FF00" id="img-b5c49787-224">
+  <g transform="translate(20,90)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FF00" id="img-b5c49787-225">
+  <g transform="translate(20,160)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#FFA500" id="img-b5c49787-226">
+  <g transform="translate(260,312.5)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FFFF" id="img-b5c49787-227">
+  <g transform="translate(60,360)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FFFF" id="img-b5c49787-228">
+  <g transform="translate(220,290)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FFFF" id="img-b5c49787-229">
+  <g transform="translate(60,90)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FFFF" id="img-b5c49787-230">
+  <g transform="translate(40,300)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FF00" id="img-b5c49787-231">
+  <g transform="translate(20,360)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FFFF" id="img-b5c49787-232">
+  <g transform="translate(600,360.94)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FFFF" id="img-b5c49787-233">
+  <g transform="translate(120,325)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#FFA500" id="img-b5c49787-234">
+  <g transform="translate(20,290)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FFFF" id="img-b5c49787-235">
+  <g transform="translate(100,295)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FFFF" id="img-b5c49787-236">
+  <g transform="translate(340,308.75)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#FFA500" id="img-b5c49787-237">
+  <g transform="translate(360,326.25)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g fill="#00FFFF" id="img-b5c49787-238">
+  <g transform="translate(120,15)">
+    <circle cx="0" cy="0" r="4" class="primitive"/>
+  </g>
+</g>
+<g font-family="futura" font-size="3.53" stroke="#000000" id="img-b5c49787-239">
+  <g transform="translate(20,380)">
     <g class="primitive">
-      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">1,271,509</tspan><tspan x="0" dy="1.2em">0,14</tspan></text>
+      <text text-anchor="middle" dy="-0.25em">op33<tspan x="0" dy="1.2em">100,100</tspan></text>
     </g>
   </g>
-  <g transform="translate(460,105)">
+  <g transform="translate(20,210)">
     <g class="primitive">
-      <text text-anchor="middle" dy="-0.85em">deposit<tspan x="0" dy="1.2em">4,11,510</tspan><tspan x="0" dy="1.2em">131,131</tspan></text>
+      <text text-anchor="middle" dy="-0.25em">op32<tspan x="0" dy="1.2em">100,100</tspan></text>
     </g>
   </g>
-  <g transform="translate(580,65)">
+  <g transform="translate(1320,235.95)">
     <g class="primitive">
-      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">2,247,349</tspan><tspan x="0" dy="1.2em">143,149</tspan></text>
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">25,399,-1</tspan><tspan x="0" dy="1.2em">304,304</tspan></text>
     </g>
   </g>
-  <g transform="translate(120,70)">
+  <g transform="translate(1300,229.91)">
     <g class="primitive">
-      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">2,277,252</tspan><tspan x="0" dy="1.2em">22,24</tspan></text>
+      <text text-anchor="middle" dy="-0.85em">deposit<tspan x="0" dy="1.2em">25,30,399</tspan><tspan x="0" dy="1.2em">304,304</tspan></text>
     </g>
   </g>
-  <g transform="translate(260,95)">
+  <g transform="translate(1280,229.91)">
     <g class="primitive">
-      <text text-anchor="middle" dy="-0.85em">carry<tspan x="0" dy="1.2em">1,8,94</tspan><tspan x="0" dy="1.2em">64,95</tspan></text>
+      <text text-anchor="middle" dy="-0.85em">carry<tspan x="0" dy="1.2em">25,30,399</tspan><tspan x="0" dy="1.2em">289,304</tspan></text>
     </g>
   </g>
-  <g transform="translate(280,95)">
+  <g transform="translate(1260,229.91)">
     <g class="primitive">
-      <text text-anchor="middle" dy="-0.85em">deposit<tspan x="0" dy="1.2em">1,8,94</tspan><tspan x="0" dy="1.2em">95,95</tspan></text>
+      <text text-anchor="middle" dy="-0.85em">collect<tspan x="0" dy="1.2em">25,30,118</tspan><tspan x="0" dy="1.2em">289,289</tspan></text>
     </g>
   </g>
-  <g transform="translate(40,70)">
+  <g transform="translate(160,380)">
     <g class="primitive">
-      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">2,196,197</tspan><tspan x="0" dy="1.2em">0,1</tspan></text>
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">10,383,365</tspan><tspan x="0" dy="1.2em">173,274</tspan></text>
     </g>
   </g>
-  <g transform="translate(380,100)">
+  <g transform="translate(140,375)">
     <g class="primitive">
-      <text text-anchor="middle" dy="-0.25em">op439<tspan x="0" dy="1.2em">120,120</tspan></text>
+      <text text-anchor="middle" dy="-0.85em">deposit<tspan x="0" dy="1.2em">10,21,383</tspan><tspan x="0" dy="1.2em">173,173</tspan></text>
     </g>
   </g>
-  <g transform="translate(40,30)">
+  <g transform="translate(120,375)">
     <g class="primitive">
-      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">4,119,221</tspan><tspan x="0" dy="1.2em">0,23</tspan></text>
+      <text text-anchor="middle" dy="-0.85em">carry<tspan x="0" dy="1.2em">10,21,383</tspan><tspan x="0" dy="1.2em">155,173</tspan></text>
     </g>
   </g>
-  <g transform="translate(400,100)">
+  <g transform="translate(100,375)">
     <g class="primitive">
-      <text text-anchor="middle" dy="-0.25em">O11-505<tspan x="0" dy="1.2em">120,120</tspan></text>
+      <text text-anchor="middle" dy="-0.85em">collect<tspan x="0" dy="1.2em">10,21,130</tspan><tspan x="0" dy="1.2em">155,155</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(260,370)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">24,531,556</tspan><tspan x="0" dy="1.2em">198,221</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(240,365)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">deposit<tspan x="0" dy="1.2em">24,22,531</tspan><tspan x="0" dy="1.2em">198,198</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(220,365)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">carry<tspan x="0" dy="1.2em">24,22,531</tspan><tspan x="0" dy="1.2em">173,198</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(200,365)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">collect<tspan x="0" dy="1.2em">24,22,89</tspan><tspan x="0" dy="1.2em">173,173</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(720,361.48)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">9,379,-1</tspan><tspan x="0" dy="1.2em">212,304</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(700,367.97)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">deposit<tspan x="0" dy="1.2em">9,24,379</tspan><tspan x="0" dy="1.2em">212,212</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(680,367.97)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">carry<tspan x="0" dy="1.2em">9,24,379</tspan><tspan x="0" dy="1.2em">198,212</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(660,367.97)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">collect<tspan x="0" dy="1.2em">9,24,410</tspan><tspan x="0" dy="1.2em">198,198</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(240,295)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">4,74,-1</tspan><tspan x="0" dy="1.2em">160,304</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(220,215)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">deposit<tspan x="0" dy="1.2em">4,23,74</tspan><tspan x="0" dy="1.2em">160,160</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(200,215)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">carry<tspan x="0" dy="1.2em">4,23,74</tspan><tspan x="0" dy="1.2em">155,160</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(180,215)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">collect<tspan x="0" dy="1.2em">4,23,69</tspan><tspan x="0" dy="1.2em">155,155</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(820,203.24)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">7,259,-1</tspan><tspan x="0" dy="1.2em">221,304</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(800,211.48)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">deposit<tspan x="0" dy="1.2em">7,25,259</tspan><tspan x="0" dy="1.2em">221,221</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(780,211.48)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">carry<tspan x="0" dy="1.2em">7,25,259</tspan><tspan x="0" dy="1.2em">212,221</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(760,211.48)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">collect<tspan x="0" dy="1.2em">7,25,203</tspan><tspan x="0" dy="1.2em">212,212</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(920,218.11)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">24,519,-1</tspan><tspan x="0" dy="1.2em">241,304</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(900,224.73)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">deposit<tspan x="0" dy="1.2em">24,26,519</tspan><tspan x="0" dy="1.2em">241,241</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(880,224.73)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">carry<tspan x="0" dy="1.2em">24,26,519</tspan><tspan x="0" dy="1.2em">221,241</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(860,224.73)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">collect<tspan x="0" dy="1.2em">24,26,556</tspan><tspan x="0" dy="1.2em">221,221</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(1020,190.81)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">13,417,-1</tspan><tspan x="0" dy="1.2em">259,304</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(1000,196.62)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">deposit<tspan x="0" dy="1.2em">13,27,417</tspan><tspan x="0" dy="1.2em">259,259</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(980,196.62)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">carry<tspan x="0" dy="1.2em">13,27,417</tspan><tspan x="0" dy="1.2em">241,259</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(960,196.62)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">collect<tspan x="0" dy="1.2em">13,27,244</tspan><tspan x="0" dy="1.2em">241,241</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(1120,202.03)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">2,90,-1</tspan><tspan x="0" dy="1.2em">274,304</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(1100,207.43)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">deposit<tspan x="0" dy="1.2em">2,28,90</tspan><tspan x="0" dy="1.2em">274,274</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(1080,207.43)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">carry<tspan x="0" dy="1.2em">2,28,90</tspan><tspan x="0" dy="1.2em">259,274</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(1060,207.43)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">collect<tspan x="0" dy="1.2em">2,28,373</tspan><tspan x="0" dy="1.2em">259,259</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(1220,212.63)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">10,510,-1</tspan><tspan x="0" dy="1.2em">289,304</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(1200,217.84)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">deposit<tspan x="0" dy="1.2em">10,29,510</tspan><tspan x="0" dy="1.2em">289,289</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(1180,217.84)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">carry<tspan x="0" dy="1.2em">10,29,510</tspan><tspan x="0" dy="1.2em">274,289</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(1160,217.84)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">collect<tspan x="0" dy="1.2em">10,29,365</tspan><tspan x="0" dy="1.2em">274,274</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(1240,223.04)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.25em">O30-118<tspan x="0" dy="1.2em">289,289</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(1140,212.84)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.25em">O29-365<tspan x="0" dy="1.2em">274,274</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(1040,202.43)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.25em">O28-373<tspan x="0" dy="1.2em">259,259</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(940,231.35)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.25em">O27-244<tspan x="0" dy="1.2em">241,241</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(840,219.73)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.25em">O26-556<tspan x="0" dy="1.2em">221,221</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(740,379.45)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.25em">O25-203<tspan x="0" dy="1.2em">212,212</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(280,360)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.25em">O24-410<tspan x="0" dy="1.2em">198,198</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(40,210)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.25em">O23-69<tspan x="0" dy="1.2em">100,100</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(180,370)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.25em">O22-89<tspan x="0" dy="1.2em">173,173</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(40,380)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.25em">O21-130<tspan x="0" dy="1.2em">100,100</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(1320,223.88)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.25em">op31<tspan x="0" dy="1.2em">304,304</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(160,370)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.25em">op30<tspan x="0" dy="1.2em">173,173</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(260,360)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.25em">op29<tspan x="0" dy="1.2em">198,198</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(720,379.45)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.25em">op28<tspan x="0" dy="1.2em">212,212</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(820,219.73)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.25em">op27<tspan x="0" dy="1.2em">221,221</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(920,231.35)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.25em">op26<tspan x="0" dy="1.2em">241,241</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(1020,202.43)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.25em">op25<tspan x="0" dy="1.2em">259,259</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(1120,212.84)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.25em">op24<tspan x="0" dy="1.2em">274,274</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(1220,223.04)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.25em">op23<tspan x="0" dy="1.2em">289,289</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(80,180)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">5,450,-1</tspan><tspan x="0" dy="1.2em">85,304</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(80,360)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">24,44,89</tspan><tspan x="0" dy="1.2em">85,173</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(80,170)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">19,359,-1</tspan><tspan x="0" dy="1.2em">85,304</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(80,190)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">13,292,244</tspan><tspan x="0" dy="1.2em">85,241</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(80,200)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">7,226,203</tspan><tspan x="0" dy="1.2em">85,212</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(80,160)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">14,94,-1</tspan><tspan x="0" dy="1.2em">85,304</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(80,150)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">21,296,-1</tspan><tspan x="0" dy="1.2em">85,304</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(60,140)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">16,271,-1</tspan><tspan x="0" dy="1.2em">85,304</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(80,130)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">23,10,-1</tspan><tspan x="0" dy="1.2em">85,304</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(80,120)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">29,56,-1</tspan><tspan x="0" dy="1.2em">85,304</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(80,370)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">10,41,130</tspan><tspan x="0" dy="1.2em">85,155</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(60,110)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">3,514,-1</tspan><tspan x="0" dy="1.2em">85,304</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(80,100)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">22,468,-1</tspan><tspan x="0" dy="1.2em">85,304</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(80,350)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">9,513,513</tspan><tspan x="0" dy="1.2em">85,146</tspan></text>
     </g>
   </g>
   <g transform="translate(80,90)">
     <g class="primitive">
-      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">1,509,509</tspan><tspan x="0" dy="1.2em">17,44</tspan></text>
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">17,82,-1</tspan><tspan x="0" dy="1.2em">85,304</tspan></text>
     </g>
   </g>
-  <g transform="translate(20,90)">
+  <g transform="translate(80,80)">
     <g class="primitive">
-      <text text-anchor="middle" dy="-0.25em">R1-271<tspan x="0" dy="1.2em">0,0</tspan></text>
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">27,33,-1</tspan><tspan x="0" dy="1.2em">85,304</tspan></text>
     </g>
   </g>
-  <g transform="translate(340,105)">
+  <g transform="translate(80,70)">
     <g class="primitive">
-      <text text-anchor="middle" dy="-0.85em">carry<tspan x="0" dy="1.2em">1,7,74</tspan><tspan x="0" dy="1.2em">109,120</tspan></text>
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">20,24,-1</tspan><tspan x="0" dy="1.2em">85,304</tspan></text>
     </g>
   </g>
-  <g transform="translate(420,105)">
+  <g transform="translate(160,360)">
     <g class="primitive">
-      <text text-anchor="middle" dy="-0.85em">collect<tspan x="0" dy="1.2em">4,11,505</tspan><tspan x="0" dy="1.2em">120,120</tspan></text>
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">25,270,270</tspan><tspan x="0" dy="1.2em">85,123</tspan></text>
     </g>
   </g>
-  <g transform="translate(360,35)">
+  <g transform="translate(80,60)">
     <g class="primitive">
-      <text text-anchor="middle" dy="-0.85em">carry<tspan x="0" dy="1.2em">4,9,502</tspan><tspan x="0" dy="1.2em">95,110</tspan></text>
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">15,530,-1</tspan><tspan x="0" dy="1.2em">85,304</tspan></text>
     </g>
   </g>
-  <g transform="translate(140,45)">
+  <g transform="translate(80,50)">
     <g class="primitive">
-      <text text-anchor="middle" dy="-0.85em">collect<tspan x="0" dy="1.2em">2,10,252</tspan><tspan x="0" dy="1.2em">24,24</tspan></text>
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">1,464,-1</tspan><tspan x="0" dy="1.2em">85,304</tspan></text>
     </g>
   </g>
-  <g transform="translate(300,90)">
+  <g transform="translate(80,40)">
     <g class="primitive">
-      <text text-anchor="middle" dy="-0.25em">op438<tspan x="0" dy="1.2em">95,95</tspan></text>
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">18,503,-1</tspan><tspan x="0" dy="1.2em">85,304</tspan></text>
     </g>
   </g>
-  <g transform="translate(360,105)">
+  <g transform="translate(80,340)">
     <g class="primitive">
-      <text text-anchor="middle" dy="-0.85em">deposit<tspan x="0" dy="1.2em">1,7,74</tspan><tspan x="0" dy="1.2em">120,120</tspan></text>
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">12,410,410</tspan><tspan x="0" dy="1.2em">85,138</tspan></text>
     </g>
   </g>
-  <g transform="translate(200,85)">
+  <g transform="translate(80,30)">
     <g class="primitive">
-      <text text-anchor="middle" dy="-0.85em">deposit<tspan x="0" dy="1.2em">1,6,539</tspan><tspan x="0" dy="1.2em">56,56</tspan></text>
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">28,36,-1</tspan><tspan x="0" dy="1.2em">85,304</tspan></text>
     </g>
   </g>
-  <g transform="translate(20,60)">
+  <g transform="translate(80,280)">
     <g class="primitive">
-      <text text-anchor="middle" dy="-0.25em">O7-63<tspan x="0" dy="1.2em">0,0</tspan></text>
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">8,483,483</tspan><tspan x="0" dy="1.2em">85,88</tspan></text>
     </g>
   </g>
-  <g transform="translate(220,90)">
+  <g transform="translate(80,310)">
     <g class="primitive">
-      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">1,539,380</tspan><tspan x="0" dy="1.2em">56,64</tspan></text>
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">11,538,538</tspan><tspan x="0" dy="1.2em">85,117</tspan></text>
     </g>
   </g>
-  <g transform="translate(380,115)">
+  <g transform="translate(160,330)">
     <g class="primitive">
-      <text text-anchor="middle" dy="-0.85em">deposit<tspan x="0" dy="1.2em">4,9,502</tspan><tspan x="0" dy="1.2em">110,110</tspan></text>
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">4,68,69</tspan><tspan x="0" dy="1.2em">85,155</tspan></text>
     </g>
   </g>
-  <g transform="translate(60,90)">
+  <g transform="translate(100,15)">
     <g class="primitive">
-      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">1,509,509</tspan><tspan x="0" dy="1.2em">14,17</tspan></text>
+      <text text-anchor="middle" dy="-0.85em">carry<tspan x="0" dy="1.2em">6,10,222</tspan><tspan x="0" dy="1.2em">78,92</tspan></text>
     </g>
   </g>
-  <g transform="translate(380,130)">
+  <g transform="translate(20,130)">
     <g class="primitive">
-      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">1,74,57</tspan><tspan x="0" dy="1.2em">120,137</tspan></text>
+      <text text-anchor="middle" dy="-0.25em">R23-10<tspan x="0" dy="1.2em">0,0</tspan></text>
     </g>
   </g>
-  <g transform="translate(480,120)">
+  <g transform="translate(60,310)">
     <g class="primitive">
-      <text text-anchor="middle" dy="-0.25em">op437<tspan x="0" dy="1.2em">131,131</tspan></text>
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">11,519,538</tspan><tspan x="0" dy="1.2em">50,85</tspan></text>
     </g>
   </g>
-  <g transform="translate(20,30)">
+  <g transform="translate(40,60)">
     <g class="primitive">
-      <text text-anchor="middle" dy="-0.25em">R4-119<tspan x="0" dy="1.2em">0,0</tspan></text>
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">15,531,531</tspan><tspan x="0" dy="1.2em">42,50</tspan></text>
     </g>
   </g>
-  <g transform="translate(320,90)">
+  <g transform="translate(300,317.5)">
     <g class="primitive">
-      <text text-anchor="middle" dy="-0.25em">O9-221<tspan x="0" dy="1.2em">95,95</tspan></text>
+      <text text-anchor="middle" dy="-0.85em">carry<tspan x="0" dy="1.2em">11,15,523</tspan><tspan x="0" dy="1.2em">117,123</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(60,270)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">2,238,221</tspan><tspan x="0" dy="1.2em">50,60</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(20,370)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.25em">R10-67<tspan x="0" dy="1.2em">0,0</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(40,280)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">8,455,455</tspan><tspan x="0" dy="1.2em">0,50</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(20,190)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.25em">R13-266<tspan x="0" dy="1.2em">0,0</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(120,295)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">deposit<tspan x="0" dy="1.2em">26,13,476</tspan><tspan x="0" dy="1.2em">96,96</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(140,360)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">25,271,270</tspan><tspan x="0" dy="1.2em">77,85</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(60,130)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">23,10,10</tspan><tspan x="0" dy="1.2em">50,85</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(40,370)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">10,67,41</tspan><tspan x="0" dy="1.2em">0,50</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(40,40)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">18,503,503</tspan><tspan x="0" dy="1.2em">0,50</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(20,350)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.25em">R9-467<tspan x="0" dy="1.2em">0,0</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(20,340)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.25em">R12-442<tspan x="0" dy="1.2em">0,0</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(40,160)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">14,94,94</tspan><tspan x="0" dy="1.2em">25,50</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(240,312.5)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.25em">op15<tspan x="0" dy="1.2em">117,117</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(40,270)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">2,238,238</tspan><tspan x="0" dy="1.2em">0,50</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(20,140)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.25em">R16-271<tspan x="0" dy="1.2em">78,78</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(420,331.25)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">deposit<tspan x="0" dy="1.2em">25,16,196</tspan><tspan x="0" dy="1.2em">138,138</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(20,330)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.25em">R25-582<tspan x="0" dy="1.2em">0,0</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(20,310)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.25em">R11-519<tspan x="0" dy="1.2em">46,46</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(240,282.5)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">8,74,-1</tspan><tspan x="0" dy="1.2em">117,304</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(20,70)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.25em">R20-24<tspan x="0" dy="1.2em">0,0</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(40,100)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">22,468,468</tspan><tspan x="0" dy="1.2em">0,50</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(80,15)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">collect<tspan x="0" dy="1.2em">6,10,130</tspan><tspan x="0" dy="1.2em">78,78</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(20,270)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.25em">R2-238<tspan x="0" dy="1.2em">0,0</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(20,170)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.25em">R19-359<tspan x="0" dy="1.2em">0,0</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(40,190)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">13,266,266</tspan><tspan x="0" dy="1.2em">0,50</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(40,200)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">7,226,226</tspan><tspan x="0" dy="1.2em">41,50</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(140,320)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">2,417,373</tspan><tspan x="0" dy="1.2em">88,259</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(140,310)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.25em">op5<tspan x="0" dy="1.2em">92,92</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(440,348.12)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.25em">op13<tspan x="0" dy="1.2em">138,138</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(60,120)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">29,56,56</tspan><tspan x="0" dy="1.2em">50,85</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(20,280)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.25em">R8-455<tspan x="0" dy="1.2em">0,0</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(40,20)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">6,110,130</tspan><tspan x="0" dy="1.2em">0,50</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(20,20)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.25em">R6-110<tspan x="0" dy="1.2em">0,0</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(60,150)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">21,297,296</tspan><tspan x="0" dy="1.2em">50,85</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(640,368.91)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">9,370,410</tspan><tspan x="0" dy="1.2em">155,198</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(40,80)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">27,59,33</tspan><tspan x="0" dy="1.2em">0,50</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(80,325)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">collect<tspan x="0" dy="1.2em">25,12,556</tspan><tspan x="0" dy="1.2em">60,60</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(60,200)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">7,226,226</tspan><tspan x="0" dy="1.2em">50,85</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(40,360)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">24,44,44</tspan><tspan x="0" dy="1.2em">0,50</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(60,170)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">19,359,359</tspan><tspan x="0" dy="1.2em">50,85</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(60,180)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">5,450,450</tspan><tspan x="0" dy="1.2em">50,85</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(100,265)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">carry<tspan x="0" dy="1.2em">2,11,417</tspan><tspan x="0" dy="1.2em">60,88</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(20,220)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.25em">R30-559<tspan x="0" dy="1.2em">0,0</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(560,364.06)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.25em">O20-513<tspan x="0" dy="1.2em">146,146</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(40,30)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">28,36,36</tspan><tspan x="0" dy="1.2em">0,50</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(60,20)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">6,130,130</tspan><tspan x="0" dy="1.2em">50,78</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(60,300)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">26,469,495</tspan><tspan x="0" dy="1.2em">50,60</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(60,40)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">18,503,503</tspan><tspan x="0" dy="1.2em">50,85</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(80,295)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">collect<tspan x="0" dy="1.2em">26,13,495</tspan><tspan x="0" dy="1.2em">60,60</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(40,220)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">30,559,559</tspan><tspan x="0" dy="1.2em">0,50</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(540,342.19)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">12,247,-1</tspan><tspan x="0" dy="1.2em">146,304</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(400,331.25)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">carry<tspan x="0" dy="1.2em">25,16,196</tspan><tspan x="0" dy="1.2em">123,138</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(80,225)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">collect<tspan x="0" dy="1.2em">30,18,532</tspan><tspan x="0" dy="1.2em">60,60</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(20,230)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.25em">O18-532<tspan x="0" dy="1.2em">60,60</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(20,180)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.25em">R5-450<tspan x="0" dy="1.2em">0,0</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(200,290)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">carry<tspan x="0" dy="1.2em">8,14,74</tspan><tspan x="0" dy="1.2em">88,117</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(60,340)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">12,442,410</tspan><tspan x="0" dy="1.2em">50,85</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(180,290)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">collect<tspan x="0" dy="1.2em">8,14,483</tspan><tspan x="0" dy="1.2em">88,88</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(540,364.06)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.25em">op12<tspan x="0" dy="1.2em">146,146</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(620,360.94)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">deposit<tspan x="0" dy="1.2em">9,20,370</tspan><tspan x="0" dy="1.2em">155,155</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(20,100)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.25em">R22-468<tspan x="0" dy="1.2em">0,0</tspan></text>
     </g>
   </g>
   <g transform="translate(20,40)">
     <g class="primitive">
-      <text text-anchor="middle" dy="-0.25em">O10-252<tspan x="0" dy="1.2em">0,0</tspan></text>
+      <text text-anchor="middle" dy="-0.25em">R18-503<tspan x="0" dy="1.2em">0,0</tspan></text>
     </g>
   </g>
-  <g transform="translate(160,85)">
+  <g transform="translate(500,353.12)">
     <g class="primitive">
-      <text text-anchor="middle" dy="-0.85em">collect<tspan x="0" dy="1.2em">1,6,509</tspan><tspan x="0" dy="1.2em">44,44</tspan></text>
+      <text text-anchor="middle" dy="-0.85em">carry<tspan x="0" dy="1.2em">12,19,247</tspan><tspan x="0" dy="1.2em">138,146</tspan></text>
     </g>
   </g>
-  <g transform="translate(540,55)">
+  <g transform="translate(40,130)">
     <g class="primitive">
-      <text text-anchor="middle" dy="-0.85em">carry<tspan x="0" dy="1.2em">2,12,247</tspan><tspan x="0" dy="1.2em">131,143</tspan></text>
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">23,10,10</tspan><tspan x="0" dy="1.2em">0,50</tspan></text>
     </g>
   </g>
-  <g transform="translate(500,120)">
+  <g transform="translate(60,30)">
     <g class="primitive">
-      <text text-anchor="middle" dy="-0.25em">O12-355<tspan x="0" dy="1.2em">131,131</tspan></text>
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">28,36,36</tspan><tspan x="0" dy="1.2em">50,85</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(40,70)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">20,24,24</tspan><tspan x="0" dy="1.2em">0,50</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(60,220)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">30,559,532</tspan><tspan x="0" dy="1.2em">50,60</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(20,200)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.25em">R7-226<tspan x="0" dy="1.2em">41,41</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(100,225)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">carry<tspan x="0" dy="1.2em">30,18,482</tspan><tspan x="0" dy="1.2em">60,91</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(60,190)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">13,266,292</tspan><tspan x="0" dy="1.2em">50,85</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(60,80)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">27,33,33</tspan><tspan x="0" dy="1.2em">50,85</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(80,245)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">collect<tspan x="0" dy="1.2em">4,17,355</tspan><tspan x="0" dy="1.2em">60,60</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(640,352.97)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.25em">op17<tspan x="0" dy="1.2em">155,155</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(20,30)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.25em">R28-36<tspan x="0" dy="1.2em">0,0</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(20,80)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.25em">R27-59<tspan x="0" dy="1.2em">0,0</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(40,250)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">4,302,302</tspan><tspan x="0" dy="1.2em">0,50</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(40,180)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">5,450,450</tspan><tspan x="0" dy="1.2em">0,50</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(20,50)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.25em">R1-490<tspan x="0" dy="1.2em">0,0</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(60,330)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">25,582,556</tspan><tspan x="0" dy="1.2em">50,60</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(520,353.12)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">deposit<tspan x="0" dy="1.2em">12,19,247</tspan><tspan x="0" dy="1.2em">146,146</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(460,348.12)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.25em">O19-410<tspan x="0" dy="1.2em">138,138</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(60,250)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">4,302,355</tspan><tspan x="0" dy="1.2em">50,60</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(140,345)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.25em">op16<tspan x="0" dy="1.2em">88,88</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(60,60)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">15,531,530</tspan><tspan x="0" dy="1.2em">50,85</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(20,120)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.25em">R29-56<tspan x="0" dy="1.2em">34,34</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(40,340)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">12,442,442</tspan><tspan x="0" dy="1.2em">0,50</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(40,330)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">25,582,582</tspan><tspan x="0" dy="1.2em">0,50</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(140,300)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">6,222,-1</tspan><tspan x="0" dy="1.2em">92,304</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(20,320)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.25em">O12-556<tspan x="0" dy="1.2em">60,60</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(440,324.38)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">25,196,118</tspan><tspan x="0" dy="1.2em">138,289</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(100,325)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">carry<tspan x="0" dy="1.2em">25,12,271</tspan><tspan x="0" dy="1.2em">60,77</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(340,326.25)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.25em">op14<tspan x="0" dy="1.2em">123,123</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(20,240)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.25em">O17-355<tspan x="0" dy="1.2em">60,60</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(580,360.94)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">collect<tspan x="0" dy="1.2em">9,20,513</tspan><tspan x="0" dy="1.2em">146,146</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(60,370)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">10,41,41</tspan><tspan x="0" dy="1.2em">50,85</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(40,170)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">19,359,359</tspan><tspan x="0" dy="1.2em">0,50</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(480,353.12)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">collect<tspan x="0" dy="1.2em">12,19,410</tspan><tspan x="0" dy="1.2em">138,138</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(60,160)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">14,94,94</tspan><tspan x="0" dy="1.2em">50,85</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(140,330)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">4,68,68</tspan><tspan x="0" dy="1.2em">79,85</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(280,317.5)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">collect<tspan x="0" dy="1.2em">11,15,538</tspan><tspan x="0" dy="1.2em">117,117</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(20,60)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.25em">R15-531<tspan x="0" dy="1.2em">42,42</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(20,110)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.25em">R3-514<tspan x="0" dy="1.2em">72,72</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(100,245)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">carry<tspan x="0" dy="1.2em">4,17,68</tspan><tspan x="0" dy="1.2em">60,79</tspan></text>
     </g>
   </g>
   <g transform="translate(20,10)">
     <g class="primitive">
-      <text text-anchor="middle" dy="-0.25em">R3-545<tspan x="0" dy="1.2em">0,0</tspan></text>
+      <text text-anchor="middle" dy="-0.25em">O10-130<tspan x="0" dy="1.2em">78,78</tspan></text>
     </g>
   </g>
-  <g transform="translate(200,40)">
+  <g transform="translate(40,50)">
     <g class="primitive">
-      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">2,374,355</tspan><tspan x="0" dy="1.2em">29,31</tspan></text>
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">1,490,490</tspan><tspan x="0" dy="1.2em">0,50</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(40,150)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">21,297,297</tspan><tspan x="0" dy="1.2em">0,50</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(120,245)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">deposit<tspan x="0" dy="1.2em">4,17,68</tspan><tspan x="0" dy="1.2em">79,79</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(20,250)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.25em">R4-302<tspan x="0" dy="1.2em">0,0</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(20,260)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.25em">O11-221<tspan x="0" dy="1.2em">60,60</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(140,290)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">26,476,-1</tspan><tspan x="0" dy="1.2em">96,304</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(60,350)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">9,466,513</tspan><tspan x="0" dy="1.2em">50,85</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(40,350)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">9,467,466</tspan><tspan x="0" dy="1.2em">0,50</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(120,265)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">deposit<tspan x="0" dy="1.2em">2,11,417</tspan><tspan x="0" dy="1.2em">88,88</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(60,280)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">8,455,483</tspan><tspan x="0" dy="1.2em">50,85</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(40,140)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">16,271,271</tspan><tspan x="0" dy="1.2em">78,85</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(380,331.25)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">collect<tspan x="0" dy="1.2em">25,16,270</tspan><tspan x="0" dy="1.2em">123,123</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(60,100)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">22,468,468</tspan><tspan x="0" dy="1.2em">50,85</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(80,265)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">collect<tspan x="0" dy="1.2em">2,11,221</tspan><tspan x="0" dy="1.2em">60,60</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(140,220)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">30,482,-1</tspan><tspan x="0" dy="1.2em">91,304</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(60,70)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">20,24,24</tspan><tspan x="0" dy="1.2em">50,85</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(40,310)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">11,519,519</tspan><tspan x="0" dy="1.2em">46,50</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(40,90)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">17,82,82</tspan><tspan x="0" dy="1.2em">27,50</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(120,225)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">deposit<tspan x="0" dy="1.2em">30,18,482</tspan><tspan x="0" dy="1.2em">91,91</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(320,317.5)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">deposit<tspan x="0" dy="1.2em">11,15,523</tspan><tspan x="0" dy="1.2em">123,123</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(160,345)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.25em">O14-483<tspan x="0" dy="1.2em">88,88</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(40,120)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">29,56,56</tspan><tspan x="0" dy="1.2em">34,50</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(40,110)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">3,514,514</tspan><tspan x="0" dy="1.2em">72,85</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(20,300)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.25em">R26-469<tspan x="0" dy="1.2em">0,0</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(20,150)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.25em">R21-297<tspan x="0" dy="1.2em">0,0</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(60,50)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">1,490,464</tspan><tspan x="0" dy="1.2em">50,85</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(20,90)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.25em">R17-82<tspan x="0" dy="1.2em">27,27</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(20,160)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.25em">R14-94<tspan x="0" dy="1.2em">25,25</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(260,312.5)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.25em">O15-538<tspan x="0" dy="1.2em">117,117</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(60,360)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">24,44,44</tspan><tspan x="0" dy="1.2em">50,85</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(220,290)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">deposit<tspan x="0" dy="1.2em">8,14,74</tspan><tspan x="0" dy="1.2em">117,117</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(60,90)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">17,82,82</tspan><tspan x="0" dy="1.2em">50,85</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(40,300)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">26,469,469</tspan><tspan x="0" dy="1.2em">0,50</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(20,360)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.25em">R24-44<tspan x="0" dy="1.2em">0,0</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(600,360.94)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">carry<tspan x="0" dy="1.2em">9,20,370</tspan><tspan x="0" dy="1.2em">146,155</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(120,325)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">deposit<tspan x="0" dy="1.2em">25,12,271</tspan><tspan x="0" dy="1.2em">77,77</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(20,290)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.25em">O13-495<tspan x="0" dy="1.2em">60,60</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(100,295)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">carry<tspan x="0" dy="1.2em">26,13,476</tspan><tspan x="0" dy="1.2em">60,96</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(340,308.75)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">go<tspan x="0" dy="1.2em">11,523,-1</tspan><tspan x="0" dy="1.2em">123,304</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(360,326.25)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.25em">O16-270<tspan x="0" dy="1.2em">123,123</tspan></text>
+    </g>
+  </g>
+  <g transform="translate(120,15)">
+    <g class="primitive">
+      <text text-anchor="middle" dy="-0.85em">deposit<tspan x="0" dy="1.2em">6,10,222</tspan><tspan x="0" dy="1.2em">92,92</tspan></text>
     </g>
   </g>
 </g>

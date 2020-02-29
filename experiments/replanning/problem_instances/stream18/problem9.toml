@@ -9,101 +9,101 @@ initial_conditions = [[1, 75], [2, 343], [3, 258], [4, 495], [5, 384], [6, 369],
 pre = [[29, 342]]
 post = [[30, 361]]
 station_id = 30
-id = 17422
+id = 1850
 dt = 0
 [[operations]]
 pre = [[28, 510], [27, 476]]
 post = [[29, 276]]
 station_id = 29
-id = 17423
+id = 1851
 dt = 0
 [[operations]]
-pre = [[25, 56], [26, 271], [24, 265]]
+pre = [[26, 271], [25, 56], [24, 265]]
 post = [[28, 528]]
 station_id = 28
-id = 17424
+id = 1852
 dt = 0
 [[operations]]
 pre = [[23, 94]]
 post = [[26, 392]]
 station_id = 26
-id = 17425
+id = 1853
 dt = 0
 [[operations]]
 pre = [[22, 545]]
 post = [[27, 538]]
 station_id = 27
-id = 17426
+id = 1854
 dt = 0
 [[operations]]
 pre = [[21, 107]]
 post = [[23, 544]]
 station_id = 23
-id = 17427
+id = 1855
 dt = 0
 [[operations]]
 pre = [[20, 519]]
 post = [[21, 104]]
 station_id = 21
-id = 17428
+id = 1856
 dt = 0
 [[operations]]
 pre = [[19, 131]]
 post = [[25, 477]]
 station_id = 25
-id = 17429
+id = 1857
 dt = 0
 [[operations]]
 pre = [[18, 208], [16, 370], [17, 405]]
 post = [[19, 264]]
 station_id = 19
-id = 17430
+id = 1858
 dt = 0
 [[operations]]
-pre = [[15, 82], [14, 202], [13, 251]]
+pre = [[15, 82], [13, 251], [14, 202]]
 post = [[24, 404]]
 station_id = 24
-id = 17431
+id = 1859
 dt = 0
 [[operations]]
 pre = [[12, 99]]
 post = [[22, 355]]
 station_id = 22
-id = 17432
+id = 1860
 dt = 0
 [[operations]]
 pre = [[10, 125], [11, 62]]
 post = [[20, 89]]
 station_id = 20
-id = 17433
+id = 1861
 dt = 0
 [[operations]]
 pre = [[9, 383]]
 post = [[17, 233]]
 station_id = 17
-id = 17434
+id = 1862
 dt = 0
 [[operations]]
-pre = [[7, 86], [8, 243]]
+pre = [[8, 243], [7, 86]]
 post = [[16, 550]]
 station_id = 16
-id = 17435
+id = 1863
 dt = 0
 [[operations]]
-pre = [[4, 399], [6, 374], [5, 362]]
+pre = [[6, 374], [5, 362], [4, 399]]
 post = [[18, 118]]
 station_id = 18
-id = 17436
+id = 1864
 dt = 0
 [[operations]]
-pre = [[1, 411], [2, 74], [3, 222]]
+pre = [[3, 222], [2, 74], [1, 411]]
 post = [[7, 505]]
 station_id = 7
-id = 17437
+id = 1865
 dt = 0
 [[operations]]
 pre = [[30, 68]]
 post = []
 station_id = -1
-id = 17438
+id = 1866
 dt = 0
