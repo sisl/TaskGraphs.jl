@@ -34,6 +34,7 @@ export
     read_assignment,
     read_sparse_matrix,
     run_profiling,
+    compile_solver_results,
     run_replanner_profiling
 
 
@@ -454,7 +455,6 @@ function profile_replanning(replan_model, fallback_model, solver, fallback_solve
                 cost = fallback_cost
             else
                 println("TIMEOUT! No feasible solution found by fallback solver or regular solver. Terminating...",idx)
-                # return Dict{String,Any}()
                 merge!(final_times[idx], Dict{AbstractID,Int}(OperationID(k)=>-1 for k in keys(get_operations(next_schedule))))
                 break
             end
@@ -478,25 +478,16 @@ function profile_replanning(replan_model, fallback_model, solver, fallback_solve
 
     results_dict["fallback_feasible"]   = map(i->local_results[i]["fallback_feasible"], 2:idx)
 
-# try
     println("COMPUTING MAKESPANS")
     results_dict["final_time"]         = map(i->maximum(collect(values(final_times[i]))),1:idx)
     results_dict["makespans"]          = [b-a for (a,b) in zip(results_dict["arrival_time"],results_dict["final_time"])]
     @show results_dict["makespans"]
-# catch e
-#     @show final_times
-#     throw(e)
-# end
-    # if results_dict["feasible"][end] || results_dict["fallback_feasible"][end]
+
     if cost[1] < Inf
-    # try
+        println("SAVING PATHS")
         object_path_dict, object_interval_dict = fill_object_path_dicts!(solution,search_env.schedule,search_env.cache,object_path_dict,object_interval_dict)
         object_paths, object_intervals = convert_to_path_vectors(object_path_dict, object_interval_dict)
-    # catch e
-    #     @show solution
-    #     throw(e)
-    # end
-        println("SAVING PATHS")
+
         results_dict["robot_paths"]         = convert_to_vertex_lists(solution)
         results_dict["object_paths"]        = object_paths
         results_dict["object_intervals"]    = object_intervals

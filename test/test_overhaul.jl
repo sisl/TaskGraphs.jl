@@ -311,8 +311,8 @@ let
         );
 
     # replan_model = MergeAndBalance()
-    replan_model = ReassignFreeRobots()
-    # replan_model = DeferUntilCompletion()
+    # replan_model = ReassignFreeRobots()
+    replan_model = DeferUntilCompletion()
     fallback_model = ReassignFreeRobots()
 
     primary_objective = SumOfMakeSpans
@@ -430,6 +430,296 @@ let
 end
 
 # for REPLANNING
+let
+
+    env_id=2
+    env_filename = string(ENVIRONMENT_DIR,"/env_",env_id,".toml")
+    factory_env = read_env(env_filename)
+    env_graph = factory_env
+    dist_matrix = get_dist_matrix(env_graph)
+    dist_mtx_map = DistMatrixMap(factory_env.vtx_map,factory_env.vtxs)
+
+    base_solver_configs = [
+        Dict(
+        :nbs_time_limit=>8,
+        :route_planning_buffer=>2,
+        :env_id=>2,
+        :OutputFlag => 0,
+        :Presolve => -1,
+        ),
+    ]
+    replan_configs = [
+        Dict(:replan_model=>MergeAndBalance(),),
+        Dict(:replan_model=>Oracle(),:time_out_buffer=>-105,:route_planning_buffer=>5),
+        Dict(:replan_model=>ReassignFreeRobots(),),
+        Dict(:replan_model=>DeferUntilCompletion(),),
+    ]
+    fallback_configs = [
+        Dict(:fallback_model=>ReassignFreeRobots(),),
+    ]
+    solver_configs = Dict[]
+    for dicts in Base.Iterators.product(base_solver_configs,replan_configs,fallback_configs)
+        push!(solver_configs,merge(dicts...))
+    end
+    base_configs = [
+        Dict(
+            :warning_time=>20,
+            :commit_threshold=>10,
+            :fallback_commit_threshold=>10,
+            :num_trials => 4,
+            :max_parents => 3,
+            :depth_bias => 0.4,
+            :dt_min => 0,
+            :dt_max => 0,
+            :dt_collect => 0,
+            :dt_deliver => 0,
+            :task_sizes => (1=>1.0,2=>0.0,4=>0.0),
+            )
+    ]
+    stream_configs = [
+        Dict(:N=>30, :M=>10, :num_projects=>10, :arrival_interval=>40, ),
+        Dict(:N=>30, :M=>15, :num_projects=>10, :arrival_interval=>50, ),
+        Dict(:N=>30, :M=>20, :num_projects=>10, :arrival_interval=>60, ),
+        Dict(:N=>30, :M=>25, :num_projects=>10, :arrival_interval=>70, ),
+        Dict(:N=>30, :M=>30, :num_projects=>10, :arrival_interval=>80, ),
+    ]
+    problem_configs = Dict[]
+    for dicts in Base.Iterators.product(base_configs,stream_configs)
+        push!(problem_configs,merge(dicts...))
+    end
+
+    solver_template = PC_TAPF_Solver(
+        nbs_model                   = SparseAdjacencyMILP(),
+        DEBUG                       = true,
+        l1_verbosity                = 1,
+        l2_verbosity                = 1,
+        l3_verbosity                = 0,
+        l4_verbosity                = 0,
+        LIMIT_assignment_iterations = 10,
+        LIMIT_A_star_iterations     = 8000
+        );
+    fallback_solver_template = PC_TAPF_Solver(
+        nbs_model                   = GreedyAssignment(),
+        astar_model                 = PrioritizedAStarModel(),
+        DEBUG                       = true,
+        l1_verbosity                = 1,
+        l2_verbosity                = 1,
+        l3_verbosity                = 0,
+        l4_verbosity                = 0,
+        LIMIT_assignment_iterations = 2,
+        LIMIT_A_star_iterations     = 8000
+        );
+
+
+    base_dir            = joinpath(EXPERIMENT_DIR,"replanning")
+    base_problem_dir    = joinpath(base_dir,"problem_instances")
+    base_results_dir    = joinpath(base_dir,"results")
+
+    solver_config = solver_configs[4]
+    problem_config = problem_configs[1]
+    primary_objective = SumOfMakeSpans
+    folder_id = 5
+    # reset_operation_id_counter!()
+    # reset_action_id_counter!()
+    # run_replanner_profiling(:write;
+    #     problem_configs=problem_configs,
+    #     base_problem_dir=base_problem_dir,
+    #     )
+    modes = [:solve]
+    # for solver_config in solver_configs
+    replan_model = get(solver_config,:replan_model,  MergeAndBalance())
+    fallback_model  = get(solver_config,:fallback_model,ReassignFreeRobots())
+    results_dir     = get(solver_config,:results_dir,   joinpath(
+        base_results_dir, string(typeof(replan_model),"-",typeof(fallback_model))))
+        # for mode in modes
+        #     reset_operation_id_counter!()
+        #     reset_action_id_counter!()
+        #     run_replanner_profiling(mode;
+        #         solver_config=solver_config,
+        #         problem_configs=problem_configs,
+        #         base_problem_dir=base_problem_dir,
+        #         base_results_dir=results_dir,
+        #         solver_template=solver_template,
+        #         fallback_solver_template=fallback_solver_template,
+        #         primary_objective=SumOfMakeSpans,
+        #         )
+        # end
+    # end
+
+    Random.seed!(1)
+    # folder_id = initial_problem_id-1;
+    # run tests and push results into table
+    # for problem_config in problem_configs
+
+    num_trials          = get(problem_config,:num_trials,1)
+    max_parents         = get(problem_config,:max_parents,3)
+    depth_bias          = get(problem_config,:depth_bias,0.4)
+    dt_min              = get(problem_config,:dt_min,0)
+    dt_max              = get(problem_config,:dt_max,0)
+    dt_collect          = get(problem_config,:dt_collect,0)
+    dt_deliver          = get(problem_config,:dt_deliver,0)
+    task_sizes          = get(problem_config,:task_sizes,(1=>1.0,2=>0.0,4=>0.0))
+    N                   = get(problem_config,:N,30)
+    M                   = get(problem_config,:M,10)
+    num_projects        = get(problem_config,:num_projects,10)
+    arrival_interval    = get(problem_config,:arrival_interval,40)
+    # for trial in 1:num_trials
+    # try
+    # folder_id += 1 # moved this to the beginning so it doesn't get skipped
+    problem_dir = joinpath(base_problem_dir,string("stream",folder_id))
+
+    project_list = SimpleProblemDef[]
+    for problem_id in 1:num_projects
+        problem_filename = joinpath(problem_dir,string("problem",problem_id,".toml"))
+        config_filename = joinpath(problem_dir,string("config",problem_id,".toml"))
+        # config_filename = joinpath(problem_dir,string("config",problem_id,".toml"))
+        problem_def = read_problem_def(problem_filename)
+        push!(project_list, problem_def)
+    end
+
+    solver = PC_TAPF_Solver(solver_template,start_time=time());
+    fallback_solver = PC_TAPF_Solver(fallback_solver_template,start_time=time());
+
+    arrival_interval            = problem_config[:arrival_interval] # new project requests arrive every `arrival_interval` timesteps
+    warning_time                = problem_config[:warning_time] # the project request arrives in the command center `warning_time` timesteps before the relevant objects become available
+    commit_threshold            = problem_config[:commit_threshold] # freeze the current plan (route plan and schedule) at `t_arrival` + `commit_threshold`
+    fallback_commit_threshold   = problem_config[:fallback_commit_threshold] # a tentative plan (computed with a fast heuristic) may take effect at t = t_arrival + fallback_commit_threshold--just in case the solver fails
+
+    local_results = map(p->Dict{String,Any}(),project_list)
+    final_times = map(p->Dict{AbstractID,Int}(),project_list)
+
+    idx = 1
+    t_arrival = 0
+    def = project_list[idx]
+    project_spec, problem_spec, _, _, robot_ICs = construct_task_graphs_problem(def, dist_matrix;
+        Δt_collect=map(i->get(problem_config,:dt_collect,0), def.s0),
+        Δt_deliver=map(i->get(problem_config,:dt_deliver,0), def.s0),
+        cost_function=primary_objective,
+        task_shapes=def.shapes,
+        shape_dict=env_graph.expanded_zones,
+        );
+    partial_schedule = construct_partial_project_schedule(project_spec,problem_spec,robot_ICs)
+    base_search_env = construct_search_env(solver,partial_schedule,problem_spec,env_graph;primary_objective=primary_objective)
+
+    # store solution for plotting
+    project_ids = Dict{Int,Int}()
+    for (object_id, pred) in get_object_ICs(partial_schedule)
+        project_ids[get_id(object_id)] = idx
+    end
+    object_path_dict = Dict{Int,Vector{Vector{Int}}}()
+    object_interval_dict = Dict{Int,Vector{Int}}()
+
+    # print_project_schedule(string("schedule",idx,"B"),base_search_env.schedule;mode=:leaf_aligned)
+    (solution, _, cost, search_env, optimality_gap), elapsed_time, byte_ct, gc_time, mem_ct = @timed high_level_search!(
+        solver, base_search_env, Gurobi.Optimizer;primary_objective=primary_objective)
+    # print_project_schedule(string("schedule",idx,"C"),search_env.schedule;mode=:leaf_aligned)
+    local_results[idx] = compile_solver_results(solver, solution, cost, search_env, optimality_gap, elapsed_time, t_arrival)
+    merge!(final_times[idx], Dict{AbstractID,Int}(OperationID(k)=>t_arrival for k in keys(get_operations(partial_schedule))))
+    for i in 1:idx
+        for node_id in keys(final_times[i])
+            v = get_vtx(search_env.schedule,node_id)
+            final_times[i][node_id] = max(final_times[i][node_id], get(search_env.cache.tF, v, -1))
+        end
+    end
+
+    while idx < length(project_list)
+        project_schedule = search_env.schedule
+        cache = search_env.cache
+        idx += 1
+        t_request = arrival_interval * (idx - 1) # time when request reaches command center
+        t_arrival = t_request + warning_time # time when objects become available
+        # load next project
+        def = project_list[idx]
+        project_spec, problem_spec, _, _, _ = construct_task_graphs_problem(def, dist_matrix;
+            Δt_collect=map(i->get(problem_config,:dt_collect,0), def.s0),
+            Δt_deliver=map(i->get(problem_config,:dt_deliver,0), def.s0),
+            cost_function=primary_objective,
+            task_shapes=def.shapes,
+            shape_dict=env_graph.expanded_zones
+        )
+        next_schedule = construct_partial_project_schedule(project_spec,problem_spec)
+        remap_object_ids!(next_schedule,project_schedule)
+        print_project_schedule(string("next_schedule",idx),next_schedule;mode=:leaf_aligned)
+        # store solution for plotting
+        object_path_dict, object_interval_dict = fill_object_path_dicts!(solution,project_schedule,cache,object_path_dict,object_interval_dict)
+        for (object_id, pred) in get_object_ICs(next_schedule)
+            project_ids[get_id(object_id)] = idx
+        end
+        # Fallback
+        println("Computing Fallback plan at idx = ",idx)
+        fallback_search_env = replan(fallback_solver, fallback_model, search_env, env_graph, problem_spec, solution, next_schedule, t_request, t_arrival;commit_threshold=fallback_commit_threshold)
+        reset_solver!(fallback_solver)
+        (fallback_solution, _, fallback_cost, fallback_search_env, fallback_optimality_gap), fallback_elapsed_time, _, _, _ = @timed high_level_search!(
+            fallback_solver, fallback_search_env, Gurobi.Optimizer;primary_objective=primary_objective)
+
+        print_project_schedule(string("schedule",idx,"A"),fallback_search_env;mode=:leaf_aligned)
+        # Replanning outer loop
+        # t_commit = get_commit_time(replan_model, search_env, t_request, commit_threshold)
+        base_search_env = replan(solver, replan_model, search_env, env_graph, problem_spec, solution, next_schedule, t_request, t_arrival; commit_threshold=commit_threshold)
+        # base_search_env = replan(solver, replan_model, fallback_search_env, env_graph, problem_spec, fallback_solution, nothing, t_request, t_arrival;commit_threshold=commit_threshold)
+        print_project_schedule(string("schedule",idx,"B"),base_search_env;mode=:leaf_aligned)
+        # plan for current project
+        println("Computing plan at idx = ",idx)
+        reset_solver!(solver)
+        (solution, _, cost, search_env, optimality_gap), elapsed_time, _, _, _ = @timed high_level_search!(solver, base_search_env, Gurobi.Optimizer;primary_objective=primary_objective)
+        print_project_schedule(string("schedule",idx,"C"),search_env;mode=:leaf_aligned)
+        # m = maximum(map(p->length(p), get_paths(solution)))
+        # @show
+
+        fallback_results = compile_solver_results(fallback_solver, fallback_solution, fallback_cost, fallback_search_env, fallback_optimality_gap, fallback_elapsed_time, t_arrival)
+        local_results[idx] = compile_solver_results(solver, solution, cost, search_env, optimality_gap, elapsed_time, t_arrival)
+        merge!(local_results[idx],Dict(string("fallback_",k)=>v for (k,v) in fallback_results))
+        # Switch to fallback if necessary
+        if (elapsed_time > solver.time_limit) || ~local_results[idx]["feasible"]
+            if local_results[idx]["feasible"]
+                println("TIMEOUT! Using feasible solver output",idx)
+            elseif local_results[idx]["fallback_feasible"]
+                println("TIMEOUT! Solver failed to find feasible solution. Resorting to fallback plan on ",idx)
+                solution = fallback_solution
+                search_env = fallback_search_env
+                cost = fallback_cost
+            else
+                println("TIMEOUT! No feasible solution found by fallback solver or regular solver. Terminating...",idx)
+                merge!(final_times[idx], Dict{AbstractID,Int}(OperationID(k)=>-1 for k in keys(get_operations(next_schedule))))
+                break
+            end
+        end
+        merge!(final_times[idx], Dict{AbstractID,Int}(OperationID(k)=>t_arrival for k in keys(get_operations(next_schedule))))
+        for i in 1:idx
+            for node_id in keys(final_times[i])
+                v = get_vtx(search_env.schedule,node_id)
+                final_times[i][node_id] = max(final_times[i][node_id], get(search_env.cache.tF, v, -1))
+            end
+        end
+    end
+    results_dict = Dict{String,Any}()
+    println("DONE REPLANNING - Aggregating results")
+    results_dict["time"]                = map(i->local_results[i]["time"], 1:idx)
+    results_dict["optimality_gap"]      = map(i->local_results[i]["optimality_gap"], 1:idx)
+    results_dict["optimal"]             = map(i->local_results[i]["optimal"], 1:idx)
+    results_dict["feasible"]            = map(i->local_results[i]["feasible"], 1:idx)
+    results_dict["cost"]                = map(i->local_results[i]["cost"], 1:idx)
+    results_dict["arrival_time"]        = map(i->local_results[i]["arrival_time"], 1:idx)
+
+    results_dict["fallback_feasible"]   = map(i->local_results[i]["fallback_feasible"], 2:idx)
+
+    println("COMPUTING MAKESPANS")
+    results_dict["final_time"]         = map(i->maximum(collect(values(final_times[i]))),1:idx)
+    results_dict["makespans"]          = [b-a for (a,b) in zip(results_dict["arrival_time"],results_dict["final_time"])]
+    @show results_dict["makespans"]
+
+    if cost[1] < Inf
+        println("SAVING PATHS")
+        object_path_dict, object_interval_dict = fill_object_path_dicts!(solution,search_env.schedule,search_env.cache,object_path_dict,object_interval_dict)
+        object_paths, object_intervals = convert_to_path_vectors(object_path_dict, object_interval_dict)
+
+        results_dict["robot_paths"]         = convert_to_vertex_lists(solution)
+        results_dict["object_paths"]        = object_paths
+        results_dict["object_intervals"]    = object_intervals
+        results_dict["project_idxs"]        = map(k->project_ids[k], sort(collect(keys(project_ids))))
+    end
+    results_dict
+end
 
 # Collaborative transport
 

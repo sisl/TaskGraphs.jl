@@ -602,7 +602,7 @@ function CRCBS.build_env(solver, env::E, node::N, schedule_node::T, v::Int,path_
     end
     # make sure base_path hits t0 constraint
     if get_end_index(base_path) < env.cache.t0[v]
-        log_info(-1, solver, string("LOW LEVEL SEARCH: in schedule node ",v," -- ",
+        log_info(1, solver, string("LOW LEVEL SEARCH: in schedule node ",v," -- ",
             string(schedule_node),": cache.t0[v] - get_end_index(base_path) = ",env.cache.t0[v] - get_end_index(base_path),". Extending path to ",env.cache.t0[v]," ..."))
         # base_path = extend_path(cbs_env,base_path,env.cache.t0[v])
         extend_path!(cbs_env,base_path,env.cache.t0[v])
@@ -1228,7 +1228,7 @@ function fix_precutoff_nodes!(project_schedule::ProjectSchedule,problem_spec::Pr
     # verify that all vertices following active_vtxs have a start time > 0
     @assert all(map(v->cache.t0[v], collect(fixed_vtxs)) .<= t)
     @assert all(map(v->cache.tF[v] + minimum(cache.local_slack[v]), collect(active_vtxs)) .>= t)
-    project_schedule
+    project_schedule, cache
 end
 
 """
@@ -1391,6 +1391,7 @@ export
     MergeAndBalance,
     Oracle,
     FallBackPlanner,
+    get_commit_time,
     replan
 
 abstract type ReplannerModel end
@@ -1443,6 +1444,43 @@ function set_time_limits!(solver,replan_model::DeferUntilCompletion,t_request,t_
     solver
 end
 
+split_active_vtxs!(replan_model::ReplannerModel,new_schedule,problem_spec,new_cache,t_commit;kwargs...) = split_active_vtxs!(new_schedule,problem_spec,new_cache,t_commit;kwargs...)
+
+fix_precutoff_nodes!(replan_model,new_schedule,problem_spec,new_cache,t_commit) = fix_precutoff_nodes!(new_schedule,problem_spec,new_cache,t_commit)
+# function fix_precutoff_nodes!(replan_model::DeferUntilCompletion,project_schedule,problem_spec,new_cache,t_commit)
+#     fix_precutoff_nodes!(project_schedule,problem_spec,new_cache,t_commit)
+#     # prune all nodes but the tip GO nodes
+#     new_schedule = ProjectSchedule()
+#     for v in vertices(project_schedule)
+#         if ~get_path_spec(project_schedule,v).fixed
+#             node_id = get_vtx_id(project_schedule,v)
+#             node = get_node_from_id(project_schedule,node_id)
+#             @assert isa(node,GO)
+#             add_to_schedule!(new_schedule,problem_spec,node,node_id)
+#             robot_id = get_robot_id(node)
+#             robot_node = ROBOT_AT(get_robot_id(node),get_initial_location_id(node))
+#             robot_path_spec = PathSpec(generate_path_spec(new_schedule,problem_spec,robot_node),fixed=true,plan_path=false)
+#             add_to_schedule!(new_schedule,robot_path_spec,robot_node,robot_id)
+#             add_edge!(new_schedule,robot_id,node_id)
+#         end
+#     end
+#     new_cache = initialize_planning_cache(new_schedule;t0=map(v->t_commit,vertices(new_schedule)))
+#     new_schedule, new_cache
+#     # try
+#     #     @assert(all(map(v->get_path_spec(new_schedule,v).fixed,vertices(new_schedule))))
+#     # catch e
+#     #     for v in vertices(new_schedule)
+#     #         if ~get_path_spec(new_schedule,v).fixed
+#     #             @show string(get_node_from_vtx(new_schedule,v)), get_path_spec(new_schedule,v).fixed, new_cache.t0[v],new_cache.tF[v]
+#     #             for v2 in inneighbors(new_schedule,v)
+#     #                @show string(get_node_from_vtx(new_schedule,v2)), new_cache.t0[v2],new_cache.tF[v2]
+#     #             end
+#     #         end
+#     #     end
+#     #     throw(e)
+#     # end
+# end
+
 function replan(solver, replan_model, search_env, env_graph, problem_spec, solution, next_schedule, t_request, t_arrival; commit_threshold=5,kwargs...)
     project_schedule = search_env.schedule
     cache = search_env.cache
@@ -1455,10 +1493,10 @@ function replan(solver, replan_model, search_env, env_graph, problem_spec, solut
     @assert sanity_check(new_schedule," after prune_schedule()")
     # split active nodes
     robot_positions=get_env_snapshot(solution,t_commit)
-    new_schedule, new_cache = split_active_vtxs!(new_schedule,problem_spec,new_cache,t_commit;robot_positions=robot_positions)
+    new_schedule, new_cache = split_active_vtxs!(replan_model,new_schedule,problem_spec,new_cache,t_commit;robot_positions=robot_positions)
     @assert sanity_check(new_schedule," after split_active_vtxs!()")
     # freeze nodes that terminate before cutoff time
-    fix_precutoff_nodes!(new_schedule,problem_spec,new_cache,t_commit)
+    new_schedule, new_cache = fix_precutoff_nodes!(replan_model,new_schedule,problem_spec,new_cache,t_commit)
     # Remove all "assignments" from schedule
     break_assignments!(replan_model,new_schedule,problem_spec)
     @assert sanity_check(new_schedule," after break_assignments!()")
@@ -1466,11 +1504,14 @@ function replan(solver, replan_model, search_env, env_graph, problem_spec, solut
     # splice projects together!
     splice_schedules!(new_schedule,next_schedule)
     @assert sanity_check(new_schedule," after splice_schedules!()")
-    t0 = map(v->get(new_cache.t0, v, t_arrival), vertices(get_graph(new_schedule)))
-    tF = map(v->get(new_cache.tF, v, t_arrival), vertices(get_graph(new_schedule)))
+    # t0 = map(v->get(new_cache.t0, v, t_arrival), vertices(get_graph(new_schedule)))
+    # tF = map(v->get(new_cache.tF, v, t_arrival), vertices(get_graph(new_schedule)))
+    t0 = map(v->get(new_cache.t0, v, t_commit), vertices(get_graph(new_schedule)))
+    tF = map(v->get(new_cache.tF, v, t_commit), vertices(get_graph(new_schedule)))
     base_search_env = construct_search_env(solver, new_schedule, search_env.problem_spec, env_graph;t0=t0,tF=tF)
     trimmed_solution = trim_solution(base_search_env, solution, t_commit)
     base_search_env = SearchEnv(base_search_env, base_solution=trimmed_solution)
+    base_search_env
 end
 replan(solver, replan_model::NullReplanner, search_env, args...;kwargs...) = search_env
 
