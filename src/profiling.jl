@@ -451,8 +451,11 @@ function profile_replanning(replan_model, fallback_model, solver, fallback_solve
                 println("TIMEOUT! Solver failed to find feasible solution. Resorting to fallback plan on ",idx)
                 solution = fallback_solution
                 search_env = fallback_search_env
+                cost = fallback_cost
             else
                 println("TIMEOUT! No feasible solution found by fallback solver or regular solver. Terminating...",idx)
+                # return Dict{String,Any}()
+                merge!(final_times[idx], Dict{AbstractID,Int}(OperationID(k)=>-1 for k in keys(get_operations(next_schedule))))
                 break
             end
         end
@@ -466,7 +469,6 @@ function profile_replanning(replan_model, fallback_model, solver, fallback_solve
     end
     results_dict = Dict{String,Any}()
     println("DONE REPLANNING - Aggregating results")
-
     results_dict["time"]                = map(i->local_results[i]["time"], 1:idx)
     results_dict["optimality_gap"]      = map(i->local_results[i]["optimality_gap"], 1:idx)
     results_dict["optimal"]             = map(i->local_results[i]["optimal"], 1:idx)
@@ -474,20 +476,32 @@ function profile_replanning(replan_model, fallback_model, solver, fallback_solve
     results_dict["cost"]                = map(i->local_results[i]["cost"], 1:idx)
     results_dict["arrival_time"]        = map(i->local_results[i]["arrival_time"], 1:idx)
 
+    results_dict["fallback_feasible"]   = map(i->local_results[i]["fallback_feasible"], 2:idx)
+
+# try
     println("COMPUTING MAKESPANS")
-    results_dict["final_time"]         = map(dict->maximum(collect(values(dict))),final_times)
+    results_dict["final_time"]         = map(i->maximum(collect(values(final_times[i]))),1:idx)
     results_dict["makespans"]          = [b-a for (a,b) in zip(results_dict["arrival_time"],results_dict["final_time"])]
-
     @show results_dict["makespans"]
-
-    object_path_dict, object_interval_dict = fill_object_path_dicts!(solution,search_env.schedule,search_env.cache,object_path_dict,object_interval_dict)
-    object_paths, object_intervals = convert_to_path_vectors(object_path_dict, object_interval_dict)
-
-    println("SAVING PATHS")
-    results_dict["robot_paths"]         = convert_to_vertex_lists(solution)
-    results_dict["object_paths"]        = object_paths
-    results_dict["object_intervals"]    = object_intervals
-    results_dict["project_idxs"]        = map(k->project_ids[k], sort(collect(keys(project_ids))))
+# catch e
+#     @show final_times
+#     throw(e)
+# end
+    # if results_dict["feasible"][end] || results_dict["fallback_feasible"][end]
+    if cost[1] < Inf
+    # try
+        object_path_dict, object_interval_dict = fill_object_path_dicts!(solution,search_env.schedule,search_env.cache,object_path_dict,object_interval_dict)
+        object_paths, object_intervals = convert_to_path_vectors(object_path_dict, object_interval_dict)
+    # catch e
+    #     @show solution
+    #     throw(e)
+    # end
+        println("SAVING PATHS")
+        results_dict["robot_paths"]         = convert_to_vertex_lists(solution)
+        results_dict["object_paths"]        = object_paths
+        results_dict["object_intervals"]    = object_intervals
+        results_dict["project_idxs"]        = map(k->project_ids[k], sort(collect(keys(project_ids))))
+    end
     results_dict
 end
 
@@ -667,7 +681,7 @@ function run_replanner_profiling(MODE=:nothing;
         problem_configs=Vector{Dict}(),
         solver_template=PC_TAPF_Solver(),
         fallback_solver_template = PC_TAPF_Solver(),
-        TimeLimit       = get(solver_config,:nbs_time_limit, solver_template.time_limit),
+        # TimeLimit       = get(solver_config,:nbs_time_limit, solver_template.time_limit),
         OutputFlag      = get(solver_config,:OutputFlag,    0),
         Presolve        = get(solver_config,:Presolve,      -1),
         initial_problem_id = 1,
@@ -754,24 +768,23 @@ function run_replanner_profiling(MODE=:nothing;
                     problem_def = read_problem_def(problem_filename)
                     push!(project_list, problem_def)
                 end
-                # problem_spec = ProblemSpec(problem_spec, D=dist_mtx_map)
 
                 solver = PC_TAPF_Solver(solver_template,
-                    time_limit=get(problem_config,:commit_threshold, solver_template.time_limit) - time_out_buffer,
+                    # time_limit=get(problem_config,:commit_threshold, solver_template.time_limit) - time_out_buffer,
                     start_time=time());
                 fallback_solver = PC_TAPF_Solver(fallback_solver_template,
-                    time_limit=get(problem_config,:fallback_commit_threshold, solver_template.time_limit) - time_out_buffer,
+                    # time_limit=get(problem_config,:fallback_commit_threshold, solver_template.time_limit) - time_out_buffer,
                     start_time=time());
-                TimeLimit = solver.time_limit - get(solver_config,:route_planning_buffer, 2)
+                # TimeLimit = solver.time_limit - get(solver_config,:route_planning_buffer, 2)
 
                 results_dict = profile_replanning(replan_model,fallback_model,solver, fallback_solver, project_list, env_graph, dist_matrix, solver_config,problem_config;
                         primary_objective=primary_objective,
-                        TimeLimit=TimeLimit,
+                        # TimeLimit=TimeLimit,
                         OutputFlag=OutputFlag,
                         Presolve=Presolve
                     )
 
-                println("PROFILER: ",typeof(solver.nbs_model)," --- ",string(MODE), " --- Solved problem ",folder_id," in ",results_dict["time"]," seconds! \n\n")
+                println("PROFILER: ",typeof(replan_model),"-",typeof(fallback_model)," --- ",string(MODE), " --- Solved problem ",folder_id," in ",results_dict["time"]," seconds! \n\n")
                 # print the results
                 open(results_filename, "w") do io
                     TOML.print(io, results_dict)

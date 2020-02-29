@@ -107,6 +107,7 @@ struct PrioritizedAStarModel <: AbstractPathFinderModel end
 
     start_time                  ::Float64 = time()
     time_limit                  ::Float64 = 200.0
+    nbs_time_limit              ::Float64 = 190.0
 
     verbosity                   ::Int = 0
     l1_verbosity                ::Int = 0
@@ -993,6 +994,7 @@ function high_level_search!(solver::P, base_search_env::SearchEnv,  optimizer;
         t0_ = Dict{AbstractID,Int}(get_vtx_id(base_search_env.schedule, v)=>t0 for (v,t0) in enumerate(base_search_env.cache.t0)),
         tF_ = Dict{AbstractID,Int}(get_vtx_id(base_search_env.schedule, v)=>tF for (v,tF) in enumerate(base_search_env.cache.tF)),
         primary_objective=SumOfMakeSpans,
+        TimeLimit=solver.nbs_time_limit,
         kwargs...) where {P<:PC_TAPF_Solver}
 
     enter_assignment!(solver)
@@ -1008,7 +1010,7 @@ function high_level_search!(solver::P, base_search_env::SearchEnv,  optimizer;
     best_env        = SearchEnv()
     best_assignment = adjacency_matrix(get_graph(project_schedule))
     model = formulate_milp(solver.nbs_model,project_schedule,problem_spec;
-        cost_model=primary_objective,optimizer=optimizer,t0_=t0_,tF_=tF_,kwargs...) #TODO pass t0_ in replanning mode
+        cost_model=primary_objective,optimizer=optimizer,t0_=t0_,tF_=tF_,TimeLimit=TimeLimit,kwargs...) #TODO pass t0_ in replanning mode
 
     base_schedule = deepcopy(project_schedule)
 
@@ -1392,19 +1394,54 @@ export
     replan
 
 abstract type ReplannerModel end
-struct DeferUntilCompletion <: ReplannerModel end
-struct ReassignFreeRobots   <: ReplannerModel end
-struct MergeAndBalance      <: ReplannerModel end
-struct Oracle               <: ReplannerModel end
-struct FallBackPlanner      <: ReplannerModel end
-struct NullReplanner        <: ReplannerModel end
+@with_kw struct DeferUntilCompletion <: ReplannerModel
+    max_time_limit::Float64 = 100
+    time_out_buffer::Float64 = 1
+    route_planning_buffer::Float64 = 2
+end
+@with_kw struct ReassignFreeRobots   <: ReplannerModel
+    time_out_buffer::Float64 = 1
+    route_planning_buffer::Float64 = 2
+end
+@with_kw struct MergeAndBalance      <: ReplannerModel
+    time_out_buffer::Float64 = 1
+    route_planning_buffer::Float64 = 2
+end
+@with_kw struct Oracle               <: ReplannerModel
+    time_out_buffer::Float64 = -110
+    route_planning_buffer::Float64 = 10
+end
+@with_kw struct FallBackPlanner      <: ReplannerModel
+    time_out_buffer::Float64 = 1
+    route_planning_buffer::Float64 = 2
+end
+@with_kw struct NullReplanner        <: ReplannerModel
+    time_out_buffer::Float64 = 1
+    route_planning_buffer::Float64 = 2
+end
+
+get_timeout_buffer(replan_model) = replan_model.time_out_buffer
+get_route_planning_buffer(replan_model) = replan_model.route_planning_buffer
 
 get_commit_time(replan_model, search_env, t_request, commit_threshold) = t_request + commit_threshold
 get_commit_time(replan_model::Oracle, search_env, t_request, args...) = t_request
-get_commit_time(replan_model::DeferUntilCompletion, search_env, args...) = maximum(search_env.cache.tF)
+get_commit_time(replan_model::DeferUntilCompletion, search_env, t_request, commit_threshold) = max(t_request + commit_threshold,maximum(search_env.cache.tF))
 
 break_assignments!(replan_model::ReplannerModel,args...) = break_assignments!(args...)
 break_assignments!(replan_model::ReassignFreeRobots,args...) = nothing
+break_assignments!(replan_model::DeferUntilCompletion,args...) = nothing
+
+function set_time_limits!(solver,replan_model,t_request,t_commit)
+    solver.time_limit = (t_commit - t_request) - get_timeout_buffer(replan_model)
+    solver.nbs_time_limit = solver.time_limit - get_route_planning_buffer(replan_model)
+    solver
+end
+function set_time_limits!(solver,replan_model::DeferUntilCompletion,t_request,t_commit)
+    solver.time_limit = (t_commit - t_request) - get_timeout_buffer(replan_model)
+    solver.time_limit = min(solver.time_limit,replan_model.max_time_limit)
+    solver.nbs_time_limit = solver.time_limit - get_route_planning_buffer(replan_model)
+    solver
+end
 
 function replan(solver, replan_model, search_env, env_graph, problem_spec, solution, next_schedule, t_request, t_arrival; commit_threshold=5,kwargs...)
     project_schedule = search_env.schedule
@@ -1412,6 +1449,7 @@ function replan(solver, replan_model, search_env, env_graph, problem_spec, solut
     @assert sanity_check(project_schedule," in replan()")
     # Freeze solution and schedule at t_commit
     t_commit = get_commit_time(replan_model, search_env, t_request, commit_threshold)
+    set_time_limits!(solver,replan_model,t_request,t_commit)
     # Update operating schedule
     new_schedule, new_cache = prune_schedule(project_schedule,problem_spec,cache,t_commit)
     @assert sanity_check(new_schedule," after prune_schedule()")

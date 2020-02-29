@@ -197,7 +197,7 @@ let
     ]
     replan_configs = [
         Dict(:replan_model=>MergeAndBalance(),),
-        Dict(:replan_model=>Oracle(),),
+        Dict(:replan_model=>Oracle(),:time_out_buffer=>-105,:route_planning_buffer=>5),
         Dict(:replan_model=>ReassignFreeRobots(),),
         Dict(:replan_model=>DeferUntilCompletion(),),
     ]
