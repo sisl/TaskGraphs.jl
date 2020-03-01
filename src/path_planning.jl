@@ -1506,6 +1506,7 @@ function replan(solver, replan_model, search_env, env_graph, problem_spec, solut
     @assert sanity_check(new_schedule," after splice_schedules!()")
     # t0 = map(v->get(new_cache.t0, v, t_arrival), vertices(get_graph(new_schedule)))
     # tF = map(v->get(new_cache.tF, v, t_arrival), vertices(get_graph(new_schedule)))
+    # NOTE: better performance is obtained when t_commit is the default t0 (tighter constraint on milp)
     t0 = map(v->get(new_cache.t0, v, t_commit), vertices(get_graph(new_schedule)))
     tF = map(v->get(new_cache.tF, v, t_commit), vertices(get_graph(new_schedule)))
     base_search_env = construct_search_env(solver, new_schedule, search_env.problem_spec, env_graph;t0=t0,tF=tF)

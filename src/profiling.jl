@@ -22,6 +22,7 @@ export
     add_assignment_only_row!,
     add_low_level_search_row!,
     add_full_solver_row!,
+    add_replanner_row!,
     add_results_row!,
     construct_config_dataframe,
     construct_result_dataframe,
@@ -120,6 +121,37 @@ function init_data_frame(;
             max_CBS_iterations          = Int[],
             max_A_star_iterations       = Int[]
         )
+    elseif mode == :replanning
+        return DataFrame(
+            problem_id                  = Int[],
+            time                        = Vector{Float64}[],
+            optimal                     = Vector{Bool}[],
+            optimality_gap              = Vector{Int}[],
+            feasible                    = Vector{Bool}[],
+            fallback_feasible           = Vector{Bool}[],
+            # cost                        = Vector{Int}[],
+            final_time                  = Vector{Int}[],
+            arrival_time                = Vector{Int}[],
+            makespans                   = Vector{Int}[],
+            # from solver
+            # total_assignment_iterations = Int[],
+            # total_CBS_iterations        = Int[],
+            # total_A_star_iterations     = Int[],
+            # max_CBS_iterations          = Int[],
+            # max_A_star_iterations       = Int[]
+        )
+    elseif mode == :replanning_config
+        return DataFrame(
+            problem_id = Int[],
+            min_process_time = Int[],
+            max_process_time = Int[],
+            max_parents = Int[],
+            M = Int[],
+            N = Int[],
+            num_projects = Int[],
+            arrival_interval = Int[],
+            depth_bias = Float64[]
+            )
     else
         return DataFrame()
     end
@@ -130,6 +162,19 @@ function add_config_row!(df,toml_dict,problem_id)
         :min_process_time   => toml_dict["min_process_time"],
         :max_process_time   => toml_dict["max_process_time"],
         :max_parents        => toml_dict["max_parents"],
+        :M                  => toml_dict["M"],
+        :N                  => toml_dict["N"],
+        :depth_bias         => toml_dict["depth_bias"]
+    ))
+end
+function add_replanning_config_row!(df,toml_dict,problem_id)
+    push!(df, Dict(
+        :problem_id         => problem_id,
+        :min_process_time   => toml_dict["min_process_time"],
+        :max_process_time   => toml_dict["max_process_time"],
+        :max_parents        => toml_dict["max_parents"],
+        :arrival_interval   => toml_dict["arrival_interval"],
+        :num_projects       => toml_dict["num_projects"],
         :M                  => toml_dict["M"],
         :N                  => toml_dict["N"],
         :depth_bias         => toml_dict["depth_bias"]
@@ -169,6 +214,25 @@ function add_full_solver_row!(df,toml_dict,problem_id)
         :max_A_star_iterations      => get(toml_dict, "max_A_star_iterations", -1)
     ))
 end
+function add_replanner_row!(df,toml_dict,problem_id)
+    push!(df, Dict(
+        :problem_id                 => problem_id,
+        :time                       => get(toml_dict, "time", [-1]),
+        :optimal                    => get(toml_dict, "optimal", [false]),
+        :optimality_gap             => get(toml_dict, "optimality_gap", [10000]),
+        :feasible                   => get(toml_dict, "feasible", [false]),
+        :fallback_feasible          => get(toml_dict, "fallback_feasible", [false]),
+        :final_time                 => get(toml_dict, "final_time", [1.0]),
+        :arrival_time               => get(toml_dict, "arrival_time", [1.0]),
+        :makespans                  => get(toml_dict, "makespans", [1.0]),
+        # :cost                       => Int(get(toml_dict, "cost", (-1,-1,-1,-1))[1]),
+        # :total_assignment_iterations=> get(toml_dict, "total_assignment_iterations", -1),
+        # :total_CBS_iterations       => get(toml_dict, "total_CBS_iterations", -1),
+        # :total_A_star_iterations    => get(toml_dict, "total_A_star_iterations", -1),
+        # :max_CBS_iterations         => get(toml_dict, "max_CBS_iterations", -1),
+        # :max_A_star_iterations      => get(toml_dict, "max_A_star_iterations", -1)
+    ))
+end
 function add_results_row!(df,mode,toml_dict,problem_id)
     if mode == :assignment_only
         add_assignment_only_row!(df,toml_dict,problem_id)
@@ -178,13 +242,15 @@ function add_results_row!(df,mode,toml_dict,problem_id)
         add_low_level_search_row!(df,toml_dict,problem_id)
     elseif mode == :full_solver
         add_full_solver_row!(df,toml_dict,problem_id)
+    elseif mode == :replanning
+        add_replanner_row!(df,toml_dict,problem_id)
     end
     df
 end
-function construct_result_dataframe(mode,problem_dir,results_dir,N_problems)
+function construct_result_dataframe(mode,problem_dir,results_dir,N_problems,path_function=(dir,mode,id)->joinpath(dir,string(mode),string("results",id,".toml")))
     df = init_data_frame(;mode=mode)
     for problem_id in 1:N_problems
-        results_path = joinpath(results_dir,string(mode),string("results",problem_id,".toml"))
+        results_path = path_function(results_dir,mode,problem_id)
         if isfile(results_path)
             results_dict = TOML.parsefile(results_path)
             add_results_row!(df,mode,results_dict,problem_id)
@@ -192,13 +258,17 @@ function construct_result_dataframe(mode,problem_dir,results_dir,N_problems)
     end
     df
 end
-function construct_config_dataframe(problem_dir,N_problems)
-    df = init_data_frame(;mode=:config)
+function construct_config_dataframe(problem_dir,N_problems,mode=:config,path_function=(dir,id)->joinpath(dir,string("config",id,".toml")))
+    df = init_data_frame(;mode=mode)
     for problem_id in 1:N_problems
-        config_path  = joinpath(problem_dir,string("config",problem_id,".toml"))
+        config_path  = path_function(problem_dir,problem_id)
         if isfile(config_path)
             config_dict = TOML.parsefile(config_path)
-            add_config_row!(df,config_dict,problem_id)
+            if mode == :config
+                add_config_row!(df,config_dict,problem_id)
+            elseif mode == :replanning_config
+                add_replanning_config_row!(df,config_dict,problem_id)
+            end
         end
     end
     df
@@ -209,6 +279,15 @@ function construct_result_dataframes(problem_dir,results_dir,N_problems)
     Dict(
         mode => join(config_df,
             construct_result_dataframe(mode, problem_dir,results_dir,N_problems),
+            on = :problem_id, kind = :inner) for mode in modes
+    )
+end
+function construct_replanner_result_dataframe(problem_dir,results_dir,N_problems)
+    config_df = construct_config_dataframe(problem_dir,N_problems,:replanning_config,(dir,id)->joinpath(dir,string("stream",id,"/stream_config.toml")))
+    modes = [:replanning]
+    Dict(
+        mode => join(config_df,
+            construct_result_dataframe(mode, problem_dir,results_dir,N_problems,(dir,mode,id)->joinpath(dir,string("stream",id,"/results.toml"))),
             on = :problem_id, kind = :inner) for mode in modes
     )
 end
@@ -483,7 +562,7 @@ function profile_replanning(replan_model, fallback_model, solver, fallback_solve
     results_dict["makespans"]          = [b-a for (a,b) in zip(results_dict["arrival_time"],results_dict["final_time"])]
     @show results_dict["makespans"]
 
-    if cost[1] < Inf
+    if cost[1] < Inf && get(problem_config, :save_paths, true)
         println("SAVING PATHS")
         object_path_dict, object_interval_dict = fill_object_path_dicts!(solution,search_env.schedule,search_env.cache,object_path_dict,object_interval_dict)
         object_paths, object_intervals = convert_to_path_vectors(object_path_dict, object_interval_dict)
@@ -712,6 +791,21 @@ function run_replanner_profiling(MODE=:nothing;
                     mkpath(problem_dir)
                 end
                 # for problem_id in
+                config_filename = joinpath(problem_dir,string("stream_config.toml"))
+                open(config_filename, "w") do io
+                    TOML.print(io, Dict(
+                        "N"=>N,
+                        "M"=>M,
+                        "max_parents"=>max_parents,
+                        "arrival_interval"=>arrival_interval,
+                        "num_projects"=>num_projects,
+                        "depth_bias"=>depth_bias,
+                        "min_process_time"=>dt_min,
+                        "max_process_time"=>dt_max,
+                        "env_id"=>env_id
+                        )
+                    )
+                end
                 for problem_id in 1:num_projects
                     problem_filename = joinpath(problem_dir,string("problem",problem_id,".toml"))
                     config_filename = joinpath(problem_dir,string("config",problem_id,".toml"))
@@ -733,6 +827,8 @@ function run_replanner_profiling(MODE=:nothing;
                             "N"=>N,
                             "M"=>M,
                             "max_parents"=>max_parents,
+                            "arrival_interval"=>arrival_interval,
+                            "num_projects"=>num_projects,
                             "depth_bias"=>depth_bias,
                             "min_process_time"=>dt_min,
                             "max_process_time"=>dt_max,
@@ -792,5 +888,258 @@ function run_replanner_profiling(MODE=:nothing;
     end
 end
 
+export
+    get_replanning_config_1,
+    get_replanning_config_2,
+    get_replanning_config_3
+
+function get_replanning_config_1()
+    base_solver_configs = [
+        Dict(
+        :nbs_time_limit=>8,
+        :route_planning_buffer=>2,
+        :env_id=>2,
+        :OutputFlag => 0,
+        :Presolve => -1,
+        ),
+    ]
+    fallback_configs = [
+        Dict(:fallback_model=>ReassignFreeRobots(),),
+    ]
+    replan_configs = [
+        Dict(:replan_model=>MergeAndBalance(),),
+        Dict(:replan_model=>Oracle(),:time_out_buffer=>-105,:route_planning_buffer=>5),
+        Dict(:replan_model=>ReassignFreeRobots(),),
+        Dict(:replan_model=>DeferUntilCompletion(),),
+    ]
+    solver_configs = Dict[]
+    for dicts in Base.Iterators.product(base_solver_configs,fallback_configs,replan_configs)
+        push!(solver_configs,merge(dicts...))
+    end
+    base_configs = [
+        Dict(
+            :warning_time=>20,
+            :commit_threshold=>10,
+            :fallback_commit_threshold=>10,
+            :num_trials => 4,
+            :max_parents => 3,
+            :depth_bias => 0.4,
+            :dt_min => 0,
+            :dt_max => 0,
+            :dt_collect => 0,
+            :dt_deliver => 0,
+            :task_sizes => (1=>1.0,2=>0.0,4=>0.0),
+            )
+    ]
+    stream_configs = [
+        Dict(:N=>30, :M=>10, :num_projects=>10, :arrival_interval=>40, ),
+        Dict(:N=>30, :M=>15, :num_projects=>10, :arrival_interval=>50, ),
+        Dict(:N=>30, :M=>20, :num_projects=>10, :arrival_interval=>60, ),
+        Dict(:N=>30, :M=>25, :num_projects=>10, :arrival_interval=>70, ),
+        Dict(:N=>30, :M=>30, :num_projects=>10, :arrival_interval=>80, ),
+    ]
+    problem_configs = Dict[]
+    for dicts in Base.Iterators.product(base_configs,stream_configs)
+        push!(problem_configs,merge(dicts...))
+    end
+
+    solver_template = PC_TAPF_Solver(
+        nbs_model                   = SparseAdjacencyMILP(),
+        DEBUG                       = true,
+        l1_verbosity                = 1,
+        l2_verbosity                = 1,
+        l3_verbosity                = 0,
+        l4_verbosity                = 0,
+        LIMIT_assignment_iterations = 10,
+        LIMIT_A_star_iterations     = 8000
+        );
+    fallback_solver_template = PC_TAPF_Solver(
+        nbs_model                   = GreedyAssignment(),
+        astar_model                 = PrioritizedAStarModel(),
+        DEBUG                       = true,
+        l1_verbosity                = 1,
+        l2_verbosity                = 1,
+        l3_verbosity                = 0,
+        l4_verbosity                = 0,
+        LIMIT_assignment_iterations = 2,
+        LIMIT_A_star_iterations     = 8000
+        );
+
+
+    base_dir            = joinpath(EXPERIMENT_DIR,"replanning")
+    base_problem_dir    = joinpath(base_dir,"problem_instances")
+    base_results_dir    = joinpath(base_dir,"results")
+
+    base_problem_dir, base_results_dir, solver_configs, problem_configs, solver_template, fallback_solver_template
+end
+function get_replanning_config_2()
+    base_solver_configs = [
+        Dict(
+        :nbs_time_limit=>8,
+        :route_planning_buffer=>2,
+        :env_id=>2,
+        :OutputFlag => 0,
+        :Presolve => -1,
+        ),
+    ]
+    fallback_configs = [
+        Dict(:fallback_model=>ReassignFreeRobots(),),
+    ]
+    replan_configs = [
+        Dict(:replan_model=>MergeAndBalance(),),
+        Dict(:replan_model=>Oracle(),:time_out_buffer=>-55,:route_planning_buffer=>5),
+        Dict(:replan_model=>ReassignFreeRobots(),),
+        Dict(:replan_model=>DeferUntilCompletion(),),
+    ]
+    solver_configs = Dict[]
+    for dicts in Base.Iterators.product(base_solver_configs,fallback_configs,replan_configs)
+        push!(solver_configs,merge(dicts...))
+    end
+    base_configs = [
+        Dict(
+            :warning_time=>20,
+            :commit_threshold=>10,
+            :fallback_commit_threshold=>10,
+            :num_trials => 4,
+            :max_parents => 3,
+            :depth_bias => 0.4,
+            :dt_min => 0,
+            :dt_max => 0,
+            :dt_collect => 0,
+            :dt_deliver => 0,
+            :task_sizes => (1=>1.0,2=>0.0,4=>0.0),
+            :num_projects => 40,
+            :save_paths => false
+            )
+    ]
+    stream_configs = [
+        Dict(:N=>30, :M=>10,  :arrival_interval=>20, ),
+        Dict(:N=>30, :M=>10,  :arrival_interval=>30, ),
+        Dict(:N=>30, :M=>10,  :arrival_interval=>40, ),
+
+        Dict(:N=>30, :M=>20,  :arrival_interval=>40, ),
+        Dict(:N=>30, :M=>20,  :arrival_interval=>50, ),
+        Dict(:N=>30, :M=>20,  :arrival_interval=>60, ),
+
+        Dict(:N=>30, :M=>30,  :arrival_interval=>60, ),
+        Dict(:N=>30, :M=>30,  :arrival_interval=>70, ),
+        Dict(:N=>30, :M=>30,  :arrival_interval=>80, ),
+    ]
+    problem_configs = Dict[]
+    for dicts in Base.Iterators.product(base_configs,stream_configs)
+        push!(problem_configs,merge(dicts...))
+    end
+
+    solver_template = PC_TAPF_Solver(
+        nbs_model                   = SparseAdjacencyMILP(),
+        DEBUG                       = true,
+        l1_verbosity                = 1,
+        l2_verbosity                = 1,
+        l3_verbosity                = 0,
+        l4_verbosity                = 0,
+        LIMIT_assignment_iterations = 10,
+        LIMIT_A_star_iterations     = 8000
+        );
+    fallback_solver_template = PC_TAPF_Solver(
+        nbs_model                   = GreedyAssignment(),
+        astar_model                 = PrioritizedAStarModel(),
+        DEBUG                       = true,
+        l1_verbosity                = 1,
+        l2_verbosity                = 1,
+        l3_verbosity                = 0,
+        l4_verbosity                = 0,
+        LIMIT_assignment_iterations = 2,
+        LIMIT_A_star_iterations     = 8000
+        );
+
+    base_dir            = joinpath(EXPERIMENT_DIR,"replanning/long_problems")
+    base_problem_dir    = joinpath(base_dir,"problem_instances")
+    base_results_dir    = joinpath(base_dir,"results")
+
+    base_problem_dir, base_results_dir, solver_configs, problem_configs, solver_template, fallback_solver_template
+end
+function get_replanning_config_3()
+    base_solver_configs = [
+        Dict(
+        :env_id=>2,
+        :OutputFlag => 0,
+        :Presolve => -1,
+        ),
+    ]
+    fallback_configs = [
+        Dict(:fallback_model=>ReassignFreeRobots(),),
+    ]
+    replan_configs = [
+        Dict(:replan_model=>MergeAndBalance(),),
+        Dict(:replan_model=>Oracle(),:time_out_buffer=>-55,:route_planning_buffer=>5),
+        Dict(:replan_model=>ReassignFreeRobots(),),
+        Dict(:replan_model=>DeferUntilCompletion(),),
+    ]
+    solver_configs = Dict[]
+    for dicts in Base.Iterators.product(base_solver_configs,fallback_configs,replan_configs)
+        push!(solver_configs,merge(dicts...))
+    end
+    base_configs = [
+        Dict(
+            :warning_time=>20,
+            :commit_threshold=>10,
+            :fallback_commit_threshold=>10,
+            :num_trials => 4,
+            :max_parents => 3,
+            :depth_bias => 0.4,
+            :dt_min => 0,
+            :dt_max => 0,
+            :dt_collect => 0,
+            :dt_deliver => 0,
+            :task_sizes => (1=>1.0,2=>0.0,4=>0.0),
+            :num_projects => 40,
+            :save_paths => false
+            )
+    ]
+    stream_configs = [
+        Dict(:N=>30, :M=>10,  :arrival_interval=>20, ),
+        Dict(:N=>30, :M=>10,  :arrival_interval=>30, ),
+        Dict(:N=>30, :M=>10,  :arrival_interval=>40, ),
+
+        Dict(:N=>30, :M=>20,  :arrival_interval=>40, ),
+        Dict(:N=>30, :M=>20,  :arrival_interval=>50, ),
+        Dict(:N=>30, :M=>20,  :arrival_interval=>60, ),
+
+        Dict(:N=>30, :M=>30,  :arrival_interval=>60, ),
+        Dict(:N=>30, :M=>30,  :arrival_interval=>70, ),
+        Dict(:N=>30, :M=>30,  :arrival_interval=>80, ),
+    ]
+    problem_configs = Dict[]
+    for dicts in Base.Iterators.product(base_configs,stream_configs)
+        push!(problem_configs,merge(dicts...))
+    end
+
+    solver_template = PC_TAPF_Solver(
+        nbs_model                   = SparseAdjacencyMILP(),
+        DEBUG                       = true,
+        l1_verbosity                = 1,
+        l2_verbosity                = 1,
+        l3_verbosity                = 0,
+        l4_verbosity                = 0,
+        LIMIT_assignment_iterations = 10,
+        LIMIT_A_star_iterations     = 8000
+        );
+    fallback_solver_template = PC_TAPF_Solver(
+        nbs_model                   = GreedyAssignment(),
+        DEBUG                       = true,
+        l1_verbosity                = 1,
+        l2_verbosity                = 1,
+        l3_verbosity                = 0,
+        l4_verbosity                = 0,
+        LIMIT_assignment_iterations = 2,
+        LIMIT_A_star_iterations     = 8000
+        );
+
+    base_dir            = joinpath(EXPERIMENT_DIR,"replanning/better_fallback")
+    base_problem_dir    = joinpath(base_dir,"problem_instances")
+    base_results_dir    = joinpath(base_dir,"results")
+
+    base_problem_dir, base_results_dir, solver_configs, problem_configs, solver_template, fallback_solver_template
+end
 
 end

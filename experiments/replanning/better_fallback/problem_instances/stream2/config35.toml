@@ -1,0 +1,9 @@
+min_process_time = 0
+max_parents = 3
+M = 10
+N = 30
+max_process_time = 0
+env_id = 2
+num_projects = 40
+arrival_interval = 20
+depth_bias = 0.4
