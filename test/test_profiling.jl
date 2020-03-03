@@ -61,20 +61,21 @@ let
 
     modes = [
         :assignment_only,
-        # :low_level_search_without_repair,
-        # :low_level_search_with_repair,
-        # :full_solver
+        :low_level_search_without_repair,
+        :low_level_search_with_repair,
+        :full_solver
         ]
     results_dirs = [
-        # joinpath(EXPERIMENT_DIR,"assignment_solver/results")
+        joinpath(EXPERIMENT_DIR,"assignment_solver/final_results")
         # joinpath(EXPERIMENT_DIR,"adjacency_solver/results")
-        joinpath(EXPERIMENT_DIR,"sparse_adjacency_solver/results")
+        # joinpath(EXPERIMENT_DIR,"sparse_adjacency_solver/results")
     ]
     milp_models = [
-        # AssignmentMILP(),
+        AssignmentMILP(),
         # AdjacencyMILP(),
-        SparseAdjacencyMILP()
+        # SparseAdjacencyMILP()
     ]
+    problem_dir = PROBLEM_DIR
     for (milp_model, results_dir) in zip(milp_models, results_dirs)
         for mode in modes
             run_profiling(mode;
@@ -85,10 +86,10 @@ let
                 num_trials = 4,
                 env_id = 2,
                 initial_problem_id = 1,
-                problem_dir = PROBLEM_DIR,
+                problem_dir = problem_dir,
                 results_dir = results_dir,
                 # milp_model = milp_model,
-                OutputFlag=0,
+                OutputFlag = 0,
                 Presolve = -1, # automatic setting (-1), off (0), conservative (1), or aggressive (2)
                 TimeLimit = 100,
                 solver_template = PC_TAPF_Solver(

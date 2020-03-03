@@ -1013,6 +1013,7 @@ function high_level_search!(solver::P, base_search_env::SearchEnv,  optimizer;
         cost_model=primary_objective,optimizer=optimizer,t0_=t0_,tF_=tF_,TimeLimit=TimeLimit,kwargs...) #TODO pass t0_ in replanning mode
 
     base_schedule = deepcopy(project_schedule)
+    best_lower_bound = typemax(Int)
 
     solver.start_time = time()
     while get_primary_cost(solver,solver.best_cost) > lower_bound
@@ -1036,6 +1037,7 @@ function high_level_search!(solver::P, base_search_env::SearchEnv,  optimizer;
                 log_info(0,solver.l1_verbosity,string("HIGH LEVEL SEARCH: MILP not optimally solved. Current lower bound cost = ",lower_bound))
                 lower_bound = max(lower_bound, Int(round(value(objective_bound(model)))) )
             end
+            best_lower_bound = min(best_lower_bound, lower_bound)
             log_info(0,solver.l1_verbosity,string("HIGH LEVEL SEARCH: Current lower bound cost = ",lower_bound))
             # if lower_bound < get_primary_cost(solver,solver.best_cost)
             if lower_bound < get_primary_cost(solver,solver.best_cost)
