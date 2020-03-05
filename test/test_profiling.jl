@@ -6,15 +6,15 @@ let
     dummy_results_dir = "dummy_results_dir"
     modes = [
         :write,
-        # :assignment_only,
-        # :low_level_search_without_repair,
-        # :low_level_search_with_repair,
+        :assignment_only,
+        :low_level_search_without_repair,
+        :low_level_search_with_repair,
         :full_solver
         ]
     milp_models = [
-        # AssignmentMILP(),
+        AssignmentMILP(),
         # AdjacencyMILP(),
-        SparseAdjacencyMILP()
+        # SparseAdjacencyMILP()
         # GreedyAssignment()
     ]
     for milp_model in milp_models
@@ -24,9 +24,9 @@ let
                 num_robots=[4],
                 depth_biases=[0.1],
                 task_size_distributions = [
-                    # ( 1=>1.0, 2=>0.0, 4=>0.0 ),
+                    ( 1=>1.0, 2=>0.0, 4=>0.0 ),
                     # ( 1=>1.0, 2=>1.0, 4=>0.0 ),
-                    ( 1=>1.0, 2=>1.0, 4=>1.0 ),
+                    # ( 1=>1.0, 2=>1.0, 4=>1.0 ),
                     # ( 1=>0.0, 2=>1.0, 4=>1.0 ),
                     ],
                 num_trials=4,
@@ -60,13 +60,13 @@ let
     println("RUNNING PROFILING TESTS")
 
     modes = [
-        :assignment_only,
-        :low_level_search_without_repair,
-        :low_level_search_with_repair,
+        # :assignment_only,
+        # :low_level_search_without_repair,
+        # :low_level_search_with_repair,
         :full_solver
         ]
     results_dirs = [
-        joinpath(EXPERIMENT_DIR,"assignment_solver/final_results")
+        joinpath(EXPERIMENT_DIR,"assignment_solver/other_final_results")
         # joinpath(EXPERIMENT_DIR,"adjacency_solver/results")
         # joinpath(EXPERIMENT_DIR,"sparse_adjacency_solver/results")
     ]
@@ -89,17 +89,20 @@ let
                 problem_dir = problem_dir,
                 results_dir = results_dir,
                 # milp_model = milp_model,
+                primary_objective=MakeSpan,
                 OutputFlag = 0,
                 Presolve = -1, # automatic setting (-1), off (0), conservative (1), or aggressive (2)
-                TimeLimit = 100,
+                # TimeLimit = 100,
                 solver_template = PC_TAPF_Solver(
                     nbs_model=milp_model,
                     verbosity=0,
+                    l1_verbosity=2,
                     l2_verbosity=2,
-                    l3_verbosity=0,
+                    l3_verbosity=1,
                     l4_verbosity=0,
                     LIMIT_A_star_iterations=8000,
-                    time_limit=100
+                    time_limit=120,
+                    nbs_time_limit=100
                     )
                 )
         end

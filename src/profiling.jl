@@ -320,7 +320,7 @@ function profile_low_level_search_and_repair(solver, project_spec, problem_spec,
     # solver = PC_TAPF_Solver(verbosity=0,LIMIT_A_star_iterations=10*nv(env_graph));
     project_schedule = construct_partial_project_schedule(project_spec,problem_spec,robot_ICs)
     if update_project_schedule!(solver.nbs_model,project_schedule, problem_spec, adj_matrix)
-        env = construct_search_env(project_schedule, problem_spec, env_graph;
+        env = construct_search_env(solver,project_schedule, problem_spec, env_graph;
             primary_objective=primary_objective); # TODO pass in t0_ here (maybe get it straight from model?)
         pc_mapf = PC_MAPF(env);
         node = initialize_root_node(pc_mapf)
@@ -352,7 +352,7 @@ function profile_low_level_search(solver, project_spec, problem_spec, robot_ICs,
     # solver = PC_TAPF_Solver(verbosity=0,LIMIT_A_star_iterations=10*nv(env_graph));
     project_schedule = construct_partial_project_schedule(project_spec,problem_spec,robot_ICs)
     if update_project_schedule!(solver.nbs_model, project_schedule, problem_spec, adj_matrix)
-        env = construct_search_env(project_schedule, problem_spec, env_graph;
+        env = construct_search_env(solver,project_schedule, problem_spec, env_graph;
             primary_objective=primary_objective); # TODO pass in t0_ here (maybe get it straight from model?)
         pc_mapf = PC_MAPF(env);
         node = initialize_root_node(pc_mapf)
@@ -435,6 +435,9 @@ end
 function profile_replanning(replan_model, fallback_model, solver, fallback_solver, project_list, env_graph, dist_matrix, solver_config,problem_config;
         primary_objective=SumOfMakeSpans, kwargs...
     )
+
+    solver_template             = deepcopy(solver)
+    fallback_solver_template    = deepcopy(fallback_solver)
     arrival_interval            = problem_config[:arrival_interval] # new project requests arrive every `arrival_interval` timesteps
     warning_time                = problem_config[:warning_time] # the project request arrives in the command center `warning_time` timesteps before the relevant objects become available
     commit_threshold            = problem_config[:commit_threshold] # freeze the current plan (route plan and schedule) at `t_arrival` + `commit_threshold`
@@ -504,6 +507,7 @@ function profile_replanning(replan_model, fallback_model, solver, fallback_solve
         println("Computing Fallback plan at idx = ",idx)
         fallback_search_env = replan(fallback_solver, fallback_model, search_env, env_graph, problem_spec, solution, next_schedule, t_request, t_arrival;commit_threshold=fallback_commit_threshold)
         reset_solver!(fallback_solver)
+        fallback_solver = PC_TAPF_Solver(fallback_solver_template)
         (fallback_solution, _, fallback_cost, fallback_search_env, fallback_optimality_gap), fallback_elapsed_time, _, _, _ = @timed high_level_search!(
             fallback_solver, fallback_search_env, Gurobi.Optimizer;primary_objective=primary_objective,kwargs...)
 
@@ -514,6 +518,7 @@ function profile_replanning(replan_model, fallback_model, solver, fallback_solve
         # print_project_schedule(string("schedule",idx,"B"),base_search_env;mode=:leaf_aligned)
         # plan for current project
         println("Computing plan at idx = ",idx)
+        solver = PC_TAPF_Solver(solver_template)
         reset_solver!(solver)
         (solution, _, cost, search_env, optimality_gap), elapsed_time, _, _, _ = @timed high_level_search!(solver, base_search_env, Gurobi.Optimizer;primary_objective=primary_objective,kwargs...)
         # print_project_schedule(string("schedule",idx,"C"),search_env;mode=:leaf_aligned)

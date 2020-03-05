@@ -194,7 +194,7 @@ end
 function exit_assignment!(solver::S) where {S<:PC_TAPF_Solver}
 end
 function enter_cbs!(solver::S) where {S<:PC_TAPF_Solver}
-    solver.num_assignment_iterations += 1
+    # solver.num_assignment_iterations += 1
     log_info(0,solver.l2_verbosity,"CBS: solver.num_CBS_iterations = ",solver.num_CBS_iterations)
     check_time(solver)
 end
@@ -995,6 +995,7 @@ function high_level_search!(solver::P, base_search_env::SearchEnv,  optimizer;
         tF_ = Dict{AbstractID,Int}(get_vtx_id(base_search_env.schedule, v)=>tF for (v,tF) in enumerate(base_search_env.cache.tF)),
         primary_objective=SumOfMakeSpans,
         TimeLimit=solver.nbs_time_limit,
+        buffer=5.0, # to give some extra time to the path planner if the milp terminates late.
         kwargs...) where {P<:PC_TAPF_Solver}
 
     enter_assignment!(solver)
@@ -1010,16 +1011,17 @@ function high_level_search!(solver::P, base_search_env::SearchEnv,  optimizer;
     best_env        = SearchEnv()
     best_assignment = adjacency_matrix(get_graph(project_schedule))
     model = formulate_milp(solver.nbs_model,project_schedule,problem_spec;
-        cost_model=primary_objective,optimizer=optimizer,t0_=t0_,tF_=tF_,TimeLimit=TimeLimit,kwargs...) #TODO pass t0_ in replanning mode
+        cost_model=primary_objective,optimizer=optimizer,t0_=t0_,tF_=tF_,
+        TimeLimit=min(TimeLimit,solver.time_limit-(buffer+time()-solver.start_time)),
+        kwargs...) #TODO pass t0_ in replanning mode
 
     base_schedule = deepcopy(project_schedule)
-    best_lower_bound = typemax(Int)
 
     solver.start_time = time()
     while get_primary_cost(solver,solver.best_cost) > lower_bound
         try
-            check_time(solver)
             solver.num_assignment_iterations += 1
+            check_time(solver)
             log_info(0,solver.l1_verbosity,string("HIGH LEVEL SEARCH: iteration ",solver.num_assignment_iterations,"..."))
             ############## Task Assignment ###############
             exclude_solutions!(model) # exclude most recent solution in order to get next best solution
@@ -1036,8 +1038,8 @@ function high_level_search!(solver::P, base_search_env::SearchEnv,  optimizer;
             else
                 log_info(0,solver.l1_verbosity,string("HIGH LEVEL SEARCH: MILP not optimally solved. Current lower bound cost = ",lower_bound))
                 lower_bound = max(lower_bound, Int(round(value(objective_bound(model)))) )
+                solver.LIMIT_assignment_iterations = solver.num_assignment_iterations
             end
-            best_lower_bound = min(best_lower_bound, lower_bound)
             log_info(0,solver.l1_verbosity,string("HIGH LEVEL SEARCH: Current lower bound cost = ",lower_bound))
             # if lower_bound < get_primary_cost(solver,solver.best_cost)
             if lower_bound < get_primary_cost(solver,solver.best_cost)

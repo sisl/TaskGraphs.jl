@@ -1561,7 +1561,9 @@ function formulate_optimization_problem(N,M,G,D,Δt,Δt_collect,Δt_deliver,to0_
     assignments=Dict{Int64,Int64}(),
     cost_model=MakeSpan,
     t0_ = Dict(),
-    tF_ = Dict()
+    tF_ = Dict(),
+    Mm = 10000,
+    # Mm = sum([D[s1,s2] for s1 in r0 for s2 in s0]) + sum([D[s1,s2] for s1 in s0 for s2 in sF])
     )
 
     model = Model(with_optimizer(optimizer,
@@ -1595,7 +1597,6 @@ function formulate_optimization_problem(N,M,G,D,Δt,Δt_collect,Δt_deliver,to0_
         @constraint(model, X[i,j] == 1)
     end
     # constraints
-    Mm = sum(D)
     for j in 1:M
         # constraint on task start time
         if !is_root_node(G,j)
