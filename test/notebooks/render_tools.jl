@@ -176,7 +176,7 @@ function visualize_env(vtxs,pickup_vtxs,dropoff_vtxs,t=0;
         goals=[],
         vpad = 0.05,
         n=80,
-        rsize=5pt,
+        rsize=4pt,
         osize=3pt,
         cell_width=1.0,
         line_width=2pt,
@@ -187,10 +187,11 @@ function visualize_env(vtxs,pickup_vtxs,dropoff_vtxs,t=0;
         dropoff_color="pink",
         active_object_color="black",
         project_idxs=map(i->1,object_paths),
-        proj_colors_vec = gen_object_colors(maximum(project_idxs)),
+        proj_colors_vec = gen_object_colors(maximum([1,project_idxs...])),
         active_object_colors=map(idx->proj_colors_vec[idx],project_idxs),
         completed_object_color="gray",
         inactive_object_color="gray",
+        show_inactive_objects=true,
         show_paths=true
     )
 
@@ -221,7 +222,7 @@ function visualize_env(vtxs,pickup_vtxs,dropoff_vtxs,t=0;
                 layer(
                     x=[interpolate(vtxs[idx1][1],vtxs[idx2][1],t-(t1-1))],
                     y=[interpolate(vtxs[idx1][2],vtxs[idx2][2],t-(t1-1))],
-                    Geom.point,size=[rsize],Theme(default_color=colors_vec[i]))
+                    Geom.point,size=[rsize],Theme(default_color=colors_vec[i],highlight_width=0pt))
             )
         end
     end
@@ -247,15 +248,17 @@ function visualize_env(vtxs,pickup_vtxs,dropoff_vtxs,t=0;
             object_color = active_object_colors[i]
         end
         if length(p) > 0 && interval[2] > t
-            interpolate(p[min(t1,length(p))],p[min(t1+1,length(p))],t1-(t+1))
-            idx1 = p[max(1,min(t1,length(p)))]
-            idx2 = p[max(1,min(t1+1,length(p)))]
-            push!(object_layers,
-                layer(
-                    x=[interpolate(vtxs[idx1][1],vtxs[idx2][1],t-(t1-1))],
-                    y=[interpolate(vtxs[idx1][2],vtxs[idx2][2],t-(t1-1))],
-                    Geom.point,size=[osize],Theme(default_color=object_color))
-            )
+            if (interval[1] <= t) || show_inactive_objects
+                interpolate(p[min(t1,length(p))],p[min(t1+1,length(p))],t1-(t+1))
+                idx1 = p[max(1,min(t1,length(p)))]
+                idx2 = p[max(1,min(t1+1,length(p)))]
+                push!(object_layers,
+                    layer(
+                        x=[interpolate(vtxs[idx1][1],vtxs[idx2][1],t-(t1-1))],
+                        y=[interpolate(vtxs[idx1][2],vtxs[idx2][2],t-(t1-1))],
+                        Geom.point,size=[osize],Theme(default_color=object_color,highlight_width=0pt))
+                )
+            end
         end
     end
     if length(object_vtxs) > 0

@@ -173,7 +173,7 @@ let
                 costs = Float64[]
                 project_spec, problem_spec, robot_ICs, assignments, env_graph = f(;verbose=false);
                 for milp_model in [AssignmentMILP(),AdjacencyMILP(),SparseAdjacencyMILP()]
-                    solver = PC_TAPF_Solver(nbs_model=milp_model,verbosity=0)
+                    solver = PC_TAPF_Solver(nbs_model=milp_model,l3_verbosity=0)
                     solution, assignment, cost, env = high_level_search!(
                         solver,
                         env_graph,
@@ -193,6 +193,23 @@ let
             end
         end
     end
+end
+
+let
+    f = initialize_toy_problem_9
+    cost_model = MakeSpan
+    project_spec, problem_spec, robot_ICs, assignments, env_graph = f(;verbose=false)
+    solver = PC_TAPF_Solver(nbs_model=AssignmentMILP(),l3_verbosity=0)
+    solution, assignment, cost, env = high_level_search!(
+        solver,
+        env_graph,
+        project_spec,
+        problem_spec,
+        robot_ICs,
+        Gurobi.Optimizer;
+        primary_objective=cost_model,
+        )
+
 end
 
 # end

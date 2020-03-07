@@ -1285,31 +1285,33 @@ end
     with each vertex in the `schedule`. Slack for each vertex is represented as
     a vector in order to handle multi-headed projects.
 """
-function process_schedule(schedule::P; t0=zeros(Int,get_num_vtxs(schedule)),
-        tF=zeros(Int,get_num_vtxs(schedule))
+function process_schedule(schedule::P; t0=zeros(Int,nv(schedule)),
+        tF=zeros(Int,nv(schedule))
     ) where {P<:ProjectSchedule}
 
-    solution_graph = get_graph(schedule)
-    traversal = topological_sort_by_dfs(solution_graph)
+    G = get_graph(schedule)
+    traversal = topological_sort_by_dfs(G)
     n_roots = max(length(schedule.root_nodes),1)
-    slack = map(i->Inf*ones(n_roots), vertices(solution_graph))
-    local_slack = map(i->Inf*ones(n_roots), vertices(solution_graph))
+    slack = map(i->Inf*ones(n_roots), vertices(G))
+    local_slack = map(i->Inf*ones(n_roots), vertices(G))
+    # max_deadlines = map(i->typemax(Int), vertices(G))
     # True terminal nodes
     for (i,v) in enumerate(schedule.root_nodes)
         slack[v] = Inf*ones(n_roots)
-        slack[v][i] = 0 # only slack for corresponing head is set to 0
+        slack[v][i] = 0 # only slack for corresponding head is set to 0
     end
     ########## Compute Lower Bounds Via Forward Dynamic Programming pass
     for v in traversal
         path_spec = schedule.path_specs[v]
-        for v2 in inneighbors(solution_graph,v)
+        Δt_min = path_spec.min_path_duration
+        for v2 in inneighbors(G,v)
             t0[v] = max(t0[v], tF[v2])
         end
-        tF[v] = max(tF[v], t0[v] + path_spec.min_path_duration)
+        tF[v] = max(tF[v], t0[v] + Δt_min)
     end
     ########### Compute Slack Via Backward Dynamic Programming pass
     for v in reverse(traversal)
-        for v2 in outneighbors(solution_graph,v)
+        for v2 in outneighbors(G,v)
             local_slack[v] = min.(local_slack[v], (t0[v2] - tF[v]) )
             slack[v] = min.(slack[v], slack[v2] .+ (t0[v2] - tF[v]) )
         end

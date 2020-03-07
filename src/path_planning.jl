@@ -330,13 +330,14 @@ export
     plan_next_path!
 
 @with_kw struct PlanningCache
-    closed_set::Set{Int}    = Set{Int}()    # nodes that are completed
-    active_set::Set{Int}    = Set{Int}()    # active nodes
+    closed_set::Set{Int}                    = Set{Int}()    # nodes that are completed
+    active_set::Set{Int}                    = Set{Int}()    # active nodes
     node_queue::PriorityQueue{Int,Tuple{Float64,Float64}} = PriorityQueue{Int,Tuple{Float64,Float64}}() # active nodes prioritized by slack
-    t0::Vector{Int}         = Vector{Int}()
-    tF::Vector{Int}         = Vector{Int}()
-    slack::Vector{Vector{Float64}}       = Vector{Vector{Float64}}()
-    local_slack::Vector{Vector{Float64}} = Vector{Vector{Float64}}()
+    t0::Vector{Int}                         = Vector{Int}()
+    tF::Vector{Int}                         = Vector{Int}()
+    slack::Vector{Vector{Float64}}          = Vector{Vector{Float64}}()
+    local_slack::Vector{Vector{Float64}}    = Vector{Vector{Float64}}()
+    max_deadline::Vector{Int}               = Vector{Int}() # Marks the time at whcih this node will begin accumulating a delay cost
 end
 
 function isps_queue_cost(schedule::ProjectSchedule,cache::PlanningCache,v::Int)
@@ -346,7 +347,8 @@ end
 
 function initialize_planning_cache(schedule::ProjectSchedule;kwargs...)
     t0,tF,slack,local_slack = process_schedule(schedule;kwargs...);
-    cache = PlanningCache(t0=t0,tF=tF,slack=slack,local_slack=local_slack)
+    deadline = tF .+ map(i->minimum(i),slack) # soft deadline (can be tightened as necessary)
+    cache = PlanningCache(t0=t0,tF=tF,slack=slack,local_slack=local_slack,max_deadline=deadline)
     for v in vertices(get_graph(schedule))
         if is_root_node(get_graph(schedule),v)
             push!(cache.active_set,v)
@@ -380,6 +382,18 @@ function reset_cache!(cache::PlanningCache,schedule::ProjectSchedule)
     end
     cache
 end
+function reverse_propagate_delay!(solver,cache,schedule,delay_vec)
+    buffer = zeros(nv(schedule))
+    for v in reverse(topological_sort_by_dfs(get_graph(schedule)))
+        Δt_min = get_path_spec(schedule,v).min_path_duration
+        buffer[v] = (cache.tF[v] - (cache.t0[v] + Δt_min))
+        for v2 in outneighbors(schedule,v)
+            delay_vec[v] = max(delay_vec[v], delay_vec[v2] - buffer[v2])
+            delay_vec[v] = max(0, delay_vec[v] - (cache.t0[v2] - cache.tF[v]))
+        end
+    end
+    delay_vec
+end
 function update_planning_cache!(solver::M,cache::C,schedule::S,v::Int,path::P) where {M<:PC_TAPF_Solver,C<:PlanningCache,S<:ProjectSchedule,P<:Path}
     active_set = cache.active_set
     closed_set = cache.closed_set
@@ -387,7 +401,32 @@ function update_planning_cache!(solver::M,cache::C,schedule::S,v::Int,path::P) w
     graph = get_graph(schedule)
 
     # update t0, tF, slack, local_slack
-    if get_final_state(path).t > cache.tF[v]
+    Δt = get_final_state(path).t - cache.tF[v]
+    if Δt > 0
+        # TODO Add backtracking
+        delay = Δt - minimum(cache.slack[v])
+        log_info(-1,solver.l3_verbosity,"LOW LEVEL SEARCH: schedule delay of ",delay," time steps incurred by path for vertex v = ",v," - ",string(get_node_from_vtx(schedule,v)))
+        if delay > 0
+            delay_vec = zeros(nv(schedule))
+            delay_vec[v] = delay
+            delay_vec = reverse_propagate_delay!(solver,cache,schedule,delay_vec)
+            replannable = true
+            for v_ in vertices(schedule)
+                if is_root_node(schedule,v_)
+                    if delay_vec[v_] > 0
+                        replannable = false
+                        break
+                    end
+                end
+            end
+            if replannable
+                cache.tF[v] = get_final_state(path).t
+                log_info(-1,solver.l3_verbosity,"LOW LEVEL SEARCH: replan with tighter bounds is possible")
+                for v_ in vertices(schedule)
+
+                end
+            end
+        end
         cache.tF[v] = get_final_state(path).t
         t0,tF,slack,local_slack = process_schedule(schedule;t0=cache.t0,tF=cache.tF)
         cache.t0            .= t0
@@ -909,13 +948,15 @@ function CRCBS.low_level_search!(
 
     # TODO make the number of "repair" iterations a parameter of PC_TAPF_Solver
     enter_low_level!(solver)
-    reset_cache!(pc_mapf.env.cache, pc_mapf.env.schedule)
-    valid_flag = low_level_search!(solver, pc_mapf.env, node)
-    if valid_flag
-        # repair solution: call low_level_search with conflict table already populated
+    valid_flag = true
+    for i in 1:solver.isps_model.n_repair_iters
         reset_cache!(pc_mapf.env.cache, pc_mapf.env.schedule)
         valid_flag = low_level_search!(solver, pc_mapf.env, node)
-    end # else return
+        if valid_flag == false
+            log_info(0,solver.l3_verbosity,"LOW LEVEL SEARCH: failed on ",i,"th repair iteration.")
+            break
+        end
+    end
     exit_low_level!(solver)
     return valid_flag
 end
