@@ -348,7 +348,7 @@ end
 function initialize_planning_cache(schedule::ProjectSchedule;kwargs...)
     t0,tF,slack,local_slack = process_schedule(schedule;kwargs...);
     deadline = tF .+ map(i->minimum(i),slack) # soft deadline (can be tightened as necessary)
-    cache = PlanningCache(t0=t0,tF=tF,slack=slack,local_slack=local_slack,max_deadline=deadline)
+    cache = PlanningCache(t0=t0,tF=tF,slack=slack,local_slack=local_slack)
     for v in vertices(get_graph(schedule))
         if is_root_node(get_graph(schedule),v)
             push!(cache.active_set,v)
@@ -405,8 +405,8 @@ function update_planning_cache!(solver::M,cache::C,schedule::S,v::Int,path::P) w
     if Δt > 0
         # TODO Add backtracking
         delay = Δt - minimum(cache.slack[v])
-        log_info(-1,solver.l3_verbosity,"LOW LEVEL SEARCH: schedule delay of ",delay," time steps incurred by path for vertex v = ",v," - ",string(get_node_from_vtx(schedule,v)))
         if delay > 0
+            log_info(-1,solver.l3_verbosity,"LOW LEVEL SEARCH: schedule delay of ",delay," time steps incurred by path for vertex v = ",v," - ",string(get_node_from_vtx(schedule,v)))
             delay_vec = zeros(nv(schedule))
             delay_vec[v] = delay
             delay_vec = reverse_propagate_delay!(solver,cache,schedule,delay_vec)
@@ -950,8 +950,14 @@ function CRCBS.low_level_search!(
     enter_low_level!(solver)
     valid_flag = true
     for i in 1:solver.isps_model.n_repair_iters
-        reset_cache!(pc_mapf.env.cache, pc_mapf.env.schedule)
-        valid_flag = low_level_search!(solver, pc_mapf.env, node)
+        # reset_cache!(pc_mapf.env.cache, pc_mapf.env.schedule) # DEBUG This line appears to be carrying over all delays introduced in the cache...
+        # valid_flag = low_level_search!(solver, pc_mapf.env, node)
+        cache = initialize_planning_cache(pc_mapf.env.schedule;
+            t0=deepcopy(pc_mapf.env.cache.t0),
+            tF=deepcopy(pc_mapf.env.cache.tF)
+        )
+        search_env = SearchEnv(pc_mapf.env,cache=cache)
+        valid_flag = low_level_search!(solver, search_env, node)
         if valid_flag == false
             log_info(0,solver.l3_verbosity,"LOW LEVEL SEARCH: failed on ",i,"th repair iteration.")
             break

@@ -210,6 +210,10 @@ let
         primary_objective=cost_model,
         )
 
+    cache = env.cache
+    tF = cache.tF
+    slack = cache.slack
+    deadline = tF .+ map(i->minimum(i),slack)
 end
 
 # end
