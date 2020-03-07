@@ -200,6 +200,7 @@ let
     cost_model = MakeSpan
     project_spec, problem_spec, robot_ICs, assignments, env_graph = f(;verbose=false)
     solver = PC_TAPF_Solver(nbs_model=AssignmentMILP(),l3_verbosity=0)
+
     solution, assignment, cost, env = high_level_search!(
         solver,
         env_graph,
@@ -210,10 +211,31 @@ let
         primary_objective=cost_model,
         )
 
+
+
     cache = env.cache
     tF = cache.tF
     slack = cache.slack
     deadline = tF .+ map(i->minimum(i),slack)
+
+    env = construct_search_env(solver,env.schedule, problem_spec, env_graph;
+        primary_objective=cost_model,
+        )
+    pc_mapf = PC_MAPF(env);
+    ##### Call CBS Search Routine (LEVEL 2) #####
+    # solution, cache, cost = solve!(solver,pc_mapf);
+    mapf = pc_mapf
+    node = initialize_root_node(mapf)
+    constraint = StateConstraint(
+        1, # agent id
+        PathNode(PCCBS.State(5,1),PCCBS.Action(Edge(5,6),1),PCCBS.State(6,2)),
+        2, # t
+    )
+    add_constraint!(node,constraint)
+    search_env, valid_flag = low_level_search!(solver,mapf,node)
+    convert_to_vertex_lists(node.solution)
+    # node.solution.paths[1].path_nodes[1].sp
+
 end
 
 # end

@@ -348,7 +348,8 @@ end
 function initialize_planning_cache(schedule::ProjectSchedule;kwargs...)
     t0,tF,slack,local_slack = process_schedule(schedule;kwargs...);
     deadline = tF .+ map(i->minimum(i),slack) # soft deadline (can be tightened as necessary)
-    cache = PlanningCache(t0=t0,tF=tF,slack=slack,local_slack=local_slack)
+    deadline = map(i->i==Inf ? typemax(Int) : Int(i), deadline)
+    cache = PlanningCache(t0=t0,tF=tF,slack=slack,local_slack=local_slack,max_deadline=deadline)
     for v in vertices(get_graph(schedule))
         if is_root_node(get_graph(schedule),v)
             push!(cache.active_set,v)
@@ -407,6 +408,7 @@ function update_planning_cache!(solver::M,cache::C,schedule::S,v::Int,path::P) w
         delay = Δt - minimum(cache.slack[v])
         if delay > 0
             log_info(-1,solver.l3_verbosity,"LOW LEVEL SEARCH: schedule delay of ",delay," time steps incurred by path for vertex v = ",v," - ",string(get_node_from_vtx(schedule,v)))
+            # identify where to replan
             delay_vec = zeros(nv(schedule))
             delay_vec[v] = delay
             delay_vec = reverse_propagate_delay!(solver,cache,schedule,delay_vec)
