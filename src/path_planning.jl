@@ -949,6 +949,11 @@ function CRCBS.low_level_search!(
     # TODO make the number of "repair" iterations a parameter of PC_TAPF_Solver
     enter_low_level!(solver)
     valid_flag = true
+    cache = initialize_planning_cache(pc_mapf.env.schedule;
+        t0=deepcopy(pc_mapf.env.cache.t0),
+        tF=deepcopy(pc_mapf.env.cache.tF)
+    )
+    search_env = SearchEnv(pc_mapf.env,cache=cache)
     for i in 1:solver.isps_model.n_repair_iters
         # reset_cache!(pc_mapf.env.cache, pc_mapf.env.schedule) # DEBUG This line appears to be carrying over all delays introduced in the cache...
         # valid_flag = low_level_search!(solver, pc_mapf.env, node)
@@ -964,7 +969,7 @@ function CRCBS.low_level_search!(
         end
     end
     exit_low_level!(solver)
-    return valid_flag
+    return search_env, valid_flag
 end
 
 function CRCBS.solve!(
@@ -974,26 +979,26 @@ function CRCBS.solve!(
 
     enter_cbs!(solver)
 
-    priority_queue = PriorityQueue{ConstraintTreeNode,get_cost_type(mapf.env)}()
+    priority_queue = PriorityQueue{Tuple{ConstraintTreeNode,PlanningCache},get_cost_type(mapf.env)}()
 
     root_node = initialize_root_node(mapf) #TODO initialize with a partial solution when replanning
-    valid_flag = low_level_search!(solver,mapf,root_node;path_finder=path_finder)
+    search_env, valid_flag = low_level_search!(solver,mapf,root_node;path_finder=path_finder)
     detect_conflicts!(root_node.conflict_table,root_node.solution;t0=max(minimum(mapf.env.cache.t0), 1))
     if valid_flag
-        enqueue!(priority_queue, root_node => root_node.cost)
+        enqueue!(priority_queue, (root_node,search_env.cache) => root_node.cost)
     else
         log_info(-1,solver.l2_verbosity,"CBS: first call to low_level_search returned infeasible.")
     end
 
     while length(priority_queue) > 0
         try
-            node = dequeue!(priority_queue)
+            node,cache = dequeue!(priority_queue)
             log_info(1,solver.l2_verbosity,string("CBS: node.cost = ",get_cost(node.solution)))
             # check for conflicts
             conflict = get_next_conflict(node.conflict_table)
             if !CRCBS.is_valid(conflict)
                 log_info(-1,solver.l2_verbosity,string("CBS: valid route plan found after ",solver.num_CBS_iterations," CBS iterations! Cost = ",node.cost))
-                return node.solution, node.cost
+                return node.solution, cache, node.cost
             end
             log_info(1,solver.l2_verbosity,string("CBS: ", string(conflict)))
             # otherwise, create constraints and branch
@@ -1003,9 +1008,10 @@ function CRCBS.solve!(
                 new_node = initialize_child_search_node(node,mapf)
                 if CRCBS.add_constraint!(new_node,constraint)
                     step_cbs!(solver,constraint)
-                    if low_level_search!(solver, mapf, new_node, [get_agent_id(constraint)]; path_finder=path_finder)
-                        detect_conflicts!(new_node.conflict_table,new_node.solution,[get_agent_id(constraint)];t0=max(minimum(mapf.env.cache.t0), 1)) # update conflicts related to this agent
-                        enqueue!(priority_queue, new_node => new_node.cost)
+                    search_env, valid_flag = low_level_search!(solver, mapf, new_node, [get_agent_id(constraint)]; path_finder=path_finder)
+                    if valid_flag
+                        detect_conflicts!(new_node.conflict_table,new_node.solution,[get_agent_id(constraint)];t0=max(minimum(search_env.cache.t0), 1)) # update conflicts related to this agent
+                        enqueue!(priority_queue, (new_node,search_env.cache) => new_node.cost)
                     end
                 end
             end
@@ -1020,7 +1026,8 @@ function CRCBS.solve!(
     end
     log_info(-1,solver.l2_verbosity,"CBS: no solution found. Returning default solution")
     exit_cbs!(solver)
-    return default_solution(mapf)
+    solution, cost = default_solution(mapf)
+    return solution, mapf.env.cache, cost
 end
 # CRCBS.solve!(solver,mapf::PC_MAPF,args...) = CRCBS.solve!(solver,mapf.env,args...)
 
@@ -1102,12 +1109,12 @@ function high_level_search!(solver::P, base_search_env::SearchEnv,  optimizer;
                     env = SearchEnv(env,base_solution=base_search_env.base_solution)
                     pc_mapf = PC_MAPF(env);
                     ##### Call CBS Search Routine (LEVEL 2) #####
-                    solution, cost = solve!(solver,pc_mapf);
+                    solution, cache, cost = solve!(solver,pc_mapf);
                     if cost < solver.best_cost
                         best_solution = solution
                         best_assignment = adj_matrix # this represents an assignment matrix in AssignmentMILP
                         solver.best_cost = cost # TODO make sure that the operation duration is accounted for here
-                        best_env = env
+                        best_env = SearchEnv(env,cache=cache)
                     end
                     optimality_gap = get_primary_cost(solver,solver.best_cost) - lower_bound
                     log_info(0,solver,string("HIGH LEVEL SEARCH: Best cost so far = ", get_primary_cost(solver,solver.best_cost), ". Optimality gap = ",optimality_gap))
