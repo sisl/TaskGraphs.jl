@@ -399,10 +399,40 @@ function robots_vs_task_vs_time_box_plot(df;
 end
 
 
-function get_runtime_box_plot(df;obj=:time,m_range=10:10:60,n_range=10:10:40,ymin=0.007,title="",nsym="n",msym="m",)
-    @pgf gp = GroupPlot({group_style = {
+function get_box_plot_group_plot(df;
+        obj=:time,
+        outer_key=:M,
+        inner_key=:N,
+        outer_range=10:10:60,
+        inner_range=10:10:40,
+        xmin=0, 
+        xmax=length(inner_range)+1,
+        ymin=0.007,
+        ymax=120,
+        xtick=[10,20,30,40],
+        xticklabels=[10,20,30,40],
+        tickpos="left",
+        ytick=[0.1,1,10,100],
+        ylabel_shift="0pt",
+        title="",
+        title_shift=[3.3,2.55],
+        inner_sym="n",
+        outer_sym="m",
+        xlabels=map(m->string(outer_sym," = ",m), outer_range),
+        ylabels=map(n->string(inner_sym," = ",n), inner_range),
+        ylabel="time (s)",
+        draw_labels=true,
+        ymode="log",
+        width="3.25cm",
+        height="6cm",
+        legend_draw="black",
+        legend_fill="white",
+        legend_x_shift="2pt",
+        mark="*",
+    )
+    @pgf gp = GroupPlot({group_style = { 
                 "group name"="myPlots",
-                "group size"="6 by 1",
+                "group size"=string(length(outer_range)," by 1"),
                 "xlabels at"="edge bottom",
                 "xticklabels at"="edge bottom",
                 "vertical sep"="0pt",
@@ -410,70 +440,116 @@ function get_runtime_box_plot(df;obj=:time,m_range=10:10:60,n_range=10:10:40,ymi
             },
             boxplot,
             "boxplot/draw direction"="y",
-            # axis lines=left,
-            # hide axis,
-            ymode="log",
+            ymode=ymode,
             footnotesize,
-            width="3.25cm",
-            height="6cm",
-            xmin=0,
-            xmax=5,
+            width=width,
+            height=height,
+            xmin=xmin, 
+            xmax=xmax,
             ymin=ymin,
-            ymax=120,
-            xtick=[10,20,30,40],
-            xticklabels=[10,20,30,40],
-            tickpos="left",
-            ytick=[0.1,1,10,100],
+            ymax=ymax,
+            xtick=xtick,
+            xticklabels=xtick,
+            tickpos=tickpos,
+            ytick=ytick,
             yticklabels=[],
-            "ylabel shift"="0pt",
+            # "set layers"="standard",
+            "ylabel shift"=ylabel_shift,
             "ytick align"="outside",
-            "xtick align"="outside"});
+            "xtick align"="outside",
+            # "legend entries"={map(j->@sprintf("\$%s\$",ylabels[j]),1:length(inner_range))...},
+            # "legend cell align"="left",
+            # "legend to name"="grouplegend",
+            # "legend style"={
+            #     draw=legend_draw,
+            #     fill=legend_fill,
+            #     xshift=legend_x_shift,
+            #     "inner sep"="1pt",
+            #     yshift="0pt",
+            #     font="\\scriptsize"
+            # },
+            # "legend pos"="north west"
+        }
+        
+        );
 
-    @pgf for (i,m) in enumerate(m_range)
-        if i == 1
-            push!(gp,
-                {xlabel=@sprintf("\$%s=%i\$",msym,m),
-                ylabel="time (s)",
-                yticklabels=[0.1,1,10,100],
-                "legend style"="{draw=none,xshift=2pt}",
-                "legend pos"="north west"},
-                map(n->LegendEntry({},@sprintf("\$%s=%i\$",nsym,n),false),n_range)...,
+    @pgf for (i,m) in enumerate(outer_range)
+        if i == 1 && draw_labels
+            # push!(gp, 
+            #     """
+            #     \\coordinate (leg) at (rel axis cs:0,1);
+            #     """
+            # )
+            push!(gp, 
+                {xlabel=@sprintf("\$%s\$",xlabels[i]),
+                ylabel=ylabel,
+                yticklabels=ytick,
+                "legend style"={
+                    draw=legend_draw,
+                    fill=legend_fill,
+                    xshift=legend_x_shift,
+                    yshift="0pt"},
+                "legend pos"="north west"
+                },
+                map(j->LegendEntry({},@sprintf("\$%s\$",ylabels[j]),false),1:length(inner_range))...,
                 """
                 \\addlegendimage{no markers,blue}
                 \\addlegendimage{no markers,red}
                 \\addlegendimage{no markers,brown}
                 \\addlegendimage{no markers,black}
                 """,
-                map(n->PGFPlotsX.PlotInc({boxplot},Table(
+                map(n->PGFPlotsX.PlotInc({boxplot,mark=mark},Table(
                             {"y index"=0},
-                            [:data=>df[(df.M .== m) .& (df.N .== n),obj]])),n_range)...)
+                            [:data=>df[(df[:,outer_key] .== m) .& (df[:,inner_key] .== n),obj]])),inner_range)...)
         else
-            push!(gp, {xlabel=@sprintf("\$%s=%i\$",msym,m)},
-                map(n->PGFPlotsX.PlotInc({boxplot},Table(
+            push!(gp, {
+                    xlabel=@sprintf("\$%s\$",xlabels[i]),
+                    ymajorticks="false",
+                    yminorticks="false"
+                },
+                map(n->PGFPlotsX.PlotInc({boxplot,mark=mark},Table(
                             {"y index"=0},
-                            [:data=>df[(df.M .== m) .& (df.N .== n),obj]])),n_range)...)
+                            [:data=>df[(df[:,outer_key] .== m) .& (df[:,inner_key] .== n),obj]])),inner_range)...)
         end
     end;
+    gp
+end
+function get_runtime_box_plot(df;
+        title="",
+        title_shift=[3.3,2.55],
+        scale=0.7,
+        kwargs...)
+    gp = get_box_plot_group_plot(df;kwargs...)
     if title != ""
-        tikzpic = @pgf TikzPicture({scale=0.7},
+        tikzpic = @pgf TikzPicture({scale=scale},
             """
             \\centering
+            \\pgfplotsset{set layers=standard,cell picture=true}
             """,
             gp,
             @sprintf("""
-            \\node (title) at (\$(myPlots c1r1.center)!0.5!(myPlots c2r1.center)+(3.3cm,2.55cm)\$) {\\textbf{%s}};
-            """,title)
+            \\node (title) at (\$(myPlots c1r1.center)!0.5!(myPlots c2r1.center)+(%2.2fcm,%2.2fcm)\$) {\\textbf{%s}};
+            """,title_shift...,title),
+            # """
+            # \\node[anchor= north west] (leg) at (myPlots c1r1.north west){\\pgfplotslegendfromname{grouplegend}};
+            # """
         )
     else
-        tikzpic = @pgf TikzPicture({scale=0.7},
+        tikzpic = @pgf TikzPicture({scale=scale},
             """
             \\centering
+            \\pgfplotsset{set layers=standard,cell picture=true}
             """,
-            gp
+            gp,
+            # """
+            # \\node[anchor= north west] (leg) at (myPlots c1r1.north west){\\pgfplotslegendfromname{grouplegend}};
+            # """
         )
     end
     return tikzpic
 end
+
+# print_tex(gp)
 
 function preprocess_collab_results!(df_dict)
     num_tasks = [12,18,24]

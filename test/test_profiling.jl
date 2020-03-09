@@ -4,6 +4,8 @@ let
 
     dummy_problem_dir = "dummy_problem_dir"
     dummy_results_dir = "dummy_results_dir"
+    run(pipeline(`rm -rf $dummy_problem_dir`, stdout=devnull, stderr=devnull))
+    run(pipeline(`rm -rf $dummy_results_dir`, stdout=devnull, stderr=devnull))
     modes = [
         :write,
         :assignment_only,
@@ -60,10 +62,10 @@ let
     println("RUNNING PROFILING TESTS")
 
     modes = [
-        :assignment_only,
-        :low_level_search_without_repair,
+        # :assignment_only,
+        # :low_level_search_without_repair,
         :low_level_search_with_repair,
-        :full_solver
+        # :full_solver
         ]
     results_dirs = [
         joinpath(EXPERIMENT_DIR,"assignment_solver/cache_fix_results")

@@ -1,0 +1,8 @@
+edge_list = [[15, 1], [18, 2], [3, 3], [8, 4], [23, 5], [1, 6], [27, 7], [26, 8], [12, 9], [30, 10]]
+cost = 102
+time = 0.013433498
+optimality_gap = 0
+size_j = 10
+size_i = 40
+optimal = true
+feasible = true

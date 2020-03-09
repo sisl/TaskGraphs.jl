@@ -324,7 +324,7 @@ function profile_low_level_search_and_repair(solver, project_spec, problem_spec,
             primary_objective=primary_objective); # TODO pass in t0_ here (maybe get it straight from model?)
         pc_mapf = PC_MAPF(env);
         node = initialize_root_node(pc_mapf)
-        valid_flag, elapsed_time, byte_ct, gc_time, mem_ct = @timed low_level_search!(solver, pc_mapf, node)
+        (search_env, valid_flag), elapsed_time, byte_ct, gc_time, mem_ct = @timed low_level_search!(solver, pc_mapf, node)
 
         cost = collect(get_cost(node.solution))
         if cost[1] == Inf
