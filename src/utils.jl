@@ -490,9 +490,9 @@ title_string(a::TEAM_ACTION{A},verbose=true) where {A} = verbose ? string("team"
 
 Base.string(pred::OBJECT_AT) =  string("O(",get_id(get_object_id(pred)),",",get_id(get_location_id(pred)),")")
 Base.string(pred::ROBOT_AT)  =  string("R(",get_id(get_robot_id(pred)),",",get_id(get_location_id(pred)),")")
-Base.string(a::GO)        =  string("GO(",get_id(get_robot_id(a)),",",get_id(get_initial_location_id(a)),",",get_id(get_destination_location_id(a)),")")
+Base.string(a::GO)        =  string("GO(",get_id(get_robot_id(a)),",",get_id(get_initial_location_id(a)),"->",get_id(get_destination_location_id(a)),")")
 Base.string(a::COLLECT)   =  string("COLLECT(",get_id(get_robot_id(a)),",",get_id(get_object_id(a)),",",get_id(get_location_id(a)),")")
-Base.string(a::CARRY)     =  string("CARRY(",get_id(get_robot_id(a)),",",get_id(get_object_id(a)),",",get_id(get_destination_location_id(a)),")")
+Base.string(a::CARRY)     =  string("CARRY(",get_id(get_robot_id(a)),",",get_id(get_object_id(a)),",",get_id(get_initial_location_id(a)),"->",get_id(get_destination_location_id(a)),")")
 Base.string(a::DEPOSIT)   =  string("DEPOSIT(",get_id(get_robot_id(a)),",",get_id(get_object_id(a)),",",get_id(get_location_id(a)),")")
 Base.string(op::Operation)=  string("OP(",get_id(get_operation_id(op)),")")
 Base.string(a::TEAM_ACTION{A}) where {A} =  string("TEAM_ACTION( ",map(i->string(string(i), ","), a.instructions)...," )")

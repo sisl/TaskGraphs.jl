@@ -431,6 +431,77 @@ function initialize_toy_problem_9(;cost_function=SumOfMakeSpans,verbose=false,Δ
     return project_spec, problem_spec, robot_ICs, assignments, env_graph
 end
 
+
+export
+    initialize_toy_problem_10
+
+"""
+    Motivation for backtracking in ISPS
+
+    The makespan optimal solution is T = 8. However, the optimistic schedule
+    will always prioritize task route planning for tasks 1,2, and 3 before 4.
+    This leads to a double delay that will not be caught without backtracking
+    in ISPS. Hence, the solver will return a solution with T = 9.
+"""
+function initialize_toy_problem_10(;cost_function=MakeSpan,verbose=false,Δt_op=0,Δt_collect=[0,0,0,0,0,0],Δt_deliver=[0,0,0,0,0,0])
+    N = 4                  # num robots
+    M = 4                  # num delivery tasks
+    vtx_grid = initialize_dense_vtx_grid(11,13)
+
+    #  1  12  23  34  45  56  67  78  89  100  111  122  133
+    #  2  13  24  35  46  57  68  79  90  101  112  123  134
+    #  3  14  25  36  47  58  69  80  91  102  113  124  135
+    #  4  15  26  37  48  59  70  81  92  103  114  125  136
+    #  5  16  27  38  49  60  71  82  93  104  115  126  137
+    #  6  17  28  39  50  61  72  83  94  105  116  127  138
+    #  7  18  29  40  51  62  73  84  95  106  117  128  139
+    #  8  19  30  41  52  63  74  85  96  107  118  129  140
+    #  9  20  31  42  53  64  75  86  97  108  119  130  141
+    # 10  21  32  43  54  65  76  87  98  109  120  131  142
+    # 11  22  33  44  55  66  77  88  99  110  121  132  143
+
+    #            (2)
+    #
+    #
+    #     (1)
+    # (4)    [4]     [4] [3] [4]                         [3]
+    #
+    #
+    #
+    #            [2]
+    #
+    #     [1]
+
+    env_graph = construct_factory_env_from_vtx_grid(vtx_grid)
+    dist_matrix = get_dist_matrix(env_graph)
+    r0 = [15,34,137, 5       ]
+    s0 = [15,34,137, 5, 27,49 ]
+    sF = [22,42,60,  27,49,71]
+
+    project_spec, robot_ICs = initialize_toy_problem(r0,s0,sF,(v1,v2)->dist_matrix[v1,v2])
+    add_operation!(project_spec,construct_operation(project_spec,-1,[1,2,3,6],[],Δt_op))
+    # add_operation!(project_spec,construct_operation(project_spec,-1,[2],[],Δt_op))
+    add_operation!(project_spec,construct_operation(project_spec,-1,[4],[5],Δt_op))
+    add_operation!(project_spec,construct_operation(project_spec,-1,[5],[6],Δt_op))
+    # add_operation!(project_spec,construct_operation(project_spec,-1,[4],[],Δt_op))
+    project_spec, problem_spec, object_ICs, object_FCs, robot_ICs = construct_task_graphs_problem(project_spec,r0,s0,sF,dist_matrix;Δt_collect=Δt_collect,Δt_deliver=Δt_deliver,cost_function=cost_function)
+    # assignments = [1,2]
+    assignment_dict = Dict(1=>[1],2=>[2],3=>[3],4=>[4,5,6])
+    assignments = [1,2,3,4,4,4]
+
+    if verbose
+        print_toy_problem_specs("""
+            TOY PROBLEM 10
+
+            The makespan optimal solution is T = 8. However, the optimistic schedule
+            will always prioritize task route planning for tasks 1,2, and 3 before 4.
+            This leads to a double delay that will not be caught without backtracking
+            in ISPS. Hence, the solver will return a solution with T = 9.
+            """,vtx_grid,r0,s0,sF,project_spec,problem_spec.graph)
+    end
+    return project_spec, problem_spec, robot_ICs, assignments, env_graph
+end
+
 export
     get_object_paths
 

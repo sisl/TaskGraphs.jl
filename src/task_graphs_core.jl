@@ -874,10 +874,10 @@ function validate(project_schedule::ProjectSchedule,paths::Vector{Vector{Int}},t
             final_vtx = path_spec.final_vtx
             try
                 if start_vtx != -1
-                    @assert(path[t0[v] + 1] == start_vtx, string("node: ",typeof(node), ", vtx: ",start_vtx, ", t+1: ",t0[v]+1,", path: ", path))
+                    @assert(path[t0[v] + 1] == start_vtx, string("node: ",string(node), ", start_vtx: ",start_vtx, ", t0+1: ",t0[v]+1,", path: ", path))
                 end
                 if final_vtx != -1
-                    @assert(path[tF[v] + 1] == final_vtx, string("node: ",typeof(node), ", vtx: ",start_vtx, ", t+1: ",t0[v]+1,", path: ", path))
+                    @assert(path[tF[v] + 1] == final_vtx, string("node: ",string(node), ", final vtx: ",final_vtx, ", tF+1: ",tF[v]+1,", path: ", path))
                 end
             catch e
                 # if typeof(e) <: AssertionError

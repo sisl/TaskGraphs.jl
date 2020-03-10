@@ -405,7 +405,7 @@ function get_box_plot_group_plot(df;
         inner_key=:N,
         outer_range=10:10:60,
         inner_range=10:10:40,
-        xmin=0, 
+        xmin=0,
         xmax=length(inner_range)+1,
         ymin=0.007,
         ymax=120,
@@ -430,7 +430,7 @@ function get_box_plot_group_plot(df;
         legend_x_shift="2pt",
         mark="*",
     )
-    @pgf gp = GroupPlot({group_style = { 
+    @pgf gp = GroupPlot({group_style = {
                 "group name"="myPlots",
                 "group size"=string(length(outer_range)," by 1"),
                 "xlabels at"="edge bottom",
@@ -444,7 +444,7 @@ function get_box_plot_group_plot(df;
             footnotesize,
             width=width,
             height=height,
-            xmin=xmin, 
+            xmin=xmin,
             xmax=xmax,
             ymin=ymin,
             ymax=ymax,
@@ -470,17 +470,17 @@ function get_box_plot_group_plot(df;
             # },
             # "legend pos"="north west"
         }
-        
+
         );
 
     @pgf for (i,m) in enumerate(outer_range)
         if i == 1 && draw_labels
-            # push!(gp, 
+            # push!(gp,
             #     """
             #     \\coordinate (leg) at (rel axis cs:0,1);
             #     """
             # )
-            push!(gp, 
+            push!(gp,
                 {xlabel=@sprintf("\$%s\$",xlabels[i]),
                 ylabel=ylabel,
                 yticklabels=ytick,
@@ -750,7 +750,9 @@ function show_times(sched::ProjectSchedule,v)
     return string(map(a->string(a[v],","), arr[1:2])...)
 end
 function show_times(cache::PlanningCache,v)
-    return string(cache.t0[v],",",cache.tF[v])
+    slack = minimum(cache.slack[v])
+    slack_string = slack == Inf ? string(slack) : string(Int(slack))
+    return string(cache.t0[v],",",cache.tF[v],",",slack_string)
 end
 function print_project_schedule(filename::String,project_schedule::ProjectSchedule,cache=initialize_planning_cache(project_schedule);mode=:root_aligned,verbose=true)
     rg = get_display_metagraph(project_schedule;

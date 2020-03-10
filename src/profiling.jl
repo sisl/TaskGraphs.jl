@@ -379,7 +379,7 @@ function profile_low_level_search(solver, project_spec, problem_spec, robot_ICs,
     end
 end
 function profile_full_solver(solver, project_spec, problem_spec, robot_ICs, env_graph,dist_matrix;
-        primary_objective=SumOfMakeSpans,kwargs...)
+        primary_objective=SumOfMakeSpans,save_paths=false,kwargs...)
     # Solve the problem
     # solver = PC_TAPF_Solver(verbosity=0,LIMIT_A_star_iterations=5*nv(env_graph));
 
@@ -388,8 +388,6 @@ function profile_full_solver(solver, project_spec, problem_spec, robot_ICs, env_
         primary_objective=primary_objective,
         kwargs...);
 
-    robot_paths = convert_to_vertex_lists(solution)
-    object_paths, object_intervals = get_object_paths(solution,search_env)
     optimal = (optimality_gap <= 0)
     feasible = true
     if cost[1] == Inf
@@ -404,13 +402,19 @@ function profile_full_solver(solver, project_spec, problem_spec, robot_ICs, env_
     merge!(results_dict, TOML.parse(sparse(assignment)))
     results_dict["time"] = elapsed_time
     # results_dict["assignment"] = assignment
-    results_dict["robot_paths"] = robot_paths
-    results_dict["object_paths"] = object_paths
-    results_dict["object_intervals"] = object_intervals
     results_dict["optimality_gap"] = Int(optimality_gap)
     results_dict["optimal"] = optimal
     results_dict["feasible"] = feasible
     results_dict["cost"] = collect(cost)
+
+    if feasible && save_paths
+        robot_paths = convert_to_vertex_lists(solution)
+        object_paths, object_intervals = get_object_paths(solution,search_env)
+        results_dict["robot_paths"] = robot_paths
+        results_dict["object_paths"] = object_paths
+        results_dict["object_intervals"] = object_intervals
+    end
+
     results_dict
 end
 function compile_solver_results(solver, solution, cost, search_env, optimality_gap, elapsed_time, t_arrival)

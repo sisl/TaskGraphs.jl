@@ -167,6 +167,7 @@ let
         initialize_toy_problem_6,
         initialize_toy_problem_7,
         initialize_toy_problem_8,
+        # initialize_toy_problem_10,
         ])
         for cost_model in [SumOfMakeSpans, MakeSpan]
             let
@@ -184,6 +185,7 @@ let
                         primary_objective=cost_model,
                         )
                     push!(costs, cost[1])
+                    @show f
                     @test validate(env.schedule)
                     @show convert_to_vertex_lists(solution)
                     @test validate(env.schedule, convert_to_vertex_lists(solution), env.cache.t0, env.cache.tF)
@@ -195,11 +197,23 @@ let
     end
 end
 
+# Backtracking motivating example
 let
-    f = initialize_toy_problem_9
+    f = initialize_toy_problem_10
     cost_model = MakeSpan
-    project_spec, problem_spec, robot_ICs, assignments, env_graph = f(;verbose=false)
-    solver = PC_TAPF_Solver(nbs_model=AssignmentMILP(),l3_verbosity=0)
+    project_spec, problem_spec, robot_ICs, assignments, env_graph = f(;cost_function=cost_model,verbose=true)
+    solver = PC_TAPF_Solver(nbs_model=AssignmentMILP(),l1_verbosity=2,l2_verbosity=2,l3_verbosity=0)
+
+    project_schedule = construct_partial_project_schedule(project_spec,problem_spec,map(i->robot_ICs[i], 1:problem_spec.N))
+    model = formulate_milp(solver.nbs_model,project_schedule,problem_spec;cost_model=cost_model)
+    optimize!(model)
+    @test termination_status(model) == MOI.OPTIMAL
+    cost = Int(round(value(objective_function(model))))
+    adj_matrix = get_assignment_matrix(model)
+    update_project_schedule!(solver.nbs_model,project_schedule,problem_spec,adj_matrix)
+    set_leaf_operation_nodes!(project_schedule)
+    @test validate(project_schedule)
+    print_project_schedule(project_schedule,"backtracking_schedule";mode=:root_align)
 
     solution, assignment, cost, env = high_level_search!(
         solver,
@@ -210,34 +224,8 @@ let
         Gurobi.Optimizer;
         primary_objective=cost_model,
         )
-
-
-
-    cache = env.cache
-    tF = cache.tF
-    slack = cache.slack
-    deadline = tF .+ map(i->minimum(i),slack)
-
-    env = construct_search_env(solver,env.schedule, problem_spec, env_graph;
-        primary_objective=cost_model,
-        )
-    pc_mapf = PC_MAPF(env);
-    ##### Call CBS Search Routine (LEVEL 2) #####
-    # solution, cache, cost = solve!(solver,pc_mapf);
-    mapf = pc_mapf
-    node = initialize_root_node(mapf)
-    constraint = StateConstraint(
-        1, # agent id
-        PathNode(PCCBS.State(5,1),PCCBS.Action(Edge(5,6),1),PCCBS.State(6,2)),
-        2, # t
-    )
-    add_constraint!(node,constraint)
-    search_env, valid_flag = low_level_search!(solver,mapf,node)
-    convert_to_vertex_lists(node.solution)
-    # node.solution.paths[1].path_nodes[1].sp
-
+    convert_to_vertex_lists(solution), cost
 end
-
 # end
 
 # For catching troublesome problem instances

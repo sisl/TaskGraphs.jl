@@ -332,24 +332,24 @@ export
 @with_kw struct PlanningCache
     closed_set::Set{Int}                    = Set{Int}()    # nodes that are completed
     active_set::Set{Int}                    = Set{Int}()    # active nodes
-    node_queue::PriorityQueue{Int,Tuple{Float64,Float64}} = PriorityQueue{Int,Tuple{Float64,Float64}}() # active nodes prioritized by slack
+    node_queue::PriorityQueue{Int,Tuple{Int,Float64}} = PriorityQueue{Int,Tuple{Int,Float64}}() # active nodes prioritized by slack
     t0::Vector{Int}                         = Vector{Int}()
     tF::Vector{Int}                         = Vector{Int}()
     slack::Vector{Vector{Float64}}          = Vector{Vector{Float64}}()
     local_slack::Vector{Vector{Float64}}    = Vector{Vector{Float64}}()
-    max_deadline::Vector{Int}               = Vector{Int}() # Marks the time at whcih this node will begin accumulating a delay cost
+    max_deadline::Vector{Int}               = Vector{Int}() # Marks the time at whidh this node will begin accumulating a delay cost
 end
 
 function isps_queue_cost(schedule::ProjectSchedule,cache::PlanningCache,v::Int)
     path_spec = get_path_spec(schedule,v)
-    return (1.0*(path_spec.plan_path), minimum(cache.slack[v]))
+    return (Int(path_spec.plan_path), minimum(cache.slack[v]))
 end
 
 function initialize_planning_cache(schedule::ProjectSchedule;kwargs...)
     t0,tF,slack,local_slack = process_schedule(schedule;kwargs...);
-    deadline = tF .+ map(i->minimum(i),slack) # soft deadline (can be tightened as necessary)
-    deadline = map(i->i==Inf ? typemax(Int) : Int(i), deadline)
-    cache = PlanningCache(t0=t0,tF=tF,slack=slack,local_slack=local_slack,max_deadline=deadline)
+    allowable_slack = map(i->minimum(i),slack) # soft deadline (can be tightened as necessary)
+    allowable_slack = map(i->i==Inf ? typemax(Int) : Int(i), allowable_slack) # initialize deadline at infinity
+    cache = PlanningCache(t0=t0,tF=tF,slack=slack,local_slack=local_slack,max_deadline=allowable_slack)
     for v in vertices(get_graph(schedule))
         if is_root_node(get_graph(schedule),v)
             push!(cache.active_set,v)
@@ -383,6 +383,34 @@ function reset_cache!(cache::PlanningCache,schedule::ProjectSchedule)
     end
     cache
 end
+
+export
+    SearchEnv,
+    construct_search_env,
+    update_env!
+
+# @with_kw struct SearchEnv{C,E<:AbstractLowLevelEnv{State,Action,C},S<:LowLevelSolution} <: AbstractLowLevelEnv{State,Action,C}
+@with_kw struct SearchEnv{C,E<:AbstractLowLevelEnv{State,Action,C},S} <: AbstractLowLevelEnv{State,Action,C}
+    schedule::ProjectSchedule       = ProjectSchedule()
+    cache::PlanningCache            = PlanningCache()
+    env::E                          = PCCBS.LowLevelEnv()
+    problem_spec::ProblemSpec       = ProblemSpec()
+    dist_function::DistMatrixMap    = env.graph.dist_function # DistMatrixMap(env.graph.vtx_map, env.graph.vtxs)
+    cost_model::C                   = get_cost_model(env)
+    num_agents::Int                 = length(get_robot_ICs(schedule))
+    base_solution::S                = LowLevelSolution(
+        paths = map(i->Path{State,Action,get_cost_type(cost_model)}(), 1:num_agents),
+        cost_model = cost_model,
+        costs = map(i->get_initial_cost(cost_model), 1:num_agents),
+        cost  = aggregate_costs(cost_model, map(i->get_initial_cost(cost_model), 1:num_agents)),
+        )
+end
+function CRCBS.get_start(env::SearchEnv,v::Int)
+    start_vtx   = get_path_spec(env.schedule,v).start_vtx
+    start_time  = env.cache.t0[v]
+    PCCBS.State(start_vtx,start_time)
+end
+
 function reverse_propagate_delay!(solver,cache,schedule,delay_vec)
     buffer = zeros(nv(schedule))
     for v in reverse(topological_sort_by_dfs(get_graph(schedule)))
@@ -395,7 +423,30 @@ function reverse_propagate_delay!(solver,cache,schedule,delay_vec)
     end
     delay_vec
 end
-function update_planning_cache!(solver::M,cache::C,schedule::S,v::Int,path::P) where {M<:PC_TAPF_Solver,C<:PlanningCache,S<:ProjectSchedule,P<:Path}
+function backtrack_deadlines(solver,cache,schedule,v)
+    frontier = Set{Int}([v])
+    delay_cut = Set{Int}()
+    while length(frontier) > 0
+        v = pop!(frontier)
+        # Δt_min = get_path_spec(schedule,v).min_path_duration
+        # buffer = (cache.tF[v] - (cache.t0[v] + Δt_min))
+        if cache.max_deadline[v] > 0 # still has room for some delay
+            push!(delay_cut,v)
+        elseif indegree(schedule,v) == 0
+            # if v is a root_node, the deadlines cannot be tightened anymore
+            log_info(-1,solver.l3_verbosity,"ISPS: deadlines cannot be tightened any more.")
+            return Set{Int}()
+        else
+            for v2 in inneighbors(schedule,v)
+                push!(frontier,v2)
+            end
+        end
+    end
+    return delay_cut
+end
+function update_planning_cache!(solver::M,env::E,v::Int,path::P) where {M<:PC_TAPF_Solver,E<:SearchEnv,P<:Path}
+    cache = env.cache
+    schedule = env.schedule
     active_set = cache.active_set
     closed_set = cache.closed_set
     node_queue = cache.node_queue
@@ -404,30 +455,30 @@ function update_planning_cache!(solver::M,cache::C,schedule::S,v::Int,path::P) w
     # update t0, tF, slack, local_slack
     Δt = get_final_state(path).t - cache.tF[v]
     if Δt > 0
-        # TODO Add backtracking
         delay = Δt - minimum(cache.slack[v])
         if delay > 0
-            log_info(-1,solver.l3_verbosity,"LOW LEVEL SEARCH: schedule delay of ",delay," time steps incurred by path for vertex v = ",v," - ",string(get_node_from_vtx(schedule,v)))
-            # identify where to replan
-            delay_vec = zeros(nv(schedule))
-            delay_vec[v] = delay
-            delay_vec = reverse_propagate_delay!(solver,cache,schedule,delay_vec)
-            replannable = true
-            for v_ in vertices(schedule)
-                if is_root_node(schedule,v_)
-                    if delay_vec[v_] > 0
-                        replannable = false
-                        break
-                    end
-                end
-            end
-            if replannable
-                cache.tF[v] = get_final_state(path).t
-                log_info(-1,solver.l3_verbosity,"LOW LEVEL SEARCH: replan with tighter bounds is possible")
-                for v_ in vertices(schedule)
-
-                end
-            end
+            log_info(-1,solver.l3_verbosity,"LOW LEVEL SEARCH: schedule delay of ",delay," time steps incurred by path for vertex v = ",v," - ",string(get_node_from_vtx(schedule,v)), " - tF = ",get_final_state(path).t)
+            # Backtracking
+            tightenable_set = backtrack_deadlines(solver,cache,schedule,v)
+            # for v_ in tightenable_set
+            #     # adjust allowable_slack
+            #     cache.max_deadline[v] = max(0, cache.max_deadline[v]-1)
+            #     # remove from closed set
+            #     push!(active_set, v_)
+            #     setdiff!(closed_set,v_)
+            #     # TODO trim schedule at v.t0
+            #     # for v2 in outneighbors(schedule,v)
+            #     for v2 in map(e->e.dst,collect(edges(bfs_tree(graph,v_;dir=:out))))
+            #         setdiff!(closed_set,v2)
+            #         setdiff!(active_set,v2)
+            #     end
+            #     empty!(node_queue)
+            #     for v2 in active_set
+            #         node_queue[v2] = isps_queue_cost(schedule,cache,v2)
+            #     end
+            # end
+            log_info(-1,solver,"ISPS: backtracking at vtxs ",collect(tightenable_set),".")
+            # return cache
         end
         cache.tF[v] = get_final_state(path).t
         t0,tF,slack,local_slack = process_schedule(schedule;t0=cache.t0,tF=cache.tF)
@@ -461,34 +512,6 @@ function update_planning_cache!(solver::M,cache::C,schedule::S,v::Int,path::P) w
     log_info(2,solver,"moved ",v," to closed set, moved ",activated_vtxs," to active set")
     log_info(3,solver,string("cache.tF[v] = ",cache.tF))
     return cache
-end
-
-
-export
-    SearchEnv,
-    construct_search_env,
-    update_env!
-
-# @with_kw struct SearchEnv{C,E<:AbstractLowLevelEnv{State,Action,C},S<:LowLevelSolution} <: AbstractLowLevelEnv{State,Action,C}
-@with_kw struct SearchEnv{C,E<:AbstractLowLevelEnv{State,Action,C},S} <: AbstractLowLevelEnv{State,Action,C}
-    schedule::ProjectSchedule       = ProjectSchedule()
-    cache::PlanningCache            = PlanningCache()
-    env::E                          = PCCBS.LowLevelEnv()
-    problem_spec::ProblemSpec       = ProblemSpec()
-    dist_function::DistMatrixMap    = env.graph.dist_function # DistMatrixMap(env.graph.vtx_map, env.graph.vtxs)
-    cost_model::C                   = get_cost_model(env)
-    num_agents::Int                 = length(get_robot_ICs(schedule))
-    base_solution::S                = LowLevelSolution(
-        paths = map(i->Path{State,Action,get_cost_type(cost_model)}(), 1:num_agents),
-        cost_model = cost_model,
-        costs = map(i->get_initial_cost(cost_model), 1:num_agents),
-        cost  = aggregate_costs(cost_model, map(i->get_initial_cost(cost_model), 1:num_agents)),
-        )
-end
-function CRCBS.get_start(env::SearchEnv,v::Int)
-    start_vtx   = get_path_spec(env.schedule,v).start_vtx
-    start_time  = env.cache.t0[v]
-    PCCBS.State(start_vtx,start_time)
 end
 
 function CRCBS.SumOfMakeSpans(schedule::S,cache::C) where {S<:ProjectSchedule,C<:PlanningCache}
@@ -575,7 +598,7 @@ function update_env!(solver::S,env::E,v::Int,path::P,agent_id::Int=get_path_spec
     schedule = env.schedule
 
     # UPDATE CACHE
-    update_planning_cache!(solver,cache,schedule,v,path)
+    update_planning_cache!(solver,env,v,path)
     update_cost_model!(env)
     # ADD UPDATED PATH TO HEURISTIC MODELS
     if agent_id != -1
@@ -593,7 +616,8 @@ function CRCBS.build_env(solver, env::E, node::N, schedule_node::T, v::Int,path_
     agent_id = path_spec.agent_id
     goal_vtx = path_spec.final_vtx
     goal_time = env.cache.tF[v]                             # time after which goal can be satisfied
-    deadline = env.cache.tF[v] .+ env.cache.slack[v]         # deadline for DeadlineCost
+    # deadline = env.cache.tF[v] .+ env.cache.slack[v]         # deadline for DeadlineCost
+    deadline = env.cache.tF[v] .+ min.(env.cache.max_deadline[v],env.cache.slack[v])         # deadline for DeadlineCost
     # Adjust deadlines if necessary:
     if get_path_spec(env.schedule, v).tight == true
         goal_time += minimum(env.cache.local_slack[v])
@@ -819,9 +843,10 @@ function plan_next_path!(solver::S, env::E, node::N;
 
     valid_flag = true
     if length(env.cache.node_queue) > 0
-        v = dequeue!(env.cache.node_queue)
+        v,priority = dequeue_pair!(env.cache.node_queue)
         node_id = get_vtx_id(env.schedule,v)
         schedule_node = get_node_from_id(env.schedule,node_id)
+        # log_info(1,solver.l3_verbosity,"ISPS: dequeuing v = ",v," - ",string(schedule_node)," with priority ",priority)
         step_low_level!(solver,schedule_node,env.cache.t0[v],env.cache.tF[v],get_path_spec(env.schedule, v).plan_path)
         if get_path_spec(env.schedule, v).plan_path == true
             enter_a_star!(solver)
@@ -848,7 +873,7 @@ function plan_next_path!(solver::S, env::E, node::N;
                 cost=get_initial_cost(env.env)
                 )
             # update planning cache only
-            update_planning_cache!(solver,env.cache,env.schedule,v,path) # NOTE I think this is all we need, since there is no actual path to update
+            update_planning_cache!(solver,env,v,path) # NOTE I think this is all we need, since there is no actual path to update
         end
         exit_a_star!(solver)
     end
