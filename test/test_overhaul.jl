@@ -225,6 +225,19 @@ let
         primary_objective=cost_model,
         )
     convert_to_vertex_lists(solution), cost
+
+    # robot_paths = convert_to_vertex_lists(solution)
+    # object_path_dict, object_interval_dict = fill_object_path_dicts!(solution,env.schedule,env.cache)
+    # object_paths, object_intervals = convert_to_path_vectors(object_path_dict, object_interval_dict)
+    #
+    # # # Render video clip
+    # tf = maximum(map(p->length(p),robot_paths))
+    # set_default_plot_size(24cm,24cm)
+    # record_video(joinpath(VIDEO_DIR,string("toy_example.webm")),
+    #     t->render_paths(t,env_graph,robot_paths,object_paths;
+    #         object_intervals=object_intervals,
+    #         colors_vec=map(i->LCHab(60,80,200),1:length(robot_paths)),
+    #         show_paths=false);tf=tf)
 end
 # end
 

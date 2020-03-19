@@ -77,7 +77,9 @@ function construct_expanded_zones(vtxs,vtx_map,pickup_zones,dropoff_zones;shapes
             vtx_list = Int[]
             for dx in sort([0,d[1]][1:shape[1]])
                 for dy in sort([0,d[2]][1:shape[2]])
-                    push!(vtx_list, vtx_map[vtx[1]+dx, vtx[2]+dy])
+                    if 0 < vtx[1]+dx <= size(vtx_map,1) && 0 < vtx[2]+dy <= size(vtx_map,2)
+                        push!(vtx_list, vtx_map[vtx[1]+dx, vtx[2]+dy])
+                    end
                 end
             end
             expanded_zones[v][shape] = vtx_list

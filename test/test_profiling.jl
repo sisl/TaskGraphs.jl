@@ -64,11 +64,12 @@ let
     modes = [
         # :assignment_only,
         # :low_level_search_without_repair,
-        :low_level_search_with_repair,
-        # :full_solver
+        # :low_level_search_with_repair,
+        :full_solver
         ]
     results_dirs = [
-        joinpath(EXPERIMENT_DIR,"assignment_solver/cache_fix_results")
+        joinpath(EXPERIMENT_DIR,"assignment_solver/cbs_fix_results")
+        # joinpath(EXPERIMENT_DIR,"assignment_solver/cache_fix_results")
         # joinpath(EXPERIMENT_DIR,"adjacency_solver/results")
         # joinpath(EXPERIMENT_DIR,"sparse_adjacency_solver/results")
     ]
