@@ -1,6 +1,6 @@
 edge_list = [[4, 1], [3, 2], [2, 3], [1, 4]]
 cost = 66
-time = 0.002313651
+time = 0.003583091
 optimality_gap = 0
 size_j = 4
 size_i = 8

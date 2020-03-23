@@ -817,11 +817,11 @@ function validate(project_schedule::ProjectSchedule,paths::Vector{Vector{Int}},t
                     @assert(path[tF[v] + 1] == final_vtx, string("node: ",string(node), ", final vtx: ",final_vtx, ", tF+1: ",tF[v]+1,", path: ", path))
                 end
             catch e
-                # if typeof(e) <: AssertionError
-                #     print(e.msg)
-                # else
+                if typeof(e) <: AssertionError
+                    print(e.msg)
+                else
                     throw(e)
-                # end
+                end
                 return false
             end
         end

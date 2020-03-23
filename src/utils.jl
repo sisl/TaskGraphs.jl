@@ -553,11 +553,14 @@ end
 ################################################################################
 function Base.:(==)(o1::OBJECT_AT,o2::OBJECT_AT)
     try
-        assert(o1.o == o2.o)
+        @assert(o1.o == o2.o)
         @assert(o1.x == o2.x)
     catch e
-        # println(e.msg)
-        # throw(e)
+        if isa(e,AssertionError)
+            # println(e.msg)
+        else
+            throw(e)
+        end
         return false
     end
     return true
@@ -569,8 +572,11 @@ function Base.:(==)(op1::Operation,op2::Operation)
         @assert(op1.Δt == op2.Δt)
         @assert(op1.station_id == op2.station_id)
     catch e
-        # println(e.msg)
-        # throw(e)
+        if isa(e,AssertionError)
+            # println(e.msg)
+        else
+            throw(e)
+        end
         return false
     end
     return true
@@ -587,8 +593,11 @@ function Base.:(==)(spec1::ProjectSpec,spec2::ProjectSpec)
         @assert(spec1.weight == spec2.weight)
         @assert(spec1.object_id_to_idx == spec2.object_id_to_idx)
     catch e
-        # println(e.msg)
-        # throw(e)
+        if isa(e,AssertionError)
+            # println(e.msg)
+        else
+            throw(e)
+        end
         return false
     end
     return true

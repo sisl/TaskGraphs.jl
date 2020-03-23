@@ -774,7 +774,7 @@ let
 
     validate_edge_cache(factory_env,factory_env.vtxs,factory_env.edge_cache)
 
-    file_name = joinpath(DEBUG_PATH,"A_star_dump_2.jld2")
+    file_name = joinpath(DEBUG_PATH,"A_star_dump_1.jld2")
     dict = load(file_name)
     agent_id = dict["agent_id"]
     history = dict["history"]
