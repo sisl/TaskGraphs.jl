@@ -975,7 +975,7 @@ function get_replanning_config_1()
         );
 
 
-    base_dir            = joinpath(EXPERIMENT_DIR,"replanning")
+    base_dir            = joinpath("/scratch/task_graphs_experiments","replanning")
     base_problem_dir    = joinpath(base_dir,"problem_instances")
     base_results_dir    = joinpath(base_dir,"results")
 
@@ -1061,7 +1061,7 @@ function get_replanning_config_2()
         LIMIT_A_star_iterations     = 8000
         );
 
-    base_dir            = joinpath(EXPERIMENT_DIR,"replanning/long_problems")
+    base_dir            = joinpath("/scratch/task_graphs_experiments","replanning/long_problems")
     base_problem_dir    = joinpath(base_dir,"problem_instances")
     base_results_dir    = joinpath(base_dir,"results")
 
@@ -1131,7 +1131,8 @@ function get_replanning_config_3()
         l3_verbosity                = 0,
         l4_verbosity                = 0,
         LIMIT_assignment_iterations = 10,
-        LIMIT_A_star_iterations     = 8000
+        LIMIT_A_star_iterations     = 8000,
+        best_cost                   = (Inf,Inf,Inf,Inf,Inf),
         );
     fallback_solver_template = PC_TAPF_Solver(
         nbs_model                   = GreedyAssignment(),
@@ -1141,10 +1142,11 @@ function get_replanning_config_3()
         l3_verbosity                = 0,
         l4_verbosity                = 0,
         LIMIT_assignment_iterations = 2,
-        LIMIT_A_star_iterations     = 8000
+        LIMIT_A_star_iterations     = 8000,
+        best_cost                   = (Inf,Inf,Inf,Inf,Inf),
         );
 
-    base_dir            = joinpath(EXPERIMENT_DIR,"replanning/better_fallback")
+    base_dir            = joinpath("/scratch/task_graphs_experiments","replanning/better_fallback")
     base_problem_dir    = joinpath(base_dir,"problem_instances")
     base_results_dir    = joinpath(base_dir,"results")
 

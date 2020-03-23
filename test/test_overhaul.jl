@@ -1,5 +1,5 @@
-# using Pkg
-# Pkg.activate("/home/kylebrown/.julia/dev/TaskGraphs")
+using Pkg
+Pkg.activate("/home/kylebrown/.julia/dev/TaskGraphs")
 using TaskGraphs
 using CRCBS
 using LightGraphs, MetaGraphs, GraphUtils
@@ -7,6 +7,7 @@ using ImageFiltering
 using Gurobi
 using JuMP, MathOptInterface
 using TOML
+using JLD2, FileIO
 using Random
 using Test
 using GraphPlottingBFS
@@ -765,76 +766,50 @@ let
     results_dict
 end
 
-# Collaborative transport
+# Visualizing A star
+let
+    env_id = 2
+    env_filename = string(ENVIRONMENT_DIR,"/env_",env_id,".toml")
+    factory_env = read_env(env_filename)
 
-# GreedyAssignment
-# let
-#     vtx_grid = initialize_dense_vtx_grid(8,8)
-#     # 1   9  17  25  33  41  49  57
-#     # 2  10  18  26  34  42  50  58
-#     # 3  11  19  27  35  43  51  59
-#     # 4  12  20  28  36  44  52  60
-#     # 5  13  21  29  37  45  53  61
-#     # 6  14  22  30  38  46  54  62
-#     # 7  15  23  31  39  47  55  63
-#     # 8  16  24  32  40  48  56  64
-#     env_graph = construct_factory_env_from_vtx_grid(vtx_grid)
-#     # dist_matrix = get_dist_matrix(env_graph)
-#     dist_matrix = DistMatrixMap(env_graph.vtx_map,env_graph.vtxs)
-#     r0 = [1,25,4,29]
-#     # r0 = [1,25,8,28] # check that planning works even when it takes longer for some robots to arrive than others
-#     s0 = [10]#,18,11,19]
-#     sF = [42] #,50,43,51]
-#
-#     task_shapes = Dict(1=>(2,2))
-#     shape_dict = Dict(
-#         10=>Dict((2,2)=>[10,18,11,19]),
-#         42=>Dict((2,2)=>[42,50,43,51]),
-#         )
-#
-#     project_spec, robot_ICs = TaskGraphs.initialize_toy_problem(r0,[s0],[sF],(v1,v2)->dist_matrix[v1,v2])
-#     add_operation!(project_spec,construct_operation(project_spec,-1,[1],[],0))
-#
-#     cost_function = MakeSpan
-#     project_spec, problem_spec, object_ICs, object_FCs, robot_ICs = construct_task_graphs_problem(
-#         project_spec,r0,s0,sF,dist_matrix;cost_function=cost_function,
-#         task_shapes=task_shapes,shape_dict=shape_dict)
-#
-#     solver = PC_TAPF_Solver(
-#         DEBUG=true,
-#         LIMIT_A_star_iterations=5*nv(env_graph),
-#         verbosity=1,
-#         l4_verbosity=1
-#         );
-#
-#     env_id = 2
-#     env_filename = string(ENVIRONMENT_DIR,"/env_",env_id,".toml")
-#     factory_env = read_env(env_filename)
-#     env_graph = factory_env
-#     dist_matrix = get_dist_matrix(env_graph)
-#     dist_mtx_map = DistMatrixMap(factory_env.vtx_map,factory_env.vtxs)
-#
-#     problem_filename = "dummy_problem_dir/problem1.toml"
-#     problem_def = read_problem_def(problem_filename)
-#     project_spec, r0, s0, sF = problem_def.project_spec,problem_def.r0,problem_def.s0,problem_def.sF
-#
-#     project_spec, problem_spec, _, _, robot_ICs = construct_task_graphs_problem(
-#         project_spec, r0, s0, sF,
-#         dist_mtx_map;
-#         task_shapes=problem_def.shapes,
-#         shape_dict=factory_env.expanded_zones,
-#         );
-#     # solution, _, cost, env = high_level_search!(SparseAdjacencyMILP(),solver,env_graph,project_spec,problem_spec,robot_ICs,Gurobi.Optimizer)
-#     # solution, _, cost, env = high_level_search!(GreedyAssignment(),solver,env_graph,project_spec,problem_spec,robot_ICs,Gurobi.Optimizer)
-#
-#     project_schedule = construct_partial_project_schedule(project_spec, problem_spec, map(i->robot_ICs[i], 1:problem_spec.N))
-#
-#     print_project_schedule(project_schedule,"project_schedule1")
-#
-#     milp_model = formulate_milp(GreedyAssignment(),project_schedule,problem_spec)
-#     optimize!(milp_model)
-#     X = get_assignment_matrix(milp_model)
-#     @test update_project_schedule!(milp_model,project_schedule,problem_spec,X)
-#
-#     print_project_schedule(project_schedule,"project_schedule2")
-# end
+    validate_edge_cache(factory_env,factory_env.vtxs,factory_env.edge_cache)
+
+    file_name = joinpath(DEBUG_PATH,"A_star_dump_2.jld2")
+    dict = load(file_name)
+    agent_id = dict["agent_id"]
+    history = dict["history"]
+    start   = dict["start"]
+    goal    = dict["goal"]
+    robot_paths = map(p->p.nzval, dict["paths"])
+    state_constraints = dict["state_constraints"]
+    action_constraints = dict["action_constraints"]
+
+    findall(map(p->p[212],robot_paths) .== 550)
+    robot_paths[24][170:end]
+
+    t0 = start[2]
+    history = history[1:400]
+    empty!(robot_paths[agent_id])
+    start,goal
+
+    # Render video clip
+    set_default_plot_size(24cm,24cm)
+    record_video(joinpath(VIDEO_DIR,string("A_star_debug.webm")),
+        k->render_search(history[k][2],factory_env;
+            robot_paths=robot_paths,
+            search_patterns=[history],
+            goals=[goal[1]],
+            search_idx=k,
+            show_search_paths=true,
+            # search_size=1.0pt,
+            # goal_size=1.0pt,
+            colors_vec=map(i->LCHab(60,80,200),1:length(robot_paths)),
+            show_paths=false,
+            );
+            t_history=1:length(history)
+            )
+
+    # recreate A* search environment
+
+
+end

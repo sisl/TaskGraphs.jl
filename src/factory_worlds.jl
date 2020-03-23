@@ -45,6 +45,25 @@ function construct_edge_cache(vtxs,vtx_map)
     end
     edge_cache
 end
+export
+    validate_edge_cache
+
+function validate_edge_cache(G,vtxs,cache)
+    valid = true
+    for v in vertices(G)
+        vtx = vtxs[v]
+        for v2 in outneighbors(G,v)
+            vtx2 = vtxs[v2]
+            d = [vtx2...] - [vtx...]
+            d = tuple(d...)
+            try
+                @assert(d in edge_cache[v], "$d not in $(edge_cache[v])")
+            catch e
+                return false
+            end
+        end
+    end
+end
 
 export
     construct_expanded_zones

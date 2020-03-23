@@ -10,12 +10,14 @@ using JuMP
 using TOML
 
 export
+    DEBUG_PATH,
     EXPERIMENT_DIR,
     ENVIRONMENT_DIR,
     PROBLEM_DIR,
     RESULTS_DIR,
     VIDEO_DIR
 
+global DEBUG_PATH       = joinpath(dirname(pathof(TaskGraphs)),"..","debug")
 global EXPERIMENT_DIR   = joinpath(dirname(pathof(TaskGraphs)),"..","experiments")
 global ENVIRONMENT_DIR  = joinpath(EXPERIMENT_DIR,"environments")
 global PROBLEM_DIR      = joinpath(EXPERIMENT_DIR,"problem_instances")

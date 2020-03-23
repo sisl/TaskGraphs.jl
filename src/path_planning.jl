@@ -6,6 +6,7 @@ using MetaGraphs
 using DataStructures
 using MathOptInterface, JuMP
 using TOML
+using JLD2, FileIO
 
 using GraphUtils
 using CRCBS
@@ -33,21 +34,6 @@ struct PC_TAPF{L<:LowLevelSolution}
     schedule::ProjectSchedule       # partial project schedule
     initial_solution::L             # initial condition
 end
-
-# function default_pc_tapf_solution(N::Int;extra_T=400)
-#     c0 = (0.0, 0.0, 0.0, 0.0)
-#     LowLevelSolution(
-#         paths=map(i->Path{State,Action,typeof(c0)}(s0=State(),cost=c0),1:N),
-#         cost_model = construct_composite_cost_model(
-#                 SumOfMakeSpans(Float64[0],Int64[1],Float64[1],Float64[0]),
-#                 HardConflictCost(DiGraph(10), 10+extra_T, N),
-#                 SumOfTravelDistance(),
-#                 FullCostModel(sum,NullCost())
-#             ),
-#         costs=map(i->c0,1:N),
-#         cost=c0,
-#     )
-# end
 
 function CRCBS.get_initial_solution(schedule::ProjectSchedule,env::E) where {E<:PCCBS.LowLevelEnv}
     starts = State[]
@@ -80,7 +66,9 @@ abstract type AbstractISPSModel end
     n_repair_iters::Int = 2
 end
 abstract type AbstractPathFinderModel end
-struct AStarPathFinderModel <: AbstractPathFinderModel end
+@with_kw struct AStarPathFinderModel <: AbstractPathFinderModel
+    search_history::Vector{State} = State[]
+end
 struct PrioritizedAStarModel <: AbstractPathFinderModel end
 
 @with_kw mutable struct PC_TAPF_Solver{M,C,I,A,T} <: AbstractMAPFSolver
@@ -165,7 +153,7 @@ function reset_solver!(solver::S) where {S<:PC_TAPF_Solver}
     solver.num_assignment_iterations = 0
     solver.num_CBS_iterations = 0
     solver.num_A_star_iterations = 0
-    solver.best_cost = (Inf,Inf,Inf,Inf)
+    solver.best_cost = map(c->Inf,solver.best_cost)
 
     solver.total_assignment_iterations = 0
     solver.total_CBS_iterations = 0
@@ -237,12 +225,30 @@ function exit_a_star!(solver::S,args...) where {S<:PC_TAPF_Solver}
     solver.num_A_star_iterations = 0
     check_time(solver)
 end
-function CRCBS.logger_step_a_star!(solver::PC_TAPF_Solver, s, q_cost)
+function CRCBS.logger_step_a_star!(solver::PC_TAPF_Solver, env, base_path, s, q_cost)
     solver.num_A_star_iterations += 1
+    if solver.DEBUG
+        push!(solver.astar_model.search_history, s)
+    end
     if solver.num_A_star_iterations > solver.LIMIT_A_star_iterations
+        if solver.DEBUG
+            # Dump env to JLD2 environment
+            filename = joinpath(DEBUG_PATH,string("A_star_dump_",get_debug_file_id(),".jld2"))
+            mkpath(DEBUG_PATH)
+            log_info(-1,solver.l4_verbosity,"Dumping A* env to $filename")
+            agent_id = env.agent_idx
+            history = map(s->(s.vtx,s.t),solver.astar_model.search_history)
+            start   = (get_final_state(base_path).vtx,get_final_state(base_path).t)
+            goal    = (env.goal.vtx,env.goal.t)
+            paths   = env.cost_model.cost_models[2].model.table.paths
+            state_constraints = map(c->(c.a,(c.v.s.vtx,c.v.sp.vtx),c.t),collect(env.constraints.state_constraints))
+            action_constraints = map(c->(c.a,(c.v.s.vtx,c.v.sp.vtx),c.t),collect(env.constraints.action_constraints))
+            @save filename agent_id history start goal paths state_constraints action_constraints
+            @assert false "making a bogus assertion to hack my way out of this block"
+        end
         throw(SolverAstarMaxOutException(string("# MAX OUT: A* limit of ",solver.LIMIT_A_star_iterations," exceeded.")))
     end
-    log_info(2,solver.l4_verbosity,"A*: q_cost = ", q_cost)
+    log_info(2,solver.l4_verbosity,"A* iter $(solver.num_A_star_iterations): s = (v=$(s.vtx), t=$(s.t)), q_cost = $q_cost")
 end
 function CRCBS.logger_enter_a_star!(solver::PC_TAPF_Solver)
     log_info(1,solver.l4_verbosity,"A*: entering...")
@@ -250,7 +256,11 @@ function CRCBS.logger_enter_a_star!(solver::PC_TAPF_Solver)
         log_info(-1,solver.l4_verbosity,"A*: ERROR: iterations = ", solver.num_A_star_iterations, " at entry")
     end
 end
+function CRCBS.logger_enqueue_a_star!(solver::PC_TAPF_Solver,env,s,a,sp,h_cost)
+    log_info(2,solver.l4_verbosity,"A* exploring ($(s.vtx),$(s.t)) -- ($(sp.vtx),$(sp.t)), h_cost = $h_cost")
+end
 function CRCBS.logger_exit_a_star!(solver::PC_TAPF_Solver, path, cost, status)
+    empty!(solver.astar_model.search_history)
     if status == false
         log_info(-1,solver.l4_verbosity,"A*: failed to find feasible path. Returning path of cost ",cost)
     else
@@ -610,29 +620,31 @@ function CRCBS.MakeSpan(schedule::S,cache::C) where {S<:ProjectSchedule,C<:Plann
         cache.tF[schedule.root_nodes])
 end
 
-function construct_a_star_cost_model(a_star_model, schedule, cache, problem_spec, env_graph; extra_T=400, primary_objective=SumOfMakeSpans)
+function construct_a_star_cost_model(astar_model, schedule, cache, problem_spec, env_graph; extra_T=400, primary_objective=SumOfMakeSpans)
     N = problem_spec.N
     # NOTE: This particular setting of cost model is crucial for good performance of A_star, because it encourages depth first search. If we were to replace them with SumOfTravelTime(), we would get worst-case exponentially slow breadth-first search!
     cost_model = construct_composite_cost_model(
         primary_objective(schedule,cache),
         HardConflictCost(env_graph,maximum(cache.tF)+extra_T, N),
         SumOfTravelDistance(),
-        FullCostModel(sum,NullCost()) # SumOfTravelTime(),
+        FullCostModel(sum,NullCost()), # SumOfTravelTime(),
+        FullCostModel(sum,TransformCostModel(c->-1*c,TravelTime()))
     )
     ph = PerfectHeuristic(get_dist_matrix(env_graph))
-    heuristic_model = construct_composite_heuristic(ph,NullHeuristic(),ph,ph)
+    heuristic_model = construct_composite_heuristic(ph,NullHeuristic(),ph,ph,NullHeuristic())
     cost_model, heuristic_model
 end
-function construct_a_star_cost_model(a_star_model::PrioritizedAStarModel, schedule, cache, problem_spec, env_graph; extra_T=400, primary_objective=SumOfMakeSpans)
+function construct_a_star_cost_model(astar_model::PrioritizedAStarModel, schedule, cache, problem_spec, env_graph; extra_T=400, primary_objective=SumOfMakeSpans)
     N = problem_spec.N
     cost_model = construct_composite_cost_model(
         HardConflictCost(env_graph,maximum(cache.tF)+extra_T, N),
         primary_objective(schedule,cache),
         SumOfTravelDistance(),
-        FullCostModel(sum,NullCost()) # SumOfTravelTime(),
+        FullCostModel(sum,NullCost()), # SumOfTravelTime(),
+        FullCostModel(sum,TransformCostModel(c->-1*c,TravelTime()))
     )
     ph = PerfectHeuristic(get_dist_matrix(env_graph))
-    heuristic_model = construct_composite_heuristic(NullHeuristic(),ph,ph,ph)
+    heuristic_model = construct_composite_heuristic(NullHeuristic(),ph,ph,ph,NullHeuristic())
     cost_model, heuristic_model
 end
 construct_a_star_cost_model(solver::PC_TAPF_Solver, args...; kwargs...) = construct_a_star_cost_model(solver.astar_model, args...; kwargs...)
@@ -773,7 +785,7 @@ function CRCBS.build_env(solver, env::E, node::N, schedule_node::TEAM_ACTION, v:
     for (i, sub_node) in enumerate(schedule_node.instructions)
         # if i == 1 # leader
             ph = PerfectHeuristic(env.dist_function.dist_mtxs[schedule_node.shape][i])
-            heuristic = construct_composite_heuristic(ph,NullHeuristic(),ph,ph)
+            heuristic = construct_composite_heuristic(ph,NullHeuristic(),ph,ph,NullHeuristic())
         # else
         #     heuristic = get_heuristic_model(env.env)
         # end
@@ -1140,13 +1152,11 @@ end
 ################################################################################
 export
     high_level_search!
-    # high_level_search_mod!
 
 """
     This is the modified version of high-level search that uses the adjacency
     matrix MILP formulation.
 """
-# function high_level_search!(solver::P, env_graph, project_schedule::ProjectSchedule, problem_spec,  optimizer;
 function high_level_search!(solver::P, base_search_env::SearchEnv,  optimizer;
         t0_ = Dict{AbstractID,Int}(get_vtx_id(base_search_env.schedule, v)=>t0 for (v,t0) in enumerate(base_search_env.cache.t0)),
         tF_ = Dict{AbstractID,Int}(get_vtx_id(base_search_env.schedule, v)=>tF for (v,tF) in enumerate(base_search_env.cache.tF)),
@@ -1226,6 +1236,9 @@ function high_level_search!(solver::P, base_search_env::SearchEnv,  optimizer;
         catch e
             if isa(e, SolverException)
                 log_info(-1,solver.l1_verbosity,e.msg)
+                # if isa(e, SolverAstarMaxOutException)
+                #     throw(e)
+                # end
                 break
             else
                 throw(e)

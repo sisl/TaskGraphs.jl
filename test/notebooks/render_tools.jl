@@ -172,12 +172,16 @@ function visualize_env(vtxs,pickup_vtxs,dropoff_vtxs,t=0;
         robot_paths=[],
         object_paths=[],
         object_intervals=map(p->[0,length(p)], object_paths),
+        search_idx=1,
+        show_search_paths=false,
         search_patterns=[],
         goals=[],
         vpad = 0.05,
         n=80,
         rsize=4pt,
         osize=3pt,
+        search_size=1.5pt,
+        goal_size=2.0pt,
         cell_width=1.0,
         line_width=2pt,
         color_scale = Scale.color_discrete_hue(),
@@ -194,7 +198,6 @@ function visualize_env(vtxs,pickup_vtxs,dropoff_vtxs,t=0;
         show_inactive_objects=true,
         show_paths=true
     )
-
 
     cw = cell_width/2 - vpad
     xpts = map(vtx->cell_width*vtx[1], vtxs)
@@ -227,15 +230,30 @@ function visualize_env(vtxs,pickup_vtxs,dropoff_vtxs,t=0;
         end
     end
     search_pattern_layers = []
-    for (i,p) in enumerate(search_patterns)
-        df = DataFrame(x=map(s->vtxs[s[1]][1],p),y=map(s->vtxs[s[1]][2],p),t=map(s->s[2],p))
-        push!(path_layers, layer(df,x="x",y="y",color="t",Geom.point,size=[3pt]))
+    if show_search_paths
+        for (i,p) in enumerate(search_patterns)
+            if length(p) > 0
+                idx = max(1,min(search_idx,length(p)))
+                t_search = p[idx][2] # time step
+                df = DataFrame(x=map(s->vtxs[s[1]][1],p[1:idx]),y=map(s->vtxs[s[1]][2],p[1:idx]),t=map(s->s[2],p[1:idx]))
+                push!(search_pattern_layers,
+                    layer(x=[df.x[end]],y=[df.y[end]],Geom.point,size=[search_size],
+                        Theme(default_color="black",highlight_width=0pt))
+                    )
+                push!(search_pattern_layers,
+                    layer(df,x="x",y="y",Geom.point,size=[search_size],
+                        Theme(default_color="gray",highlight_width=0pt))
+                    )
+            end
+        end
     end
     goal_layers = []
     for (i,s) in enumerate(goals)
         push!(goal_layers,
-            layer(x=[vtxs[s[1]][1]],y=[vtxs[s[1]][2]],Geom.point,size=[vsize],shape=[Shape.diamond],Theme(
-                    default_color=colors_vec[i]))
+            layer(x=[vtxs[s[1]][1]],y=[vtxs[s[1]][2]],Geom.point,size=[goal_size],
+                Theme(default_color="red",highlight_width=0pt)
+                # Theme(default_color=colors_vec[i])
+            )
         )
     end
     object_layers = []
@@ -275,10 +293,11 @@ function visualize_env(vtxs,pickup_vtxs,dropoff_vtxs,t=0;
     end
 
     plot(
+        search_pattern_layers...,
+        goal_layers...,
         object_layers...,
         robot_layers...,
         path_layers...,
-        search_pattern_layers...,
         get_grid_world_layer(pickup_vtxs,pickup_color,cw),
         get_grid_world_layer(dropoff_vtxs,dropoff_color,cw),
         get_grid_world_layer(vtxs,floor_color,cw),
@@ -302,15 +321,17 @@ function visualize_env(env::GridFactoryEnvironment,t=0;kwargs...)
     visualize_env(get_vtxs(env),get_pickup_vtxs(env),get_dropoff_vtxs(env),t;kwargs...)
 end
 function record_video(outfile_name,render_function;
-        dt = 0.25,
+        t0 = 0,
         tf = 10,
+        dt = 0.25,
+        t_history=t0:dt:tf,
         fps = 10,
         ext = "png",
         s = (4inch, 4inch),
         res = "1080x1080"
     )
     tmpdir = mktempdir()
-    for (i,t) in enumerate(0.0:dt:tf)
+    for (i,t) in enumerate(t_history)
         filename = joinpath(tmpdir,string(i,".",ext))
         render_function(t) |> PNG(filename, s[1], s[2])
     end
@@ -322,12 +343,12 @@ end
 render_env(t) = visualize_env(factory_env,t;robot_vtxs=r0,object_vtxs=s0,paths=paths,search_patterns=[],goals=[])
 render_paths(t,factory_env,robot_paths,object_paths=[];kwargs...) = visualize_env(factory_env,t;robot_paths=robot_paths,object_paths=object_paths,kwargs...)
 render_both(t,paths1,paths2) = hstack(render_paths(t,paths1),render_paths(t,paths2))
+render_search(t_start,factory_env;kwargs...) = visualize_env(factory_env,t_start;show_search_paths=true,kwargs...)
 
 
 
 # Plotting results
 function preprocess_results!(df)
-#     for (k,df) in df_dict
     if nrow(df) > 0
         if :depth_bias in names(df)
             begin df[!,:depth_bias_string] = string.(df.depth_bias)
@@ -342,21 +363,10 @@ function preprocess_results!(df)
         sort!(df, (:M,:N))
     end
     df
-#     end
-#     df_dict
 end
 function preprocess_results!(df_dict::Dict)
     for (k,df) in df_dict
         preprocess_results!(df)
-#         if nrow(df) > 0
-#             begin df[!,:depth_bias_string] = string.(df.depth_bias)
-#                 df
-#             end
-#             begin df[!,:N_string] = string.(df.N)
-#                 df
-#             end
-#             sort!(df, (:M,:N))
-#         end
     end
     df_dict
 end
