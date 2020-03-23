@@ -709,8 +709,10 @@ function CRCBS.build_env(solver, env::E, node::N, schedule_node::T, v::Int,path_
     agent_id = path_spec.agent_id
     goal_vtx = path_spec.final_vtx
     goal_time = env.cache.tF[v]                             # time after which goal can be satisfied
-    # deadline = env.cache.tF[v] .+ env.cache.slack[v]         # deadline for DeadlineCost
-    deadline = env.cache.tF[v] .+ min.(env.cache.max_deadline[v],env.cache.slack[v])         # deadline for DeadlineCost
+
+    # deadline = env.cache.tF[v] .+ min.(env.cache.max_deadline[v],env.cache.slack[v]) # NOTE iterative deadline tightening was causing problems with slack running out before the goal time, so this line has been replaced by the original
+    # deadline = env.cache.tF[v] .+ min.(max.(env.cache.local_slack[v], env.cache.max_deadline[v]),env.cache.slack[v]) # This is a potential fix that would allow iterative tightening to keep working
+    deadline = env.cache.tF[v] .+ env.cache.slack[v]         # deadline for DeadlineCost
     # Adjust deadlines if necessary:
     if get_path_spec(env.schedule, v).tight == true
         goal_time += minimum(env.cache.local_slack[v])
@@ -765,16 +767,10 @@ function CRCBS.build_env(solver, env::E, node::N, schedule_node::T, v::Int,path_
         # base_path = extend_path(cbs_env,base_path,env.cache.t0[v])
         extend_path!(cbs_env,base_path,env.cache.t0[v])
     end
-    log_info(2,solver,
-    """
-    agent_id = $(agent_id)
-    node_type = $(typeof(schedule_node))
-    v = $(v)
-    deadline = $(deadline)
-    slack = $(env.cache.slack[v])
-    goal = ($(cbs_env.goal.vtx),$(cbs_env.goal.t))
-    """
-    )
+    log_info(2,solver.l3_verbosity,
+    "LOW LEVEL SEARCH: v=$(v), node=$(string(schedule_node)), deadline=$(deadline), ",
+    "local_slack=$(env.cache.slack[v]), slack=$(env.cache.slack[v]), goal=($(cbs_env.goal.vtx),$(cbs_env.goal.t))
+    ")
     return cbs_env, base_path
 end
 function CRCBS.build_env(solver, env::E, node::N, schedule_node::TEAM_ACTION, v::Int) where {E<:SearchEnv,N<:ConstraintTreeNode}

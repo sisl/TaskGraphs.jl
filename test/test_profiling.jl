@@ -198,8 +198,12 @@ let
     base_problem_dir, base_results_dir, solver_configs, problem_configs, solver_template, fallback_solver_template = get_replanning_config_3()
 
     solver_template = PC_TAPF_Solver(solver_template,
-        LIMIT_A_star_iterations=1000,l4_verbosity=4)
+        LIMIT_A_star_iterations=1000,
+        l3_verbosity=3,
+        l4_verbosity=4,
+        )
 
+    reset_debug_file_id!()
     reset_operation_id_counter!()
     reset_action_id_counter!()
     run_replanner_profiling(:write;
