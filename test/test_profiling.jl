@@ -43,6 +43,7 @@ let
                 TimeLimit = 20,
                 solver_template = PC_TAPF_Solver(
                     nbs_model=milp_model,
+                    best_cost= (Inf,Inf,Inf,Inf,Inf),
                     verbosity=0,
                     l1_verbosity=2,
                     l2_verbosity=2,

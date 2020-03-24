@@ -509,21 +509,18 @@ function profile_replanning(replan_model, fallback_model, solver, fallback_solve
         end
         # Fallback
         println("Computing Fallback plan at idx = ",idx)
-        fallback_search_env = replan(fallback_solver, fallback_model, search_env, env_graph, problem_spec, solution, next_schedule, t_request, t_arrival;commit_threshold=fallback_commit_threshold)
-        reset_solver!(fallback_solver)
-        fallback_solver = PC_TAPF_Solver(fallback_solver_template)
+        fallback_solver = PC_TAPF_Solver(fallback_solver_template,start_time=time())
+        # reset_solver!(fallback_solver)
+        fallback_search_env, fallback_solver = replan!(fallback_solver, fallback_model, search_env, env_graph, problem_spec, solution, next_schedule, t_request, t_arrival;commit_threshold=fallback_commit_threshold)
         (fallback_solution, _, fallback_cost, fallback_search_env, fallback_optimality_gap), fallback_elapsed_time, _, _, _ = @timed high_level_search!(
             fallback_solver, fallback_search_env, Gurobi.Optimizer;primary_objective=primary_objective,kwargs...)
 
         # print_project_schedule(string("schedule",idx,"A"),fallback_search_env;mode=:leaf_aligned)
         # Replanning outer loop
-        base_search_env = replan(solver, replan_model, search_env, env_graph, problem_spec, solution, next_schedule, t_request, t_arrival; commit_threshold=commit_threshold,kwargs...)
-        # base_search_env = replan(solver, replan_model, fallback_search_env, env_graph, problem_spec, fallback_solution, nothing, t_request, t_arrival;commit_threshold=commit_threshold)
-        # print_project_schedule(string("schedule",idx,"B"),base_search_env;mode=:leaf_aligned)
-        # plan for current project
         println("Computing plan at idx = ",idx)
-        solver = PC_TAPF_Solver(solver_template)
-        reset_solver!(solver)
+        solver = PC_TAPF_Solver(solver_template,start_time=time())
+        # reset_solver!(solver)
+        base_search_env, solver = replan!(solver, replan_model, search_env, env_graph, problem_spec, solution, next_schedule, t_request, t_arrival; commit_threshold=commit_threshold,kwargs...)
         (solution, _, cost, search_env, optimality_gap), elapsed_time, _, _, _ = @timed high_level_search!(solver, base_search_env, Gurobi.Optimizer;primary_objective=primary_objective,kwargs...)
         # print_project_schedule(string("schedule",idx,"C"),search_env;mode=:leaf_aligned)
         # m = maximum(map(p->length(p), get_paths(solution)))

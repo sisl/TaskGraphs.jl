@@ -168,6 +168,8 @@ function reset_solver!(solver::S) where {S<:PC_TAPF_Solver}
     solver.max_CBS_iterations = 0
     solver.max_A_star_iterations = 0
 
+    # solver.start_time = time() # Set solver start time to current time
+
     solver
 end
 function check_time(solver::PC_TAPF_Solver)
@@ -1188,9 +1190,12 @@ function high_level_search!(solver::P, base_search_env::SearchEnv,  optimizer;
     best_solution   = default_solution(base_search_env)
     best_env        = SearchEnv()
     best_assignment = adjacency_matrix(get_graph(project_schedule))
+
+    TimeLimit       = min(TimeLimit,solver.time_limit-(buffer+time()-solver.start_time))
+    @assert TimeLimit >= 0.0
     model = formulate_milp(solver.nbs_model,project_schedule,problem_spec;
         cost_model=primary_objective,optimizer=optimizer,t0_=t0_,tF_=tF_,
-        TimeLimit=min(TimeLimit,solver.time_limit-(buffer+time()-solver.start_time)),
+        TimeLimit=TimeLimit,
         kwargs...) #TODO pass t0_ in replanning mode
 
     base_schedule = deepcopy(project_schedule)
@@ -1578,7 +1583,7 @@ export
     Oracle,
     FallBackPlanner,
     get_commit_time,
-    replan
+    replan!
 
 abstract type ReplannerModel end
 @with_kw struct DeferUntilCompletion <: ReplannerModel
@@ -1667,12 +1672,13 @@ fix_precutoff_nodes!(replan_model,new_schedule,problem_spec,new_cache,t_commit) 
 #     # end
 # end
 
-function replan(solver, replan_model, search_env, env_graph, problem_spec, solution, next_schedule, t_request, t_arrival; commit_threshold=5,kwargs...)
+function replan!(solver, replan_model, search_env, env_graph, problem_spec, solution, next_schedule, t_request, t_arrival; commit_threshold=5,kwargs...)
     project_schedule = search_env.schedule
     cache = search_env.cache
-    @assert sanity_check(project_schedule," in replan()")
+    @assert sanity_check(project_schedule," in replan!()")
     # Freeze solution and schedule at t_commit
     t_commit = get_commit_time(replan_model, search_env, t_request, commit_threshold)
+    reset_solver!(solver)
     set_time_limits!(solver,replan_model,t_request,t_commit)
     # Update operating schedule
     new_schedule, new_cache = prune_schedule(project_schedule,problem_spec,cache,t_commit)
@@ -1698,8 +1704,8 @@ function replan(solver, replan_model, search_env, env_graph, problem_spec, solut
     base_search_env = construct_search_env(solver, new_schedule, search_env.problem_spec, env_graph;t0=t0,tF=tF)
     trimmed_solution = trim_solution(base_search_env, solution, t_commit)
     base_search_env = SearchEnv(base_search_env, base_solution=trimmed_solution)
-    base_search_env
+    base_search_env, solver
 end
-replan(solver, replan_model::NullReplanner, search_env, args...;kwargs...) = search_env
+replan!(solver, replan_model::NullReplanner, search_env, args...;kwargs...) = search_env
 
 end # PathPlanning module
