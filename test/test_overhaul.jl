@@ -784,8 +784,8 @@ let
     state_constraints = dict["state_constraints"]
     action_constraints = dict["action_constraints"]
 
-    findall(map(p->p[212],robot_paths) .== 550)
-    robot_paths[24][170:end]
+    # findall(map(p->p[212],robot_paths) .== 550)
+    # robot_paths[24][170:end]
 
     t0 = start[2]
     history = history[1:400]

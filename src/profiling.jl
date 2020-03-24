@@ -1125,6 +1125,7 @@ function get_replanning_config_3()
 
     solver_template = PC_TAPF_Solver(
         nbs_model                   = SparseAdjacencyMILP(),
+        astar_model                 = AStarPathFinderModel(replan=true),
         DEBUG                       = true,
         l1_verbosity                = 1,
         l2_verbosity                = 1,
@@ -1136,6 +1137,7 @@ function get_replanning_config_3()
         );
     fallback_solver_template = PC_TAPF_Solver(
         nbs_model                   = GreedyAssignment(),
+        astar_model                 = AStarPathFinderModel(replan=true),
         DEBUG                       = true,
         l1_verbosity                = 1,
         l2_verbosity                = 1,

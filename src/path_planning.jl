@@ -60,16 +60,22 @@ export
     PC_TAPF_Solver
 
 abstract type AbstractCBSModel end
-struct DefaultCBSModel <: AbstractCBSModel end
+struct DefaultCBSModel <: AbstractCBSModel
+    # constraint_history::Vector{State}
+end
 abstract type AbstractISPSModel end
 @with_kw struct DefaultISPSModel <: AbstractISPSModel
     n_repair_iters::Int = 2
 end
 abstract type AbstractPathFinderModel end
 @with_kw struct AStarPathFinderModel <: AbstractPathFinderModel
-    search_history::Vector{State} = State[]
+    search_history::Vector{State}   = State[]
+    replan::Bool                    = false # Flag for replanning with empty conflict table after timeout
 end
-struct PrioritizedAStarModel <: AbstractPathFinderModel end
+@with_kw struct PrioritizedAStarModel <: AbstractPathFinderModel
+    # search_history::Vector{State}   = State[]
+    replan::Bool                    = false # Flag for replanning with empty conflict table after timeout
+end
 
 @with_kw mutable struct PC_TAPF_Solver{M,C,I,A,T} <: AbstractMAPFSolver
     # TODO parameterize by MILP Solver, CBS solver, ISPS solver, A_star solver
@@ -244,9 +250,9 @@ function CRCBS.logger_step_a_star!(solver::PC_TAPF_Solver, env, base_path, s, q_
             state_constraints = map(c->(c.a,(c.v.s.vtx,c.v.sp.vtx),c.t),collect(env.constraints.state_constraints))
             action_constraints = map(c->(c.a,(c.v.s.vtx,c.v.sp.vtx),c.t),collect(env.constraints.action_constraints))
             @save filename agent_id history start goal paths state_constraints action_constraints
-            @assert false "making a bogus assertion to hack my way out of this block"
+            # @assert false "making a bogus assertion to hack my way out of this block"
         end
-        throw(SolverAstarMaxOutException(string("# MAX OUT: A* limit of ",solver.LIMIT_A_star_iterations," exceeded.")))
+        # throw(SolverAstarMaxOutException(string("# MAX OUT: A* limit of ",solver.LIMIT_A_star_iterations," exceeded.")))
     end
     log_info(2,solver.l4_verbosity,"A* iter $(solver.num_A_star_iterations): s = (v=$(s.vtx), t=$(s.t)), q_cost = $q_cost")
 end
@@ -828,8 +834,17 @@ function plan_path!(solver::PC_TAPF_Solver, env::SearchEnv, node::N, schedule_no
         solver.DEBUG ? validate(base_path,v) : nothing
         path, cost = path_finder(solver, cbs_env, base_path, heuristic;verbose=(solver.verbosity > 3))
         if cost == get_infeasible_cost(cbs_env)
-            log_info(-1,solver.l4_verbosity,"A*: returned infeasible path for node ", string(schedule_node))
-            return false
+            if solver.astar_model.replan == true
+                # TODO replan with empty conflict table
+                cost_model = construct_a_star_cost_model(solver.astar_model, schedule, cache, env.problem_spec, env.env.graph;
+                    primary_objective=env.problem_spec.cost_function)
+                cbs_env, base_path = build_env(solver, env, node, schedule_node, v;cost_model=cost_model)
+                path, cost = path_finder(solver, cbs_env, base_path, heuristic)
+            end
+            if cost == get_infeasible_cost(cbs_env)
+                log_info(-1,solver.l4_verbosity,"A*: returned infeasible path for node ", string(schedule_node))
+                return false
+            end
         end
         solver.DEBUG ? validate(path,v,cbs_env) : nothing
     end
