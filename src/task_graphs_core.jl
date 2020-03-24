@@ -1937,6 +1937,7 @@ function formulate_milp(milp_model::SparseAdjacencyMILP,project_schedule::Projec
         job_shop=milp_model.job_shop
     )
 
+    println("NBS TIME LIMIT: TimeLimit = $TimeLimit")
     model = Model(with_optimizer(optimizer,
         TimeLimit=TimeLimit,
         OutputFlag=OutputFlag,

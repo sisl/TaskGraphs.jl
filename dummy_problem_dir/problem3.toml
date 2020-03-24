@@ -6,20 +6,20 @@ shapes = [[1, 1], [1, 1], [1, 1], [1, 1]]
 initial_conditions = [[1, 337], [2, 398], [3, 410], [4, 225]]
 
 [[operations]]
-pre = [[3, 383], [2, 551]]
+pre = [[2, 551], [3, 383]]
 post = [[4, 225]]
 station_id = 4
-id = 7
+id = 326
 dt = 0
 [[operations]]
 pre = [[1, 374]]
 post = [[3, 410]]
 station_id = 3
-id = 8
+id = 327
 dt = 0
 [[operations]]
 pre = [[4, 234]]
 post = []
 station_id = -1
-id = 9
+id = 328
 dt = 0
