@@ -196,7 +196,8 @@ let
 
     # base_problem_dir, base_results_dir, solver_configs, problem_configs, solver_template, fallback_solver_template = get_replanning_config_1()
     # base_problem_dir, base_results_dir, solver_configs, problem_configs, solver_template, fallback_solver_template = get_replanning_config_2()
-    base_problem_dir, base_results_dir, solver_configs, problem_configs, solver_template, fallback_solver_template = get_replanning_config_3()
+    # base_problem_dir, base_results_dir, solver_configs, problem_configs, solver_template, fallback_solver_template = get_replanning_config_3()
+    base_problem_dir, base_results_dir, solver_configs, problem_configs, solver_template, fallback_solver_template = get_replanning_config_4()
 
     solver_template = PC_TAPF_Solver(solver_template)
 

@@ -9,7 +9,6 @@ using Gurobi
 using TOML
 using CRCBS
 using SparseArrays
-# using ImageFiltering
 
 # using ..PlanningPredicates
 # using ..FactoryWorlds

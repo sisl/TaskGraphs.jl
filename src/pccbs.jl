@@ -5,6 +5,7 @@ module PCCBS
 using CRCBS
 using Parameters, LightGraphs, DataStructures
 using ..FactoryWorlds
+using ..PlanningPredicates
 
 ################################################################################
 ############################### ENVIRONMENT DEF ################################
@@ -27,8 +28,9 @@ Base.:(==)(s1::S,s2::S) where {S<:State} = hash(s1) == hash(s2)
 #    SOUTH
 # end
 # LowLevelEnv
-@with_kw struct LowLevelEnv{C<:AbstractCostModel,H<:AbstractCostModel} <: AbstractLowLevelEnv{State,Action,C}
+@with_kw struct LowLevelEnv{C<:AbstractCostModel,H<:AbstractCostModel,N} <: AbstractLowLevelEnv{State,Action,C}
     graph::GridFactoryEnvironment   = GridFactoryEnvironment()
+    schedule_node::N                = nothing
     constraints::ConstraintTable    = ConstraintTable()
     goal::State                     = State()
     agent_idx::Int                  = -1
@@ -37,21 +39,20 @@ Base.:(==)(s1::S,s2::S) where {S<:State} = hash(s1) == hash(s2)
 end
 CRCBS.get_cost_model(env::E) where {E<:LowLevelEnv} = env.cost_model
 CRCBS.get_heuristic_model(env::E) where {E<:LowLevelEnv} = env.heuristic
-# TODO implement a check to be sure that no two agents have the same goal
 ################################################################################
 ######################## Low-Level (Independent) Search ########################
 ################################################################################
 # build_env
-function CRCBS.build_env(mapf::MAPF{E,S,G}, node::ConstraintTreeNode, idx::Int) where {S,G,E<:LowLevelEnv}
-    typeof(mapf.env)(
-        graph = mapf.env.graph,
-        constraints = get_constraints(node,idx),
-        goal = mapf.goals[idx],
-        agent_idx = idx,
-        heuristic = get_heuristic_model(mapf.env),  # TODO update the heuristic model
-        cost_model = get_cost_model(mapf.env)       # TODO update the cost model
-        )
-end
+# function CRCBS.build_env(mapf::MAPF{E,S,G}, node::ConstraintTreeNode, idx::Int) where {S,G,E<:LowLevelEnv}
+#     typeof(mapf.env)(
+#         graph = mapf.env.graph,
+#         constraints = get_constraints(node,idx),
+#         goal = mapf.goals[idx],
+#         agent_idx = idx,
+#         heuristic = get_heuristic_model(mapf.env),  # TODO update the heuristic model
+#         cost_model = get_cost_model(mapf.env)       # TODO update the cost model
+#         )
+# end
 # heuristic
 CRCBS.get_heuristic_cost(env::E,s::State) where {E<:LowLevelEnv} = CRCBS.get_heuristic_cost(env,get_heuristic_model(env),s)
 function CRCBS.get_heuristic_cost(env::E,h::H,s::State) where {E<:LowLevelEnv,H<:Union{PerfectHeuristic,DefaultPerfectHeuristic}}
@@ -92,33 +93,35 @@ end
 CRCBS.wait(s::State) = Action(e=Edge(s.vtx,s.vtx))
 CRCBS.wait(env::LowLevelEnv,s::State) = Action(e=Edge(s.vtx,s.vtx))
 # get_possible_actions
-struct ActionIter
-    s::Int # source state
-    neighbor_list::Vector{Int} # length of target edge list
-end
-struct ActionIterState
-    idx::Int # idx of target node
-end
-ActionIterState() = ActionIterState(0)
-function Base.iterate(it::ActionIter)
-    iter_state = ActionIterState(0)
-    return iterate(it,iter_state)
-end
-function Base.iterate(it::ActionIter, iter_state::ActionIterState)
-    iter_state = ActionIterState(iter_state.idx+1)
-    if iter_state.idx > length(it.neighbor_list)
-        return nothing
-    end
-    Action(e=Edge(it.s,it.neighbor_list[iter_state.idx])), iter_state
-end
-Base.length(iter::ActionIter) = length(iter.neighbor_list)
-function CRCBS.get_possible_actions(env::LowLevelEnv,s::State)
-    if s.vtx > 0
-        ActionIter(s.vtx,outneighbors(env.graph,s.vtx))
-    else
-        ActionIter(-1,Int[])
-    end
-end
+# struct ActionIter
+#     s::Int # source state
+#     neighbor_list::Vector{Int} # length of target edge list
+# end
+# struct ActionIterState
+#     idx::Int # idx of target node
+# end
+# ActionIterState() = ActionIterState(0)
+# function Base.iterate(it::ActionIter)
+#     iter_state = ActionIterState(0)
+#     return iterate(it,iter_state)
+# end
+# function Base.iterate(it::ActionIter, iter_state::ActionIterState)
+#     iter_state = ActionIterState(iter_state.idx+1)
+#     if iter_state.idx > length(it.neighbor_list)
+#         return nothing
+#     end
+#     Action(e=Edge(it.s,it.neighbor_list[iter_state.idx])), iter_state
+# end
+# Base.length(iter::ActionIter) = length(iter.neighbor_list)
+# function CRCBS.get_possible_actions(env::LowLevelEnv,s::State)
+#     if s.vtx > 0
+#         ActionIter(s.vtx,outneighbors(env.graph,s.vtx))
+#     else
+#         ActionIter(-1,Int[])
+#     end
+# end
+CRCBS.get_possible_actions(env::LowLevelEnv,s::State) = map(v2->Action(e=Edge(s.vtx,v2)), outneighbors(env.graph,s.vtx))
+CRCBS.get_possible_actions(env::LowLevelEnv{C,H,N},s::State) where {C,H,N<:Union{DEPOSIT,COLLECT}} = [CRCBS.wait(s)]
 function CRCBS.get_possible_actions(env::MetaAgentCBS.LowLevelEnv,s::MetaAgentCBS.State{PCCBS.State})
     d_set = Set{Tuple}([(0,0),(-1,0),(0,1),(1,0),(0,-1)])
     for (e,s) in zip(env.envs, s.states)

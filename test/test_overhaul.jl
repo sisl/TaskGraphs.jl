@@ -198,6 +198,50 @@ let
     end
 end
 
+# Test ReservationTablePlanner
+let
+    for (i, f) in enumerate([
+        initialize_toy_problem_1,
+        initialize_toy_problem_2,
+        initialize_toy_problem_3,
+        initialize_toy_problem_5,
+        initialize_toy_problem_5,
+        initialize_toy_problem_6,
+        initialize_toy_problem_7,
+        initialize_toy_problem_8,
+        ])
+        for cost_model in [MakeSpan, SumOfMakeSpans]
+            costs = Float64[]
+            project_spec, problem_spec, robot_ICs, assignments, env_graph = f(;verbose=false);
+            for milp_model in [SparseAdjacencyMILP(),GreedyAssignment()]
+                # MILP formulations alone
+                schedule = construct_partial_project_schedule(project_spec,problem_spec,map(i->robot_ICs[i], 1:problem_spec.N))
+                model = formulate_milp(milp_model,schedule,problem_spec;cost_model=cost_model)
+                optimize!(model)
+                @test termination_status(model) == MOI.OPTIMAL
+                cost = Int(round(value(objective_function(model))))
+                adj_matrix = get_assignment_matrix(model)
+                update_project_schedule!(milp_model,schedule,problem_spec,adj_matrix)
+                @test validate(schedule)
+                @test cost != Inf
+                push!(costs, cost)
+
+                # Check that it matches low_level_search
+                solver = PC_TAPF_Solver(verbosity=0)
+                env = construct_search_env(solver, schedule, problem_spec, env_graph;primary_objective=cost_model)
+                pc_mapf = PC_MAPF(env)
+                constraint_node = initialize_root_node(pc_mapf)
+                low_level_search!(solver,pc_mapf,constraint_node)
+                @show i, f, milp_model, cost_model, cost, constraint_node.cost
+                @test get_primary_cost(solver,constraint_node.cost) == cost
+                @test validate(env.schedule)
+            end
+            @show costs
+        end
+    end
+end
+
+
 # Backtracking motivating example
 let
     f = initialize_toy_problem_10
@@ -774,7 +818,7 @@ let
 
     validate_edge_cache(factory_env,factory_env.vtxs,factory_env.edge_cache)
 
-    file_name = joinpath(DEBUG_PATH,"A_star_dump_1.jld2")
+    file_name = joinpath(DEBUG_PATH,"A_star_dump_54.jld2")
     dict = load(file_name)
     agent_id = dict["agent_id"]
     history = dict["history"]
@@ -809,7 +853,109 @@ let
             t_history=1:length(history)
             )
 
-    # recreate A* search environment
+end
 
+# Prioritized DFS
+let
+    sorted_actions(env,s) = sort(collect(get_possible_actions(env,s)), by=a->get_transition_cost(env,s,a,get_next_state(env,s,a)))
+    function get_conflict_idx(envs,states,actions,i,ordering,idxs)
+        idx = ordering[i]
+        env = envs[idx]
+        s = states[idx]
+        a = actions[idx]
+        sp = get_next_state(env,s,a)
+        pi = PathNode(s,a,sp)
+        for (j,idx) in enumerate(ordering)
+            env = envs[idx]
+            s = states[idx]
+            a = actions[idx]
+            sp = get_next_state(env,s,a)
+            pj = PathNode(s,a,sp)
+            if detect_state_conflict(pi,pj) || detect_action_conflict(pi,pj)
+                return j
+            end
+        end
+        return -1
+    end
+    function select_action_dfs!(envs,states,actions,i,ordering,idxs)
+        # TODO
+        # - maybe no need to store conflicts?
+        if i <= 0
+            return false
+        elseif i > length(s)
+            return true
+        elseif !(ordering[i] in idxs)
+            return select_action_dfs!(envs,states,actions,i+1,ordering,idxs)
+        else
+            # idx = env.ordering_map[i]
+            j = 0
+            idx = ordering[i]
+            env = envs[idx]
+            s = states[idx]
+            a = actions[idx]
+            for ai in sorted_actions(env,s)
+                c = get_transition_cost(env,s,ai)
+                c0 = get_transition_cost(env,s,a)
+                if c >= c0 && a != ai
+                    actions[idx] = ai
+                    k = get_conflict_idx(envs,states,actions,i,ordering,idxs)
+                    @assert k < i "should only check for conflicts with 1:$i, but found conflict with $k"
+                    if k <= 0
+                        if select_action_dfs!(envs,states,actions,i+1,ordering,idxs)
+                            return true
+                        end
+                    elseif !(ordering[k] in idxs)
+                        return false
+                    else
+                        j = max(k,j)
+                    end
+                end
+            end
+            return select_action_dfs!(envs,states,actions,j,ordering,idxs) #
+        end
+    end
+    function prioritized_dfs_search(envs,paths,ordering;
+            t0 = min(0, minimum(map(path->length(path),paths)) - 1)
+            )
+         tip_times = map(path->length(path),paths)
+         t = t0
+         states     = map(path->get_s(get_path_node(path,t)), paths)
+         actions    = map(path->get_a(get_path_node(path,t)), paths)
+         while true
+             @assert all(map(path->length(path)>=t,paths))
+             idxs       = Set(findall(map(path->length(path) <= t, paths)))
+             if select_action_dfs!(envs,states,actions,1,ordering,idxs)
+                 # step forward in search
+                 for idx in idxs
+                     path = paths[idx]
+                     s = states[idx]
+                     a = actions[idx]
+                     sp = get_next_state(envs[idx],s,a)
+                     push!(path.path_nodes,PathNode(s,a,sp))
+                 end
+                 t += 1
+                 states     = map(path->get_s(get_path_node(path,t)), paths)
+                 actions    = map(path->get_a(get_path_node(path,t)), paths)
+             else
+                 # step backward in search
+                 if length(findall(tip_times .< t)) == 0
+                     break
+                 end
+                 states     = map(path->get_s(get_path_node(path,t-1)), paths)
+                 actions    = map(path->get_a(get_path_node(path,t-1)), paths)
+                 for (idx,path) in enumerate(paths)
+                     if tip_times[idx] < t
+                         pop!(path.path_nodes)
+                     end
+                 end
+                 t -= 1
+             end
+             update_env!(envs,paths)
+             if is_goal(envs,states)
+                 return envs, paths, true
+             end
+         end
+         return envs, paths, false
+    end
 
 end

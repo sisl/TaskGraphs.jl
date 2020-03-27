@@ -60,9 +60,8 @@ export
     PC_TAPF_Solver
 
 abstract type AbstractCBSModel end
-struct DefaultCBSModel <: AbstractCBSModel
-    # constraint_history::Vector{State}
-end
+struct DefaultCBSModel <: AbstractCBSModel end
+struct ReservationTablePlanner <: AbstractCBSModel end
 abstract type AbstractISPSModel end
 @with_kw struct DefaultISPSModel <: AbstractISPSModel
     n_repair_iters::Int = 2
@@ -73,7 +72,7 @@ abstract type AbstractPathFinderModel end
     replan::Bool                    = false # Flag for replanning with empty conflict table after timeout
 end
 @with_kw struct PrioritizedAStarModel <: AbstractPathFinderModel
-    # search_history::Vector{State}   = State[]
+    search_history::Vector{State}   = State[]
     replan::Bool                    = false # Flag for replanning with empty conflict table after timeout
 end
 
@@ -90,7 +89,7 @@ end
     num_assignment_iterations   ::Int = 0
     num_CBS_iterations          ::Int = 0
     num_A_star_iterations       ::Int = 0
-    best_cost                   ::T   = (Inf,Inf,Inf,Inf)
+    best_cost                   ::T   = get_initial_cost(astar_model)
 
     total_assignment_iterations ::Int = 0
     total_CBS_iterations        ::Int = 0
@@ -248,7 +247,8 @@ function CRCBS.logger_step_a_star!(solver::PC_TAPF_Solver, env, base_path, s, q_
             history = map(s->(s.vtx,s.t),solver.astar_model.search_history)
             start   = (get_final_state(base_path).vtx,get_final_state(base_path).t)
             goal    = (env.goal.vtx,env.goal.t)
-            paths   = env.cost_model.cost_models[2].model.table.paths
+            idx = isa(solver.astar_model,AStarPathFinderModel) ? 2 : 1
+            paths   = env.cost_model.cost_models[idx].model.table.paths
             state_constraints = map(c->(c.a,(c.v.s.vtx,c.v.sp.vtx),c.t),collect(env.constraints.state_constraints))
             action_constraints = map(c->(c.a,(c.v.s.vtx,c.v.sp.vtx),c.t),collect(env.constraints.action_constraints))
             @save filename agent_id history start goal paths state_constraints action_constraints
@@ -260,9 +260,10 @@ function CRCBS.logger_step_a_star!(solver::PC_TAPF_Solver, env, base_path, s, q_
 end
 function CRCBS.logger_enter_a_star!(solver::PC_TAPF_Solver)
     log_info(1,solver.l4_verbosity,"A*: entering...")
-    if solver.num_A_star_iterations > 0
-        log_info(-1,solver.l4_verbosity,"A*: ERROR: iterations = ", solver.num_A_star_iterations, " at entry")
-    end
+    @assert(solver.num_A_star_iterations == 0, string("A*: ERROR: iterations = ", solver.num_A_star_iterations, " at entry"))
+    # if solver.num_A_star_iterations > 0
+    #     log_info(-1,solver.l4_verbosity,"A*: ERROR: iterations = ", solver.num_A_star_iterations, " at entry")
+    # end
 end
 function CRCBS.logger_enqueue_a_star!(solver::PC_TAPF_Solver,env,s,a,sp,h_cost)
     log_info(2,solver.l4_verbosity,"A* exploring ($(s.vtx),$(s.t)) -- ($(sp.vtx),$(sp.t)), h_cost = $h_cost")
@@ -627,7 +628,7 @@ function CRCBS.MakeSpan(schedule::S,cache::C) where {S<:ProjectSchedule,C<:Plann
         map(k->schedule.weights[k], schedule.root_nodes),
         cache.tF[schedule.root_nodes])
 end
-
+CRCBS.get_initial_cost(cost_model::Union{AStarPathFinderModel,PrioritizedAStarModel},args...) = (Inf,Inf,Inf,Inf,Inf)
 function construct_a_star_cost_model(astar_model, schedule, cache, problem_spec, env_graph; extra_T=400, primary_objective=SumOfMakeSpans)
     N = problem_spec.N
     # NOTE: This particular setting of cost model is crucial for good performance of A_star, because it encourages depth first search. If we were to replace them with SumOfTravelTime(), we would get worst-case exponentially slow breadth-first search!
@@ -746,6 +747,7 @@ function CRCBS.build_env(solver, env::E, node::N, schedule_node::T, v::Int,path_
     end
     cbs_env = PCCBS.LowLevelEnv(
         graph       = env.env.graph,
+        schedule_node = schedule_node,
         constraints = get_constraints(node, agent_id), # agent_id represents the whole path
         goal        = PCCBS.State(goal_vtx,goal_time),
         agent_idx   = agent_id, # this is only used for the HardConflictTable, which can be updated via the combined search node
@@ -826,21 +828,23 @@ function plan_path!(solver::PC_TAPF_Solver, env::SearchEnv, node::N, schedule_no
     # if get_path_spec(schedule, v).plan_path == true
     cbs_env, base_path = build_env(solver, env, node, schedule_node, v)
     ### PATH PLANNING ###
-    if typeof(schedule_node) <: Union{COLLECT,DEPOSIT} # Must sit and wait the whole time
-        path = base_path
-        extend_path!(cbs_env,path,cache.tF[v]) # NOTE looks like this might work out of the box for replanning. No need for node surgery
-        cost = get_cost(path)
-        CRCBS.logger_exit_a_star!(solver, path, cost, true)
-        solver.DEBUG ? validate(path,v) : nothing
-    else # if typeof(schedule_node) <: Union{GO,CARRY}
+    # if typeof(schedule_node) <: Union{COLLECT,DEPOSIT} # Must sit and wait the whole time
+    #     path = base_path
+    #     extend_path!(cbs_env,path,cache.tF[v]) # NOTE looks like this might work out of the box for replanning. No need for node surgery
+    #     cost = get_cost(path)
+    #     CRCBS.logger_exit_a_star!(solver, path, cost, true)
+    #     solver.DEBUG ? validate(path,v) : nothing
+    # else # if typeof(schedule_node) <: Union{GO,CARRY}
         solver.DEBUG ? validate(base_path,v) : nothing
         path, cost = path_finder(solver, cbs_env, base_path, heuristic;verbose=(solver.verbosity > 3))
         if cost == get_infeasible_cost(cbs_env)
             if solver.astar_model.replan == true
                 # TODO replan with empty conflict table
-                cost_model = construct_a_star_cost_model(solver.astar_model, schedule, cache, env.problem_spec, env.env.graph;
+                log_info(-1,solver.l4_verbosity,"A*: replanning without conflict cost", string(schedule_node))
+                solver.num_A_star_iterations = 0
+                cost_model, heuristic_model = construct_a_star_cost_model(solver.astar_model, schedule, cache, env.problem_spec, env.env.graph;
                     primary_objective=env.problem_spec.cost_function)
-                cbs_env, base_path = build_env(solver, env, node, schedule_node, v;cost_model=cost_model)
+                cbs_env, base_path = build_env(solver, env, node, schedule_node, v;cost_model=cost_model,heuristic=heuristic_model)
                 path, cost = path_finder(solver, cbs_env, base_path, heuristic)
             end
             if cost == get_infeasible_cost(cbs_env)
@@ -849,7 +853,7 @@ function plan_path!(solver::PC_TAPF_Solver, env::SearchEnv, node::N, schedule_no
             end
         end
         solver.DEBUG ? validate(path,v,cbs_env) : nothing
-    end
+    # end
     #####################
     log_info(2,solver.l3_verbosity,string("LOW LEVEL SEARCH: solver.num_A_star_iterations = ",solver.num_A_star_iterations))
     # Make sure every robot sticks around for the entire time horizon
@@ -1060,7 +1064,7 @@ CRCBS.initialize_child_search_node(node::N,pc_mapf::PC_MAPF) where {N<:Constrain
 function CRCBS.check_termination_criteria(solver::S,env::E,cost_so_far,s) where {S<:PC_TAPF_Solver,E<:AbstractLowLevelEnv}
     # solver.num_A_star_iterations += 1
     if solver.num_A_star_iterations > solver.LIMIT_A_star_iterations
-        throw(SolverAstarMaxOutException(string("# MAX OUT: A* limit of ",solver.LIMIT_A_star_iterations," exceeded.")))
+        # throw(SolverAstarMaxOutException(string("# MAX OUT: A* limit of ",solver.LIMIT_A_star_iterations," exceeded.")))
         return true
     end
     return false
@@ -1157,6 +1161,184 @@ function CRCBS.solve!(
     solution, cost = default_solution(mapf)
     return solution, mapf.env.cache, cost
 end
+# function get_next_node_matching_agent_id(schedule,cache,agent_id)
+#     node_id = RobotID(agent_id)
+#     for v in cache.active_set
+#         if agent_id == get_path_spec(schedule, v).agent_id
+#             return get_vtx_id(schedule,v)
+#         end
+#     end
+#     return node_id
+# end
+# """
+#     Iterate over agents in order of priority, allowing them to fill in a
+#     reservation table for the vtxs they would like to occupy at the next time
+#     step(s).
+# """
+# function CRCBS.solve!(solver::PC_TAPF_Solver{M,C,I,A,T},mapf::P;extra_T=400) where {M,C<:ReservationTablePlanner,I,A,T,P<:PC_MAPF}
+#
+#     cache = initialize_planning_cache(mapf.env.schedule;
+#         t0=deepcopy(mapf.env.cache.t0),
+#         tF=deepcopy(mapf.env.cache.tF)
+#     )
+#     search_env = SearchEnv(mapf.env,cache=cache)
+#     env_graph = search_env.env.graph
+#     schedule = search_env.schedule
+#     N = search_env.num_agents
+#
+#     cost_model = construct_composite_cost_model(
+#         SumOfTravelDistance(),
+#         HardConflictCost(env_graph,maximum(cache.tF)+extra_T, N)
+#     )
+#     heuristic_model = construct_composite_heuristic(PerfectHeuristic(get_dist_matrix(env_graph)),NullHeuristic())
+#
+#     route_plan = deepcopy(search_env.base_solution)
+#     reservation_table = zeros(Int,nv(env_graph))
+#     request_table = zeros(Int,nv(env_graph))
+#
+#     finished = zeros(Bool,nv(schedule))
+#     cbs_envs = Vector{PCCBS.LowLevelEnv}([PCCBS.LowLeveEnv() for i in 1:N])
+#     node_ids = Vector{AbstractID}([RobotID() for i in 1:N])
+#     for agent_id in 1:N
+#         node_id = get_next_node_matching_agent_id(schedule,cache,agent_id)
+#         v = get_vtx(schedule,node_id)
+#         schedule_node = get_node_by_id(schedule,node_id)
+#         path_spec = get_path_spec(schedule,node_id)
+#         env, _ = build_env(solver, search_env, node, get_node_from_id(schedule,node_ids[agent_id]), v;cost_model = cost_model,heuristic = heuristic)
+#         node_ids[agent_id] = node_id
+#         cbs_envs[agent_id] = env
+#     end
+#
+#     priority_function = i->(
+#         -length(route_plan.paths[i]),
+#         ~isa(get_node_from_id(schedule,node_ids[i]),Union{COLLECT,DEPOSIT}),
+#         minimum(cache.slack[get_vtx(schedule,node_ids[i])])
+#         )
+#
+#     t_step = minimum(map(path->get_final_state(path).t, get_paths(route_plan)))
+#     while ~all(finished)
+#         joint_action = map(i->Action(),1:N)
+#         # for each agent in order of priority
+#         for (i,path) in enumerate(route_plan.paths)
+#             s = get_final_state(path)
+#             if s.t > t_step
+#                 path_node = get_path_node(path,t_step)
+#                 reservation_table[get_sp(path_node).vtx] = agent_id
+#                 request_table[get_sp(path_node).vtx] = agent_id
+#                 joint_action[i] = get_a(path_node)
+#             end
+#         end
+#         for agent_id in sort(collect(1:N),by=i->priority_function(i))
+#             env = cbs_envs[agent_id]
+#             path = route_plan.paths[agent_id]
+#             node_id = node_ids[agent_id]
+#             v = get_vtx(schedule,node_id)
+#             schedule_node = get_node_from_id(schedule,node_ids[agent_id])
+#             path_spec = get_path_spec(schedule,node_id)
+#             s = get_final_state(path)
+#             if s.t <= t_step
+#                 joint_action[agent_id] = CRCBS.wait(env,s)
+#                 if isa(schedule_node,Union{COLLECT,DEPOSIT,TEAM_ACTION{COLLECT},TEAM_ACTION{DEPOSIT}})
+#                     actions = [CRCBS.wait(env,s)]
+#                 else
+#                     actions = Action[]
+#                     costs = Vector{get_cost_type(env)}()
+#                     for a in get_possible_actions(env,s)
+#                         sp = get_next_state(env,s,a)
+#                         if violates_constraints(env,s,a,sp) # Skip node if it violates any of the constraints
+#                             continue
+#                         end
+#                         new_cost = accumulate_cost(env, path.cost, get_transition_cost(env,s,a,sp))
+#                         push!(actions, a)
+#                         push!(costs, add_heuristic_cost(env, new_cost, heuristic(env,sp)))
+#                     end
+#                     if length(actions) == 0
+#                         priority[agent_id] = minimum(priority) - 1
+#                         break
+#                     else
+#                         a = actions[argmin(costs)]
+#                     end
+#                 end
+#                 for a in actions
+#                     sp = get_next_state(env,s,a)
+#                     # check
+#                     request_table[sp.vtx] = agent_id
+#                 end
+#                 # append the action to the plan
+#             end
+#         end
+#         for agent_id in 1:N
+#             env = cbs_envs[agent_id]
+#             path = route_plan.paths[agent_id]
+#             node_id = node_ids[agent_id]
+#             v = get_vtx(schedule,node_id)
+#             schedule_node = get_node_from_id(schedule,node_ids[agent_id])
+#             path_spec = get_path_spec(schedule,node_id)
+#             s = get_final_state(path)
+#             if s.t <= t_step
+#                 a = joint_action[agent_id]
+#                 sp = get_next_state(env,s,a)
+#                 push!(path.path_nodes, PathNode(s,a,sp))
+#                 if isa(schedule_node,Union{COLLECT,DEPOSIT})
+#                     if cache.t0[v] + path_spec.min_path_duration <= sp.t
+#                         finished[v] = true
+#                     end
+#                 else
+#                     if is_goal(env,sp)
+#                         finished[v] = true
+#                     end
+#                 end
+#                 if finished[v]
+#                     update_planning_cache!(solver,search_env,route_plan,v,path)
+#                     node_id = get_next_node_matching_agent_id(schedule,cache,agent_id)
+#                     v = get_vtx(schedule,node_id)
+#                     @assert ~(v in cache.closed_set)
+#                     schedule_node = get_node_by_id(schedule,node_id)
+#                     node_ids[agent_id] = node_id
+#                     cbs_envs[agent_id], _ = build_env(solver, search_env, node, schedule_node, v;cost_model = cost_model,heuristic = heuristic)
+#                 end
+#             end
+#         end
+#         t_step += 1
+#     end
+#
+#     if typeof(schedule_node) <: Union{COLLECT,DEPOSIT} # Must sit and wait the whole time
+#         path = base_path
+#         extend_path!(cbs_env,path,cache.tF[v]) # NOTE looks like this might work out of the box for replanning. No need for node surgery
+#         cost = get_cost(path)
+#         CRCBS.logger_exit_a_star!(solver, path, cost, true)
+#         solver.DEBUG ? validate(path,v) : nothing
+#     else # if typeof(schedule_node) <: Union{GO,CARRY}
+#         solver.DEBUG ? validate(base_path,v) : nothing
+#         path, cost = path_finder(solver, cbs_env, base_path, heuristic;verbose=(solver.verbosity > 3))
+#         if cost == get_infeasible_cost(cbs_env)
+#             if solver.astar_model.replan == true
+#                 # TODO replan with empty conflict table
+#                 log_info(-1,solver.l4_verbosity,"A*: replanning without conflict cost", string(schedule_node))
+#                 solver.num_A_star_iterations = 0
+#                 cost_model, heuristic_model = construct_a_star_cost_model(solver.astar_model, schedule, cache, env.problem_spec, env.env.graph;
+#                     primary_objective=env.problem_spec.cost_function)
+#                 cbs_env, base_path = build_env(solver, env, node, schedule_node, v;cost_model=cost_model,heuristic=heuristic_model)
+#                 path, cost = path_finder(solver, cbs_env, base_path, heuristic)
+#             end
+#             if cost == get_infeasible_cost(cbs_env)
+#                 log_info(-1,solver.l4_verbosity,"A*: returned infeasible path for node ", string(schedule_node))
+#                 return false
+#             end
+#         end
+#         solver.DEBUG ? validate(path,v,cbs_env) : nothing
+#     end
+#     # add to solution
+#     agent_id = get_path_spec(schedule, v).agent_id
+#     set_solution_path!(node.solution, path, agent_id)
+#     set_path_cost!(node.solution, cost, agent_id)
+#     # update
+#     update_env!(solver,env,node.solution,v,path)
+#     node.solution.cost = aggregate_costs(get_cost_model(env.env),get_path_costs(node.solution))
+#     node.cost = get_cost(node.solution)
+#     # Print for debugging
+#
+# end
 # CRCBS.solve!(solver,mapf::PC_MAPF,args...) = CRCBS.solve!(solver,mapf.env,args...)
 
 
@@ -1192,7 +1374,7 @@ function high_level_search!(solver::P, base_search_env::SearchEnv,  optimizer;
     best_assignment = adjacency_matrix(get_graph(project_schedule))
 
     TimeLimit       = min(TimeLimit,solver.time_limit-(buffer+time()-solver.start_time))
-    @assert TimeLimit >= 0.0
+    @assert(TimeLimit >= 0.0, "TimeLimit=$TimeLimit, solver.time_limit=$(solver.time_limit), time()=$(time()), solver.start_time=$(solver.start_time), buffer=$buffer")
     model = formulate_milp(solver.nbs_model,project_schedule,problem_spec;
         cost_model=primary_objective,optimizer=optimizer,t0_=t0_,tF_=tF_,
         TimeLimit=TimeLimit,
