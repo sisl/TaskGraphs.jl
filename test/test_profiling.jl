@@ -14,9 +14,9 @@ let
         :full_solver
         ]
     milp_models = [
-        AssignmentMILP(),
+        # AssignmentMILP(),
         # AdjacencyMILP(),
-        # SparseAdjacencyMILP()
+        SparseAdjacencyMILP()
         # GreedyAssignment()
     ]
     for milp_model in milp_models
@@ -26,9 +26,9 @@ let
                 num_robots=[4],
                 depth_biases=[0.1],
                 task_size_distributions = [
-                    ( 1=>1.0, 2=>0.0, 4=>0.0 ),
+                    # ( 1=>1.0, 2=>0.0, 4=>0.0 ),
                     # ( 1=>1.0, 2=>1.0, 4=>0.0 ),
-                    # ( 1=>1.0, 2=>1.0, 4=>1.0 ),
+                    ( 1=>1.0, 2=>1.0, 4=>1.0 ),
                     # ( 1=>0.0, 2=>1.0, 4=>1.0 ),
                     ],
                 num_trials=4,

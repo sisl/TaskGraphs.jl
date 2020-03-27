@@ -22,6 +22,10 @@ export
 
 const State = PCCBS.State
 const Action = PCCBS.Action
+Base.string(s::State) = "($(s.vtx),$(s.t))"
+Base.string(a::Action) = "($(a.e.src)->$(a.e.dst))"
+Base.string(s::MetaAgentCBS.State) = string("(",prod(map(s->"$(string(s)),",s.states)),")")
+Base.string(a::MetaAgentCBS.Action) = string("(",prod(map(a->"$(string(a)),",s.actions)),")")
 
 """
     `PC_TAPF{L<:LowLevelSolution}`
@@ -232,6 +236,13 @@ function exit_a_star!(solver::S,args...) where {S<:PC_TAPF_Solver}
     solver.num_A_star_iterations = 0
     check_time(solver)
 end
+function CRCBS.logger_step_a_star!(solver::PC_TAPF_Solver, env::MetaAgentCBS.LowLevelEnv, base_path, s, q_cost)
+    solver.num_A_star_iterations += 1
+    if solver.num_A_star_iterations > solver.LIMIT_A_star_iterations
+        # throw(SolverAstarMaxOutException(string("# MAX OUT: A* limit of ",solver.LIMIT_A_star_iterations," exceeded.")))
+    end
+    log_info(2,solver.l4_verbosity,"A* iter $(solver.num_A_star_iterations): s = $(string(s)), q_cost = $q_cost")
+end
 function CRCBS.logger_step_a_star!(solver::PC_TAPF_Solver, env, base_path, s, q_cost)
     solver.num_A_star_iterations += 1
     if solver.DEBUG
@@ -256,7 +267,7 @@ function CRCBS.logger_step_a_star!(solver::PC_TAPF_Solver, env, base_path, s, q_
         end
         # throw(SolverAstarMaxOutException(string("# MAX OUT: A* limit of ",solver.LIMIT_A_star_iterations," exceeded.")))
     end
-    log_info(2,solver.l4_verbosity,"A* iter $(solver.num_A_star_iterations): s = (v=$(s.vtx), t=$(s.t)), q_cost = $q_cost")
+    log_info(2,solver.l4_verbosity,"A* iter $(solver.num_A_star_iterations): s = $(string(s)), q_cost = $q_cost")
 end
 function CRCBS.logger_enter_a_star!(solver::PC_TAPF_Solver)
     log_info(1,solver.l4_verbosity,"A*: entering...")
@@ -266,7 +277,7 @@ function CRCBS.logger_enter_a_star!(solver::PC_TAPF_Solver)
     # end
 end
 function CRCBS.logger_enqueue_a_star!(solver::PC_TAPF_Solver,env,s,a,sp,h_cost)
-    log_info(2,solver.l4_verbosity,"A* exploring ($(s.vtx),$(s.t)) -- ($(sp.vtx),$(sp.t)), h_cost = $h_cost")
+    log_info(2,solver.l4_verbosity,"A* exploring $(string(s)) -- $(string(sp)), h_cost = $h_cost")
 end
 function CRCBS.logger_exit_a_star!(solver::PC_TAPF_Solver, path, cost, status)
     empty!(solver.astar_model.search_history)
@@ -779,7 +790,7 @@ function CRCBS.build_env(solver, env::E, node::N, schedule_node::T, v::Int,path_
     end
     log_info(2,solver.l3_verbosity,
     "LOW LEVEL SEARCH: v=$(v), node=$(string(schedule_node)), deadline=$(deadline), ",
-    "local_slack=$(env.cache.slack[v]), slack=$(env.cache.slack[v]), goal=($(cbs_env.goal.vtx),$(cbs_env.goal.t))
+    "local_slack=$(env.cache.slack[v]), slack=$(env.cache.slack[v]), goal=$(string(cbs_env.goal)),
     ")
     return cbs_env, base_path
 end
@@ -836,7 +847,7 @@ function plan_path!(solver::PC_TAPF_Solver, env::SearchEnv, node::N, schedule_no
     #     solver.DEBUG ? validate(path,v) : nothing
     # else # if typeof(schedule_node) <: Union{GO,CARRY}
         solver.DEBUG ? validate(base_path,v) : nothing
-        path, cost = path_finder(solver, cbs_env, base_path, heuristic;verbose=(solver.verbosity > 3))
+        path, cost = path_finder(solver, cbs_env, base_path, heuristic)
         if cost == get_infeasible_cost(cbs_env)
             if solver.astar_model.replan == true
                 # TODO replan with empty conflict table
@@ -892,17 +903,17 @@ function plan_path!(solver::PC_TAPF_Solver, env::SearchEnv, node::N, schedule_no
 
     meta_env, base_path = build_env(solver, env, node, schedule_node, v)
     ### PATH PLANNING ###
-    if A <: Union{COLLECT,DEPOSIT} # Must sit and wait the whole time
-        meta_path = base_path
-        extend_path!(meta_env,meta_path,cache.tF[v]-(cache.t0[v]-length(base_path)))
-        meta_cost = get_cost(meta_path)
-    else
+    # if A <: Union{COLLECT,DEPOSIT} # Must sit and wait the whole time
+    #     meta_path = base_path
+    #     extend_path!(meta_env,meta_path,cache.tF[v]-(cache.t0[v]-length(base_path)))
+    #     meta_cost = get_cost(meta_path)
+    # else
         meta_path, meta_cost = path_finder(solver, meta_env, base_path, heuristic;verbose=(solver.verbosity > 3))
         if meta_cost == get_infeasible_cost(meta_env)
             log_info(-1,solver.l4_verbosity,"A*: returned infeasible path for node ", string(schedule_node))
             return false
         end
-    end
+    # end
     paths = MetaAgentCBS.split_path(meta_path)
     # @show length(paths)
     # @show length(meta_env.envs)
