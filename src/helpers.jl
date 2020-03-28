@@ -68,6 +68,10 @@ function initialize_toy_problem_1(;cost_function=SumOfMakeSpans,verbose=false)
     N = 2                  # num robots
     M = 3                  # num delivery tasks
     vtx_grid = initialize_dense_vtx_grid(4,4)
+    # 1  5   9  13
+    # 2  6  10  14
+    # 3  7  11  15
+    # 4  8  12  16
     env_graph = construct_factory_env_from_vtx_grid(vtx_grid)
     dist_matrix = get_dist_matrix(env_graph)
     r0 = [1,4]

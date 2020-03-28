@@ -28,9 +28,10 @@ Base.:(==)(s1::S,s2::S) where {S<:State} = hash(s1) == hash(s2)
 #    SOUTH
 # end
 # LowLevelEnv
-@with_kw struct LowLevelEnv{C<:AbstractCostModel,H<:AbstractCostModel,N} <: AbstractLowLevelEnv{State,Action,C}
+@with_kw struct LowLevelEnv{C<:AbstractCostModel,H<:AbstractCostModel,N,I} <: AbstractLowLevelEnv{State,Action,C}
     graph::GridFactoryEnvironment   = GridFactoryEnvironment()
     schedule_node::N                = nothing
+    node_id::I                      = nothing
     constraints::ConstraintTable    = ConstraintTable()
     goal::State                     = State()
     agent_idx::Int                  = -1
@@ -39,6 +40,8 @@ Base.:(==)(s1::S,s2::S) where {S<:State} = hash(s1) == hash(s2)
 end
 CRCBS.get_cost_model(env::E) where {E<:LowLevelEnv} = env.cost_model
 CRCBS.get_heuristic_model(env::E) where {E<:LowLevelEnv} = env.heuristic
+CRCBS.is_valid(env::LowLevelEnv,s::State) = (1 <= s.v <= nv(env.graph))
+CRCBS.is_valid(env::LowLevelEnv,a::Action) = (1 <= a.e.src <= nv(env.graph)) && (1 <= a.e.dst <= nv(env.graph))
 ################################################################################
 ######################## Low-Level (Independent) Search ########################
 ################################################################################
@@ -120,8 +123,20 @@ CRCBS.wait(env::LowLevelEnv,s::State) = Action(e=Edge(s.vtx,s.vtx))
 #         ActionIter(-1,Int[])
 #     end
 # end
-CRCBS.get_possible_actions(env::LowLevelEnv,s::State) = map(v2->Action(e=Edge(s.vtx,v2)), outneighbors(env.graph,s.vtx))
-CRCBS.get_possible_actions(env::LowLevelEnv{C,H,N},s::State) where {C,H,N<:Union{DEPOSIT,COLLECT}} = [CRCBS.wait(s)]
+function CRCBS.get_possible_actions(env::LowLevelEnv,s::State)
+    if 1 <= s.vtx <= nv(env.graph)
+        return map(v2->Action(e=Edge(s.vtx,v2)), outneighbors(env.graph,s.vtx))
+    else
+        return Action[]
+    end
+end
+function CRCBS.get_possible_actions(env::LowLevelEnv{C,H,N},s::State) where {C,H,N<:Union{DEPOSIT,COLLECT}}
+    if 1 <= s.vtx <= nv(env.graph)
+        return [CRCBS.wait(s)]
+    else
+        return Action[]
+    end
+end
 function CRCBS.get_possible_actions(env::MetaAgentCBS.LowLevelEnv,s::MetaAgentCBS.State{PCCBS.State})
     d_set = Set{Tuple}([(0,0),(-1,0),(0,1),(1,0),(0,-1)])
     for (e,s) in zip(env.envs, s.states)
