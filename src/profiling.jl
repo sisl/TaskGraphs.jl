@@ -898,7 +898,9 @@ export
     get_replanning_config_1,
     get_replanning_config_2,
     get_replanning_config_3,
-    get_replanning_config_4
+    get_replanning_config_4,
+    get_replanning_config_5,
+    get_replanning_config_6
 
 function get_replanning_config_1()
     base_solver_configs = [
@@ -1234,6 +1236,176 @@ function get_replanning_config_4()
         );
 
     base_dir            = joinpath("/scratch/task_graphs_experiments","replanning/prioritized_planner_fallback")
+    base_problem_dir    = joinpath(base_dir,"problem_instances")
+    base_results_dir    = joinpath(base_dir,"results")
+
+    base_problem_dir, base_results_dir, solver_configs, problem_configs, solver_template, fallback_solver_template
+end
+function get_replanning_config_5()
+    base_solver_configs = [
+        Dict(
+        :env_id=>2,
+        :OutputFlag => 0,
+        :Presolve => -1,
+        ),
+    ]
+    fallback_configs = [
+        Dict(:fallback_model=>ReassignFreeRobots(),),
+    ]
+    replan_configs = [
+        Dict(:replan_model=>MergeAndBalance(),),
+        Dict(:replan_model=>Oracle(),:time_out_buffer=>-55,:route_planning_buffer=>5),
+        Dict(:replan_model=>ReassignFreeRobots(),),
+        Dict(:replan_model=>DeferUntilCompletion(),),
+    ]
+    solver_configs = Dict[]
+    for dicts in Base.Iterators.product(base_solver_configs,fallback_configs,replan_configs)
+        push!(solver_configs,merge(dicts...))
+    end
+    base_configs = [
+        Dict(
+            :warning_time=>20,
+            :commit_threshold=>10,
+            :fallback_commit_threshold=>10,
+            :num_trials => 4,
+            :max_parents => 3,
+            :depth_bias => 0.4,
+            :dt_min => 0,
+            :dt_max => 0,
+            :dt_collect => 0,
+            :dt_deliver => 0,
+            :task_sizes => (1=>1.0,2=>0.0,4=>0.0),
+            :num_projects => 40,
+            :save_paths => false
+            )
+    ]
+    stream_configs = [
+        Dict(:N=>30, :M=>10,  :arrival_interval=>20, ),
+        Dict(:N=>30, :M=>10,  :arrival_interval=>30, ),
+        Dict(:N=>30, :M=>10,  :arrival_interval=>40, ),
+
+        Dict(:N=>30, :M=>20,  :arrival_interval=>40, ),
+        Dict(:N=>30, :M=>20,  :arrival_interval=>50, ),
+        Dict(:N=>30, :M=>20,  :arrival_interval=>60, ),
+
+        Dict(:N=>30, :M=>30,  :arrival_interval=>60, ),
+        Dict(:N=>30, :M=>30,  :arrival_interval=>70, ),
+        Dict(:N=>30, :M=>30,  :arrival_interval=>80, ),
+    ]
+    problem_configs = Dict[]
+    for dicts in Base.Iterators.product(base_configs,stream_configs)
+        push!(problem_configs,merge(dicts...))
+    end
+
+    solver_template = PC_TAPF_Solver(
+        nbs_model                   = SparseAdjacencyMILP(),
+        astar_model                 = AStarPathFinderModel(replan=true),
+        DEBUG                       = true,
+        l1_verbosity                = 1,
+        l2_verbosity                = 1,
+        l3_verbosity                = 0,
+        l4_verbosity                = 0,
+        LIMIT_assignment_iterations = 10,
+        LIMIT_A_star_iterations     = 8000,
+        );
+    fallback_solver_template = PC_TAPF_Solver(
+        nbs_model                   = GreedyAssignment(),
+        cbs_model                   = PrioritizedDFSPlanner(),
+        astar_model                 = DFS_PathFinder(),
+        DEBUG                       = true,
+        l1_verbosity                = 1,
+        l2_verbosity                = 1,
+        l3_verbosity                = 0,
+        l4_verbosity                = 0,
+        LIMIT_assignment_iterations = 2,
+        );
+
+    base_dir            = joinpath("/scratch/task_graphs_experiments","replanning/prioritized_dfs_fallback")
+    base_problem_dir    = joinpath(base_dir,"problem_instances")
+    base_results_dir    = joinpath(base_dir,"results")
+
+    base_problem_dir, base_results_dir, solver_configs, problem_configs, solver_template, fallback_solver_template
+end
+function get_replanning_config_6()
+    base_solver_configs = [
+        Dict(
+        :env_id=>2,
+        :OutputFlag => 0,
+        :Presolve => -1,
+        ),
+    ]
+    fallback_configs = [
+        Dict(:fallback_model=>ReassignFreeRobots(),),
+    ]
+    replan_configs = [
+        Dict(:replan_model=>MergeAndBalance(),),
+        Dict(:replan_model=>Oracle(),:time_out_buffer=>-55,:route_planning_buffer=>5),
+        Dict(:replan_model=>ReassignFreeRobots(),),
+        Dict(:replan_model=>DeferUntilCompletion(),),
+    ]
+    solver_configs = Dict[]
+    for dicts in Base.Iterators.product(base_solver_configs,fallback_configs,replan_configs)
+        push!(solver_configs,merge(dicts...))
+    end
+    base_configs = [
+        Dict(
+            :warning_time=>20,
+            :commit_threshold=>20,
+            :fallback_commit_threshold=>20,
+            :num_trials => 4,
+            :max_parents => 3,
+            :depth_bias => 0.4,
+            :dt_min => 0,
+            :dt_max => 0,
+            :dt_collect => 0,
+            :dt_deliver => 0,
+            :task_sizes => (1=>1.0,2=>0.0,4=>0.0),
+            :num_projects => 40,
+            :save_paths => false
+            )
+    ]
+    stream_configs = [
+        Dict(:N=>30, :M=>10,  :arrival_interval=>20, ),
+        Dict(:N=>30, :M=>10,  :arrival_interval=>30, ),
+        Dict(:N=>30, :M=>10,  :arrival_interval=>40, ),
+
+        Dict(:N=>30, :M=>20,  :arrival_interval=>40, ),
+        Dict(:N=>30, :M=>20,  :arrival_interval=>50, ),
+        Dict(:N=>30, :M=>20,  :arrival_interval=>60, ),
+
+        Dict(:N=>30, :M=>30,  :arrival_interval=>60, ),
+        Dict(:N=>30, :M=>30,  :arrival_interval=>70, ),
+        Dict(:N=>30, :M=>30,  :arrival_interval=>80, ),
+    ]
+    problem_configs = Dict[]
+    for dicts in Base.Iterators.product(base_configs,stream_configs)
+        push!(problem_configs,merge(dicts...))
+    end
+
+    solver_template = PC_TAPF_Solver(
+        nbs_model                   = SparseAdjacencyMILP(),
+        astar_model                 = AStarPathFinderModel(replan=true),
+        DEBUG                       = true,
+        l1_verbosity                = 1,
+        l2_verbosity                = 1,
+        l3_verbosity                = 0,
+        l4_verbosity                = 0,
+        LIMIT_assignment_iterations = 10,
+        LIMIT_A_star_iterations     = 8000,
+        );
+    fallback_solver_template = PC_TAPF_Solver(
+        nbs_model                   = GreedyAssignment(),
+        astar_model                 = PrioritizedAStarModel(replan=true),
+        DEBUG                       = true,
+        l1_verbosity                = 1,
+        l2_verbosity                = 1,
+        l3_verbosity                = 0,
+        l4_verbosity                = 0,
+        LIMIT_assignment_iterations = 2,
+        LIMIT_A_star_iterations     = 8000,
+        );
+
+    base_dir            = joinpath("/scratch/task_graphs_experiments","replanning/prioritized_planner_fallback_longer_commit")
     base_problem_dir    = joinpath(base_dir,"problem_instances")
     base_results_dir    = joinpath(base_dir,"results")
 

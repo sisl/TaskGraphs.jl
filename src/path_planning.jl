@@ -67,7 +67,9 @@ export
 
 abstract type AbstractCBSModel end
 struct DefaultCBSModel <: AbstractCBSModel end
-struct PrioritizedDFSPlanner <: AbstractCBSModel end
+@with_kw struct PrioritizedDFSPlanner <: AbstractCBSModel
+    max_iters::Int = 2000
+end
 abstract type AbstractISPSModel end
 @with_kw struct DefaultISPSModel <: AbstractISPSModel
     n_repair_iters::Int = 2
@@ -117,12 +119,6 @@ struct DFS_PathFinder <: AbstractPathFinderModel end
     DEBUG                       ::Bool = false
 end
 
-export
-    get_primary_cost
-
-get_primary_cost(model,cost)                        = cost[1]
-get_primary_cost(model::PrioritizedAStarModel,cost) = cost[2]
-get_primary_cost(solver::PC_TAPF_Solver,args...)    = get_primary_cost(solver.astar_model,args...)
 
 export
     SolverException,
@@ -628,6 +624,12 @@ function update_planning_cache!(solver::M,env::E,v::Int,path::P) where {M<:PC_TA
     return cache
 end
 
+export
+    get_primary_cost
+
+get_primary_cost(model,cost)                        = cost[1]
+get_primary_cost(solver::PC_TAPF_Solver,args...)    = get_primary_cost(solver.astar_model,args...)
+
 function CRCBS.SumOfMakeSpans(schedule::S,cache::C) where {S<:ProjectSchedule,C<:PlanningCache}
     SumOfMakeSpans(
         cache.tF,
@@ -642,8 +644,7 @@ function CRCBS.MakeSpan(schedule::S,cache::C) where {S<:ProjectSchedule,C<:Plann
         map(k->schedule.weights[k], schedule.root_nodes),
         cache.tF[schedule.root_nodes])
 end
-CRCBS.get_infeasible_cost(cost_model::Union{AStarPathFinderModel,PrioritizedAStarModel},args...) = (Inf,Inf,Inf,Inf,Inf)
-CRCBS.get_infeasible_cost(cost_model::DFS_PathFinder,args...) = (Inf,)
+CRCBS.get_infeasible_cost(astar_model,args...) = (Inf,Inf,Inf,Inf,Inf)
 function construct_a_star_cost_model(astar_model, schedule, cache, problem_spec, env_graph; extra_T=400, primary_objective=SumOfMakeSpans)
     N = problem_spec.N
     # NOTE: This particular setting of cost model is crucial for good performance of A_star, because it encourages depth first search. If we were to replace them with SumOfTravelTime(), we would get worst-case exponentially slow breadth-first search!
@@ -658,6 +659,7 @@ function construct_a_star_cost_model(astar_model, schedule, cache, problem_spec,
     heuristic_model = construct_composite_heuristic(ph,NullHeuristic(),ph,ph,NullHeuristic())
     cost_model, heuristic_model
 end
+get_primary_cost(model::PrioritizedAStarModel,cost) = cost[2]
 function construct_a_star_cost_model(astar_model::PrioritizedAStarModel, schedule, cache, problem_spec, env_graph; extra_T=400, primary_objective=SumOfMakeSpans)
     N = problem_spec.N
     cost_model = construct_composite_cost_model(
@@ -665,18 +667,27 @@ function construct_a_star_cost_model(astar_model::PrioritizedAStarModel, schedul
         primary_objective(schedule,cache),
         SumOfTravelDistance(),
         FullCostModel(sum,NullCost()), # SumOfTravelTime(),
-        FullCostModel(sum,TransformCostModel(c->-1*c,TravelTime()))
+        FullCostModel(sum,TransformCostModel(c->-1*c,TravelTime())),
     )
     ph = PerfectHeuristic(get_dist_matrix(env_graph))
-    heuristic_model = construct_composite_heuristic(NullHeuristic(),ph,ph,ph,NullHeuristic())
+    heuristic_model = construct_composite_heuristic(
+        NullHeuristic(),
+        ph,
+        ph,
+        ph,
+        NullHeuristic(),
+        )
     cost_model, heuristic_model
 end
+CRCBS.get_infeasible_cost(astar_model::DFS_PathFinder,args...) = (Inf,Inf,Inf)
 function construct_a_star_cost_model(astar_model::DFS_PathFinder, schedule, cache, problem_spec, env_graph; extra_T=400, primary_objective=SumOfMakeSpans)
-    N = problem_spec.N
-    # cost_model = construct_composite_cost_model(FullCostModel(sum,NullCost()))
-    cost_model = construct_composite_cost_model(SumOfTravelTime(),SumOfTravelDistance())
+    cost_model = construct_composite_cost_model(
+        primary_objective(schedule,cache),
+        FullCostModel(maximum,TravelTime()),
+        FullCostModel(maximum,TravelDistance())
+        )
     ph = PerfectHeuristic(get_dist_matrix(env_graph))
-    heuristic_model = construct_composite_heuristic(ph,NullHeuristic())
+    heuristic_model = construct_composite_heuristic(ph,ph,NullHeuristic())
     cost_model, heuristic_model
 end
 construct_a_star_cost_model(solver::PC_TAPF_Solver, args...; kwargs...) = construct_a_star_cost_model(solver.astar_model, args...; kwargs...)
@@ -1227,7 +1238,7 @@ function get_conflict_idx(envs,states,actions,i,ordering,idxs)
     a = actions[idx]
     sp = get_next_state(env,s,a)
     pi = PathNode(s,a,sp)
-    for (j,idx) in enumerate(ordering)
+    for (j,idx) in enumerate(ordering[1:max(1,i-1)])
         if j == i
             continue
         end
@@ -1273,8 +1284,6 @@ function update_planning_cache!(solver,env)
     end
 end
 function update_envs!(solver,search_env,envs,paths)
-    # TODO
-    # - Final GO(-1,-1) nodes should take care of themselves...?
     cache = search_env.cache
     schedule = search_env.schedule
     cbs_node = initialize_root_node(search_env)
@@ -1301,6 +1310,7 @@ function update_envs!(solver,search_env,envs,paths)
             end
         end
     end
+    update_cost_model!(search_env)
     envs,paths
 end
 function select_ordering(solver,search_env,envs)
@@ -1313,22 +1323,29 @@ function select_ordering(solver,search_env,envs)
             minimum(cache.slack[get_vtx(schedule,envs[i].node_id)])
             )
         )
-    log_info(-1,solver.l2_verbosity,"ordering = $ordering")
+    log_info(4,solver.l2_verbosity,"ordering = $ordering")
     ordering
 end
-function select_action_dfs!(envs,states,actions,i,ordering,idxs,search_state=SearchState())
+function select_action_dfs!(solver,envs,states,actions,i,ordering,idxs,search_state=SearchState())
+    # search_states = map(e->search_state,1:length(envs)+1)
+    # while true
     search_state = update_search_state(search_state,i)
+    # search_states[i] = update_search_state(search_states[i],i)
     if i <= 0
         return false
     elseif i > length(states)
         for (env,s,a) in zip(envs,states,actions)
-            if a != CRCBS.wait(env,s)
+            if a != CRCBS.wait(env,s) || length(get_possible_actions(env,s)) == 1
                 return true
             end
+            # log_info(5,solver.l2_verbosity,"action ",string(a)," ineligible with env ",string(env.schedule_node)," |A| = $(length(get_possible_actions(env,s)))")
         end
+        log_info(5,solver.l2_verbosity,"action vector $(map(a->string(a),actions)) not eligible")
         return false
     elseif !(ordering[i] in idxs)
-        return select_action_dfs!(envs,states,actions,i+1,ordering,idxs,search_state)
+        # search_states[i+1] = search_states[i]
+        # i = i + 1
+        return select_action_dfs!(solver,envs,states,actions,i+1,ordering,idxs,search_state)
     else
         # idx = env.ordering_map[i]zs
         j = 0
@@ -1341,27 +1358,43 @@ function select_action_dfs!(envs,states,actions,i,ordering,idxs,search_state=Sea
             c0 = get_transition_cost(env,s,a)
             if (i >= search_state.reset_i) || (i < search_state.pickup_i && a == ai) || ((c >= c0 || is_valid(env,a)) && a != ai)
                 actions[idx] = ai
+                log_info(5,solver.l2_verbosity,"$(repeat(" ",i))i = $i, trying a=",string(ai)," for env ",string(env.schedule_node))
                 k = get_conflict_idx(envs,states,actions,i,ordering,idxs)
                 # @assert k < i "should only check for conflicts with 1:$i, but found conflict with $k"
                 if k <= 0
-                    if select_action_dfs!(envs,states,actions,i+1,ordering,idxs,search_state)
+                    # search_states[i+1] = search_states[i]
+                    # i = i+1
+                    # break
+                    if select_action_dfs!(solver,envs,states,actions,i+1,ordering,idxs,search_state)
                         return true
                     end
                 elseif !(ordering[k] in idxs)
-                    return false
+                    # i = i - 1
+                    # break
+                    # return false
                 else
+                    log_info(5,solver.l2_verbosity,"--- conflict betweeh $i and $k")
                     j = max(k,j)
                 end
             end
         end
-        search_state = DFS_SearchState(pickup_i=j,reset_id=0)
-        return select_action_dfs!(envs,states,actions,j,ordering,idxs,search_state) #
+        if j <= 0
+            return false
+        end
+        # if j > 0
+        search_state = DFS_SearchState(pickup_i=j,reset_i=0)
+        # search_states[j] = search_states[i]
+        # i = j
+        # break
+        # end
+        return select_action_dfs!(solver,envs,states,actions,j,ordering,idxs,search_state) #
     end
+    # end
 end
 function prioritized_dfs_search(solver,search_env,envs,paths;
         t0 = max(0, minimum(map(path->length(path),paths))),
-        max_iters = 20,
-        search_state = DFS_SearchState(),
+        max_iters = 4*(maximum(search_env.cache.tF)-minimum(map(p->length(p),paths))),
+        search_state = DFS_SearchState()
         )
      tip_times = map(path->length(path),paths)
      t = t0
@@ -1383,7 +1416,7 @@ function prioritized_dfs_search(solver,search_env,envs,paths;
          ordering   = select_ordering(solver,search_env,envs)
          idxs       = Set(findall(tip_times .<= t))
          log_info(4,solver.l2_verbosity,"idxs: $idxs")
-         if select_action_dfs!(envs,states,actions,1,ordering,idxs,search_state)
+         if select_action_dfs!(solver,envs,states,actions,1,ordering,idxs,search_state)
              log_info(4,solver.l2_verbosity,"actions: $(string(map(a->string(a),actions))...)")
              # step forward in search
              for idx in idxs
@@ -1427,30 +1460,31 @@ function CRCBS.solve!(
     solver::PC_TAPF_Solver{M,C,I,A,T},
     mapf::P;kwargs...) where {M,C<:PrioritizedDFSPlanner,I,A,T,P<:PC_MAPF}
 
-    cache = initialize_planning_cache(mapf.env.schedule;
-        t0=deepcopy(mapf.env.cache.t0),
-        tF=deepcopy(mapf.env.cache.tF)
-    )
-    search_env = SearchEnv(mapf.env,cache=cache)
-    env_graph = search_env.env.graph
-    schedule = search_env.schedule
-    N = search_env.num_agents
+    search_env = mapf.env
 
     route_plan = deepcopy(search_env.base_solution)
     paths = get_paths(route_plan)
-    envs = Vector{PCCBS.LowLevelEnv}([PCCBS.LowLevelEnv() for i in 1:N])
+    envs = Vector{PCCBS.LowLevelEnv}([PCCBS.LowLevelEnv() for p in paths])
     cbs_node = initialize_root_node(search_env)
-    for i in 1:N
-        node_id = get_next_node_matching_agent_id(schedule,cache,i)
-        envs[i], _ = build_env(solver,search_env,cbs_node,get_vtx(schedule,node_id))
+    for i in 1:search_env.num_agents
+        node_id = get_next_node_matching_agent_id(search_env.schedule,search_env.cache,i)
+        envs[i], _ = build_env(solver,search_env,cbs_node,get_vtx(search_env.schedule,node_id))
     end
 
-    envs, paths, status = prioritized_dfs_search(solver,search_env,envs,paths)
-    # TODO compute the true cost (based on MakeSpan or SumOfMakeSpans)
+    envs, paths, status = prioritized_dfs_search(solver,search_env,envs,paths;
+        max_iters = solver.cbs_model.max_iters
+    )
+    @show validate(search_env.schedule,convert_to_vertex_lists(route_plan),search_env.cache.t0,search_env.cache.tF)
+    # for (path,base_path,env) in zip(paths,search_env.base_solution.paths,envs)
+    #     c = base_path.cost
+    #     for p in path.path_nodes
+    #         c = accumulate_cost(env,c,get_transition_cost(env,p.s,p.a,p.sp))
+    #     end
+    #     path.cost = c
+    # end
     cost = aggregate_costs(get_cost_model(search_env),map(p->get_cost(p),paths))
 
     return route_plan, search_env.cache, cost
-
 end
 
 

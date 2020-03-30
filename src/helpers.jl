@@ -45,8 +45,8 @@ function print_toy_problem_specs(prob_name,vtx_grid,r0,s0,sF,project_spec,delive
     @show sF
     display(project_spec.operations)
     print("\n\n")
-    # display(delivery_graph.tasks)
-    # print("\n\n")
+    display(delivery_graph.tasks)
+    print("\n\n")
 end
 
 function initialize_toy_problem(r0,s0,sF,dist_function)
@@ -90,6 +90,10 @@ function initialize_toy_problem_1(;cost_function=SumOfMakeSpans,verbose=false)
     if verbose
         problem_description = """
         #### TOY PROBLEM 1 ####
+        r0 = [1,4]
+        s0 = [5,8,14]
+        sF = [13,12,15]
+        assignment_dict = Dict(1=>[1,3],2=>[2])
         """
         print_toy_problem_specs(problem_description,vtx_grid,r0,s0,sF,project_spec)
     end

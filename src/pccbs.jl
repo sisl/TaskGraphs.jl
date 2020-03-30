@@ -123,16 +123,16 @@ CRCBS.wait(env::LowLevelEnv,s::State) = Action(e=Edge(s.vtx,s.vtx))
 #         ActionIter(-1,Int[])
 #     end
 # end
-function CRCBS.get_possible_actions(env::LowLevelEnv,s::State)
+function CRCBS.get_possible_actions(env,s::State)
     if 1 <= s.vtx <= nv(env.graph)
         return map(v2->Action(e=Edge(s.vtx,v2)), outneighbors(env.graph,s.vtx))
     else
         return Action[]
     end
 end
-function CRCBS.get_possible_actions(env::LowLevelEnv{C,H,N},s::State) where {C,H,N<:Union{DEPOSIT,COLLECT}}
+function CRCBS.get_possible_actions(env::E,s::State) where {C,H,N<:Union{COLLECT,DEPOSIT},I,E<:LowLevelEnv{C,H,N,I}}
     if 1 <= s.vtx <= nv(env.graph)
-        return [CRCBS.wait(s)]
+        return [CRCBS.wait(env,s)]
     else
         return Action[]
     end

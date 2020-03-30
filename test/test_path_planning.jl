@@ -192,35 +192,36 @@ let
     cost_model = MakeSpan
     project_spec, problem_spec, robot_ICs, assignments, env_graph = initialize_toy_problem_1(;verbose=false);
 
-    # milp_model = SparseAdjacencyMILP()
-    milp_model = GreedyAssignment()
+    milp_model = SparseAdjacencyMILP()
+    # milp_model = GreedyAssignment()
     project_schedule = construct_partial_project_schedule(project_spec,problem_spec,map(i->robot_ICs[i], 1:problem_spec.N))
     model = formulate_milp(milp_model,project_schedule,problem_spec;cost_model=cost_model)
     optimize!(model)
     adj_matrix = get_assignment_matrix(model)
     update_project_schedule!(milp_model,project_schedule,problem_spec,adj_matrix)
 
-    solver = PC_TAPF_Solver(
-        cbs_model = PrioritizedDFSPlanner(),
-        astar_model = DFS_PathFinder(),
-        l2_verbosity=5
-    )
-    search_env = construct_search_env(solver, project_schedule, problem_spec, env_graph;primary_objective=cost_model)
-
-    env_graph = search_env.env.graph
-    project_schedule = search_env.schedule
-    N = search_env.num_agents
-
-    route_plan = deepcopy(search_env.base_solution)
-    paths = get_paths(route_plan)
-    envs = Vector{PCCBS.LowLevelEnv}([PCCBS.LowLevelEnv() for i in 1:N])
-    cbs_node = initialize_root_node(search_env)
-    for i in 1:N
-        node_id = get_next_node_matching_agent_id(project_schedule,cache,i)
-        envs[i], _ = build_env(solver,search_env,cbs_node,get_vtx(project_schedule,node_id))
-    end
 
     for k in 1:2
+        solver = PC_TAPF_Solver(
+            cbs_model = PrioritizedDFSPlanner(),
+            astar_model = DFS_PathFinder(),
+            l2_verbosity=5
+        )
+        search_env = construct_search_env(solver, project_schedule, problem_spec, env_graph;primary_objective=cost_model)
+
+        env_graph = search_env.env.graph
+        project_schedule = search_env.schedule
+        N = search_env.num_agents
+
+        route_plan = deepcopy(search_env.base_solution)
+        paths = get_paths(route_plan)
+        envs = Vector{PCCBS.LowLevelEnv}([PCCBS.LowLevelEnv() for i in 1:N])
+        cbs_node = initialize_root_node(search_env)
+        for i in 1:N
+            node_id = get_next_node_matching_agent_id(project_schedule,search_env.cache,i)
+            envs[i], _ = build_env(solver,search_env,cbs_node,get_vtx(project_schedule,node_id))
+        end
+
         if k == 1
             # test with paths of equal length
         elseif k == 2
@@ -281,6 +282,90 @@ let
         end
     end
 end
+let
+    cost_model = MakeSpan
+    project_spec, problem_spec, robot_ICs, assignments, env_graph = initialize_toy_problem_4(;verbose=false);
+
+    milp_model = SparseAdjacencyMILP()
+    # milp_model = GreedyAssignment()
+    project_schedule = construct_partial_project_schedule(project_spec,problem_spec,map(i->robot_ICs[i], 1:problem_spec.N))
+    model = formulate_milp(milp_model,project_schedule,problem_spec;cost_model=cost_model)
+    optimize!(model)
+    adj_matrix = get_assignment_matrix(model)
+    update_project_schedule!(milp_model,project_schedule,problem_spec,adj_matrix)
+
+    solver = PC_TAPF_Solver(
+        nbs_model = milp_model,
+        cbs_model = PrioritizedDFSPlanner(),
+        astar_model = DFS_PathFinder(),
+        l2_verbosity=6
+    )
+    search_env = construct_search_env(solver, project_schedule, problem_spec, env_graph;primary_objective=cost_model)
+
+    route_plan = deepcopy(search_env.base_solution)
+    paths = get_paths(route_plan)
+    envs = Vector{PCCBS.LowLevelEnv}([PCCBS.LowLevelEnv() for p in paths])
+    cbs_node = initialize_root_node(search_env)
+    for i in 1:search_env.num_agents
+        node_id = get_next_node_matching_agent_id(search_env.schedule,search_env.cache,i)
+        envs[i], _ = build_env(solver,search_env,cbs_node,get_vtx(search_env.schedule,node_id))
+    end
+
+    envs, paths, status = prioritized_dfs_search(solver,search_env,envs,paths;max_iters=1)
+    vtxs = map(e->get_vtx(search_env.schedule,e.node_id),envs)
+    nodes = map(e->e.schedule_node,envs)
+    println(map(n->string(n),nodes)...)
+    println("t0=$(search_env.cache.t0[vtxs]), tF=$(search_env.cache.tF[vtxs])")
+    envs, paths, status = prioritized_dfs_search(solver,search_env,envs,paths;max_iters=1)
+    envs, paths, status = prioritized_dfs_search(solver,search_env,envs,paths;max_iters=1)
+    envs, paths, status = prioritized_dfs_search(solver,search_env,envs,paths;max_iters=1)
+    @show string(get_node_from_vtx(search_env.schedule,v)), search_env.cache.tF[v]
+    cost = aggregate_costs(get_cost_model(search_env),map(p->get_cost(p),paths))
+
+end
+let
+    cost_model = MakeSpan
+    project_spec, problem_spec, robot_ICs, assignments, env_graph = initialize_toy_problem_3(;verbose=false);
+
+    milp_model = SparseAdjacencyMILP()
+    # milp_model = GreedyAssignment()
+    project_schedule = construct_partial_project_schedule(project_spec,problem_spec,map(i->robot_ICs[i], 1:problem_spec.N))
+    model = formulate_milp(milp_model,project_schedule,problem_spec;cost_model=cost_model)
+    optimize!(model)
+    adj_matrix = get_assignment_matrix(model)
+    update_project_schedule!(milp_model,project_schedule,problem_spec,adj_matrix)
+
+
+    solver = PC_TAPF_Solver(
+        cbs_model = PrioritizedDFSPlanner(),
+        astar_model = DFS_PathFinder(),
+        l2_verbosity=6
+    )
+    search_env = construct_search_env(solver, project_schedule, problem_spec, env_graph;primary_objective=cost_model)
+
+    env_graph = search_env.env.graph
+    project_schedule = search_env.schedule
+    N = search_env.num_agents
+
+    route_plan = deepcopy(search_env.base_solution)
+    paths = get_paths(route_plan)
+    envs = Vector{PCCBS.LowLevelEnv}([PCCBS.LowLevelEnv() for i in 1:N])
+    cbs_node = initialize_root_node(search_env)
+    for i in 1:N
+        node_id = get_next_node_matching_agent_id(project_schedule,search_env.cache,i)
+        envs[i], _ = build_env(solver,search_env,cbs_node,get_vtx(project_schedule,node_id))
+    end
+
+    envs, paths, status = prioritized_dfs_search(solver,search_env,envs,paths;max_iters=1)
+    vtxs = map(e->get_vtx(search_env.schedule,e.node_id),envs)
+    t0 = map(v->search_env.cache.t0[v],vtxs)
+    tF = map(v->search_env.cache.tF[v],vtxs)
+    nodes = map(e->string(e.schedule_node),envs)
+    states = hcat(map(p->convert_to_vertex_lists(p),paths))
+    println("t0=$t0, tF=$tF, nodes=$nodes, states=$states")
+    # nodes, t0, tF, states
+
+end
 # Still testing DFS planner
 let
 
@@ -289,7 +374,7 @@ let
                 initialize_toy_problem_1,
                 initialize_toy_problem_2,
                 initialize_toy_problem_3,
-                initialize_toy_problem_5,
+                initialize_toy_problem_4,
                 initialize_toy_problem_5,
                 initialize_toy_problem_6,
                 initialize_toy_problem_7,
@@ -300,18 +385,25 @@ let
         project_schedule = construct_partial_project_schedule(project_spec,problem_spec,map(i->robot_ICs[i], 1:problem_spec.N))
         model = formulate_milp(milp_model,project_schedule,problem_spec;cost_model=cost_model)
         optimize!(model)
+        lower_bound = Int(round(objective_function(model)))
         adj_matrix = get_assignment_matrix(model)
         update_project_schedule!(milp_model,project_schedule,problem_spec,adj_matrix)
 
         solver = PC_TAPF_Solver(
             cbs_model = PrioritizedDFSPlanner(),
-            astar_model = DFS_PathFinder()
+            astar_model = DFS_PathFinder(),
+            l2_verbosity=4
         )
         env = construct_search_env(solver, project_schedule, problem_spec, env_graph;primary_objective=cost_model)
         pc_mapf = PC_MAPF(env)
 
         route_plan, cache, cost = CRCBS.solve!(solver,pc_mapf)
+        @show f, lower_bound, cost
+        @show convert_to_vertex_lists(route_plan)
         @test length(cache.active_set) == 0
         @test length(cache.closed_set) == nv(project_schedule)
+        @test maximum(cache.tF) == maximum(map(p->length(p),route_plan.paths))
+        @show maximum(cache.tF) 
+        @test validate(env.schedule, convert_to_vertex_lists(route_plan),env.cache.t0,env.cache.tF)
     end
 end

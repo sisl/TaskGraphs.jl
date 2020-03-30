@@ -12,7 +12,6 @@ using Random
 using Test
 using GraphPlottingBFS
 using Compose
-
 # load rendering tools
 include(joinpath(pathof(TaskGraphs),"../..","test/notebooks/render_tools.jl"))
 # for f in *.svg; do inkscape -z $f -e $f.png; done
@@ -67,7 +66,7 @@ let
         initialize_toy_problem_1,
         initialize_toy_problem_2,
         initialize_toy_problem_3,
-        initialize_toy_problem_5,
+        initialize_toy_problem_4,
         initialize_toy_problem_5,
         initialize_toy_problem_6,
         initialize_toy_problem_7,
@@ -120,7 +119,7 @@ let
         initialize_toy_problem_1,
         initialize_toy_problem_2,
         initialize_toy_problem_3,
-        initialize_toy_problem_5,
+        initialize_toy_problem_4,
         initialize_toy_problem_5,
         initialize_toy_problem_6,
         initialize_toy_problem_7,
@@ -197,50 +196,6 @@ let
         end
     end
 end
-
-# Test ReservationTablePlanner
-let
-    for (i, f) in enumerate([
-        initialize_toy_problem_1,
-        initialize_toy_problem_2,
-        initialize_toy_problem_3,
-        initialize_toy_problem_5,
-        initialize_toy_problem_5,
-        initialize_toy_problem_6,
-        initialize_toy_problem_7,
-        initialize_toy_problem_8,
-        ])
-        for cost_model in [MakeSpan, SumOfMakeSpans]
-            costs = Float64[]
-            project_spec, problem_spec, robot_ICs, assignments, env_graph = f(;verbose=false);
-            for milp_model in [SparseAdjacencyMILP(),GreedyAssignment()]
-                # MILP formulations alone
-                schedule = construct_partial_project_schedule(project_spec,problem_spec,map(i->robot_ICs[i], 1:problem_spec.N))
-                model = formulate_milp(milp_model,schedule,problem_spec;cost_model=cost_model)
-                optimize!(model)
-                @test termination_status(model) == MOI.OPTIMAL
-                cost = Int(round(value(objective_function(model))))
-                adj_matrix = get_assignment_matrix(model)
-                update_project_schedule!(milp_model,schedule,problem_spec,adj_matrix)
-                @test validate(schedule)
-                @test cost != Inf
-                push!(costs, cost)
-
-                # Check that it matches low_level_search
-                solver = PC_TAPF_Solver(verbosity=0)
-                env = construct_search_env(solver, schedule, problem_spec, env_graph;primary_objective=cost_model)
-                pc_mapf = PC_MAPF(env)
-                constraint_node = initialize_root_node(pc_mapf)
-                low_level_search!(solver,pc_mapf,constraint_node)
-                @show i, f, milp_model, cost_model, cost, constraint_node.cost
-                @test get_primary_cost(solver,constraint_node.cost) == cost
-                @test validate(env.schedule)
-            end
-            @show costs
-        end
-    end
-end
-
 
 # Backtracking motivating example
 let
@@ -865,7 +820,7 @@ let
                 initialize_toy_problem_1,
                 initialize_toy_problem_2,
                 initialize_toy_problem_3,
-                initialize_toy_problem_5,
+                initialize_toy_problem_4,
                 initialize_toy_problem_5,
                 initialize_toy_problem_6,
                 initialize_toy_problem_7,
@@ -890,4 +845,51 @@ let
         @test length(cache.active_set) == 0
         @test length(cache.closed_set) == nv(project_schedule)
     end
+end
+let
+
+    # init env
+    env_id = 2
+    env_filename = string(ENVIRONMENT_DIR,"/env_",env_id,".toml")
+    factory_env = read_env(env_filename)
+    env_graph = factory_env
+    # set up problem
+    primary_objective = MakeSpan
+    problem_filename="/scratch/task_graphs_experiments/problem_instances/problem180.toml"
+    problem_def = read_problem_def(problem_filename)
+    project_spec, r0, s0, sF = problem_def.project_spec,problem_def.r0,problem_def.s0,problem_def.sF
+    project_spec, problem_spec, _, _, robot_ICs = construct_task_graphs_problem(
+        project_spec, r0, s0, sF,
+        factory_env.dist_function;
+        cost_function=primary_objective,
+        task_shapes=problem_def.shapes,
+        shape_dict=factory_env.expanded_zones,
+        );
+    # define solver
+    solver = PC_TAPF_Solver(
+        # nbs_model = SparseAdjacencyMILP(),
+        nbs_model = GreedyAssignment(),
+        cbs_model = PrioritizedDFSPlanner(max_iters=400),
+        astar_model = DFS_PathFinder(),
+        LIMIT_assignment_iterations = 1,
+        l1_verbosity=4,
+        l2_verbosity=1
+    )
+    # solve
+    solution, assignment, cost, search_env, optimality_gap = high_level_search!(
+        solver, env_graph, project_spec, problem_spec, robot_ICs, Gurobi.Optimizer;
+        primary_objective=primary_objective);
+
+    # record video
+    robot_paths = convert_to_vertex_lists(solution)
+    object_paths, object_intervals, object_ids, path_idxs = get_object_paths(solution,search_env)
+    tf = maximum(map(p->length(p),robot_paths))
+    tf = max(tf,200)
+    set_default_plot_size(24cm,24cm)
+    record_video(joinpath(VIDEO_DIR,string("greedy_dfs.webm")),
+        t->render_paths(t,factory_env,robot_paths,object_paths;
+            object_intervals=object_intervals,
+            colors_vec=map(i->LCHab(60,80,200),1:length(robot_paths)),
+            show_paths=false);tf=tf)
+
 end

@@ -8,30 +8,30 @@ let
     run(pipeline(`rm -rf $dummy_results_dir`, stdout=devnull, stderr=devnull))
     modes = [
         :write,
-        :assignment_only,
-        :low_level_search_without_repair,
-        :low_level_search_with_repair,
+        # :assignment_only,
+        # :low_level_search_without_repair,
+        # :low_level_search_with_repair,
         :full_solver
         ]
     milp_models = [
         # AssignmentMILP(),
         # AdjacencyMILP(),
-        SparseAdjacencyMILP()
-        # GreedyAssignment()
+        # SparseAdjacencyMILP(),
+        GreedyAssignment(),
     ]
     for milp_model in milp_models
         for mode in modes
             run_profiling(mode;
-                num_tasks=[4],
-                num_robots=[4],
+                num_tasks=[30],
+                num_robots=[30],
                 depth_biases=[0.1],
                 task_size_distributions = [
-                    # ( 1=>1.0, 2=>0.0, 4=>0.0 ),
+                    ( 1=>1.0, 2=>0.0, 4=>0.0 ),
                     # ( 1=>1.0, 2=>1.0, 4=>0.0 ),
-                    ( 1=>1.0, 2=>1.0, 4=>1.0 ),
+                    # ( 1=>1.0, 2=>1.0, 4=>1.0 ),
                     # ( 1=>0.0, 2=>1.0, 4=>1.0 ),
                     ],
-                num_trials=4,
+                num_trials=1,
                 Δt_collect=1,
                 Δt_deliver=1,
                 primary_objective=MakeSpan,
@@ -43,7 +43,11 @@ let
                 TimeLimit = 20,
                 solver_template = PC_TAPF_Solver(
                     nbs_model=milp_model,
-                    best_cost= (Inf,Inf,Inf,Inf,Inf),
+                    cbs_model = PrioritizedDFSPlanner(),
+                    astar_model = DFS_PathFinder(),
+                    # astar_model = PrioritizedAStarModel(),
+                    LIMIT_assignment_iterations = 1,
+                    # best_cost= (Inf,Inf,Inf,Inf,Inf),
                     verbosity=0,
                     l1_verbosity=2,
                     l2_verbosity=2,
@@ -197,7 +201,9 @@ let
     # base_problem_dir, base_results_dir, solver_configs, problem_configs, solver_template, fallback_solver_template = get_replanning_config_1()
     # base_problem_dir, base_results_dir, solver_configs, problem_configs, solver_template, fallback_solver_template = get_replanning_config_2()
     # base_problem_dir, base_results_dir, solver_configs, problem_configs, solver_template, fallback_solver_template = get_replanning_config_3()
-    base_problem_dir, base_results_dir, solver_configs, problem_configs, solver_template, fallback_solver_template = get_replanning_config_4()
+    # base_problem_dir, base_results_dir, solver_configs, problem_configs, solver_template, fallback_solver_template = get_replanning_config_4()
+    # base_problem_dir, base_results_dir, solver_configs, problem_configs, solver_template, fallback_solver_template = get_replanning_config_5()
+    base_problem_dir, base_results_dir, solver_configs, problem_configs, solver_template, fallback_solver_template = get_replanning_config_6()
 
     solver_template = PC_TAPF_Solver(solver_template)
 
