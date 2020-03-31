@@ -893,3 +893,32 @@ let
             show_paths=false);tf=tf)
 
 end
+# Visualizing dumped DFS solution
+let
+    env_id = 2
+    env_filename = string(ENVIRONMENT_DIR,"/env_",env_id,".toml")
+    factory_env = read_env(env_filename)
+
+    file_name = joinpath(DEBUG_PATH,"DFS_demo1.jld2")
+    dict = load(file_name)
+    robot_paths = dict["robot_paths"]
+    object_paths = dict["object_paths"]
+    object_intervals = dict["object_intervals"]
+    object_ids = dict["object_ids"]
+    path_idxs = dict["path_idxs"]
+
+    # record video
+    tf = maximum(map(p->length(p),robot_paths))
+    t0 = 400
+    tf = min(tf,600)
+    robot_paths = map(p->p[min(t0+1,length(p)):end],robot_paths)
+    object_paths = map(p->p[min(t0+1,length(p)):end],object_paths)
+    object_intervals = map(p->p.-t0,object_intervals)
+    set_default_plot_size(24cm,24cm)
+    record_video(joinpath(VIDEO_DIR,string("dfs_stuck.webm")),
+        t->render_paths(t,factory_env,robot_paths,object_paths;
+            object_intervals=object_intervals,
+            colors_vec=map(i->LCHab(60,80,200),1:length(robot_paths)),
+            show_paths=false);tf=tf-t0)
+
+end

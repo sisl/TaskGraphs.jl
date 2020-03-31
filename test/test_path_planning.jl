@@ -403,7 +403,6 @@ let
         @test length(cache.active_set) == 0
         @test length(cache.closed_set) == nv(project_schedule)
         @test maximum(cache.tF) == maximum(map(p->length(p),route_plan.paths))
-        @show maximum(cache.tF) 
         @test validate(env.schedule, convert_to_vertex_lists(route_plan),env.cache.t0,env.cache.tF)
     end
 end

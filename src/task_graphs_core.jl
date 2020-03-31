@@ -809,16 +809,16 @@ function validate(project_schedule::ProjectSchedule,paths::Vector{Vector{Int}},t
             start_vtx = path_spec.start_vtx
             final_vtx = path_spec.final_vtx
             try
-                @assert length(path) > t0[v]
-                @assert length(path) > tF[v]
+                @assert(length(path) > t0[v], string("length(path) == $(length(path)), should be greater than t0[v] == $(t0[v]) in node ",string(node)))
+                @assert(length(path) > t0[v], string("length(path) == $(length(path)), should be greater than tF[v] == $(tF[v]) in node ",string(node)))
                 if start_vtx != -1
                     if length(path) > t0[v]
-                        @assert(path[t0[v] + 1] == start_vtx, string("node: ",string(node), ", start_vtx: ",start_vtx, ", t0+1: ",t0[v]+1,", path: ", path))
+                        @assert(path[t0[v] + 1] == start_vtx, string("node: ",string(node), ", start_vtx: ",start_vtx, ", t0+1: ",t0[v]+1,", path[t0[v] + 1] = ",path[t0[v] + 1],", path: ", path))
                     end
                 end
                 if final_vtx != -1
                     if length(path) > tF[v]
-                        @assert(path[tF[v] + 1] == final_vtx, string("node: ",string(node), ", final vtx: ",final_vtx, ", tF+1: ",tF[v]+1,", path: ", path))
+                        @assert(path[tF[v] + 1] == final_vtx, string("node: ",string(node), ", final vtx: ",final_vtx, ", tF+1: ",tF[v]+1,", path[tF[v] + 1] = ",path[tF[v] + 1],", path: ", path))
                     end
                 end
             catch e

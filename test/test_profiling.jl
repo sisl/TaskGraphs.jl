@@ -202,10 +202,13 @@ let
     # base_problem_dir, base_results_dir, solver_configs, problem_configs, solver_template, fallback_solver_template = get_replanning_config_2()
     # base_problem_dir, base_results_dir, solver_configs, problem_configs, solver_template, fallback_solver_template = get_replanning_config_3()
     # base_problem_dir, base_results_dir, solver_configs, problem_configs, solver_template, fallback_solver_template = get_replanning_config_4()
-    # base_problem_dir, base_results_dir, solver_configs, problem_configs, solver_template, fallback_solver_template = get_replanning_config_5()
-    base_problem_dir, base_results_dir, solver_configs, problem_configs, solver_template, fallback_solver_template = get_replanning_config_6()
+    base_problem_dir, base_results_dir, solver_configs, problem_configs, solver_template, fallback_solver_template = get_replanning_config_5()
+    # base_problem_dir, base_results_dir, solver_configs, problem_configs, solver_template, fallback_solver_template = get_replanning_config_6()
 
-    solver_template = PC_TAPF_Solver(solver_template)
+    # solver_template = PC_TAPF_Solver(solver_template,l2_verbosity=2)
+
+    # fallback_solver_template.l2_verbosity=4
+    # fallback_solver_template.cbs_model = PrioritizedDFSPlanner(max_iters=200)
 
     reset_debug_file_id!()
     reset_operation_id_counter!()

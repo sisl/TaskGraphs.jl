@@ -792,6 +792,7 @@ function run_replanner_profiling(MODE=:nothing;
             folder_id += 1 # moved this to the beginning so it doesn't get skipped
             problem_dir = joinpath(base_problem_dir,string("stream",folder_id))
 
+            already_written = false
             if MODE == :write
                 if !isdir(problem_dir)
                     mkpath(problem_dir)
@@ -815,8 +816,12 @@ function run_replanner_profiling(MODE=:nothing;
                 for problem_id in 1:num_projects
                     problem_filename = joinpath(problem_dir,string("problem",problem_id,".toml"))
                     config_filename = joinpath(problem_dir,string("config",problem_id,".toml"))
+                    if already_written
+                        continue
+                    end
                     if isfile(problem_filename)
-                        println("file ",problem_filename," already exists. Skipping ...")
+                        println("file ",problem_filename," already exists. Skipping write for this and all other problem files")
+                        already_written=true
                         continue # don't overwrite existing files
                     end
                     # initialize a random problem
@@ -1310,14 +1315,14 @@ function get_replanning_config_5()
         );
     fallback_solver_template = PC_TAPF_Solver(
         nbs_model                   = GreedyAssignment(),
-        cbs_model                   = PrioritizedDFSPlanner(),
+        cbs_model                   = PrioritizedDFSPlanner(max_iters=2000),
         astar_model                 = DFS_PathFinder(),
         DEBUG                       = true,
         l1_verbosity                = 1,
         l2_verbosity                = 1,
         l3_verbosity                = 0,
         l4_verbosity                = 0,
-        LIMIT_assignment_iterations = 2,
+        LIMIT_assignment_iterations = 1,
         );
 
     base_dir            = joinpath("/scratch/task_graphs_experiments","replanning/prioritized_dfs_fallback")

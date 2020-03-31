@@ -68,7 +68,7 @@ export
 abstract type AbstractCBSModel end
 struct DefaultCBSModel <: AbstractCBSModel end
 @with_kw struct PrioritizedDFSPlanner <: AbstractCBSModel
-    max_iters::Int = 2000
+    max_iters::Int = 3000
 end
 abstract type AbstractISPSModel end
 @with_kw struct DefaultISPSModel <: AbstractISPSModel
@@ -803,7 +803,14 @@ function CRCBS.build_env(solver, env::E, node::N, schedule_node::T, v::Int, path
         #     s0=PCCBS.State(start_vtx, 0), # TODO fix start time
         #     cost=get_initial_cost(cbs_env)
         #     )
-        @assert PCCBS.State(path_spec.start_vtx, 0) == get_final_state(base_path)
+        # try
+        #     @assert(PCCBS.State(path_spec.start_vtx, 0) == get_final_state(base_path),"State(path_spec.start_vtx, 0) = $((path_spec.start_vtx,0)), not equal to get_final_state(base_path) = $(get_final_state(base_path))")
+        # catch e
+        #     println(e.msg)
+        #     @show path_spec
+        #     @show schedule_node
+        #     throw(e)
+        # end
     end
     # make sure base_path hits t0 constraint
     if get_end_index(base_path) < env.cache.t0[v]
@@ -1287,26 +1294,85 @@ function update_envs!(solver,search_env,envs,paths)
     cache = search_env.cache
     schedule = search_env.schedule
     cbs_node = initialize_root_node(search_env)
+    # update_planning_cache!(solver,search_env)        cache.tF[v] = get_final_state(path).t
+
+    # update cache times
+    up_to_date = true
+    for i in 1:length(envs)
+        env = envs[i]
+        path = paths[i]
+        v = get_vtx(schedule,env.node_id)
+        s = get_final_state(path)
+        if is_goal(envs[i],s)
+            t_arrival = max(cache.tF[v], s.t + get_distance(search_env.dist_function,s.vtx,env.goal.vtx))
+            if t_arrival > cache.tF[v] && env.goal.vtx != -1
+                log_info(-1,solver.l2_verbosity,"DFS update_envs!(): extending tF[v] from $(cache.tF[v]) to $t_arrival in ",string(env.schedule_node))
+                cache.tF[v] = t_arrival
+                up_to_date = false
+            end
+        end
+    end
+    # reset cache
+    if !up_to_date
+        t0,tF,slack,local_slack = process_schedule(schedule;t0=cache.t0,tF=cache.tF)
+        cache.t0            .= t0
+        cache.tF            .= tF
+        cache.slack         .= slack
+        cache.local_slack   .= local_slack
+        # rebuild envs to reset goal time
+        for i in 1:length(envs)
+            env = envs[i]
+            path = paths[i]
+            v = get_vtx(schedule,env.node_id)
+            envs[i],_ = build_env(solver,search_env,cbs_node,v)
+        end
+    end
+    # mark finished envs as complete
+    for i in 1:length(envs)
+        env = envs[i]
+        path = paths[i]
+        if is_goal(envs[i],get_final_state(path))
+            # update schedule and cache
+            v = get_vtx(schedule,env.node_id)
+            if !(v in cache.closed_set)
+                update_planning_cache!(solver,search_env,v,path)
+                @assert v in cache.closed_set
+                @assert i == env.agent_idx
+            end
+        end
+    end
     update_planning_cache!(solver,search_env)
     i = 0
     while i < length(envs)
         i += 1
         env = envs[i]
         path = paths[i]
+        v = get_vtx(schedule,env.node_id)
         if is_goal(envs[i],get_final_state(path))
             # update schedule and cache
-            v = get_vtx(schedule,env.node_id)
-            update_planning_cache!(solver,search_env,v,path)
-            update_planning_cache!(solver,search_env)
-            # TODO update all vertices that don't require a robot
+            if !(v in cache.closed_set)
+                update_planning_cache!(solver,search_env,v,path)
+                update_planning_cache!(solver,search_env)
+            end
             @assert v in cache.closed_set
-            # swap out env for new env
             @assert i == env.agent_idx
+            for v2 in outneighbors(schedule,v)
+                if get_path_spec(schedule,v).agent_id == i
+                    if !(v2 in cache.active_set)
+                        log_info(4,solver.l2_verbosity,"node ",string(get_node_from_vtx(schedule,v2))," not yet in active set")
+                    end
+                end
+            end
+            # swap out env for new env
             node_id = get_next_node_matching_agent_id(schedule,cache,env.agent_idx)
             @assert node_id != env.node_id
             if get_vtx(schedule,node_id) in cache.active_set
                 envs[i],_ = build_env(solver,search_env,cbs_node,get_vtx(schedule,node_id))
-                i = 0
+                # i = 0
+                i -= 1
+            else
+                node_string = string(get_node_from_id(search_env.schedule,node_id))
+                log_info(4,solver.l2_verbosity,"cannot update environment for agent $i because next node ",node_string," not in cache.active_set")
             end
         end
     end
@@ -1320,6 +1386,7 @@ function select_ordering(solver,search_env,envs)
         collect(1:search_env.num_agents),
         by = i->(
             ~isa(envs[i].schedule_node,Union{COLLECT,DEPOSIT}),
+            ~isa(envs[i].schedule_node,CARRY),
             minimum(cache.slack[get_vtx(schedule,envs[i].node_id)])
             )
         )
@@ -1335,12 +1402,12 @@ function select_action_dfs!(solver,envs,states,actions,i,ordering,idxs,search_st
         return false
     elseif i > length(states)
         for (env,s,a) in zip(envs,states,actions)
-            if a != CRCBS.wait(env,s) || length(get_possible_actions(env,s)) == 1
+            if a != CRCBS.wait(env,s) || length(get_possible_actions(env,s)) == 1 || s.t < env.goal.t
                 return true
             end
             # log_info(5,solver.l2_verbosity,"action ",string(a)," ineligible with env ",string(env.schedule_node)," |A| = $(length(get_possible_actions(env,s)))")
         end
-        log_info(5,solver.l2_verbosity,"action vector $(map(a->string(a),actions)) not eligible")
+        log_info(4,solver.l2_verbosity,"action vector $(map(a->string(a),actions)) not eligible")
         return false
     elseif !(ordering[i] in idxs)
         # search_states[i+1] = search_states[i]
@@ -1358,7 +1425,7 @@ function select_action_dfs!(solver,envs,states,actions,i,ordering,idxs,search_st
             c0 = get_transition_cost(env,s,a)
             if (i >= search_state.reset_i) || (i < search_state.pickup_i && a == ai) || ((c >= c0 || is_valid(env,a)) && a != ai)
                 actions[idx] = ai
-                log_info(5,solver.l2_verbosity,"$(repeat(" ",i))i = $i, trying a=",string(ai)," for env ",string(env.schedule_node))
+                log_info(5,solver.l2_verbosity,"$(repeat(" ",i))i = $i, trying a=",string(ai)," from s = ",string(s),"for env ",string(env.schedule_node), " with env.goal = ",string(env.goal))
                 k = get_conflict_idx(envs,states,actions,i,ordering,idxs)
                 # @assert k < i "should only check for conflicts with 1:$i, but found conflict with $k"
                 if k <= 0
@@ -1404,6 +1471,7 @@ function prioritized_dfs_search(solver,search_env,envs,paths;
      iter = 0
      while true && iter < max_iters
          iter += 1
+         # Update cache to reflect any delay ?
          update_envs!(solver,search_env,envs,paths)
          # if all(map(i->is_goal(envs[i],states[i]),1:length(paths)))
          if length(search_env.cache.active_set) == 0
@@ -1430,7 +1498,7 @@ function prioritized_dfs_search(solver,search_env,envs,paths;
              end
              t += 1
              search_state = DFS_SearchState()
-             log_info(4,solver.l2_verbosity,"stepping forward, t = $t")
+             log_info(3,solver.l2_verbosity,"stepping forward, t = $t")
          else
              # step backward in search
              all(tip_times .> t) == 0 ? break : nothing
@@ -1444,10 +1512,14 @@ function prioritized_dfs_search(solver,search_env,envs,paths;
              idxs    = Set(findall(tip_times .<= t))
               # start new search where previous search left off
              search_state = DFS_SearchState(pickup_i = maximum(idxs))
-             log_info(3,solver.l2_verbosity,"stepping backward, t = $t")
+             log_info(-1,solver.l2_verbosity,"stepping backward, t = $t")
          end
          states     = map(path->get_s(get_path_node(path,t+1)), paths)
          actions    = map(path->get_a(get_path_node(path,t+1)), paths)
+     end
+     if iter > max_iters
+         # throw(SolverCBSMaxOutException("ERROR in DFS: max_iters exceeded before finding a valid route plan!"))
+         throw(AssertionError("ERROR in DFS: max_iters exceeded before finding a valid route plan!"))
      end
      return envs, paths, false
 end
@@ -1461,6 +1533,7 @@ function CRCBS.solve!(
     mapf::P;kwargs...) where {M,C<:PrioritizedDFSPlanner,I,A,T,P<:PC_MAPF}
 
     search_env = mapf.env
+    update_planning_cache!(solver,search_env) # NOTE to get rid of all nodes that don't need planning but are in the active set
 
     route_plan = deepcopy(search_env.base_solution)
     paths = get_paths(route_plan)
@@ -1474,10 +1547,23 @@ function CRCBS.solve!(
     envs, paths, status = prioritized_dfs_search(solver,search_env,envs,paths;
         max_iters = solver.cbs_model.max_iters
     )
-    @show validate(search_env.schedule,convert_to_vertex_lists(route_plan),search_env.cache.t0,search_env.cache.tF)
+    if validate(search_env.schedule,convert_to_vertex_lists(route_plan),search_env.cache.t0,search_env.cache.tF)
+        log_info(0,solver.l2_verbosity,"DFS: Succeeded in finding a valid route plan!")
+    else
+        # throw(SolverCBSMaxOutException("ERROR in DFS! Failed to find a valid route plan!"))
+        # DUMP
+        filename = joinpath(DEBUG_PATH,string("DFS_demo",get_debug_file_id(),".jld2"))
+        mkpath(DEBUG_PATH)
+        robot_paths = convert_to_vertex_lists(route_plan)
+        object_paths, object_intervals, object_ids, path_idxs = get_object_paths(route_plan,search_env)
+        log_info(-1,solver.l4_verbosity,"Dumping DFS route plan to $filename")
+        @save filename robot_paths object_paths object_intervals object_ids path_idxs
+
+        throw(AssertionError("ERROR in DFS! Failed to find a valid route plan!"))
+    end
     # for (path,base_path,env) in zip(paths,search_env.base_solution.paths,envs)
     #     c = base_path.cost
-    #     for p in path.path_nodes
+    #     for p in path.path_nodes[length(base_path)+1:end]
     #         c = accumulate_cost(env,c,get_transition_cost(env,p.s,p.a,p.sp))
     #     end
     #     path.cost = c
