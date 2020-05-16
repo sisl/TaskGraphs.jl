@@ -1303,10 +1303,10 @@ function update_envs!(solver,search_env,envs,paths)
         path = paths[i]
         v = get_vtx(schedule,env.node_id)
         s = get_final_state(path)
+        t_arrival = max(cache.tF[v], s.t + get_distance(search_env.dist_function,s.vtx,env.goal.vtx))
         if is_goal(envs[i],s)
-            t_arrival = max(cache.tF[v], s.t + get_distance(search_env.dist_function,s.vtx,env.goal.vtx))
             if t_arrival > cache.tF[v] && env.goal.vtx != -1
-                log_info(-1,solver.l2_verbosity,"DFS update_envs!(): extending tF[v] from $(cache.tF[v]) to $t_arrival in ",string(env.schedule_node))
+                log_info(-1,solver.l2_verbosity,"DFS update_envs!(): extending tF[v] from $(cache.tF[v]) to $t_arrival in ",string(env.schedule_node),", s = ",string(s))
                 cache.tF[v] = t_arrival
                 up_to_date = false
             end
@@ -1359,7 +1359,8 @@ function update_envs!(solver,search_env,envs,paths)
             for v2 in outneighbors(schedule,v)
                 if get_path_spec(schedule,v).agent_id == i
                     if !(v2 in cache.active_set)
-                        log_info(4,solver.l2_verbosity,"node ",string(get_node_from_vtx(schedule,v2))," not yet in active set")
+                        log_info(-1,solver.l2_verbosity,"node ",string(get_node_from_vtx(schedule,v2))," not yet in active set")
+                        log_info(-1,solver.l2_verbosity,"inneighbors of ",string(get_node_from_vtx(schedule,v2))," are ",map(v3->string(get_node_from_vtx(schedule,v3)),neighborhood(schedule,v2,3,dir=:in))...)
                     end
                 end
             end
@@ -1554,6 +1555,10 @@ function CRCBS.solve!(
         # DUMP
         filename = joinpath(DEBUG_PATH,string("DFS_demo",get_debug_file_id(),".jld2"))
         mkpath(DEBUG_PATH)
+        for env in envs
+            v = get_vtx(search_env.schedule,env.node_id)
+            log_info(-1,solver.l2_verbosity,"node ",string(env.schedule_node)," t0=$(search_env.cache.t0[v]), tF=$(search_env.cache.tF[v]), closed=$(v in search_env.cache.closed_set),")
+        end
         robot_paths = convert_to_vertex_lists(route_plan)
         object_paths, object_intervals, object_ids, path_idxs = get_object_paths(route_plan,search_env)
         log_info(-1,solver.l4_verbosity,"Dumping DFS route plan to $filename")

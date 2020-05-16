@@ -258,13 +258,13 @@ function visualize_env(vtxs,pickup_vtxs,dropoff_vtxs,t=0;
     end
     object_layers = []
     for (i,(p,interval)) in enumerate(zip(object_paths,object_intervals))
-        if interval[1] > t
-            object_color = inactive_object_color
-        elseif interval[2] < t
-            object_color = completed_object_color
-        else
+        # if interval[1] > t
+        #     object_color = inactive_object_color
+        # elseif interval[2] < t
+        #     object_color = completed_object_color
+        # else
             object_color = active_object_colors[i]
-        end
+        # end
         if length(p) > 0 && interval[2] > t
             if (interval[1] <= t) || show_inactive_objects
                 interpolate(p[min(t1,length(p))],p[min(t1+1,length(p))],t1-(t+1))

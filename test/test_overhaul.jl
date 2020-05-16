@@ -899,7 +899,7 @@ let
     env_filename = string(ENVIRONMENT_DIR,"/env_",env_id,".toml")
     factory_env = read_env(env_filename)
 
-    file_name = joinpath(DEBUG_PATH,"DFS_demo1.jld2")
+    file_name = joinpath(DEBUG_PATH,"DFS_demo3.jld2")
     dict = load(file_name)
     robot_paths = dict["robot_paths"]
     object_paths = dict["object_paths"]
@@ -907,18 +907,62 @@ let
     object_ids = dict["object_ids"]
     path_idxs = dict["path_idxs"]
 
+
     # record video
     tf = maximum(map(p->length(p),robot_paths))
-    t0 = 400
-    tf = min(tf,600)
+    t0 = 1500
+    tf = min(tf,1700)
     robot_paths = map(p->p[min(t0+1,length(p)):end],robot_paths)
     object_paths = map(p->p[min(t0+1,length(p)):end],object_paths)
     object_intervals = map(p->p.-t0,object_intervals)
     set_default_plot_size(24cm,24cm)
+    colors_vec=map(i->LCHab(60,80,200),1:length(robot_paths))
+    colors_vec[1] = LCHab(60,80,150)
+    colors_vec[3] = LCHab(60,80,60)
+    project_idxs=ones(Int,length(object_paths))
+    project_idxs[findall(object_ids.==751)[1]] = 2
+    project_idxs[findall(object_ids.==774)[1]] = 3
     record_video(joinpath(VIDEO_DIR,string("dfs_stuck.webm")),
         t->render_paths(t,factory_env,robot_paths,object_paths;
             object_intervals=object_intervals,
-            colors_vec=map(i->LCHab(60,80,200),1:length(robot_paths)),
+            project_idxs=project_idxs,
+            colors_vec=colors_vec,
             show_paths=false);tf=tf-t0)
+
+end
+
+# Video for ICRA presentation
+let
+
+    # init env
+    project_spec, problem_spec, robot_ICs, assignments, env_graph = initialize_toy_problem_3(;verbose=false);
+    primary_objective=MakeSpan
+    # define solver
+    solver = PC_TAPF_Solver()
+    # solver = PC_TAPF_Solver(
+    #     # nbs_model = SparseAdjacencyMILP(),
+    #     nbs_model = GreedyAssignment(),
+    #     cbs_model = PrioritizedDFSPlanner(max_iters=400),
+    #     astar_model = DFS_PathFinder(),
+    #     LIMIT_assignment_iterations = 1,
+    #     l1_verbosity=4,
+    #     l2_verbosity=1
+    # )
+    # solve
+    solution, assignment, cost, search_env, optimality_gap = high_level_search!(
+        solver, env_graph, project_spec, problem_spec, robot_ICs, Gurobi.Optimizer;
+        primary_objective=primary_objective);
+
+    # record video
+    robot_paths = convert_to_vertex_lists(solution)
+    object_paths, object_intervals, object_ids, path_idxs = get_object_paths(solution,search_env)
+    tf = maximum(map(p->length(p),robot_paths))
+    tf = max(tf,200)
+    set_default_plot_size(24cm,24cm)
+    record_video(joinpath(VIDEO_DIR,string("toy_problem_3.webm")),
+        t->render_paths(t,env_graph,robot_paths,object_paths;
+            object_intervals=object_intervals,
+            colors_vec=map(i->LCHab(60,80,200),1:length(robot_paths)),
+            show_paths=false);tf=tf)
 
 end

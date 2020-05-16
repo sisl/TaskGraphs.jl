@@ -799,8 +799,8 @@ function validate(project_schedule::ProjectSchedule)
     return true
 end
 function validate(project_schedule::ProjectSchedule,paths::Vector{Vector{Int}},t0::Vector{Int},tF::Vector{Int})
-    G = get_graph(project_schedule)
-    for v in vertices(G)
+    # G = get_graph(project_schedule)
+    for v in vertices(project_schedule)
         node = get_node_from_vtx(project_schedule, v)
         path_spec = get_path_spec(project_schedule, v)
         agent_id = path_spec.agent_id
