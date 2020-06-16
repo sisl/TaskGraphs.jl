@@ -1,4 +1,24 @@
 let
+    dims = (2,2)
+    # initialize a dense grid graph
+    G = initialize_grid_graph_from_vtx_grid(initialize_dense_vtx_grid(dims...))
+    # construct the corresponding vertex coordinate list
+    vtxs = [(i,j) for i in 1:dims[1] for j in 1:dims[2]]
+    vtx_map = construct_vtx_map(vtxs,dims)
+    edge_cache = construct_edge_cache(vtxs,vtx_map)
+    @test validate_edge_cache(G,vtxs,edge_cache)
+end
+let
+    grid = initialize_regular_vtx_grid()
+    dims = size(grid)
+    vtxs = [(i,j) for i in 1:dims[1] for j in 1:dims[2] if grid[i,j] > 0]
+    sort!(vtxs, by=vtx->grid[vtx...])
+    zones = [v for (v,vtx) in enumerate(vtxs) if sum(grid[clip(vtx[1]-1,1,dims[1]):clip(vtx[1]+1,1,dims[1]),clip(vtx[2]-1,1,dims[2]):clip(vtx[2]+1,1,dims[2])] .> 0) == 7]
+    expanded_zones1 = construct_expanded_zones(vtxs,construct_vtx_map(vtxs,dims),zones)
+
+    expanded_zones2 = construct_expanded_zones(vtxs,construct_vtx_map(vtxs,dims),zones)
+end
+let
     env = construct_regular_factory_world()
     filename = "env.toml"
     open(filename,"w") do io

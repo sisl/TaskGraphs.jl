@@ -8,22 +8,18 @@ using Printf
 using TOML
 
 export
-    GridFactoryEnvironment,
-    get_x_dim,
-    get_y_dim,
-    get_cell_width,
-    get_transition_time,
-    get_vtxs,
-    get_pickup_zones,
-    get_dropoff_zones,
-    get_obstacles,
-    get_pickup_vtxs,
-    get_dropoff_vtxs,
-    get_obstacle_vtxs,
-    get_num_free_vtxs,
-    get_free_zones
+    construct_vtx_map
 
+"""
+    `construct_vtx_map(vtxs,dims)`
 
+    Returns a matrix `M` such that `M[i,j] = v`, where v is the index of the
+    vertex whose coordinates are (i,j)
+
+    Args:
+    * vtxs : a list of integer coordinates
+    * dims : the dimensions of the grid
+"""
 function construct_vtx_map(vtxs,dims)
     vtx_map = zeros(Int,dims)
     for (i,vtx) in enumerate(vtxs)
@@ -32,6 +28,19 @@ function construct_vtx_map(vtxs,dims)
     vtx_map
 end
 
+export
+    construct_edge_cache
+
+"""
+    `construct_edge_cache(vtxs,vtx_map)`
+
+    Returns a `cache` such that `cache[v] = {(0,1),(0,0),...}`, the set of all
+    valid directions in which a robot may move from vertex `v`.
+
+    Args:
+    * vtxs : a list of integer coordinates
+    * vtx_map : a matrix such that `vtx_map[i,j] = v`, where `vtxs[i,j = v`
+"""
 function construct_edge_cache(vtxs,vtx_map)
     edge_cache = Vector{Set{Tuple{Int,Int}}}()
     for (v,pt) in enumerate(vtxs)
@@ -45,11 +54,26 @@ function construct_edge_cache(vtxs,vtx_map)
     end
     edge_cache
 end
+
 export
     validate_edge_cache
 
+"""
+    `validate_edge_cache(G,vtxs,cache)`
+
+    verifies that for a graph `G` embedded in space such that vertex `v` has
+    coordinates `vtxs[v]`, every edge `v₁ → v₂` is stored in the edge cache. In
+    other words, for every edge `v₁ → v₂`, the unit direction vector obtained by
+    `vtxs[v₂] - vtxs[v₁]` is a member of `cache[v₁]`.
+
+    Args:
+    * G : a graph on which the functions `vertices` and `outneighbors` can be
+        called
+    * vtxs : a list of integer coordinates
+    * cache : an edge cache such that e.g. `cache[v] = {(0,1),(0,0),...}`, the
+        set of all valid directions in which a robot may move from vertex `v`
+"""
 function validate_edge_cache(G,vtxs,cache)
-    valid = true
     for v in vertices(G)
         vtx = vtxs[v]
         for v2 in outneighbors(G,v)
@@ -57,55 +81,75 @@ function validate_edge_cache(G,vtxs,cache)
             d = [vtx2...] - [vtx...]
             d = tuple(d...)
             try
-                @assert(d in edge_cache[v], "$d not in $(edge_cache[v])")
+                @assert(d in cache[v], "$d not in $(edge_cache[v])")
             catch e
+                print(e.msg)
                 return false
             end
         end
     end
+    return true
 end
 
 export
     construct_expanded_zones
 
 """
-    returns a dictionary mapping vertices to a dict of shape=>vtxs for expanded
-    ssize delivery zones.
+    `construct_expanded_zones(vtxs,vtx_map,pickup_zones,dropoff_zones;
+        shapes=[(1,1),(1,2),(2,1),(2,2)])`
 
-    WARNING - Can lead to failure when constructing expanded dropoff zones.
+    A utility for constructing drop-off/pick-up zones where large-footprint
+    objects need to be delivered. Returns a dictionary mapping vertices to a
+    dict of shape=>vtxs for expanded size delivery zones. For each starting
+    vertex, the expanded zone is selected as the appropriately sized region that
+    overlaps with the original vertex, does not overlap with any obstacles, and
+    has minimal overlap with all other vertices in the zone list.
+
+    Args:
+    * vtxs : a list of integer coordinates
+    * vtx_map : a matrix such that `vtx_map[i,j] = v`, where `vtxs[i,j = v`
+    * zones : a list of integer vertex indices identifying the zones to be
+        expanded
 """
-function construct_expanded_zones(vtxs,vtx_map,pickup_zones,dropoff_zones;shapes=[(1,1),(1,2),(2,1),(2,2)])
-    expanded_zones = Dict{Int,Dict{Tuple{Int,Int},Vector{Int}}}()
-    R = [ 0 -1 ; 1 0 ]
-    for v in vcat(pickup_zones, dropoff_zones)
-        expanded_zones[v] = Dict{Tuple{Int,Int},Vector{Int}}()
-        vtx = [vtxs[v]...]
-        d = [0,1]
-        k = 0
-        while get(vtx_map,tuple((vtx .- d)...),0) > 0 && k < 4
-            d = R*d # rotate d until it points at obstacle
-            k += 1
-        end
-        anchor = (vtx .- d)
-        d2 = R*d
-        if get(vtx_map,tuple((anchor .- d2)...),0) > get(vtx_map,tuple((anchor .+ d2)...),0)
-            d2 = -d2
-        end
-        d = d + d2
-        for shape in shapes
-            vtx_list = Int[]
-            for dx in sort([0,d[1]][1:shape[1]])
-                for dy in sort([0,d[2]][1:shape[2]])
-                    if 0 < vtx[1]+dx <= size(vtx_map,1) && 0 < vtx[2]+dy <= size(vtx_map,2)
-                        push!(vtx_list, vtx_map[vtx[1]+dx, vtx[2]+dy])
+function construct_expanded_zones(vtxs,vtx_map,zones;shapes=[(1,1),(1,2),(2,1),(2,2)])
+    expanded_zones = Dict{Int,Dict{Tuple{Int,Int},Vector{Int}}}(
+        v => Dict{Tuple{Int,Int},Vector{Int}}() for v in zones
+    )
+    # populate heatmap with zones
+    grid_map = Int.(vtx_map .== 0)
+    heatmap = zeros(size(grid_map))
+    for v in zones
+        heatmap[vtxs[v]...] += 1.0
+    end
+    for s in shapes
+        # s = (2,2)
+        filtered_grid = Int.(imfilter(grid_map,centered(ones(s))) .> 0)
+        for v in zones
+            vtx = vtxs[v]
+            best_cost = Inf
+            best_vtx = (-1,-1)
+            for i in 0:s[1]-1
+                for j in 0:s[2]-1
+                    # start_vtx = clip([vtx...]-[i,j],[1,1],[size(grid_map)...] .- s .+ 1)
+                    idx1 = GraphUtils.clip(vtx[1]-i,1,size(grid_map,1)-s[1]+1)
+                    idx2 = GraphUtils.clip(vtx[2]-j,1,size(grid_map,2)-s[2]+1)
+                    if filtered_grid[idx1,idx2] == 0
+                        cost = sum(heatmap[idx1:idx1+s[1]-1,idx2:idx2+s[2]-1])
+                        if cost < best_cost
+                            best_cost = cost
+                            best_vtx = (idx1,idx2)
+                        end
                     end
                 end
             end
-            expanded_zones[v][shape] = vtx_list
+            idx1,idx2 = best_vtx
+            vtx_list = sort([vtx_map[idx1:idx1+s[1]-1,idx2:idx2+s[2]-1]...])
+            expanded_zones[v][s] = vtx_list
         end
     end
     expanded_zones
 end
+construct_expanded_zones(vtxs,vtx_map,pickup_zones,dropoff_zones;kwargs...) = construct_expanded_zones(vtxs,vtx_map,vcat(pickup_zones,dropoff_zones);kwargs...)
 
 
 
@@ -114,6 +158,8 @@ export
     get_distance
 
 """
+    `DistMatrixMap`
+
     maps team size to the effective distance (computed by Djikstra) between
     leader (top left) vtxs.
     A DistMatrixMap is constructed by starting with a base environment grid
@@ -183,6 +229,21 @@ end
 Base.getindex(d::DistMatrixMap,v1::Int,v2::Int) = get_distance(d,v1,v2,(1,1),1)
 
 
+export
+    GridFactoryEnvironment,
+    get_x_dim,
+    get_y_dim,
+    get_cell_width,
+    get_transition_time,
+    get_vtxs,
+    get_pickup_zones,
+    get_dropoff_zones,
+    get_obstacles,
+    get_pickup_vtxs,
+    get_dropoff_vtxs,
+    get_obstacle_vtxs,
+    get_num_free_vtxs,
+    get_free_zones
 
 """
     `GridFactoryEnvironment`
