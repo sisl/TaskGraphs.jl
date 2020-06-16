@@ -1,3 +1,4 @@
+
 let
     dims = (2,2)
     # initialize a dense grid graph
@@ -14,12 +15,61 @@ let
     vtxs = [(i,j) for i in 1:dims[1] for j in 1:dims[2] if grid[i,j] > 0]
     sort!(vtxs, by=vtx->grid[vtx...])
     zones = [v for (v,vtx) in enumerate(vtxs) if sum(grid[clip(vtx[1]-1,1,dims[1]):clip(vtx[1]+1,1,dims[1]),clip(vtx[2]-1,1,dims[2]):clip(vtx[2]+1,1,dims[2])] .> 0) == 7]
-    expanded_zones1 = construct_expanded_zones(vtxs,construct_vtx_map(vtxs,dims),zones)
-
-    expanded_zones2 = construct_expanded_zones(vtxs,construct_vtx_map(vtxs,dims),zones)
+    vtx_map = construct_vtx_map(vtxs,dims)
+    expanded_zones = construct_expanded_zones(vtxs,vtx_map,zones)
+    @test TaskGraphs.validate_expanded_zones(vtx_map,expanded_zones)
+end
+let
+    grid = initialize_regular_vtx_grid(;n_obstacles_x=1,n_obstacles_y=1)
+    dims = size(grid)
+    vtxs = [(i,j) for i in 1:dims[1] for j in 1:dims[2] if grid[i,j] > 0]
+    # 1   2   3   4   5   6
+    # 7   8   9  10  11  12
+    # 13  14   0   0  15  16
+    # 17  18   0   0  19  20
+    # 21  22  23  24  25  26
+    # 27  28  29  30  31  32
+    dist_mtx_map = DistMatrixMap(grid,vtxs)
+    dist_matrix = get_dist_matrix(initialize_grid_graph_from_vtx_grid(grid))
+    v1 = 13
+    v2 = 15
+    @test get_distance(dist_mtx_map,v1,v2,(1,1)) == dist_matrix[v1,v2]
+    @test get_distance(dist_mtx_map,v1,v2,(1,2)) == dist_matrix[v1,v2]
+    @test get_distance(dist_mtx_map,v1,v2,(2,1)) == dist_matrix[v1,v2] + 2
+    @test get_distance(dist_mtx_map,v1,v2,(2,2)) == dist_matrix[v1,v2] + 2
+    v3 = 18
+    v4 = 20
+    config = 4
+    @test get_distance(dist_mtx_map,v3,v4,(2,2),config) == dist_matrix[v1,v2] + 2
 end
 let
     env = construct_regular_factory_world()
+    get_x_dim(env)
+    get_y_dim(env)
+    get_cell_width(env)
+    get_transition_time(env)
+    get_vtxs(env)
+    get_pickup_zones(env)
+    get_dropoff_zones(env)
+    get_obstacles(env)
+    get_pickup_vtxs(env)
+    get_dropoff_vtxs(env)
+    get_obstacle_vtxs(env)
+    GridFactoryEnvironment(env,env.graph)
+    Base.zero(env)
+    LightGraphs.edges(env)
+    LightGraphs.edgetype(env)
+    LightGraphs.has_edge(env,1,2)
+    LightGraphs.has_vertex(env,1)
+    LightGraphs.inneighbors(env,1)
+    LightGraphs.is_directed(env)
+    LightGraphs.ne(env)
+    LightGraphs.nv(env)
+    LightGraphs.outneighbors(env,1)
+    LightGraphs.vertices(env)
+    get_num_free_vtxs(env)
+    get_free_zones(env)
+
     filename = "env.toml"
     open(filename,"w") do io
         TOML.print(io, TOML.parse(env))
@@ -29,30 +79,10 @@ let
     @test get_vtxs(env) == get_vtxs(env2)
     @test nv(env.graph) == nv(env2.graph)
     @test ne(env.graph) == ne(env2.graph)
-end
-let
-    N = 4
-    M = 6
-    env = construct_random_factory_world(
-        n_pickup_zones=M*2,
-        n_dropoff_zones=M*2
-        )
-    robot_locations = map(v->collect(v), get_vtxs(env)[sample_random_robot_locations(env,N)])
-    robot_headings = map(i->[1,0],1:N)
-end
-let
-    N = 4
-    M = 6
-    env = construct_random_factory_world(n_pickup_zones=M*2,n_dropoff_zones=M*2)
 
-    r0,s0,sF = get_random_problem_instantiation(N,M,
-        get_pickup_zones(env),get_dropoff_zones(env),get_free_zones(env))
-
-    dist_matrix = get_dist_matrix(env.graph)
-    Drs, Dss = cached_pickup_and_delivery_distances(r0,s0,sF,(v1,v2)->dist_matrix[v1,v2])
-
-    robot_ICs = Dict{Int,ROBOT_AT}(r => ROBOT_AT(r,r0[r]) for r in 1:N)
-    project_spec = construct_random_project_spec(M,s0,sF;max_parents=3,depth_bias=1.0,Δt_min=0,Δt_max=0)
+    construct_factory_env_from_vtx_grid(env.vtx_map)
+    # construct_random_factory_world()
+    # sample_random_robot_locations(env,10)
 end
 let
     xdim = 4
@@ -91,5 +121,4 @@ let
     v4 = 20
     config = 4
     @test get_distance(dist_mtx_map,v3,v4,(2,2),config) == dist_matrix[v1,v2] + 2
-
 end

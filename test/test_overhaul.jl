@@ -957,12 +957,76 @@ let
     robot_paths = convert_to_vertex_lists(solution)
     object_paths, object_intervals, object_ids, path_idxs = get_object_paths(solution,search_env)
     tf = maximum(map(p->length(p),robot_paths))
-    tf = max(tf,200)
-    set_default_plot_size(24cm,24cm)
+    tf = min(tf,200)
+    set_default_plot_size(8cm,16cm)
     record_video(joinpath(VIDEO_DIR,string("toy_problem_3.webm")),
         t->render_paths(t,env_graph,robot_paths,object_paths;
             object_intervals=object_intervals,
+            rsize=20pt,
+            osize=15pt,
+            cell_width=1.0,
+            label_objects=true,
+            label_robots=true,
+            point_label_font="CMU Serif",
+            point_label_color="white",
+            point_label_font_size=20pt,
             colors_vec=map(i->LCHab(60,80,200),1:length(robot_paths)),
-            show_paths=false);tf=tf)
+            active_object_colors=map(j->"black",object_paths),
+            show_paths=false);tf=tf,s=(8inch,8inch))
 
+end
+# Load video for ICRA presentation
+let
+    env_id = 2
+    env_filename = string(ENVIRONMENT_DIR,"/env_",env_id,".toml")
+    env_graph = read_env(env_filename)
+
+    problem_id = 290
+    base_path = "/scratch/task_graphs_experiments"
+    file_path = joinpath(base_path,"assignment_solver/final_results/full_solver","results$problem_id.toml")
+    toml_dict = TOML.parsefile(file_path)
+    robot_paths = toml_dict["robot_paths"]
+    object_paths = toml_dict["object_paths"]
+    object_intervals = toml_dict["object_intervals"]
+    object_ids = collect(1:length(object_paths))
+    path_idxs = map(o->1,object_ids)
+
+    tf = maximum(map(p->length(p),robot_paths))
+    # tf = min(tf,200)
+    set_default_plot_size(8cm,8cm)
+    record_video(joinpath(VIDEO_DIR,string("demo.webm")),
+        t->render_paths(t,env_graph,robot_paths,object_paths;
+            object_intervals=object_intervals,
+            rsize=7pt,
+            osize=5pt,
+            pickup_color= "light gray",
+            dropoff_color="light gray",
+            show_inactive_objects=false,
+            cell_width=1.0,
+            # label_objects=true,
+            # label_robots=true,
+            # point_label_font="CMU Serif",
+            # point_label_color="white",
+            # point_label_font_size=20pt,
+            colors_vec=map(i->LCHab(60,80,200),1:length(robot_paths)),
+            active_object_colors=map(j->"black",object_paths),
+            show_paths=false);tf=tf,s=(8inch,8inch))
+
+
+    render_paths(0,env_graph,robot_paths,object_paths;
+        object_intervals=object_intervals,
+        rsize=7pt,
+        osize=5pt,
+        pickup_color= "light gray",
+        dropoff_color="light gray",
+        show_inactive_objects=false,
+        cell_width=1.0,
+        # label_objects=true,
+        # label_robots=true,
+        # point_label_font="CMU Serif",
+        # point_label_color="white",
+        # point_label_font_size=20pt,
+        colors_vec=map(i->LCHab(60,80,200),1:length(robot_paths)),
+        active_object_colors=map(j->"black",object_paths),
+        show_paths=false);tf=tf,s=(8inch,8inch) |> SVG("render.png", 8inch, 8inch)
 end

@@ -68,10 +68,10 @@ function initialize_toy_problem_1(;cost_function=SumOfMakeSpans,verbose=false)
     N = 2                  # num robots
     M = 3                  # num delivery tasks
     vtx_grid = initialize_dense_vtx_grid(4,4)
-    # 1  5   9  13
-    # 2  6  10  14
-    # 3  7  11  15
-    # 4  8  12  16
+    #  1   2   3   4
+    #  5   6   7   8
+    #  9  10  11  12
+    # 13  14  15  16
     env_graph = construct_factory_env_from_vtx_grid(vtx_grid)
     dist_matrix = get_dist_matrix(env_graph)
     r0 = [1,4]
@@ -108,11 +108,15 @@ end
 function initialize_toy_problem_2(;cost_function=SumOfMakeSpans,verbose=false)
     N = 2                  # num robots
     M = 3                  # num delivery tasks
-    vtx_grid = initialize_dense_vtx_grid(4,8)
-    # 1  5   9  13  17  21  25  29
-    # 2  6  10  14  18  22  26  30
-    # 3  7  11  15  19  23  27  31
-    # 4  8  12  16  20  24  28  32
+    vtx_grid = initialize_dense_vtx_grid(8,4)
+    #  1   2   3   4
+    #  5   6   7   8
+    #  9  10  11  12
+    # 13  14  15  16
+    # 17  18  19  20
+    # 21  22  23  24
+    # 25  26  27  28
+    # 29  30  31  32
     env_graph = construct_factory_env_from_vtx_grid(vtx_grid)
     dist_matrix = get_dist_matrix(env_graph)
     r0 = [1,4]
@@ -158,23 +162,27 @@ end
 function initialize_toy_problem_3(;cost_function=SumOfMakeSpans,verbose=false,Δt_op=0,Δt_collect=[0,0,0],Δt_deliver=[0,0,0])
     N = 2                  # num robots
     M = 3                  # num delivery tasks
-    vtx_grid = initialize_dense_vtx_grid(4,8)
-    # 1  5   9  13  17  21  25  29
-    # 2  6  10  14  18  22  26  30
-    # 3  7  11  15  19  23  27  31
-    # 4  8  12  16  20  24  28  32
+    vtx_grid = initialize_dense_vtx_grid(8,4)
+    #  1   2   3   4
+    #  5   6   7   8
+    #  9  10  11  12
+    # 13  14  15  16
+    # 17  18  19  20
+    # 21  22  23  24
+    # 25  26  27  28
+    # 29  30  31  32
     env_graph = construct_factory_env_from_vtx_grid(vtx_grid)
     dist_matrix = get_dist_matrix(env_graph)
-    r0 = [5,2]
-    s0 = [7,30,12]
-    sF = [8,32,16]
+    r0 = [6,5]
+    s0 = [30,7,12]
+    sF = [32,8,16]
 
     project_spec, robot_ICs = initialize_toy_problem(r0,s0,sF,(v1,v2)->dist_matrix[v1,v2])
     add_operation!(project_spec,construct_operation(project_spec,-1,[1,2],[3],0.0))
     add_operation!(project_spec,construct_operation(project_spec,-1,[3],  [], 0.0))
     # assignments = [1,2,3]
-    assignment_dict = Dict(1=>[1,3],2=>[2])
-    assignments = [1,2,1]
+    assignment_dict = Dict(2=>[2,3],1=>[1])
+    assignments = [1,2,2]
 
     project_spec, problem_spec, object_ICs, object_FCs, robot_ICs = construct_task_graphs_problem(
         project_spec,r0,s0,sF,dist_matrix;Δt_collect=Δt_collect,Δt_deliver=Δt_deliver,cost_function=cost_function)
@@ -211,9 +219,9 @@ function initialize_toy_problem_4(;cost_function=SumOfMakeSpans,verbose=false)
     N = 2                  # num robots
     M = 2                  # num delivery tasks
     vtx_grid = initialize_dense_vtx_grid(3,3)
-    # 1  4  7
-    # 2  5  8
-    # 3  6  9
+    # 1  2  3
+    # 4  5  6
+    # 7  8  9
     env_graph = construct_factory_env_from_vtx_grid(vtx_grid)
     dist_matrix = get_dist_matrix(env_graph)
     r0 = [2,4]
@@ -264,10 +272,10 @@ function initialize_toy_problem_5(;cost_function=SumOfMakeSpans,verbose=false)
     N = 2                  # num robots
     M = 2                  # num delivery tasks
     vtx_grid = initialize_dense_vtx_grid(4,4)
-    #  1  5   9  13
-    #  2  6  10  14
-    #  3  7  11  15
-    #  4  8  12  16
+    # 1   2   3   4
+    # 5   6   7   8
+    # 9  10  11  12
+    # 13  14  15  16
     env_graph = construct_factory_env_from_vtx_grid(vtx_grid)
     dist_matrix = get_dist_matrix(env_graph)
     r0 = [3,15]
@@ -309,11 +317,15 @@ end
 function initialize_toy_problem_6(;cost_function=SumOfMakeSpans,verbose=false,Δt_op=1,Δt_collect=[0,0,0],Δt_deliver=[0,0,0])
     N = 2                  # num robots
     M = 3                  # num delivery tasks
-    vtx_grid = initialize_dense_vtx_grid(4,8)
-    # 1  5   9  13  17  21  25  29
-    # 2  6  10  14  18  22  26  30
-    # 3  7  11  15  19  23  27  31
-    # 4  8  12  16  20  24  28  32
+    vtx_grid = initialize_dense_vtx_grid(8,4)
+    #  1   2   3   4
+    #  5   6   7   8
+    #  9  10  11  12
+    # 13  14  15  16
+    # 17  18  19  20
+    # 21  22  23  24
+    # 25  26  27  28
+    # 29  30  31  32
     env_graph = construct_factory_env_from_vtx_grid(vtx_grid)
     dist_matrix = get_dist_matrix(env_graph)
     r0 = [1,4]
@@ -343,10 +355,10 @@ function initialize_toy_problem_7(;cost_function=SumOfMakeSpans,verbose=false,Δ
     N = 2                  # num robots
     M = 3                  # num delivery tasks
     vtx_grid = initialize_dense_vtx_grid(4,4)
-    # 1  5   9  13
-    # 2  6  10  14
-    # 3  7  11  15
-    # 4  8  12  16
+    #  1   2   3   4
+    #  5   6   7   8
+    #  9  10  11  12
+    # 13  14  15  16
     env_graph = construct_factory_env_from_vtx_grid(vtx_grid)
     dist_matrix = get_dist_matrix(env_graph)
     r0 = [2,9]
@@ -374,11 +386,15 @@ end
 function initialize_toy_problem_8(;cost_function=SumOfMakeSpans,verbose=false,Δt_op=0,Δt_collect=[0,0,0,0],Δt_deliver=[0,0,0,0])
     N = 2                  # num robots
     M = 4                  # num delivery tasks
-    vtx_grid = initialize_dense_vtx_grid(4,8)
-    # 1  5   9  13  17  21  25  29
-    # 2  6  10  14  18  22  26  30
-    # 3  7  11  15  19  23  27  31
-    # 4  8  12  16  20  24  28  32
+    vtx_grid = initialize_dense_vtx_grid(8,4)
+    #  1   2   3   4
+    #  5   6   7   8
+    #  9  10  11  12
+    # 13  14  15  16
+    # 17  18  19  20
+    # 21  22  23  24
+    # 25  26  27  28
+    # 29  30  31  32
     env_graph = construct_factory_env_from_vtx_grid(vtx_grid)
     dist_matrix = get_dist_matrix(env_graph)
     r0 = [1,29]
@@ -411,10 +427,10 @@ function initialize_toy_problem_9(;cost_function=SumOfMakeSpans,verbose=false,Δ
     N = 2                  # num robots
     M = 2                  # num delivery tasks
     vtx_grid = initialize_dense_vtx_grid(4,4)
-    # 1  5   9  13
-    # 2  6  10  14
-    # 3  7  11  15
-    # 4  8  12  16
+    #  1   2   3   4
+    #  5   6   7   8
+    #  9  10  11  12
+    # 13  14  15  16
     env_graph = construct_factory_env_from_vtx_grid(vtx_grid)
     dist_matrix = get_dist_matrix(env_graph)
     r0 = [1,13]
@@ -454,19 +470,21 @@ export
 function initialize_toy_problem_10(;cost_function=MakeSpan,verbose=false,Δt_op=0,Δt_collect=[0,0,0,0,0,0],Δt_deliver=[0,0,0,0,0,0])
     N = 4                  # num robots
     M = 4                  # num delivery tasks
-    vtx_grid = initialize_dense_vtx_grid(11,13)
+    vtx_grid = initialize_dense_vtx_grid(13,11)
 
-    #  1  12  23  34  45  56  67  78  89  100  111  122  133
-    #  2  13  24  35  46  57  68  79  90  101  112  123  134
-    #  3  14  25  36  47  58  69  80  91  102  113  124  135
-    #  4  15  26  37  48  59  70  81  92  103  114  125  136
-    #  5  16  27  38  49  60  71  82  93  104  115  126  137
-    #  6  17  28  39  50  61  72  83  94  105  116  127  138
-    #  7  18  29  40  51  62  73  84  95  106  117  128  139
-    #  8  19  30  41  52  63  74  85  96  107  118  129  140
-    #  9  20  31  42  53  64  75  86  97  108  119  130  141
-    # 10  21  32  43  54  65  76  87  98  109  120  131  142
-    # 11  22  33  44  55  66  77  88  99  110  121  132  143
+    #   1    2    3    4    5    6    7    8    9   10   11
+    #  12   13   14   15   16   17   18   19   20   21   22
+    #  23   24   25   26   27   28   29   30   31   32   33
+    #  34   35   36   37   38   39   40   41   42   43   44
+    #  45   46   47   48   49   50   51   52   53   54   55
+    #  56   57   58   59   60   61   62   63   64   65   66
+    #  67   68   69   70   71   72   73   74   75   76   77
+    #  78   79   80   81   82   83   84   85   86   87   88
+    #  89   90   91   92   93   94   95   96   97   98   99
+    # 100  101  102  103  104  105  106  107  108  109  110
+    # 111  112  113  114  115  116  117  118  119  120  121
+    # 122  123  124  125  126  127  128  129  130  131  132
+    # 133  134  135  136  137  138  139  140  141  142  143
 
     #            (2)
     #

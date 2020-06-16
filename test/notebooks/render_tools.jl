@@ -193,15 +193,23 @@ function visualize_env(vtxs,pickup_vtxs,dropoff_vtxs,t=0;
         project_idxs=map(i->1,object_paths),
         proj_colors_vec = gen_object_colors(maximum([1,project_idxs...])),
         active_object_colors=map(idx->proj_colors_vec[idx],project_idxs),
-        completed_object_color="gray",
+        label_objects=false,
+        label_robots=false,
+        point_label_font="arial",
+        point_label_color="white",
+        point_label_font_size=10pt,
         inactive_object_color="gray",
+        inactive_object_colors=map(idx->inactive_object_color,project_idxs),
+        completed_object_color="gray",
+        completed_object_colors=map(idx->completed_object_color,project_idxs),
         show_inactive_objects=true,
         show_paths=true
     )
 
     cw = cell_width/2 - vpad
-    xpts = map(vtx->cell_width*vtx[1], vtxs)
-    ypts = map(vtx->cell_width*vtx[2], vtxs)
+    vtxs = map(vtx->(cell_width*vtx[1],cell_width*vtx[2]),vtxs)
+    xpts = map(vtx->vtx[1], vtxs)
+    ypts = map(vtx->vtx[2], vtxs)
 
     t1 = Int(floor(t))+1
     path_layers = []
@@ -218,14 +226,26 @@ function visualize_env(vtxs,pickup_vtxs,dropoff_vtxs,t=0;
     robot_layers = []
     for (i,p) in enumerate(robot_paths)
         if length(p) > 0
-            interpolate(p[min(t1,length(p))],p[min(t1+1,length(p))],t1-(t+1))
+            # interpolate(p[min(t1,length(p))],p[min(t1+1,length(p))],t1-(t+1))
             idx1 = p[max(1,min(t1,length(p)))]
             idx2 = p[max(1,min(t1+1,length(p)))]
+            label = label_robots ? string("R",i) : ""
             push!(robot_layers,
                 layer(
                     x=[interpolate(vtxs[idx1][1],vtxs[idx2][1],t-(t1-1))],
                     y=[interpolate(vtxs[idx1][2],vtxs[idx2][2],t-(t1-1))],
-                    Geom.point,size=[rsize],Theme(default_color=colors_vec[i],highlight_width=0pt))
+                    label=[label],
+                    Geom.label(position=:centered,hide_overlaps=false),
+                    Geom.point,
+                    size=[rsize],
+                    Theme(
+                        default_color=colors_vec[i],
+                        highlight_width=0pt,
+                        point_label_font=point_label_font,
+                        point_label_color=point_label_color,
+                        point_label_font_size=point_label_font_size
+                        )
+                    )
             )
         end
     end
@@ -258,23 +278,35 @@ function visualize_env(vtxs,pickup_vtxs,dropoff_vtxs,t=0;
     end
     object_layers = []
     for (i,(p,interval)) in enumerate(zip(object_paths,object_intervals))
-        # if interval[1] > t
-        #     object_color = inactive_object_color
-        # elseif interval[2] < t
-        #     object_color = completed_object_color
-        # else
+        if interval[1] > t
+            object_color = inactive_object_colors[i]
+        elseif interval[2] < t
+            object_color = completed_object_colors[i]
+        else
             object_color = active_object_colors[i]
-        # end
+        end
         if length(p) > 0 && interval[2] > t
             if (interval[1] <= t) || show_inactive_objects
                 interpolate(p[min(t1,length(p))],p[min(t1+1,length(p))],t1-(t+1))
                 idx1 = p[max(1,min(t1,length(p)))]
                 idx2 = p[max(1,min(t1+1,length(p)))]
+                label = label_objects ? string("O",i) : ""
                 push!(object_layers,
                     layer(
                         x=[interpolate(vtxs[idx1][1],vtxs[idx2][1],t-(t1-1))],
                         y=[interpolate(vtxs[idx1][2],vtxs[idx2][2],t-(t1-1))],
-                        Geom.point,size=[osize],Theme(default_color=object_color,highlight_width=0pt))
+                        label=[label],
+                        Geom.label(position=:centered,hide_overlaps=false),
+                        Geom.point,
+                        size=[osize],
+                        Theme(
+                            default_color=object_color,
+                            highlight_width=0pt,
+                            point_label_font=point_label_font,
+                            point_label_color=point_label_color,
+                            point_label_font_size=point_label_font_size
+                            )
+                        )
                 )
             end
         end
@@ -312,7 +344,6 @@ function visualize_env(vtxs,pickup_vtxs,dropoff_vtxs,t=0;
         Guide.ylabel(nothing),
         Theme(
             plot_padding=[1mm],
-            # default_color="light gray",
             background_color="gray"
         )
     )
