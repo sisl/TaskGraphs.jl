@@ -1857,7 +1857,7 @@ function break_assignments!(project_schedule::ProjectSchedule,problem_spec::Prob
         if isa(node, AbstractRobotAction)
             new_node = typeof(node)(node,r=RobotID(-1))
             if isa(node,GO)
-                new_node = GO(new_node,x2=StationID(-1))
+                new_node = GO(new_node,x2=LocationID(-1))
                 for v2 in outneighbors(G,v)
                     rem_edge!(G,v,v2)
                 end

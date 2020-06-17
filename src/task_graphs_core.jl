@@ -179,7 +179,7 @@ function construct_operation(spec::ProjectSpec, station_id, input_ids, output_id
         pre = Set{OBJECT_AT}(map(id->get(spec.final_conditions, spec.object_id_to_idx[id], OBJECT_AT(id,station_id)), input_ids)),
         post = Set{OBJECT_AT}(map(id->get(spec.initial_conditions, spec.object_id_to_idx[id], OBJECT_AT(id,station_id)), output_ids)),
         Δt = Δt,
-        station_id = StationID(station_id),
+        station_id = LocationID(station_id),
         id = id
     )
 end
@@ -210,7 +210,7 @@ function read_operation(toml_dict::Dict)
         pre     = Set{OBJECT_AT}(map(arr->OBJECT_AT(arr[1],arr[2]),toml_dict["pre"])),
         post    = Set{OBJECT_AT}(map(arr->OBJECT_AT(arr[1],arr[2]),toml_dict["post"])),
         Δt      = get(toml_dict,"dt",get(toml_dict,"Δt",0.0)),
-        station_id = StationID(get(toml_dict,"station_id",-1)),
+        station_id = LocationID(get(toml_dict,"station_id",-1)),
         id = op_id
         )
 end
@@ -452,7 +452,7 @@ get_node_from_vtx(schedule::P,v::Int) where {P<:ProjectSchedule}= schedule.plann
 get_nodes_of_type(schedule::P,T) where {P<:ProjectSchedule} = Dict(get_id(id)=>get_node_from_id(schedule, id) for id in schedule.vtx_ids if typeof(id)<:T)
 get_object_ICs(schedule::P) where {P<:ProjectSchedule}  = get_nodes_of_type(schedule,ObjectID)
 get_robot_ICs(schedule::P) where {P<:ProjectSchedule}   = get_nodes_of_type(schedule,RobotID)
-get_robot_FCs(schedule::P) where {P<:ProjectSchedule}   = get_nodes_of_type(schedule,TerminalRobotID)
+# get_robot_FCs(schedule::P) where {P<:ProjectSchedule}   = get_nodes_of_type(schedule,TerminalRobotID)
 get_actions(schedule::P) where {P<:ProjectSchedule}     = get_nodes_of_type(schedule,ActionID)
 get_operations(schedule::P) where {P<:ProjectSchedule}  = get_nodes_of_type(schedule,OperationID)
 
@@ -843,15 +843,15 @@ function add_single_robot_delivery_task!(
         pred_id::AbstractID,
         robot_id::RobotID,
         object_id::ObjectID,
-        pickup_station_id::StationID,
-        dropoff_station_id::StationID
+        pickup_station_id::LocationID,
+        dropoff_station_id::LocationID
         ) where {S<:ProjectSchedule,T<:ProblemSpec}
 
     if robot_id != -1
         robot_pred = get_node_from_id(schedule,RobotID(robot_id))
         robot_start_station_id = get_initial_location_id(get_node_from_id(schedule, pred_id))
     else
-        robot_start_station_id = StationID(-1)
+        robot_start_station_id = LocationID(-1)
     end
 
     # THIS NODE IS DETERMINED BY THE TASK ASSIGNMENT.
@@ -882,8 +882,8 @@ function add_headless_delivery_task!(
         problem_spec::ProblemSpec,
         object_id::ObjectID,
         operation_id::OperationID,
-        pickup_station_id::StationID,
-        dropoff_station_id::StationID
+        pickup_station_id::LocationID,
+        dropoff_station_id::LocationID
         )
 
     robot_id = RobotID(-1)
@@ -904,7 +904,7 @@ function add_headless_delivery_task!(
 
     prev_action_id = action_id
     action_id = ActionID(get_unique_action_id())
-    add_to_schedule!(schedule, problem_spec, GO(robot_id, dropoff_station_id,StationID(-1)), action_id)
+    add_to_schedule!(schedule, problem_spec, GO(robot_id, dropoff_station_id,LocationID(-1)), action_id)
     add_edge!(schedule, prev_action_id, action_id)
 
     return
@@ -914,8 +914,8 @@ function add_headless_delivery_task!(
         problem_spec::T,
         object_id::ObjectID,
         operation_id::OperationID,
-        pickup_station_ids::Vector{StationID},
-        dropoff_station_ids::Vector{StationID}
+        pickup_station_ids::Vector{LocationID},
+        dropoff_station_ids::Vector{LocationID}
         ) where {S<:ProjectSchedule,T<:ProblemSpec}
 
     robot_id = RobotID(-1)
@@ -984,8 +984,8 @@ function add_headless_delivery_task!(
         problem_spec,
         ObjectID(object_id),
         OperationID(operation_id),
-        map(id->StationID(id), pickup_station_ids),
-        map(id->StationID(id), dropoff_station_ids)
+        map(id->LocationID(id), pickup_station_ids),
+        map(id->LocationID(id), dropoff_station_ids)
         )
 end
 function add_headless_delivery_task!(
@@ -1001,8 +1001,8 @@ function add_headless_delivery_task!(
         problem_spec,
         ObjectID(object_id),
         OperationID(operation_id),
-        StationID(pickup_station_id),
-        StationID(dropoff_station_id)
+        LocationID(pickup_station_id),
+        LocationID(dropoff_station_id)
         )
 end
 
