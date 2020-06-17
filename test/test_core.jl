@@ -1,7 +1,3 @@
-let
-    id = ActionID(1)
-    id += 1
-end
 # ProjectSpec
 let
     M = 3

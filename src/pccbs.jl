@@ -21,12 +21,6 @@ end
     Δt::Int         = 1
 end
 Base.:(==)(s1::S,s2::S) where {S<:State} = hash(s1) == hash(s2)
-# @enum GridWorldDirection begin
-#    NORTH
-#    EAST
-#    WEST
-#    SOUTH
-# end
 # LowLevelEnv
 @with_kw struct LowLevelEnv{C<:AbstractCostModel,H<:AbstractCostModel,N,I} <: AbstractLowLevelEnv{State,Action,C}
     graph::GridFactoryEnvironment   = GridFactoryEnvironment()
@@ -40,22 +34,11 @@ Base.:(==)(s1::S,s2::S) where {S<:State} = hash(s1) == hash(s2)
 end
 CRCBS.get_cost_model(env::E) where {E<:LowLevelEnv} = env.cost_model
 CRCBS.get_heuristic_model(env::E) where {E<:LowLevelEnv} = env.heuristic
-CRCBS.is_valid(env::LowLevelEnv,s::State) = (1 <= s.v <= nv(env.graph))
+CRCBS.is_valid(env::LowLevelEnv,s::State) = (1 <= s.vtx <= nv(env.graph))
 CRCBS.is_valid(env::LowLevelEnv,a::Action) = (1 <= a.e.src <= nv(env.graph)) && (1 <= a.e.dst <= nv(env.graph))
 ################################################################################
 ######################## Low-Level (Independent) Search ########################
 ################################################################################
-# build_env
-# function CRCBS.build_env(mapf::MAPF{E,S,G}, node::ConstraintTreeNode, idx::Int) where {S,G,E<:LowLevelEnv}
-#     typeof(mapf.env)(
-#         graph = mapf.env.graph,
-#         constraints = get_constraints(node,idx),
-#         goal = mapf.goals[idx],
-#         agent_idx = idx,
-#         heuristic = get_heuristic_model(mapf.env),  # TODO update the heuristic model
-#         cost_model = get_cost_model(mapf.env)       # TODO update the cost model
-#         )
-# end
 # heuristic
 CRCBS.get_heuristic_cost(env::E,s::State) where {E<:LowLevelEnv} = CRCBS.get_heuristic_cost(env,get_heuristic_model(env),s)
 function CRCBS.get_heuristic_cost(env::E,h::H,s::State) where {E<:LowLevelEnv,H<:Union{PerfectHeuristic,DefaultPerfectHeuristic}}
@@ -67,7 +50,7 @@ end
 
 # states_match
 CRCBS.states_match(s1::State,s2::State) = (s1.vtx == s2.vtx)
-CRCBS.states_match(env::LowLevelEnv,s1::State,s2::State) = (s1.vtx == s2.vtx)
+CRCBS.states_match(env::LowLevelEnv,s1::State,s2::State) = states_match(s1,s2)
 # is_goal
 function CRCBS.is_goal(env::LowLevelEnv,s::State)
     if s.t < env.goal.t
@@ -96,33 +79,6 @@ end
 CRCBS.wait(s::State) = Action(e=Edge(s.vtx,s.vtx))
 CRCBS.wait(env::LowLevelEnv,s::State) = Action(e=Edge(s.vtx,s.vtx))
 # get_possible_actions
-# struct ActionIter
-#     s::Int # source state
-#     neighbor_list::Vector{Int} # length of target edge list
-# end
-# struct ActionIterState
-#     idx::Int # idx of target node
-# end
-# ActionIterState() = ActionIterState(0)
-# function Base.iterate(it::ActionIter)
-#     iter_state = ActionIterState(0)
-#     return iterate(it,iter_state)
-# end
-# function Base.iterate(it::ActionIter, iter_state::ActionIterState)
-#     iter_state = ActionIterState(iter_state.idx+1)
-#     if iter_state.idx > length(it.neighbor_list)
-#         return nothing
-#     end
-#     Action(e=Edge(it.s,it.neighbor_list[iter_state.idx])), iter_state
-# end
-# Base.length(iter::ActionIter) = length(iter.neighbor_list)
-# function CRCBS.get_possible_actions(env::LowLevelEnv,s::State)
-#     if s.vtx > 0
-#         ActionIter(s.vtx,outneighbors(env.graph,s.vtx))
-#     else
-#         ActionIter(-1,Int[])
-#     end
-# end
 function CRCBS.get_possible_actions(env,s::State)
     if 1 <= s.vtx <= nv(env.graph)
         return map(v2->Action(e=Edge(s.vtx,v2)), outneighbors(env.graph,s.vtx))
