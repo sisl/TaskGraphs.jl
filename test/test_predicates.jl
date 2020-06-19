@@ -39,6 +39,8 @@ let
     op = Operation()
     get_location_id(op)
     get_operation_id(op)
+    get_input_ids(op)
+    get_output_ids(op)
     duration(op)
     preconditions(op)
     postconditions(op)

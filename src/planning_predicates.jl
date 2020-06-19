@@ -70,9 +70,9 @@ export
 abstract type AbstractPlanningPredicate end
 
 """
-	`OBJECT_AT <: AbstractPlanningPredicate`
+	OBJECT_AT <: AbstractPlanningPredicate
 
-	Encodes the location and shape of the object with id `o`
+Encodes the location and shape of the object with id `o`
 """
 struct OBJECT_AT <: AbstractPlanningPredicate
     o::ObjectID
@@ -87,9 +87,9 @@ OBJECT_AT(o::ObjectID,x::Int,args...) 		= OBJECT_AT(o,[LocationID(x)],args...)
 OBJECT_AT(o::Int,args...) 					= OBJECT_AT(ObjectID(o),args...)
 
 """
-	`ROBOT_AT <: AbstractPlanningPredicate`
+	ROBOT_AT <: AbstractPlanningPredicate
 
-	Encodes the location of robot with id `r`
+Encodes the location of robot with id `r`
 """
 struct ROBOT_AT <: AbstractPlanningPredicate
     r::RobotID
@@ -135,6 +135,8 @@ get_robot_id(pred::ROBOT_AT) = pred.r
 
 export
     Operation,
+	get_input_ids,
+	get_output_ids,
 	get_operation_id,
     preconditions,
     postconditions,
@@ -151,12 +153,17 @@ export
 end
 get_location_id(op::Operation) = op.station_id
 get_operation_id(op::Operation) = op.id
+get_input_ids(op::Operation) = sort([get_id(get_object_id(p)) for p in op.pre])
+get_output_ids(op::Operation) = sort([get_id(get_object_id(p)) for p in op.post])
 duration(op::Operation) = op.Δt
 preconditions(op::Operation) = op.pre
 postconditions(op::Operation) = op.post
 add_conditions(op::Operation) = op.post
 delete_conditions(op::Operation) = op.pre
 get_id(op::Operation) = get_id(op.id)
+# function Base.:(==)(op1::Operation,op2::Operation)
+# 	if op
+# end
 
 export
     AbstractRobotAction,
@@ -166,9 +173,9 @@ export
 abstract type AbstractRobotAction <: AbstractPlanningPredicate end
 
 """
-	`GO <: AbstractRobotAction`
+	GO <: AbstractRobotAction
 
-	Encodes the event "robot `r` goes from `x1` to `x2`"
+Encodes the event "robot `r` goes from `x1` to `x2`"
 """
 @with_kw struct GO <: AbstractRobotAction # go to position x
     r::RobotID 		= RobotID()
@@ -180,9 +187,9 @@ GO(r::RobotID,x1::Int,args...) = GO(r,LocationID(x1),args...)
 GO(r::RobotID,x1::LocationID,x2::Int) = GO(r,x1,LocationID(x2))
 
 """
-	`CARRY <: AbstractRobotAction`
+	CARRY <: AbstractRobotAction
 
-	Encodes the event "robot `r` carries object `o` from `x1` to `x2`"
+Encodes the event "robot `r` carries object `o` from `x1` to `x2`"
 """
 @with_kw struct CARRY <: AbstractRobotAction # carry object o to position x
     r::RobotID		= RobotID()
@@ -196,9 +203,9 @@ CARRY(r::RobotID,o::ObjectID,x1::Int,args) 			= CARRY(r,o,LocationID(x1),args...
 CARRY(r::RobotID,o::ObjectID,x1::LocationID,x2::Int) = CARRY(r,o,x1,LocationID(x2))
 
 """
-	`COLLECT <: AbstractRobotAction`
+	COLLECT <: AbstractRobotAction
 
-	Encodes the event "robot `r` collects object `o` from `x`
+Encodes the event "robot `r` collects object `o` from `x`
 """
 @with_kw struct COLLECT <: AbstractRobotAction
     r::RobotID 		= RobotID()
@@ -210,9 +217,9 @@ COLLECT(r::RobotID,o::Int,args...) 		= COLLECT(r,ObjectID(o),args...)
 COLLECT(r::RobotID,o::ObjectID,x::Int) 	= COLLECT(r,o,LocationID(x))
 
 """
-	`DEPOSIT <: AbstractRobotAction`
+	DEPOSIT <: AbstractRobotAction
 
-	Encodes the event "robot `r` deposits object `o` at `x`
+Encodes the event "robot `r` deposits object `o` at `x`
 """
 @with_kw struct DEPOSIT <: AbstractRobotAction
     r::RobotID 		= RobotID()
@@ -235,10 +242,10 @@ export
 	split_node
 
 """
-	`split_node(node::N,x::LocationID)`
+	split_node(node::N,x::LocationID)
 
-	Creates two new nodes of type `N`, where the destination of the first node
-	and the starting location of the second node are both set to `x`.
+Creates two new nodes of type `N`, where the destination of the first node
+and the starting location of the second node are both set to `x`.
 """
 function split_node(node::N,x::LocationID) where {N<:Union{GO,CARRY}}
 	N(node, x2=x), N(node, x1=x)
@@ -251,15 +258,15 @@ export
 	TEAM_ACTION
 
 """
-	`TEAM_ACTION{A}`
+	TEAM_ACTION{A}
 
-	For collaborative tasks.
+For collaborative tasks.
 
-    [GO, ...] -> TEAM_COLLECT -> TEAM_CARRY -> TEAM_DEPOSIT -> [GO, ...]
-    - there should be a way to prove that the milp assignment (if each robot is actually
-        assigned to a particular spot in the configuration) can be realized if all conflicts
-        (except between collaborating team members) are ignored for a TEAM_GO task. This is
-        because of the "push-and-rotate" thing once they reach the goal vertices.
+[GO, ...] -> TEAM_COLLECT -> TEAM_CARRY -> TEAM_DEPOSIT -> [GO, ...]
+- there should be a way to prove that the milp assignment (if each robot is actually
+    assigned to a particular spot in the configuration) can be realized if all conflicts
+    (except between collaborating team members) are ignored for a TEAM_GO task. This is
+    because of the "push-and-rotate" thing once they reach the goal vertices.
 """
 @with_kw struct TEAM_ACTION{A<:AbstractRobotAction} <: AbstractRobotAction
     instructions::Vector{A} = Vector{CARRY}()
@@ -283,42 +290,42 @@ export
 	align_with_successor
 
 """
-	`required_predecessors(node)`
+	required_predecessors(node)
 
-	Identifies the types (and how many) of required predecessors to `node`
+Identifies the types (and how many) of required predecessors to `node`
 
-	Example:
-		`required_predecessors(node::COLLECT) = Dict(OBJECT_AT=>1,GO=>1)`
+Example:
+	`required_predecessors(node::COLLECT) = Dict(OBJECT_AT=>1,GO=>1)`
 """
 function required_predecessors end
 
 """
-	`required_successors(node)`
+	required_successors(node)
 
-	Identifies the types (and how many) of required successors to `node`
+Identifies the types (and how many) of required successors to `node`
 
-	Example:
-		`required_successors(node::COLLECT) = Dict(CARRY=>1)`
+Example:
+	`required_successors(node::COLLECT) = Dict(CARRY=>1)`
 """
 function required_successors end
 
 """
-	`eligible_predecessors(node)`
+	eligible_predecessors(node)
 
-	Identifies the types (and how many) of eligible predecessors to `node`
+Identifies the types (and how many) of eligible predecessors to `node`
 
-	Example:
-		`eligible_predecessors(node::OBJECT_AT) = Dict(Operation=>1)`
+Example:
+	`eligible_predecessors(node::OBJECT_AT) = Dict(Operation=>1)`
 """
 function eligible_predecessors end
 
 """
-	`eligible_successors(node)`
+	eligible_successors(node)
 
-	Identifies the types (and how many) of eligible successors to `node`
+Identifies the types (and how many) of eligible successors to `node`
 
-	Example:
-		`eligible_successors(node::GO) = Dict((GO,TEAM_ACTION{COLLECT},TEAM_ACTION{GO},COLLECT)=>1)`
+Example:
+	`eligible_successors(node::GO) = Dict((GO,TEAM_ACTION{COLLECT},TEAM_ACTION{GO},COLLECT)=>1)`
 """
 function eligible_successors end
 
@@ -338,9 +345,9 @@ required_predecessors(node::ROBOT_AT)   = Dict()
 required_successors(node::ROBOT_AT)     = Dict(GO=>1)
 
 """
-	`num_required_predecessors(node)`
+	num_required_predecessors(node)
 
-	Returns the total number of required predecessors to `node`.
+Returns the total number of required predecessors to `node`.
 """
 function num_required_predecessors(node)
 	n = 1
@@ -351,9 +358,9 @@ function num_required_predecessors(node)
 end
 
 """
-	`num_required_successors(node)`
+	num_required_successors(node)
 
-	Returns the total number of required successors to `node`.
+Returns the total number of required successors to `node`.
 """
 function num_required_successors(node)
 	n = 1
@@ -371,9 +378,9 @@ eligible_predecessors(node::OBJECT_AT)  = Dict(Operation=>1)
 
 
 """
-	`num_eligible_predecessors(node)`
+	num_eligible_predecessors(node)
 
-	Returns the total number of eligible predecessors to `node`.
+Returns the total number of eligible predecessors to `node`.
 """
 function num_eligible_predecessors(node)
 	n = 1
@@ -384,9 +391,9 @@ function num_eligible_predecessors(node)
 end
 
 """
-	`num_eligible_successors(node)`
+	num_eligible_successors(node)
 
-	Returns the total number of eligible successors to `node`.
+Returns the total number of eligible successors to `node`.
 """
 function num_eligible_successors(node)
 	n = 1
@@ -407,9 +414,9 @@ required_successors(node::TEAM_ACTION{CARRY})      	= Dict(TEAM_ACTION{DEPOSIT}=
 required_successors(node::TEAM_ACTION{DEPOSIT})    	= Dict(GO=>length(node.instructions),Operation=>1)
 
 """
-	`matches_template(template,node)`
+	matches_template(template,node)
 
-	Checks if a candidate `node` satisfies the criteria encoded by `template`.
+Checks if a candidate `node` satisfies the criteria encoded by `template`.
 """
 matches_template(template,node) = false
 matches_template(template::T,node::T) where {T} = true
@@ -418,10 +425,10 @@ matches_template(template::T,node::DataType) where {T<:Tuple} = (node in templat
 matches_template(template::T,node) where {T<:Tuple} = matches_template(template, typeof(node))
 
 """
-	`resouces_reserved(node)`
+	resouces_reserved(node)
 
-	Identifies the resources reserved by a particular `node` for its duration.
-	For example, `resources_reserved(node::COLLECT) = AbstractID[get_location_id(node)]`
+Identifies the resources reserved by a particular `node` for its duration.
+For example, `resources_reserved(node::COLLECT) = AbstractID[get_location_id(node)]`
 """
 resources_reserved(node)                = AbstractID[]
 resources_reserved(node::COLLECT)       = AbstractID[get_location_id(node)]
@@ -432,11 +439,11 @@ is_valid(id::A) where {A<:AbstractID} = get_id(id) != -1
 first_valid(a,b) = is_valid(a) ? a : b
 
 """
-	`align_with_predecessor(node)`
+	align_with_predecessor(node)
 
-	Modifies a node to match the information encoded by its predecessor. This is
-	how e.g., robot ids are propagated through an existing operating schedule
-	after assignments (or re-assignments) have been made.
+Modifies a node to match the information encoded by its predecessor. This is
+how e.g., robot ids are propagated through an existing operating schedule
+after assignments (or re-assignments) have been made.
 """
 align_with_predecessor(node,pred) 						= node
 align_with_predecessor(node::GO,pred::ROBOT_AT) 		= GO(first_valid(node.r,pred.r), first_valid(node.x1,pred.x), node.x2)
@@ -484,11 +491,11 @@ function align_with_predecessor(node::TEAM_ACTION,pred::TEAM_ACTION)
 end
 
 """
-	`align_with_successor(node)`
+	align_with_successor(node)
 
-	Modifies a node to match the information encoded by its successor. This is
-	how e.g., robot ids are propagated through an existing operating schedule
-	after assignments (or re-assignments) have been made.
+Modifies a node to match the information encoded by its successor. This is
+how e.g., robot ids are propagated through an existing operating schedule
+after assignments (or re-assignments) have been made.
 """
 align_with_successor(node,pred) 						= node
 align_with_successor(node::GO,succ::COLLECT) 			= GO(first_valid(node.r,succ.r), node.x1, first_valid(node.x2,succ.x))
@@ -499,14 +506,14 @@ export
 	validate_edge
 
 """
-	`validate_edge(n1,n2)`
+	validate_edge(n1,n2)
 
-	For an edge (n1) --> (n2), checks whether the edge is legal and the nodes
-	"agree". For example,
+For an edge (n1) --> (n2), checks whether the edge is legal and the nodes
+"agree". For example,
 
-	`validate_edge(n1::ROBOT_AT, n2::GO) = (n1.x == n2.x1) && (n1.r == n2.r)`
+`validate_edge(n1::ROBOT_AT, n2::GO) = (n1.x == n2.x1) && (n1.r == n2.r)`
 
-	meaning that the robot ids and the initial initial locations must match.
+meaning that the robot ids and the initial initial locations must match.
 """
 validate_edge(n1,n2) = true
 validate_edge(n1::N1,n2::N2) where {N1<:Union{ROBOT_AT,OBJECT_AT},N2<:Union{ROBOT_AT,OBJECT_AT}} = false

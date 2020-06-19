@@ -6,9 +6,6 @@ using Gurobi
 using Random
 using TOML
 
-# using Compose
-# using GraphPlottingBFS
-
 using Test
 using Logging
 
@@ -56,24 +53,27 @@ global_logger(SimpleLogger(stderr, Logging.Debug))
     @time @testset "TaskGraphs.PlanningPredicates" begin
         include(joinpath(testdir, "test_predicates.jl"))
     end
+    @time @testset "TaskGraphs.PCCBS" begin
+        include(joinpath(testdir, "test_pccbs.jl"))
+    end
     @time @testset "TaskGraphs.CoreTests" begin
         include(joinpath(testdir, "test_core.jl"))
+    end
+    @time @testset "TaskGraphs.ExampleTests" begin
+        include(joinpath(testdir, "test_examples_milp.jl"))
     end
     @time @testset "TaskGraphs.CoreTests" begin
         include(joinpath(testdir, "test_path_planning.jl"))
     end
-    @time @testset "TaskGraphs.ExampleTests" begin
-        include(joinpath(testdir, "test_examples.jl"))
-    end
-    @time @testset "TaskGraphs.ProcessTime" begin
-        include(joinpath(testdir, "test_process_time.jl"))
-    end
+    # @time @testset "TaskGraphs.ProcessTime" begin
+    #     include(joinpath(testdir, "test_process_time.jl"))
+    # end
     # @time @testset "TaskGraphs.MultiHeadProjects" begin
     #     include(joinpath(testdir, "test_multihead_projects.jl"))
     # end
-    @time @testset "TaskGraphs.Replanning" begin
-        include(joinpath(testdir, "test_replanning.jl"))
-    end
+    # @time @testset "TaskGraphs.Replanning" begin
+    #     include(joinpath(testdir, "test_replanning.jl"))
+    # end
     # @time @testset "TaskGraphs.Profiling" begin
     #     include(joinpath(testdir, "test_profiling.jl"))
     # end

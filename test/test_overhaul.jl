@@ -74,7 +74,7 @@ let
         ])
         for cost_model in [MakeSpan, SumOfMakeSpans]
             costs = Float64[]
-            schedules = ProjectSchedule[]
+            schedules = OperatingSchedule[]
             project_spec, problem_spec, robot_ICs, assignments, env_graph = f(;verbose=false);
             for milp_model in [AssignmentMILP(),AdjacencyMILP(),SparseAdjacencyMILP()]
                 # MILP formulations alone

@@ -11,14 +11,14 @@ export
     construct_vtx_map
 
 """
-    `construct_vtx_map(vtxs,dims)`
+    construct_vtx_map(vtxs,dims)
 
-    Returns a matrix `M` such that `M[i,j] = v`, where v is the index of the
-    vertex whose coordinates are (i,j)
+Returns a matrix `M` such that `M[i,j] = v`, where v is the index of the
+vertex whose coordinates are (i,j)
 
-    Args:
-    * vtxs : a list of integer coordinates
-    * dims : the dimensions of the grid
+Arguments:
+* vtxs : a list of integer coordinates
+* dims : the dimensions of the grid
 """
 function construct_vtx_map(vtxs,dims)
     vtx_map = zeros(Int,dims)
@@ -32,14 +32,14 @@ export
     construct_edge_cache
 
 """
-    `construct_edge_cache(vtxs,vtx_map)`
+    construct_edge_cache(vtxs,vtx_map)
 
-    Returns a `cache` such that `cache[v] = {(0,1),(0,0),...}`, the set of all
-    valid directions in which a robot may move from vertex `v`.
+Returns a `cache` such that `cache[v] = {(0,1),(0,0),...}`, the set of all
+valid directions in which a robot may move from vertex `v`.
 
-    Args:
-    * vtxs : a list of integer coordinates
-    * vtx_map : a matrix such that `vtx_map[i,j] = v`, where `vtxs[i,j = v`
+Arguments:
+* vtxs : a list of integer coordinates
+* vtx_map : a matrix such that `vtx_map[i,j] = v`, where `vtxs[i,j = v`
 """
 function construct_edge_cache(vtxs,vtx_map)
     edge_cache = Vector{Set{Tuple{Int,Int}}}()
@@ -59,19 +59,19 @@ export
     validate_edge_cache
 
 """
-    `validate_edge_cache(G,vtxs,cache)`
+    validate_edge_cache(G,vtxs,cache)
 
-    verifies that for a graph `G` embedded in space such that vertex `v` has
-    coordinates `vtxs[v]`, every edge `v₁ → v₂` is stored in the edge cache. In
-    other words, for every edge `v₁ → v₂`, the unit direction vector obtained by
-    `vtxs[v₂] - vtxs[v₁]` is a member of `cache[v₁]`.
+Verifies that for a graph `G` embedded in space such that vertex `v` has
+coordinates `vtxs[v]`, every edge `v₁ → v₂` is stored in the edge cache. In
+other words, for every edge `v₁ → v₂`, the unit direction vector obtained by
+`vtxs[v₂] - vtxs[v₁]` is a member of `cache[v₁]`.
 
-    Args:
-    * G : a graph on which the functions `vertices` and `outneighbors` can be
-        called
-    * vtxs : a list of integer coordinates
-    * cache : an edge cache such that e.g. `cache[v] = {(0,1),(0,0),...}`, the
-        set of all valid directions in which a robot may move from vertex `v`
+Arguments:
+* G : a graph on which the functions `vertices` and `outneighbors` can be
+    called
+* vtxs : a list of integer coordinates
+* cache : an edge cache such that e.g. `cache[v] = {(0,1),(0,0),...}`, the
+    set of all valid directions in which a robot may move from vertex `v`
 """
 function validate_edge_cache(G,vtxs,cache)
     for v in vertices(G)
@@ -95,21 +95,21 @@ export
     construct_expanded_zones
 
 """
-    `construct_expanded_zones(vtxs,vtx_map,pickup_zones,dropoff_zones;
-        shapes=[(1,1),(1,2),(2,1),(2,2)])`
+    construct_expanded_zones(vtxs,vtx_map,pickup_zones,dropoff_zones;
+        shapes=[(1,1),(1,2),(2,1),(2,2)])
 
-    A utility for constructing drop-off/pick-up zones where large-footprint
-    objects need to be delivered. Returns a dictionary mapping vertices to a
-    dict of shape=>vtxs for expanded size delivery zones. For each starting
-    vertex, the expanded zone is selected as the appropriately sized region that
-    overlaps with the original vertex, does not overlap with any obstacles, and
-    has minimal overlap with all other vertices in the zone list.
+A utility for constructing drop-off/pick-up zones where large-footprint
+objects need to be delivered. Returns a dictionary mapping vertices to a
+dict of shape=>vtxs for expanded size delivery zones. For each starting
+vertex, the expanded zone is selected as the appropriately sized region that
+overlaps with the original vertex, does not overlap with any obstacles, and
+has minimal overlap with all other vertices in the zone list.
 
-    Args:
-    * vtxs : a list of integer coordinates
-    * vtx_map : a matrix such that `vtx_map[i,j] = v`, where `vtxs[i,j = v`
-    * zones : a list of integer vertex indices identifying the zones to be
-        expanded
+Arguments:
+* vtxs : a list of integer coordinates
+* vtx_map : a matrix such that `vtx_map[i,j] = v`, where `vtxs[i,j = v`
+* zones : a list of integer vertex indices identifying the zones to be
+    expanded
 """
 function construct_expanded_zones(vtxs,vtx_map,zones;shapes=[(1,1),(1,2),(2,1),(2,2)])
     expanded_zones = Dict{Int,Dict{Tuple{Int,Int},Vector{Int}}}(
@@ -155,10 +155,10 @@ export
     validate_expanded_zones
 
 """
-    `validate_expanded_zones(vtx_map,expanded_zones)`
+    validate_expanded_zones(vtx_map,expanded_zones)
 
-    Verify that all vertices of each expanded zone do not overlap with obstacle
-    regions, and that each expanded zone contains the original vertex.
+Verify that all vertices of each expanded zone do not overlap with obstacle
+regions, and that each expanded zone contains the original vertex.
 """
 function validate_expanded_zones(vtx_map,expanded_zones)
     for (v,shape_dict) in expanded_zones
@@ -188,39 +188,39 @@ export
     get_distance
 
 """
-    `DistMatrixMap`
+    DistMatrixMap
 
-    Maps team size to the effective distance (computed by Djikstra) between
-    leader (top left) vtxs.
-    A DistMatrixMap is constructed by starting with a base environment grid
-    graph, which is represented as a binary occupancy grid. The occupancy grid
-    is then convolved with kernels of various sizes (which represent
-    configurations of robots moving as a team). The output of each convolution
-    represents a new occupancy grid corresponding to the workspace of the robot
-    team.
-    It is assumed that the ``lead'' robot is always in the top left of the
-    configuration. If a team of robots wishes to query the distance to a
-    particular target configuration, they pass the leader's current vtx,
-    the leader's target vtx, and the team configuration (shape) to the
-    DistMatrixMap, which returns the correct distance.
+Maps team size to the effective distance (computed by Djikstra) between
+leader (top left) vtxs.
+A DistMatrixMap is constructed by starting with a base environment grid
+graph, which is represented as a binary occupancy grid. The occupancy grid
+is then convolved with kernels of various sizes (which represent
+configurations of robots moving as a team). The output of each convolution
+represents a new occupancy grid corresponding to the workspace of the robot
+team.
+It is assumed that the "lead" robot is always in the top left of the
+configuration. If a team of robots wishes to query the distance to a
+particular target configuration, they pass the leader's current vtx,
+the leader's target vtx, and the team configuration (shape) to the
+DistMatrixMap, which returns the correct distance.
 """
 struct DistMatrixMap
     dist_mtxs::Dict{Tuple{Int,Int},Dict{Int,Function}}
 end
 
 """
-    `get_distance(mtx_map::DistMatrixMap,v1::Int,v2::Int,shape::Tuple{Int,Int}=(1,1),config_idx=1)`
+    get_distance(mtx_map::DistMatrixMap,v1::Int,v2::Int,shape::Tuple{Int,Int}=(1,1),config_idx=1)
 
-    Returns the length of the minimum distance collision-free path between
-    vertices `v1` and `v2` for an object of footprint `shape`.
+Returns the length of the minimum distance collision-free path between
+vertices `v1` and `v2` for an object of footprint `shape`.
 
-    Args:
-    * mtx_map : a `DistMatrixMap`
-    * v1 : an integer corresponding to the source vertex in the graph
-    * v2 : an integer corresponding to the destination vertex in the graph
-    * shape : the footprint of the object that will move between `v1` and `v2`
-    * config_idx : an integer that identifies the position of the reference
-        point within the footprint.
+Arguments:
+* mtx_map : a `DistMatrixMap`
+* v1 : an integer corresponding to the source vertex in the graph
+* v2 : an integer corresponding to the destination vertex in the graph
+* shape : the footprint of the object that will move between `v1` and `v2`
+* config_idx : an integer that identifies the position of the reference
+    point within the footprint.
 """
 function get_distance(mtx_map::DistMatrixMap,v1::Int,v2::Int,shape::Tuple{Int,Int}=(1,1),config_idx=1)
     D = mtx_map.dist_mtxs[shape][config_idx](v1,v2)
@@ -284,7 +284,7 @@ export
     get_free_zones
 
 """
-    `GridFactoryEnvironment`
+    GridFactoryEnvironment
 """
 @with_kw struct GridFactoryEnvironment{G} <: AbstractGraph{Int}
     graph               ::G                         = MetaDiGraph()
@@ -375,10 +375,9 @@ function TOML.print(io,env::E) where {E<:GridFactoryEnvironment}
 end
 
 """
-    `read_env(io)`
+    read_env(io)
 
-    A utility for loading a saved environment from an external file. Assumes
-        that the environment has been stored as a .toml file.
+Loads saved environment from a .toml file.
 """
 function read_env(io)
     toml_dict = TOML.parsefile(io)
@@ -409,22 +408,22 @@ export
     construct_regular_factory_world
 
 """
-    `construct_regular_factory_world()`
+    construct_regular_factory_world()
 
-    Returns a `GridFactoryEnvironment` with regularly spaced obstacle regions
-    surrounded by alternating pick-up and drop-off locations.
+Returns a `GridFactoryEnvironment` with regularly spaced obstacle regions
+surrounded by alternating pick-up and drop-off locations.
 
-    Keyword Args:
-    * n_obstacles_x = 2 : number of obstacles in x direction
-    * n_obstacles_y = 2 : number of obstacles in y direction
-    * obs_width = [2;2] : obstacle width in both directions
-    * obs_offset = [1;1] : width of buffer region around each obstacle
-    * env_pad = [1;1] : env pad
-    * env_scale = 0.5 : determines the width of each grid cell when the
-        coordinates of the environment are transformed to continuous Cartesian
-        space.
-    * transition_time = 2.0 : determines the nominal travel time for a robot
-        to move from one grid cell to an adjacent one.
+Keyword Arguments:
+* n_obstacles_x = 2 : number of obstacles in x direction
+* n_obstacles_y = 2 : number of obstacles in y direction
+* obs_width = [2;2] : obstacle width in both directions
+* obs_offset = [1;1] : width of buffer region around each obstacle
+* env_pad = [1;1] : env pad
+* env_scale = 0.5 : determines the width of each grid cell when the
+    coordinates of the environment are transformed to continuous Cartesian
+    space.
+* transition_time = 2.0 : determines the nominal travel time for a robot
+    to move from one grid cell to an adjacent one.
 """
 function construct_regular_factory_world(;
     n_obstacles_x=2,
@@ -513,20 +512,20 @@ export
     construct_factory_env_from_vtx_grid
 
 """
-    `construct_factory_env_from_vtx_grid(vtx_grid;kwargs...)`
+    construct_factory_env_from_vtx_grid(vtx_grid;kwargs...)
 
-    Args:
-    * vtx_grid : a matrix such that `vtx_grid[i,j] > 0` represents free space,
-        otherwise an obstacle.
+Arguments:
+* vtx_grid : a matrix such that `vtx_grid[i,j] > 0` represents free space,
+    otherwise an obstacle.
 
-    Kewyword Args:
-    * cell_width = 0.5 : determines the width of each grid cell when the
-        coordinates of the environment are transformed to continuous Cartesian
-        space.
-    * transition_time = 2.0 : determines the nominal travel time for a robot
-        to move from one grid cell to an adjacent one.
-    * pickup_zones = Int[] : a list of vertices that represent pick-up points
-    * dropoff_zones = Int[] : a list of vertices that represent drop-off points
+Kewyword Arguments:
+* cell_width = 0.5 : determines the width of each grid cell when the
+    coordinates of the environment are transformed to continuous Cartesian
+    space.
+* transition_time = 2.0 : determines the nominal travel time for a robot
+    to move from one grid cell to an adjacent one.
+* pickup_zones = Int[] : a list of vertices that represent pick-up points
+* dropoff_zones = Int[] : a list of vertices that represent drop-off points
 """
 function construct_factory_env_from_vtx_grid(vtx_grid;
         cell_width=1.0,

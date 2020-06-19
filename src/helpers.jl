@@ -152,16 +152,18 @@ end
 """
     #### TOY PROBLEM 3 ####
 
-    In this problem robot 1 will need to yield to let robot 2 through.
+    In this problem robot 2 will need to yield to let robot 1 through.
     First operation:
-        robot 1 does [5-7-8]
-        robot 2 does [2-30-32]
+        robot 1 does [2-2-30]
     Second operation:
-        robot 1 does [8-12-16]
+        robot 1 does [30-30-32]
+        robot 2 does [5-7-8]
+    Third operation:
+        robot 2 does [8-12-16]
 """
-function initialize_toy_problem_3(;cost_function=SumOfMakeSpans,verbose=false,Δt_op=0,Δt_collect=[0,0,0],Δt_deliver=[0,0,0])
+function initialize_toy_problem_3(;cost_function=SumOfMakeSpans,verbose=false,Δt_op=0,Δt_collect=[0,0,0,0],Δt_deliver=[0,0,0,0])
     N = 2                  # num robots
-    M = 3                  # num delivery tasks
+    M = 4                  # num delivery tasks
     vtx_grid = initialize_dense_vtx_grid(8,4)
     #  1   2   3   4
     #  5   6   7   8
@@ -173,16 +175,17 @@ function initialize_toy_problem_3(;cost_function=SumOfMakeSpans,verbose=false,Δ
     # 29  30  31  32
     env_graph = construct_factory_env_from_vtx_grid(vtx_grid)
     dist_matrix = get_dist_matrix(env_graph)
-    r0 = [6,5]
-    s0 = [30,7,12]
-    sF = [32,8,16]
+    r0 = [2,5]
+    s0 = [2,30,7,12]
+    sF = [30,32,8,16]
 
     project_spec, robot_ICs = initialize_toy_problem(r0,s0,sF,(v1,v2)->dist_matrix[v1,v2])
-    add_operation!(project_spec,construct_operation(project_spec,-1,[1,2],[3],0.0))
-    add_operation!(project_spec,construct_operation(project_spec,-1,[3],  [], 0.0))
+    add_operation!(project_spec,construct_operation(project_spec,-1,[1],[2],0.0))
+    add_operation!(project_spec,construct_operation(project_spec,-1,[2,3],[4],0.0))
+    add_operation!(project_spec,construct_operation(project_spec,-1,[4],  [], 0.0))
     # assignments = [1,2,3]
-    assignment_dict = Dict(2=>[2,3],1=>[1])
-    assignments = [1,2,2]
+    assignment_dict = Dict(1=>[1,2],2=>[3,4])
+    assignments = [2,2,1,1]
 
     project_spec, problem_spec, object_ICs, object_FCs, robot_ICs = construct_task_graphs_problem(
         project_spec,r0,s0,sF,dist_matrix;Δt_collect=Δt_collect,Δt_deliver=Δt_deliver,cost_function=cost_function)
@@ -191,13 +194,14 @@ function initialize_toy_problem_3(;cost_function=SumOfMakeSpans,verbose=false,Δ
 
         #### TOY PROBLEM 3 ####
 
-        In this problem robot 1 will need to yield to let robot 2 through.
+    jj    In this problem robot 2 will need to yield to let robot 1 through.
         First operation:
-            robot 1 does [5-7-8]
-            robot 2 does [2-30-32]
+            robot 1 does [2-2-30]
         Second operation:
-            robot 1 does [8-12-16]
-
+            robot 1 does [30-30-32]
+            robot 2 does [5-7-8]
+        Third operation:
+            robot 2 does [8-12-16]
         """
         print_toy_problem_specs(problem_description,vtx_grid,r0,s0,sF,project_spec)
     end

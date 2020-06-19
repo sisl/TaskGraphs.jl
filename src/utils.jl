@@ -35,7 +35,7 @@ function remap_object_ids!(node::Operation,args...)
     node
 end
 remap_object_id(node::Operation,args...)    = remap_object_ids!(deepcopy(node),args...)
-function remap_object_ids!(project_schedule::ProjectSchedule,args...)
+function remap_object_ids!(project_schedule::OperatingSchedule,args...)
     for i in 1:length(project_schedule.vtx_ids)
         project_schedule.vtx_ids[i] = remap_object_id(project_schedule.vtx_ids[i],args...)
     end
@@ -52,7 +52,7 @@ function remap_object_ids!(project_schedule::ProjectSchedule,args...)
     @assert sanity_check(project_schedule," after remap_object_ids!()")
     project_schedule
 end
-function remap_object_ids!(new_schedule::ProjectSchedule,old_schedule::ProjectSchedule)
+function remap_object_ids!(new_schedule::OperatingSchedule,old_schedule::OperatingSchedule)
     max_obj_id = maximum([get_id(id) for id in get_vtx_ids(old_schedule) if typeof(id) <: ObjectID])
     remap_object_ids!(new_schedule,max_obj_id)
 end
@@ -497,7 +497,7 @@ Base.string(a::DEPOSIT)   =  string("DEPOSIT(",get_id(get_robot_id(a)),",",get_i
 Base.string(op::Operation)=  string("OP(",get_id(get_operation_id(op)),")")
 Base.string(a::TEAM_ACTION{A}) where {A} =  string("TEAM_ACTION( ",map(i->string(string(i), ","), a.instructions)...," )")
 
-function get_display_metagraph(project_schedule::ProjectSchedule;
+function get_display_metagraph(project_schedule::OperatingSchedule;
     verbose=true,
     f=(v,p)->title_string(p,verbose),
     object_color="orange",

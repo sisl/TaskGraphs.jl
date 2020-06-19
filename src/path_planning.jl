@@ -11,35 +11,32 @@ using JLD2, FileIO
 using GraphUtils
 using CRCBS
 
-# using ..PCCBS
-# using ..TaskGraphsCore
 using ..TaskGraphs
 
 
 export
     PC_TAPF
-    # default_pc_tapf_solution
 
 const State = PCCBS.State
 const Action = PCCBS.Action
-Base.string(s::State) = "($(s.vtx),$(s.t))"
-Base.string(a::Action) = "($(a.e.src)->$(a.e.dst))"
-Base.string(s::MetaAgentCBS.State) = string("(",prod(map(s->"$(string(s)),",s.states)),")")
-Base.string(a::MetaAgentCBS.Action) = string("(",prod(map(a->"$(string(a)),",s.actions)),")")
+# Base.string(s::State) = "($(s.vtx),$(s.t))"
+# Base.string(a::Action) = "($(a.e.src)->$(a.e.dst))"
+# Base.string(s::MetaAgentCBS.State) = string("(",prod(map(s->"$(string(s)),",s.states)),")")
+# Base.string(a::MetaAgentCBS.Action) = string("(",prod(map(a->"$(string(a)),",s.actions)),")")
 
 """
-    `PC_TAPF{L<:LowLevelSolution}`
+    PC_TAPF{L<:LowLevelSolution}
 
-    The struct defining an instance of a Precedence-Constrained Multi-Agent Task
-        Assignment and Path-Finding problem.
+Defines an instance of a Precedence-Constrained Multi-Agent Task
+    Assignment and Path-Finding problem.
 """
 struct PC_TAPF{L<:LowLevelSolution}
     env::GridFactoryEnvironment
-    schedule::ProjectSchedule       # partial project schedule
-    initial_solution::L             # initial condition
+    schedule::OperatingSchedule       # partial project schedule
+    initial_route_plan::L             # initial condition
 end
 
-function CRCBS.get_initial_solution(schedule::ProjectSchedule,env::E) where {E<:PCCBS.LowLevelEnv}
+function CRCBS.get_initial_solution(schedule::OperatingSchedule,env::E) where {E<:PCCBS.LowLevelEnv}
     starts = State[]
     robot_ics = get_robot_ICs(schedule)
     for k in sort(collect(keys(robot_ics)))
@@ -369,12 +366,12 @@ export
     max_deadline::Vector{Int}               = Vector{Int}() # Marks the time at whidh this node will begin accumulating a delay cost
 end
 
-function isps_queue_cost(schedule::ProjectSchedule,cache::PlanningCache,v::Int)
+function isps_queue_cost(schedule::OperatingSchedule,cache::PlanningCache,v::Int)
     path_spec = get_path_spec(schedule,v)
     return (Int(path_spec.plan_path), minimum(cache.slack[v]))
 end
 
-function initialize_planning_cache(schedule::ProjectSchedule;kwargs...)
+function initialize_planning_cache(schedule::OperatingSchedule;kwargs...)
     t0,tF,slack,local_slack = process_schedule(schedule;kwargs...);
     allowable_slack = map(i->minimum(i),slack) # soft deadline (can be tightened as necessary)
     allowable_slack = map(i->i==Inf ? typemax(Int) : Int(i), allowable_slack) # initialize deadline at infinity
@@ -395,7 +392,7 @@ end
     low_level_search!() will return immediately because the cache says it's
     complete)
 """
-function reset_cache!(cache::PlanningCache,schedule::ProjectSchedule)
+function reset_cache!(cache::PlanningCache,schedule::OperatingSchedule)
     t0,tF,slack,local_slack = process_schedule(schedule;t0=cache.t0,tF=cache.tF)
     cache.t0            .= t0
     cache.tF            .= tF
@@ -420,7 +417,7 @@ export
 
 # @with_kw struct SearchEnv{C,E<:AbstractLowLevelEnv{State,Action,C},S<:LowLevelSolution} <: AbstractLowLevelEnv{State,Action,C}
 @with_kw struct SearchEnv{C,E<:AbstractLowLevelEnv{State,Action,C},S} <: AbstractLowLevelEnv{State,Action,C}
-    schedule::ProjectSchedule       = ProjectSchedule()
+    schedule::OperatingSchedule       = OperatingSchedule()
     cache::PlanningCache            = PlanningCache()
     env::E                          = PCCBS.LowLevelEnv()
     problem_spec::ProblemSpec       = ProblemSpec()
@@ -510,7 +507,7 @@ function backtrack_deadlines(solver,cache,schedule,v)
     end
     return delay_cut
 end
-function tighten_deadline!(solver,env,solution,v,dt=1)
+function tighten_deadline!(solver,env,route_plan,v,dt=1)
     cache = env.cache
     schedule = env.schedule
     active_set = cache.active_set
@@ -531,9 +528,9 @@ function tighten_deadline!(solver,env,solution,v,dt=1)
             cost_model = get_cost_model(env.env),
             heuristic = get_heuristic_model(env.env)
         )
-        new_path = trim_path(cbs_env,get_paths(solution)[agent_id],cache.t0[v])
-        set_solution_path!(solution,new_path,agent_id)
-        set_path_cost!(solution,new_path.cost,agent_id)
+        new_path = trim_path(cbs_env,get_paths(route_plan)[agent_id],cache.t0[v])
+        set_solution_path!(route_plan,new_path,agent_id)
+        set_path_cost!(route_plan,new_path.cost,agent_id)
     end
     # Update node queue
     for v2 in map(e->e.dst,collect(edges(bfs_tree(graph,v;dir=:out))))
@@ -544,7 +541,7 @@ function tighten_deadline!(solver,env,solution,v,dt=1)
     for v2 in active_set
         node_queue[v2] = isps_queue_cost(schedule,cache,v2)
     end
-    env,solution
+    env,route_plan
 end
 function update_planning_cache!(solver::M,env::E,v::Int,path::P) where {M<:PC_TAPF_Solver,E<:SearchEnv,P<:Path}
     cache = env.cache
@@ -630,14 +627,14 @@ export
 get_primary_cost(model,cost)                        = cost[1]
 get_primary_cost(solver::PC_TAPF_Solver,args...)    = get_primary_cost(solver.astar_model,args...)
 
-function CRCBS.SumOfMakeSpans(schedule::S,cache::C) where {S<:ProjectSchedule,C<:PlanningCache}
+function CRCBS.SumOfMakeSpans(schedule::S,cache::C) where {S<:OperatingSchedule,C<:PlanningCache}
     SumOfMakeSpans(
         cache.tF,
         schedule.root_nodes,
         map(k->schedule.weights[k], schedule.root_nodes),
         cache.tF[schedule.root_nodes])
 end
-function CRCBS.MakeSpan(schedule::S,cache::C) where {S<:ProjectSchedule,C<:PlanningCache}
+function CRCBS.MakeSpan(schedule::S,cache::C) where {S<:OperatingSchedule,C<:PlanningCache}
     MakeSpan(
         cache.tF,
         schedule.root_nodes,
@@ -702,16 +699,16 @@ function construct_search_env(solver,schedule, problem_spec, env_graph;
     cost_model, heuristic_model = construct_a_star_cost_model(solver, schedule, cache, problem_spec, env_graph; primary_objective=primary_objective, extra_T=extra_T)
     low_level_env = PCCBS.LowLevelEnv(
         graph=env_graph, cost_model=cost_model, heuristic=heuristic_model)
-    base_solution = get_initial_solution(schedule,low_level_env)
+    base_route_plan = get_initial_solution(schedule,low_level_env)
 
     search_env = SearchEnv(schedule=schedule, cache=cache, env=low_level_env,
-        problem_spec=problem_spec, num_agents=N, base_solution=base_solution)
+        problem_spec=problem_spec, num_agents=N, base_solution=base_route_plan)
     return search_env
 end
-function construct_search_env(solver,project_spec, problem_spec, robot_ICs, assignments, env_graph;kwargs...)
-    schedule = construct_project_schedule(project_spec, problem_spec, robot_ICs, assignments)
-    construct_search_env(solver,schedule, problem_spec, env_graph;kwargs...)
-end
+# function construct_search_env(solver,project_spec, problem_spec, robot_ICs, assignments, env_graph;kwargs...)
+#     schedule = construct_project_schedule(project_spec, problem_spec, robot_ICs, assignments)
+#     construct_search_env(solver,schedule, problem_spec, env_graph;kwargs...)
+# end
 
 update_cost_model!(model::C,env::S) where {C,S<:SearchEnv} = nothing
 function update_cost_model!(model::C,env::S) where {C<:MultiDeadlineCost,S<:SearchEnv}
@@ -729,7 +726,7 @@ update_cost_model!(env::S) where {S<:SearchEnv} = update_cost_model!(env.cost_mo
 
     `v` is the vertex id
 """
-function update_env!(solver::S,env::E,solution::L,v::Int,path::P,agent_id::Int=get_path_spec(env.schedule,v).agent_id) where {S<:PC_TAPF_Solver,E<:SearchEnv,P<:Path,L<:LowLevelSolution}
+function update_env!(solver::S,env::E,route_plan::L,v::Int,path::P,agent_id::Int=get_path_spec(env.schedule,v).agent_id) where {S<:PC_TAPF_Solver,E<:SearchEnv,P<:Path,L<:LowLevelSolution}
     cache = env.cache
     schedule = env.schedule
 
@@ -738,8 +735,8 @@ function update_env!(solver::S,env::E,solution::L,v::Int,path::P,agent_id::Int=g
     update_cost_model!(env)
     # ADD UPDATED PATH TO HEURISTIC MODELS
     if agent_id != -1
-        partially_set_path!(get_heuristic_model(env.env),agent_id,convert_to_vertex_lists(get_paths(solution)[agent_id]))
-        partially_set_path!(get_cost_model(env.env),agent_id,convert_to_vertex_lists(get_paths(solution)[agent_id]))
+        partially_set_path!(get_heuristic_model(env.env),agent_id,convert_to_vertex_lists(get_paths(route_plan)[agent_id]))
+        partially_set_path!(get_cost_model(env.env),agent_id,convert_to_vertex_lists(get_paths(route_plan)[agent_id]))
     end
 
     env
@@ -1034,11 +1031,11 @@ export
 """
     Helper to reset the solution in a constraint node between re-runs of ISPS
 """
-function reset_solution!(node::N,base_solution) where {N<:ConstraintTreeNode}
-    for (agent_id,path) in enumerate(get_paths(base_solution))
+function reset_solution!(node::N,base_route_plan) where {N<:ConstraintTreeNode}
+    for (agent_id,path) in enumerate(get_paths(base_route_plan))
         set_solution_path!(node.solution, deepcopy(path), agent_id)
         set_path_cost!(node.solution, get_cost(path), agent_id)
-        node.solution.cost = base_solution.cost
+        node.solution.cost = base_route_plan.cost
         node.cost = get_cost(node.solution)
     end
     node
@@ -1587,8 +1584,30 @@ export
     high_level_search!
 
 """
-    This is the modified version of high-level search that uses the adjacency
-    matrix MILP formulation.
+    high_level_search!(solver, base_search_env, optimizer;kwargs...)
+    high_level_search!(solver, env_graph, project_schedule, problem_spec,
+        optimizer; kwargs...)
+    high_level_search!(solver, env_graph, project_spec, problem_spec, robot_ICs,
+        optimizer;kwargs...)
+
+Solves a PC-TAPF problem instance.
+Arguments:
+- solver::PC_TAPF_Solver
+- base_search_env::SearchEnv
+- optimizer
+OR
+- solver::PC_TAPF_Solver
+- env_graph::GridFactoryEnvironment
+- project_schedule::OperatingSchedule
+- problem_spec::ProblemSpec
+- optimizer
+OR
+- solver::PC_TAPF_Solver
+- env_graph::GridFactoryEnvironment
+- project_spec::ProjectSpec
+- problem_spec::ProblemSpec
+- robot_ICs::Vector{ROBOT_AT}
+- optimizer
 """
 function high_level_search!(solver::P, base_search_env::SearchEnv,  optimizer;
         t0_ = Dict{AbstractID,Int}(get_vtx_id(base_search_env.schedule, v)=>t0 for (v,t0) in enumerate(base_search_env.cache.t0)),
@@ -1607,7 +1626,7 @@ function high_level_search!(solver::P, base_search_env::SearchEnv,  optimizer;
 
     lower_bound = 0.0
     # best_solution = default_pc_tapf_solution(problem_spec.N)
-    best_solution   = default_solution(base_search_env)
+    best_route_plan   = default_solution(base_search_env)
     best_env        = SearchEnv()
     best_assignment = adjacency_matrix(get_graph(project_schedule))
 
@@ -1654,13 +1673,13 @@ function high_level_search!(solver::P, base_search_env::SearchEnv,  optimizer;
                         primary_objective=primary_objective,
                         t0 = base_search_env.cache.t0,
                         tF = base_search_env.cache.tF
-                        ) # TODO pass in previous solution
+                        ) # TODO pass in previous route_plan
                     env = SearchEnv(env,base_solution=base_search_env.base_solution)
                     pc_mapf = PC_MAPF(env);
                     ##### Call CBS Search Routine (LEVEL 2) #####
-                    solution, cache, cost = solve!(solver,pc_mapf);
+                    route_plan, cache, cost = solve!(solver,pc_mapf);
                     if cost < solver.best_cost
-                        best_solution = solution
+                        best_route_plan = route_plan
                         best_assignment = adj_matrix # this represents an assignment matrix in AssignmentMILP
                         solver.best_cost = cost # TODO make sure that the operation duration is accounted for here
                         best_env = SearchEnv(env,cache=cache)
@@ -1684,10 +1703,10 @@ function high_level_search!(solver::P, base_search_env::SearchEnv,  optimizer;
     exit_assignment!(solver)
     optimality_gap = get_primary_cost(solver,solver.best_cost) - lower_bound
     log_info(-1,solver.l1_verbosity,string("HIGH LEVEL SEARCH: optimality gap = ",optimality_gap,". Returning best solution with cost ", solver.best_cost,"\n"))
-    return best_solution, best_assignment, solver.best_cost, best_env, optimality_gap
+    return best_route_plan, best_assignment, solver.best_cost, best_env, optimality_gap
 end
 
-function high_level_search!(solver::PC_TAPF_Solver, env_graph, project_schedule::ProjectSchedule, problem_spec,  optimizer;
+function high_level_search!(solver::PC_TAPF_Solver, env_graph, project_schedule::OperatingSchedule, problem_spec,  optimizer;
     primary_objective=SumOfMakeSpans,
     kwargs...)
     base_search_env = construct_search_env(solver,project_schedule,problem_spec,env_graph;primary_objective=primary_objective)
@@ -1712,25 +1731,25 @@ end
 
 export
     get_env_snapshot,
-    trim_solution
+    trim_route_plan
 
 
 """
-    get_env_snapshot
+    get_env_snapshot(route_plan::S,t)
 """
-function get_env_snapshot(solution::S,t) where {S<:LowLevelSolution}
-    Dict(RobotID(i)=>ROBOT_AT(i, get_sp(get_path_node(path,t)).vtx) for (i,path) in enumerate(get_paths(solution)))
+function get_env_snapshot(route_plan::S,t) where {S<:LowLevelSolution}
+    Dict(RobotID(i)=>ROBOT_AT(i, get_sp(get_path_node(path,t)).vtx) for (i,path) in enumerate(get_paths(route_plan)))
 end
 
 """
-    `trim_solution`
+    trim_route_plan(search_env, route_plan, T)
 
-    construct a trimmed solution that stops at a certain time step
+Construct a trimmed route_plan that stops at a certain time step
 """
-function trim_solution(search_env, solution, T)
-    N = length(get_paths(solution))
+function trim_route_plan(search_env, route_plan, T)
+    N = length(get_paths(route_plan))
     env = search_env.env
-    trimmed_solution = get_initial_solution(MAPF(env, map(i->PCCBS.State(),1:N),map(i->PCCBS.State(),1:N)))
+    trimmed_route_plan = get_initial_solution(MAPF(env, map(i->PCCBS.State(),1:N),map(i->PCCBS.State(),1:N)))
     for agent_id in 1:N
         cbs_env = typeof(env)(
             graph = env.graph,
@@ -1738,21 +1757,21 @@ function trim_solution(search_env, solution, T)
             cost_model = get_cost_model(env),
             heuristic = get_heuristic_model(env)
         )
-        old_path = get_paths(solution)[agent_id]
-        new_path = get_paths(trimmed_solution)[agent_id]
+        old_path = get_paths(route_plan)[agent_id]
+        new_path = get_paths(trimmed_route_plan)[agent_id]
         for t in 1:max(1, min(T, length(old_path)))
             p = get_path_node(old_path,t)
             push!(new_path, p)
             new_path.cost = accumulate_cost(cbs_env, get_cost(new_path), get_transition_cost(cbs_env, p.s, p.a, p.sp))
-            set_path_cost!(trimmed_solution, new_path.cost, agent_id)
+            set_path_cost!(trimmed_route_plan, new_path.cost, agent_id)
         end
         if T > length(new_path)
-            println("Extending path in trim_solution. Agent id = ",agent_id)
+            println("Extending path in trim_route_plan. Agent id = ",agent_id)
             extend_path!(cbs_env,new_path,T)
         end
     end
-    # trimmed_solution.cost = solution.cost
-    trimmed_solution
+    # trimmed_route_plan.cost = solution.cost
+    trimmed_route_plan
 end
 
 
@@ -1766,9 +1785,12 @@ export
     splice_schedules!
 
 """
-    get all vertices that "straddle" the query time t
+    get_active_and_fixed_vtxs(project_schedule::OperatingSchedule,
+        cache::PlanningCache,t)
+
+Get all vertices that "straddle" the query time t
 """
-function get_active_and_fixed_vtxs(project_schedule::ProjectSchedule,cache::PlanningCache,t)
+function get_active_and_fixed_vtxs(project_schedule::OperatingSchedule,cache::PlanningCache,t)
     active_vtxs = Set{Int}()
     fixed_vtxs = Set{Int}()
     for v in vertices(get_graph(project_schedule))
@@ -1783,9 +1805,12 @@ function get_active_and_fixed_vtxs(project_schedule::ProjectSchedule,cache::Plan
 end
 
 """
-    Split all GO nodes that "straddle" the cutoff time.
+    split_active_vtxs!(project_schedule::OperatingSchedule,
+        problem_spec::ProblemSpec,cache::PlanningCache,t;
+
+Split all GO nodes that "straddle" the cutoff time.
 """
-function split_active_vtxs!(project_schedule::ProjectSchedule,problem_spec::ProblemSpec,cache::PlanningCache,t;
+function split_active_vtxs!(project_schedule::OperatingSchedule,problem_spec::ProblemSpec,cache::PlanningCache,t;
     robot_positions::Dict{RobotID,ROBOT_AT}=Dict{RobotID,ROBOT_AT}()
     )
     G = get_graph(project_schedule)
@@ -1826,10 +1851,13 @@ function split_active_vtxs!(project_schedule::ProjectSchedule,problem_spec::Prob
 end
 
 """
-    identify all nodes that end before the cutoff time, and change their path
-    spec so that the route planner will not actually plan a path for them.
+    fix_precutoff_nodes!(project_schedule::OperatingSchedule,
+        problem_spec::ProblemSpec,cache::PlanningCache,t)
+
+Identify all nodes that end before the cutoff time, and change their path spec
+    so that the route planner will not actually plan a path for them.
 """
-function fix_precutoff_nodes!(project_schedule::ProjectSchedule,problem_spec::ProblemSpec,cache::PlanningCache,t)
+function fix_precutoff_nodes!(project_schedule::OperatingSchedule,problem_spec::ProblemSpec,cache::PlanningCache,t)
     # active_vtxs = Set{Int}()
     active_vtxs, fixed_vtxs = get_active_and_fixed_vtxs(project_schedule,cache,t)
     # set all fixed_vtxs to plan_path=false
@@ -1843,9 +1871,11 @@ function fix_precutoff_nodes!(project_schedule::ProjectSchedule,problem_spec::Pr
 end
 
 """
-    Break all assignments that are eligible for replanning
+    break_assignments!(project_schedule::OperatingSchedule,problem_spec::ProblemSpec)
+
+Break all assignments that are eligible for replanning
 """
-function break_assignments!(project_schedule::ProjectSchedule,problem_spec::ProblemSpec)
+function break_assignments!(project_schedule::OperatingSchedule,problem_spec::ProblemSpec)
     G = get_graph(project_schedule)
     for v in vertices(G)
         path_spec = get_path_spec(project_schedule,v)
@@ -1876,11 +1906,12 @@ function break_assignments!(project_schedule::ProjectSchedule,problem_spec::Prob
 end
 
 """
-    Prune schedule
+    prune_schedule(project_schedule::OperatingSchedule,
+        problem_spec::ProblemSpec,cache::PlanningCache,t)
 
     remove nodes that don't need to be kept around any longer
 """
-function prune_schedule(project_schedule::ProjectSchedule,problem_spec::ProblemSpec,cache::PlanningCache,t)
+function prune_schedule(project_schedule::OperatingSchedule,problem_spec::ProblemSpec,cache::PlanningCache,t)
     G = get_graph(project_schedule)
 
     # identify nodes "cut" by timestep
@@ -1906,7 +1937,7 @@ function prune_schedule(project_schedule::ProjectSchedule,problem_spec::ProblemS
         end
     end
     # Construct new graph
-    new_schedule = ProjectSchedule()
+    new_schedule = OperatingSchedule()
     keep_vtxs = setdiff(Set{Int}(collect(vertices(G))), remove_set)
     # add all non-deleted nodes to new project schedule
     for v in keep_vtxs
@@ -1957,12 +1988,12 @@ end
 """
     `prune_project_schedule`
 
-    Remove all vertices that have already been completed. The idea is to identify
-    all `Operation`s that are completed before `t`, remove all nodes upstream of
-    them (except for ROBOT_AT nodes), and create new edges between the ROBOT_AT
-    nodes and their first GO assignments.
+Remove all vertices that have already been completed. The idea is to identify
+all `Operation`s that are completed before `t`, remove all nodes upstream of
+them (except for ROBOT_AT nodes), and create new edges between the ROBOT_AT
+nodes and their first GO assignments.
 """
-function prune_project_schedule(project_schedule::ProjectSchedule,problem_spec::ProblemSpec,cache::PlanningCache,t;
+function prune_project_schedule(project_schedule::OperatingSchedule,problem_spec::ProblemSpec,cache::PlanningCache,t;
         robot_positions::Dict{RobotID,ROBOT_AT}=Dict{RobotID,ROBOT_AT}()
     )
     new_schedule, new_cache = prune_schedule(project_schedule,problem_spec,cache,t)
@@ -1978,9 +2009,11 @@ function prune_project_schedule(project_schedule::ProjectSchedule,problem_spec::
 end
 
 """
-    Merge next_schedule into project_schedule
+    splice_schedules!(project_schedule::P,next_schedule::P) where {P<:OperatingSchedule}
+
+Merge next_schedule into project_schedule
 """
-function splice_schedules!(project_schedule::P,next_schedule::P) where {P<:ProjectSchedule}
+function splice_schedules!(project_schedule::P,next_schedule::P) where {P<:OperatingSchedule}
     for v in vertices(get_graph(next_schedule))
         node_id = get_vtx_id(next_schedule, v)
         add_to_schedule!(project_schedule, get_path_spec(next_schedule,v), get_node_from_id(next_schedule, node_id), node_id)
@@ -2005,16 +2038,40 @@ export
     get_commit_time,
     replan!
 
+"""
+    ReplannerModel
+
+Abstract type. Concrete subtypes currently include `DeferUntilCompletion`,
+`ReassignFreeRobots`, `MergeAndBalance`, `Oracle`, `FallBackPlanner`,
+`NullReplanner`
+"""
 abstract type ReplannerModel end
+"""
+    DeferUntilCompletion <: ReplannerModel
+
+Allow work to begin on the new project only after all other work is completed.
+"""
 @with_kw struct DeferUntilCompletion <: ReplannerModel
     max_time_limit::Float64 = 100
     time_out_buffer::Float64 = 1
     route_planning_buffer::Float64 = 2
 end
+"""
+    ReassignFreeRobots   <: ReplannerModel
+
+Allow robots to begin working on the new project as soon as they have finished
+their current assignments.
+"""
 @with_kw struct ReassignFreeRobots   <: ReplannerModel
     time_out_buffer::Float64 = 1
     route_planning_buffer::Float64 = 2
 end
+"""
+    MergeAndBalance      <: ReplannerModel
+
+Allow replanning from scratch for all assignments and routes except for those
+that will take place
+"""
 @with_kw struct MergeAndBalance      <: ReplannerModel
     time_out_buffer::Float64 = 1
     route_planning_buffer::Float64 = 2
@@ -2061,7 +2118,7 @@ fix_precutoff_nodes!(replan_model,new_schedule,problem_spec,new_cache,t_commit) 
 # function fix_precutoff_nodes!(replan_model::DeferUntilCompletion,project_schedule,problem_spec,new_cache,t_commit)
 #     fix_precutoff_nodes!(project_schedule,problem_spec,new_cache,t_commit)
 #     # prune all nodes but the tip GO nodes
-#     new_schedule = ProjectSchedule()
+#     new_schedule = OperatingSchedule()
 #     for v in vertices(project_schedule)
 #         if ~get_path_spec(project_schedule,v).fixed
 #             node_id = get_vtx_id(project_schedule,v)
@@ -2092,11 +2149,20 @@ fix_precutoff_nodes!(replan_model,new_schedule,problem_spec,new_cache,t_commit) 
 #     # end
 # end
 
-function replan!(solver, replan_model, search_env, env_graph, problem_spec, solution, next_schedule, t_request, t_arrival; commit_threshold=5,kwargs...)
+"""
+    replan!(solver, replan_model, search_env, env_graph, problem_spec, route_plan,
+        next_schedule, t_request, t_arrival; commit_threshold=5,kwargs...)
+
+Combine an existing solution with a new project request `next_schedule` that
+is requested at time `t_request`, and whose raw materials become available at
+`t_arrival`.
+The exact behavior of this function depends on `replan_model <: ReplannerModel`
+"""
+function replan!(solver, replan_model, search_env, env_graph, problem_spec, route_plan, next_schedule, t_request, t_arrival; commit_threshold=5,kwargs...)
     project_schedule = search_env.schedule
     cache = search_env.cache
     @assert sanity_check(project_schedule," in replan!()")
-    # Freeze solution and schedule at t_commit
+    # Freeze route_plan and schedule at t_commit
     t_commit = get_commit_time(replan_model, search_env, t_request, commit_threshold)
     reset_solver!(solver)
     set_time_limits!(solver,replan_model,t_request,t_commit)
@@ -2104,7 +2170,7 @@ function replan!(solver, replan_model, search_env, env_graph, problem_spec, solu
     new_schedule, new_cache = prune_schedule(project_schedule,problem_spec,cache,t_commit)
     @assert sanity_check(new_schedule," after prune_schedule()")
     # split active nodes
-    robot_positions=get_env_snapshot(solution,t_commit)
+    robot_positions=get_env_snapshot(route_plan,t_commit)
     new_schedule, new_cache = split_active_vtxs!(replan_model,new_schedule,problem_spec,new_cache,t_commit;robot_positions=robot_positions)
     @assert sanity_check(new_schedule," after split_active_vtxs!()")
     # freeze nodes that terminate before cutoff time
@@ -2122,8 +2188,8 @@ function replan!(solver, replan_model, search_env, env_graph, problem_spec, solu
     t0 = map(v->get(new_cache.t0, v, t_commit), vertices(get_graph(new_schedule)))
     tF = map(v->get(new_cache.tF, v, t_commit), vertices(get_graph(new_schedule)))
     base_search_env = construct_search_env(solver, new_schedule, search_env.problem_spec, env_graph;t0=t0,tF=tF)
-    trimmed_solution = trim_solution(base_search_env, solution, t_commit)
-    base_search_env = SearchEnv(base_search_env, base_solution=trimmed_solution)
+    trimmed_route_plan = trim_route_plan(base_search_env, route_plan, t_commit)
+    base_search_env = SearchEnv(base_search_env, base_solution=trimmed_route_plan)
     base_search_env, solver
 end
 replan!(solver, replan_model::NullReplanner, search_env, args...;kwargs...) = search_env
