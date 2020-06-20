@@ -62,7 +62,7 @@ global_logger(SimpleLogger(stderr, Logging.Debug))
     @time @testset "TaskGraphs.ExampleTests" begin
         include(joinpath(testdir, "test_examples_milp.jl"))
     end
-    @time @testset "TaskGraphs.CoreTests" begin
+    @time @testset "TaskGraphs.PathPlanning" begin
         include(joinpath(testdir, "test_path_planning.jl"))
     end
     # @time @testset "TaskGraphs.ProcessTime" begin

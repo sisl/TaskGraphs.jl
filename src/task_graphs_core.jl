@@ -1695,7 +1695,7 @@ function formulate_optimization_problem(N,M,G,D,Δt,Δt_collect,Δt_deliver,to0_
                 @constraint(model, tmax - t1[1] <= y*Mm)
                 @constraint(model, tmin - t1[2] >= (1 - y)*-Mm)
                 @constraint(model, tmin - t2[2] >= y*-Mm)
-                # @constraint(model, tmin + 1 <= tmax) 
+                # @constraint(model, tmin + 1 <= tmax)
                 @constraint(model, tmin + 1 - X[j+N,j2] - X[j2+N,j] <= tmax) # NOTE +1 not necessary if the same robot is doing both
             end
         end
@@ -2074,7 +2074,7 @@ function formulate_milp(milp_model::SparseAdjacencyMILP,project_schedule::Operat
         job_shop=milp_model.job_shop
     )
 
-    println("NBS TIME LIMIT: TimeLimit = $TimeLimit")
+    # println("NBS TIME LIMIT: TimeLimit = $TimeLimit")
     model = Model(with_optimizer(optimizer,
         TimeLimit=TimeLimit,
         OutputFlag=OutputFlag,

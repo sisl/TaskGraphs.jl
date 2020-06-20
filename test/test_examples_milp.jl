@@ -26,11 +26,11 @@ let
                 if !isa(milp_model,GreedyAssignment)
                     push!(costs, cost)
                 end
-                @show i,f,milp_model,validate(schedule)
+                # @show i,f,milp_model,validate(schedule)
                 @test validate(schedule)
                 @test cost != Inf
             end
-            @show costs
+            # @show costs
             @test all(costs .== costs[1]) # error because AssignmentMILP is adding a job shop constraint that shouldn't be there?? On toy_problem_3
         end
     end
