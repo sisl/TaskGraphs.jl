@@ -15,8 +15,14 @@ let
             let
                 costs = Float64[]
                 project_spec, problem_spec, robot_ICs, assignments, env_graph = f(;verbose=false);
-                for milp_model in [AssignmentMILP(),AdjacencyMILP(),SparseAdjacencyMILP(),GreedyAssignment()]
-                    solver = PC_TAPF_Solver(nbs_model=milp_model,l3_verbosity=0)
+                for solver in [
+                        PC_TAPF_Solver(nbs_model=AssignmentMILP()),
+                        PC_TAPF_Solver(nbs_model=AdjacencyMILP()),
+                        PC_TAPF_Solver(nbs_model=SparseAdjacencyMILP()),
+                        PC_TAPF_Solver(nbs_model=GreedyAssignment(),LIMIT_assignment_iterations=2),
+                        ]
+                    # solver = PC_TAPF_Solver(nbs_model=milp_model,l3_verbosity=0)
+                    # @show i, f, solver.nbs_model
                     solution, assignment, cost, env = high_level_search!(
                         solver,
                         env_graph,
@@ -26,7 +32,7 @@ let
                         Gurobi.Optimizer;
                         primary_objective=cost_model,
                         )
-                    if !isa(milp_model,GreedyAssignment)
+                    if !isa(solver.nbs_model,GreedyAssignment)
                         push!(costs, cost[1])
                     end
                     @test validate(env.schedule)

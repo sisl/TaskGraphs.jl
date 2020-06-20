@@ -19,10 +19,6 @@ export
 
 const State = PCCBS.State
 const Action = PCCBS.Action
-# Base.string(s::State) = "($(s.vtx),$(s.t))"
-# Base.string(a::Action) = "($(a.e.src)->$(a.e.dst))"
-# Base.string(s::MetaAgentCBS.State) = string("(",prod(map(s->"$(string(s)),",s.states)),")")
-# Base.string(a::MetaAgentCBS.Action) = string("(",prod(map(a->"$(string(a)),",s.actions)),")")
 
 """
     PC_TAPF{L<:LowLevelSolution}

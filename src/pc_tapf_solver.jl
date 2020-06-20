@@ -17,124 +17,83 @@ export
     read_solver,
     log_info
 
-@with_kw mutable struct PC_TAPF_Solver{T} <: AbstractMAPFSolver
-    LIMIT_assignment_iterations   ::Int = 50
-    LIMIT_CBS_iterations          ::Int = 100
-    LIMIT_A_star_iterations       ::Int = 5000
+"""
+    AbstractPCTAPFSolver
 
-    num_assignment_iterations   ::Int = 0
-    num_CBS_iterations          ::Int = 0
-    num_A_star_iterations       ::Int = 0
-    best_cost                   ::T   = (Inf,Inf,Inf,Inf)
+Abstract type of which all PC-TAPF solvers must be concrete subtypes. All
+concrete solvers must implement the following interface for solving PC-TAPF
+problems:
+- `solution, cost = solve!(solver,problem_def)`
+- `check_runtime(solver)` should trigger an interrupt + early return if the
+    allowable runtime has been exceeded
 
-    total_assignment_iterations ::Int = 0
-    total_CBS_iterations        ::Int = 0
-    total_A_star_iterations     ::Int = 0
+Also, we need a good Logger type for keeping track of thing like runtime,
+iterations, optimality gap (including upper and lower bound), etc.
+"""
+abstract type AbstractPCTAPFSolver end
 
-    max_CBS_iterations          ::Int = 0
-    max_A_star_iterations       ::Int = 0
+"""
+    SolverLogger
 
-    verbosity                   ::Int = 0
-    l1_verbosity                ::Int = 0
-    l2_verbosity                ::Int = 0
-    l3_verbosity                ::Int = 0
-    l4_verbosity                ::Int = 0
+A logger type for keeping track of thing like runtime, iterations, optimality
+gap (including upper and lower bound), etc.
+"""
+mutable struct SolverLogger{S,C}
+    iterations      ::Int
+    iteration_limit ::Int
+    start_time      ::Float64
+    runtime_limit   ::Float64
+    lower_bound     ::C
+    best_cost       ::C
 end
-function reset_solver!(solver::S) where {S<:PC_TAPF_Solver}
-    solver.num_assignment_iterations = 0
-    solver.num_CBS_iterations = 0
-    solver.num_A_star_iterations = 0
-    solver.best_cost = (Inf,Inf,Inf,Inf)
 
-    solver.total_assignment_iterations = 0
-    solver.total_CBS_iterations = 0
-    solver.total_A_star_iterations = 0
+"""
+    CBSPlanner
 
-    solver.max_CBS_iterations = 0
-    solver.max_A_star_iterations = 0
+A path planner that employs Conflict-Based Search
+"""
+struct CBSPlanner{L}
+    low_level_planner::L
+end
 
-    solver
-end
-# update functions
-function enter_assignment!(solver::S) where {S<:PC_TAPF_Solver}
-    reset_solver!(solver)
-end
-function exit_assignment!(solver::S) where {S<:PC_TAPF_Solver}
-end
-function enter_cbs!(solver::S) where {S<:PC_TAPF_Solver}
-    solver.num_assignment_iterations += 1
-end
-function exit_cbs!(solver::S) where {S<:PC_TAPF_Solver}
-    solver.max_CBS_iterations = max(solver.max_CBS_iterations,solver.num_CBS_iterations)
-    solver.total_CBS_iterations += solver.num_CBS_iterations
-    solver.num_CBS_iterations = 0
-end
-function enter_low_level!(solver::S) where {S<:PC_TAPF_Solver}
-    solver.num_CBS_iterations += 1
-end
-function exit_low_level!(solver::S) where {S<:PC_TAPF_Solver}
-end
-function enter_a_star!(solver::S) where {S<:PC_TAPF_Solver}
-end
-function exit_a_star!(solver::S) where {S<:PC_TAPF_Solver}
-    solver.max_A_star_iterations = max(solver.max_A_star_iterations,solver.num_A_star_iterations)
-    solver.total_A_star_iterations += solver.num_A_star_iterations
-    solver.num_A_star_iterations = 0
-end
-function TOML.parse(solver::S) where {S<:PC_TAPF_Solver}
-    toml_dict = Dict()
+"""
+    ISPSPlanner
 
-    toml_dict["LIMIT_assignment_iterations"] = solver.LIMIT_assignment_iterations
-    toml_dict["LIMIT_CBS_iterations"] = solver.LIMIT_CBS_iterations
-    toml_dict["LIMIT_A_star_iterations"] = solver.LIMIT_A_star_iterations
-    toml_dict["num_assignment_iterations"] = solver.num_assignment_iterations
-    toml_dict["num_CBS_iterations"] = solver.num_CBS_iterations
-    toml_dict["num_A_star_iterations"] = solver.num_A_star_iterations
-    if any(i->i==Inf, solver.best_cost)
-        toml_dict["best_cost"] = map(i->-1,1:length(solver.best_cost))
-    else
-        toml_dict["best_cost"] = collect(solver.best_cost)
-    end
-    toml_dict["total_assignment_iterations"] = solver.total_assignment_iterations
-    toml_dict["total_CBS_iterations"] = solver.total_CBS_iterations
-    toml_dict["total_A_star_iterations"] = solver.total_A_star_iterations
-    toml_dict["max_CBS_iterations"] = solver.max_CBS_iterations
-    toml_dict["max_A_star_iterations"] = solver.max_A_star_iterations
-    toml_dict["verbosity"] = solver.verbosity
-    toml_dict["l1_verbosity"] = solver.l1_verbosity
-    toml_dict["l2_verbosity"] = solver.l2_verbosity
-    toml_dict["l3_verbosity"] = solver.l3_verbosity
-    toml_dict["l4_verbosity"] = solver.l4_verbosity
+A path planner that employs Incremental Slack-Prioritized Search.
+"""
+struct ISPSPlanner{L}
+    low_level_planner::L
 
-    toml_dict
 end
-function read_solver(toml_dict::Dict)
-    solver = PC_TAPF_Solver(
-        LIMIT_assignment_iterations = toml_dict["LIMIT_assignment_iterations"],
-        LIMIT_CBS_iterations = toml_dict["LIMIT_CBS_iterations"],
-        LIMIT_A_star_iterations = toml_dict["LIMIT_A_star_iterations"],
 
-        num_assignment_iterations = toml_dict["num_assignment_iterations"],
-        num_CBS_iterations = toml_dict["num_CBS_iterations"],
-        num_A_star_iterations = toml_dict["num_A_star_iterations"],
-        best_cost = Tuple(toml_dict["best_cost"]),
+"""
+    NBSSolver{A,P}
 
-        total_assignment_iterations = toml_dict["total_assignment_iterations"],
-        total_CBS_iterations = toml_dict["total_CBS_iterations"],
-        total_A_star_iterations = toml_dict["total_A_star_iterations"],
+A hierarchical PC-TAPF solver with an assignment level and a path-planning
+level.
+The solver works by alternating between assignment and path-planning until the
+optimality gap between the lower bound (from task assignment) and the lower
+bound (from path planning) disappears.
+The input to the assignment problem is the full PC-TAPF problem specification.
+The output of the assignment problem is a valid `OperatingSchedule`--that is,
+an operating schedule wherein all assignments have been made in a legal way.
+The input to the route planner is the PC-TAPF problem spec along with the
+`OperatingSchedule` that comes from the assignment solution.
+"""
+@with_kw struct NBSSolver{A,P} <: AbstractPCTAPFSolver
+    assigment_model ::A     = SparseAdjacencyMILP()
+    path_planner    ::P     = CBSPlanner{ISPS{AStarSC}}()
 
-        max_CBS_iterations = toml_dict["max_CBS_iterations"],
-        max_A_star_iterations = toml_dict["max_A_star_iterations"],
-
-        verbosity = toml_dict["verbosity"],
-        l1_verbosity = toml_dict["l1_verbosity"],
-        l2_verbosity = toml_dict["l2_verbosity"],
-        l3_verbosity = toml_dict["l3_verbosity"],
-        l4_verbosity = toml_dict["l4_verbosity"]
-    )
-end
-function read_solver(io)
-    read_solver(TOML.parsefile(io))
+    # These fields should be reusable across solver types, including at each
+    # level of a nested/hierarchical solver
+    iteration_limit ::Int = 50
+    verbosity       ::Int = 0
+    DEBUG           ::Bool = false
+    # LOGGER:
+    # num_iterations   ::Int = 0
+    # best_cost         ::CostTracker{C}
+    # total_iterations  ::Int = 0
+    # start_time        ::Float64 = time()
 end
 
 # Helpers for printing
@@ -146,5 +105,107 @@ end
 function log_info(limit::Int,solver::S,msg::String) where {S<:PC_TAPF_Solver}
     log_info(limit,solver.verbosity,msg)
 end
+
+"""
+    solve!(solver, base_search_env::SearchEnv;kwargs...) where {A,P}
+
+Use the planner defined by `solver` to solve the PC-TAPF problem encoded by
+`base_search_env`.
+
+Arguments:
+- solver <: AbstractPCTAPFSolver
+- base_search_env::SearchEnv : a PC-TAPF problem
+
+Outputs:
+- best_env : a `SearchEnv` data structure that encodes a solution to the problem
+- cost : the cost of the solution encoded by `best_env`
+"""
+function solve!(solver::NBSSolver{A,P}, base_search_env::SearchEnv;kwargs...) where {A,P}
+    best_env = SearchEnv()
+    assignment_problem = formulate_assignment_problem(solver, base_search_env;
+        kwargs...)
+    while optimality_gap(solver) > 0
+        try
+            update_assignment_problem!(solver, assignment_problem, base_search_env)
+            schedule = solve_assignment_problem!(solver, assignment_problem, base_search_env;kwargs...)
+            if optimality_gap(solver) > 0
+                env = plan_route!(solver, schedule, base_search_env;kwargs...);
+                if get_cost(env) < get_cost(best_env)
+                    best_env = env
+                end
+            end
+        catch e
+            if isa(e, SolverException)
+                log_info(-1, solver.verbosity, e.msg)
+                break
+            else
+                throw(e)
+            end
+        end
+    end
+    cost = get_cost(best_env)
+    return best_env, cost
+end
+
+"""
+    solve_assignment_problem!(solver,base_search_env;kwargs...)
+
+Solve the "assignment problem"--i.e., the relaxation of the full PC-TAPF problem
+wherein we ignore collisions--using the algorithm encoded by solver.
+"""
+function solve_assignment_problem!(solver::S, model, base_search_env;
+        t0_ = Dict{AbstractID,Int}(get_vtx_id(base_search_env.schedule, v)=>t0 for (v,t0) in enumerate(base_search_env.cache.t0)),
+        tF_ = Dict{AbstractID,Int}(get_vtx_id(base_search_env.schedule, v)=>tF for (v,tF) in enumerate(base_search_env.cache.tF)),
+        TimeLimit=solver.nbs_time_limit,
+        buffer=5.0, # to give some extra time to the path planner if the milp terminates late.
+        kwargs...) where {S<:TaskGraphsMILP}
+
+    enter_assignment!(solver)
+    optimize!(model)
+    optimal = (termination_status(model) == MathOptInterface.OPTIMAL);
+    feasible = (primal_status(model) == MOI.FEASIBLE_POINT) # TODO use this!
+    if !feasible
+        throw(SolverException("Assignment problem is infeasible")))
+    end
+    if optimal
+        lower_bound = max(lower_bound, Int(round(value(objective_function(model)))) )
+    else
+        lower_bound = max(lower_bound, Int(round(value(objective_bound(model)))) )
+    end
+    schedule = deepcopy(base_search_env.schedule)
+    update_project_schedule!(model, schedule, base_search_env.problem_spec)
+end
+
+"""
+    formulate_assignment_problem(solver,base_search_env::SearchEnv;
+
+Returns an assignment problem instance that can be updated (as opposed to being
+reconstructed from scratch) on each call to `update_assignment_problem!` prior
+to being resolved.
+"""
+function formulate_assignment_problem(solver,base_search_env::SearchEnv;
+        cost_model=base_search_env.problem_spec.cost_function,
+        optimizer=get_optimizer(solver),
+        kwargs...)
+
+    project_schedule    = base_search_env.schedule
+    problem_spec        = base_search_env.problem_spec
+    formulate_milp(solver,project_schedule,problem_spec;
+        cost_model=cost_model,
+        optimizer=optimizer,
+        kwargs...)
+end
+
+"""
+    update_assignment_problem!(solver, assignment_problem)
+
+A helper method for updating an instance of an assignment problem. In the case
+    of MILP-based models, this method simply excludes all previous solutions by
+    adding new constraints on the assignment/adjacency matrix.
+"""
+function update_assignment_problem!(solver, model::TaskGraphsMILP, base_search_env)
+    exclude_solutions!(model) # exclude most recent solution in order to get next best solution
+end
+
 
 end

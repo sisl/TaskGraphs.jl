@@ -184,7 +184,7 @@ let
         TOML.print(io, TOML.parse(project_spec))
     end
     project_spec_mod = read_project_spec(filename)
-    run(`rm $filename`)
+    # run(`rm $filename`)
 
     r0 = [get_id(get_initial_location_id(robot_ICs[k])) for k in sort(collect(keys(robot_ICs)))]
     s0 = map(pred->get_id(get_initial_location_id(pred)),project_spec.initial_conditions)
@@ -195,7 +195,7 @@ let
         TOML.print(io, TOML.parse(problem_def))
     end
     problem_def = read_problem_def(filename)
-    run(`rm $filename`)
+    # run(`rm $filename`)
 end
 let
     N = 4                  # num robots
