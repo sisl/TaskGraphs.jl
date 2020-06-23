@@ -535,14 +535,22 @@ Prioritized Depth-First Search route planner.
 @with_kw struct DFSRoutePlanner{C}
     logger::SolverLogger{C} = SolverLogger{C}()
 end
-function construct_cost_model(solver::DFSRoutePlanner, schedule, cache, problem_spec, env_graph; extra_T=400, primary_objective=SumOfMakeSpans)
+function construct_heuristic_model(solver::DFSRoutePlanner,env_graph;
+        ph = PerfectHeuristic(get_dist_matrix(env_graph)),
+        kwargs...)
+    construct_composite_heuristic(ph,ph,NullHeuristic())
+end
+function construct_cost_model(solver::DFSRoutePlanner,
+        schedule, cache, problem_spec, env_graph;
+        extra_T=400, primary_objective=SumOfMakeSpans, kwargs...)
     cost_model = construct_composite_cost_model(
         primary_objective(schedule,cache),
         FullCostModel(maximum,TravelTime()),
         FullCostModel(maximum,TravelDistance())
         )
-    ph = PerfectHeuristic(get_dist_matrix(env_graph))
-    heuristic_model = construct_composite_heuristic(ph,ph,NullHeuristic())
+    heuristic_model = construct_heuristic_model(solver,env_graph;kwargs...)
+    # ph = PerfectHeuristic(get_dist_matrix(env_graph))
+    # heuristic_model = construct_composite_heuristic(ph,ph,NullHeuristic())
     cost_model, heuristic_model
 end
 
@@ -651,6 +659,24 @@ function CRCBS.solve!(solver::NBSSolver{A,P,C}, base_search_env::SearchEnv;kwarg
     cost = get_cost(best_env)
     return best_env, cost
 end
+function CRCBS.solve!(solver, env_graph, schedule::OperatingSchedule, problem_spec::ProblemSpec;
+    primary_objective=SumOfMakeSpans,
+    kwargs...)
+    base_search_env = construct_search_env(solver,schedule,problem_spec,env_graph;primary_objective=primary_objective)
+    # @show base_search_env.cache.t0
+    solve!(solver, base_search_env;
+        primary_objective=primary_objective,
+        kwargs...
+    )
+end
+function CRCBS.solve!(solver, env_graph, project_spec::ProjectSpec, problem_spec::ProblemSpec,
+        robot_ICs;kwargs...)
+    schedule = construct_partial_project_schedule(
+        project_spec,problem_spec,map(i->robot_ICs[i], 1:problem_spec.N))
+    solve!(solver, env_graph, schedule, problem_spec;
+        kwargs...)
+end
+
 
 export
     solve_assignment_problem!
