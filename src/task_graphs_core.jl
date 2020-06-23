@@ -2458,7 +2458,7 @@ Args:
 - milp_model <: TaskGraphsMILP
 - project_schedule::OperatingSchedule
 - problem_spec::ProblemSpec
-- adj_matric : an adjacency_matrix or (in the case where
+- adj_matrix : an adjacency_matrix or (in the case where
     `milp_model::AssignmentMILP`), an assignment matrix
 
 Adds all required edges to the schedule graph and modifies all nodes to
@@ -2473,6 +2473,14 @@ function update_project_schedule!(milp_model::M,
         DEBUG::Bool=false
     ) where {M<:TaskGraphsMILP,P<:OperatingSchedule,T<:ProblemSpec}
     update_project_schedule!(project_schedule,problem_spec,adj_matrix,DEBUG)
+end
+function update_project_schedule!(milp_model::M,
+        schedule::P,
+        problem_spec::T,
+        DEBUG::Bool=false
+    ) where {M<:TaskGraphsMILP,P<:OperatingSchedule,T<:ProblemSpec}
+    update_project_schedule!(milp_model,schedule,problem_spec,
+        get_assignment_matrix(model),DEBUG)
 end
 function update_project_schedule!(milp_model::AssignmentMILP,
         project_schedule::P,

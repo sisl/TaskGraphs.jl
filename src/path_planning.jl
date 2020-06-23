@@ -114,24 +114,24 @@ end
 
 
 export
-    SolverException,
+    AbstractSolverException,
     SolverTimeOutException,
     SolverMilpMaxOutException,
     SolverAstarMaxOutException,
     read_solver
 
-abstract type SolverException <: Exception end
+abstract type AbstractSolverException end
 
-@with_kw struct SolverTimeOutException <: SolverException
+@with_kw struct SolverTimeOutException <: AbstractSolverException
     msg::String = ""
 end
-@with_kw struct SolverMilpMaxOutException <: SolverException
+@with_kw struct SolverMilpMaxOutException <: AbstractSolverException
     msg::String = ""
 end
-@with_kw struct SolverCBSMaxOutException <: SolverException
+@with_kw struct SolverCBSMaxOutException <: AbstractSolverException
     msg::String = ""
 end
-@with_kw struct SolverAstarMaxOutException <: SolverException
+@with_kw struct SolverAstarMaxOutException <: AbstractSolverException
     msg::String = ""
 end
 # Helpers for printing
@@ -411,20 +411,21 @@ export
     construct_search_env,
     update_env!
 
-# @with_kw struct SearchEnv{C,E<:AbstractLowLevelEnv{State,Action,C},S<:LowLevelSolution} <: AbstractLowLevelEnv{State,Action,C}
 @with_kw struct SearchEnv{C,E<:AbstractLowLevelEnv{State,Action,C},S} <: AbstractLowLevelEnv{State,Action,C}
-    schedule::OperatingSchedule       = OperatingSchedule()
+    schedule::OperatingSchedule     = OperatingSchedule()
     cache::PlanningCache            = PlanningCache()
     env::E                          = PCCBS.LowLevelEnv()
     problem_spec::ProblemSpec       = ProblemSpec()
     dist_function::DistMatrixMap    = env.graph.dist_function # DistMatrixMap(env.graph.vtx_map, env.graph.vtxs)
     cost_model::C                   = get_cost_model(env)
     num_agents::Int                 = length(get_robot_ICs(schedule))
-    base_solution::S                = LowLevelSolution(
-        paths = map(i->Path{State,Action,get_cost_type(cost_model)}(), 1:num_agents),
+    route_plan::S                = LowLevelSolution(
+        paths = map(i->Path{State,Action,get_cost_type(cost_model)}(),
+            1:num_agents),
         cost_model = cost_model,
         costs = map(i->get_initial_cost(cost_model), 1:num_agents),
-        cost  = aggregate_costs(cost_model, map(i->get_initial_cost(cost_model), 1:num_agents)),
+        cost  = aggregate_costs(cost_model,
+            map(i->get_initial_cost(cost_model), 1:num_agents)),
         )
 end
 function CRCBS.get_start(env::SearchEnv,v::Int)
@@ -433,113 +434,113 @@ function CRCBS.get_start(env::SearchEnv,v::Int)
     PCCBS.State(start_vtx,start_time)
 end
 
-"""
-    Trim path for replanning
-"""
-function trim_path(cbs_env, old_path, T)
-    new_path = typeof(old_path)(
-        s0=get_initial_state(old_path),
-        cost=get_initial_cost(cbs_env)
-        )
-    for t in 1:max(1, min(T, length(old_path)))
-        p = get_path_node(old_path,t)
-        push!(new_path, p)
-        new_path.cost = accumulate_cost(cbs_env, get_cost(new_path), get_transition_cost(cbs_env, p.s, p.a, p.sp))
-        # set_path_cost!(trimmed_solution, new_path.cost, agent_id)
-    end
-    if T > length(new_path)
-        println("Extending path in trim_path.")
-        extend_path!(cbs_env,new_path,T)
-    end
-    new_path
-end
-function reverse_propagate_delay!(solver,cache,schedule,delay_vec)
-    buffer = zeros(nv(schedule))
-    for v in reverse(topological_sort_by_dfs(get_graph(schedule)))
-        Δt_min = get_path_spec(schedule,v).min_path_duration
-        buffer[v] = (cache.tF[v] - (cache.t0[v] + Δt_min))
-        for v2 in outneighbors(schedule,v)
-            delay_vec[v] = max(delay_vec[v], delay_vec[v2] - buffer[v2])
-            delay_vec[v] = max(0, delay_vec[v] - (cache.t0[v2] - cache.tF[v]))
-        end
-    end
-    delay_vec
-end
-function get_delay_vec(solver,cache,schedule,v0)
-    delay = zeros(nv(schedule))
-    for v in reverse(topological_sort_by_dfs(get_graph(schedule)))
-        Δt_min = get_path_spec(schedule,v).min_path_duration
-        delay[v] = (cache.tF[v] - (cache.t0[v] + Δt_min + minimum(cache.local_slack[v])))
-    end
-    # zero out all vtxs that are not predecessors of v
-    delay_vec = zeros(Int,nv(schedule))
-    for v in map(e->e.dst,collect(edges(bfs_tree(get_graph(schedule),v0;dir=:in))))
-        if cache.max_deadline[v] > 0
-            delay_vec[v] = min(delay[v],typemax(Int))
-        end
-    end
-    delay_vec
-end
-function backtrack_deadlines(solver,cache,schedule,v)
-    frontier = Set{Int}([v])
-    delay_cut = Set{Int}()
-    while length(frontier) > 0
-        v = pop!(frontier)
-        Δt_min = get_path_spec(schedule,v).min_path_duration
-        buffer = (cache.tF[v] - (cache.t0[v] + Δt_min))
-        if get_path_spec(schedule,v).fixed
-            continue
-        elseif cache.max_deadline[v] > 0 # still has room for some delay
-            push!(delay_cut,v)
-        elseif indegree(schedule,v) == 0
-            # if v is a root_node, the deadlines cannot be tightened anymore
-            log_info(-1,solver.l3_verbosity,"ISPS: deadlines cannot be tightened any more.")
-            return Set{Int}()
-        else
-            for v2 in inneighbors(schedule,v)
-                push!(frontier,v2)
-            end
-        end
-    end
-    return delay_cut
-end
-function tighten_deadline!(solver,env,route_plan,v,dt=1)
-    cache = env.cache
-    schedule = env.schedule
-    active_set = cache.active_set
-    closed_set = cache.closed_set
-    node_queue = cache.node_queue
-    graph = get_graph(schedule)
-    # adjust allowable_slack
-    cache.max_deadline[v] = max(0, cache.max_deadline[v]-1)
-    # remove from closed set
-    push!(active_set, v)
-    setdiff!(closed_set,v)
-    # Trim schedule at v.t0
-    agent_id = get_path_spec(schedule,v).agent_id
-    if agent_id != -1
-        cbs_env = typeof(env.env)(
-            graph = env.env.graph,
-            agent_idx = agent_id,
-            cost_model = get_cost_model(env.env),
-            heuristic = get_heuristic_model(env.env)
-        )
-        new_path = trim_path(cbs_env,get_paths(route_plan)[agent_id],cache.t0[v])
-        set_solution_path!(route_plan,new_path,agent_id)
-        set_path_cost!(route_plan,new_path.cost,agent_id)
-    end
-    # Update node queue
-    for v2 in map(e->e.dst,collect(edges(bfs_tree(graph,v;dir=:out))))
-        setdiff!(closed_set,v2)
-        setdiff!(active_set,v2)
-    end
-    empty!(node_queue)
-    for v2 in active_set
-        node_queue[v2] = isps_queue_cost(schedule,cache,v2)
-    end
-    env,route_plan
-end
-function update_planning_cache!(solver::M,env::E,v::Int,path::P) where {M<:PC_TAPF_Solver,E<:SearchEnv,P<:Path}
+# """
+#     Trim path for replanning
+# """
+# function trim_path(cbs_env, old_path, T)
+#     new_path = typeof(old_path)(
+#         s0=get_initial_state(old_path),
+#         cost=get_initial_cost(cbs_env)
+#         )
+#     for t in 1:max(1, min(T, length(old_path)))
+#         p = get_path_node(old_path,t)
+#         push!(new_path, p)
+#         new_path.cost = accumulate_cost(cbs_env, get_cost(new_path), get_transition_cost(cbs_env, p.s, p.a, p.sp))
+#         # set_path_cost!(trimmed_solution, new_path.cost, agent_id)
+#     end
+#     if T > length(new_path)
+#         println("Extending path in trim_path.")
+#         extend_path!(cbs_env,new_path,T)
+#     end
+#     new_path
+# end
+# function reverse_propagate_delay!(solver,cache,schedule,delay_vec)
+#     buffer = zeros(nv(schedule))
+#     for v in reverse(topological_sort_by_dfs(get_graph(schedule)))
+#         Δt_min = get_path_spec(schedule,v).min_path_duration
+#         buffer[v] = (cache.tF[v] - (cache.t0[v] + Δt_min))
+#         for v2 in outneighbors(schedule,v)
+#             delay_vec[v] = max(delay_vec[v], delay_vec[v2] - buffer[v2])
+#             delay_vec[v] = max(0, delay_vec[v] - (cache.t0[v2] - cache.tF[v]))
+#         end
+#     end
+#     delay_vec
+# end
+# function get_delay_vec(solver,cache,schedule,v0)
+#     delay = zeros(nv(schedule))
+#     for v in reverse(topological_sort_by_dfs(get_graph(schedule)))
+#         Δt_min = get_path_spec(schedule,v).min_path_duration
+#         delay[v] = (cache.tF[v] - (cache.t0[v] + Δt_min + minimum(cache.local_slack[v])))
+#     end
+#     # zero out all vtxs that are not predecessors of v
+#     delay_vec = zeros(Int,nv(schedule))
+#     for v in map(e->e.dst,collect(edges(bfs_tree(get_graph(schedule),v0;dir=:in))))
+#         if cache.max_deadline[v] > 0
+#             delay_vec[v] = min(delay[v],typemax(Int))
+#         end
+#     end
+#     delay_vec
+# end
+# function backtrack_deadlines(solver,cache,schedule,v)
+#     frontier = Set{Int}([v])
+#     delay_cut = Set{Int}()
+#     while length(frontier) > 0
+#         v = pop!(frontier)
+#         Δt_min = get_path_spec(schedule,v).min_path_duration
+#         buffer = (cache.tF[v] - (cache.t0[v] + Δt_min))
+#         if get_path_spec(schedule,v).fixed
+#             continue
+#         elseif cache.max_deadline[v] > 0 # still has room for some delay
+#             push!(delay_cut,v)
+#         elseif indegree(schedule,v) == 0
+#             # if v is a root_node, the deadlines cannot be tightened anymore
+#             log_info(-1,solver.l3_verbosity,"ISPS: deadlines cannot be tightened any more.")
+#             return Set{Int}()
+#         else
+#             for v2 in inneighbors(schedule,v)
+#                 push!(frontier,v2)
+#             end
+#         end
+#     end
+#     return delay_cut
+# end
+# function tighten_deadline!(solver,env,route_plan,v,dt=1)
+#     cache = env.cache
+#     schedule = env.schedule
+#     active_set = cache.active_set
+#     closed_set = cache.closed_set
+#     node_queue = cache.node_queue
+#     graph = get_graph(schedule)
+#     # adjust allowable_slack
+#     cache.max_deadline[v] = max(0, cache.max_deadline[v]-1)
+#     # remove from closed set
+#     push!(active_set, v)
+#     setdiff!(closed_set,v)
+#     # Trim schedule at v.t0
+#     agent_id = get_path_spec(schedule,v).agent_id
+#     if agent_id != -1
+#         cbs_env = typeof(env.env)(
+#             graph = env.env.graph,
+#             agent_idx = agent_id,
+#             cost_model = get_cost_model(env.env),
+#             heuristic = get_heuristic_model(env.env)
+#         )
+#         new_path = trim_path(cbs_env,get_paths(route_plan)[agent_id],cache.t0[v])
+#         set_solution_path!(route_plan,new_path,agent_id)
+#         set_path_cost!(route_plan,new_path.cost,agent_id)
+#     end
+#     # Update node queue
+#     for v2 in map(e->e.dst,collect(edges(bfs_tree(graph,v;dir=:out))))
+#         setdiff!(closed_set,v2)
+#         setdiff!(active_set,v2)
+#     end
+#     empty!(node_queue)
+#     for v2 in active_set
+#         node_queue[v2] = isps_queue_cost(schedule,cache,v2)
+#     end
+#     env,route_plan
+# end
+function update_planning_cache!(solver,env::E,v::Int,path::P) where {E<:SearchEnv,P<:Path}
     cache = env.cache
     schedule = env.schedule
     active_set = cache.active_set
@@ -622,6 +623,7 @@ export
 
 get_primary_cost(model,cost)                        = cost[1]
 get_primary_cost(solver::PC_TAPF_Solver,args...)    = get_primary_cost(solver.astar_model,args...)
+get_primary_cost(model::PrioritizedAStarModel,cost) = cost[2]
 
 function CRCBS.SumOfMakeSpans(schedule::S,cache::C) where {S<:OperatingSchedule,C<:PlanningCache}
     SumOfMakeSpans(
@@ -638,7 +640,8 @@ function CRCBS.MakeSpan(schedule::S,cache::C) where {S<:OperatingSchedule,C<:Pla
         cache.tF[schedule.root_nodes])
 end
 CRCBS.get_infeasible_cost(astar_model,args...) = (Inf,Inf,Inf,Inf,Inf)
-function construct_a_star_cost_model(astar_model, schedule, cache, problem_spec, env_graph; extra_T=400, primary_objective=SumOfMakeSpans)
+CRCBS.get_infeasible_cost(astar_model::DFS_PathFinder,args...) = (Inf,Inf,Inf)
+function construct_cost_model(astar_model, schedule, cache, problem_spec, env_graph; extra_T=400, primary_objective=SumOfMakeSpans)
     N = problem_spec.N
     # NOTE: This particular setting of cost model is crucial for good performance of A_star, because it encourages depth first search. If we were to replace them with SumOfTravelTime(), we would get worst-case exponentially slow breadth-first search!
     cost_model = construct_composite_cost_model(
@@ -652,8 +655,7 @@ function construct_a_star_cost_model(astar_model, schedule, cache, problem_spec,
     heuristic_model = construct_composite_heuristic(ph,NullHeuristic(),ph,ph,NullHeuristic())
     cost_model, heuristic_model
 end
-get_primary_cost(model::PrioritizedAStarModel,cost) = cost[2]
-function construct_a_star_cost_model(astar_model::PrioritizedAStarModel, schedule, cache, problem_spec, env_graph; extra_T=400, primary_objective=SumOfMakeSpans)
+function construct_cost_model(astar_model::PrioritizedAStarModel, schedule, cache, problem_spec, env_graph; extra_T=400, primary_objective=SumOfMakeSpans)
     N = problem_spec.N
     cost_model = construct_composite_cost_model(
         HardConflictCost(env_graph,maximum(cache.tF)+extra_T, N),
@@ -672,8 +674,7 @@ function construct_a_star_cost_model(astar_model::PrioritizedAStarModel, schedul
         )
     cost_model, heuristic_model
 end
-CRCBS.get_infeasible_cost(astar_model::DFS_PathFinder,args...) = (Inf,Inf,Inf)
-function construct_a_star_cost_model(astar_model::DFS_PathFinder, schedule, cache, problem_spec, env_graph; extra_T=400, primary_objective=SumOfMakeSpans)
+function construct_cost_model(astar_model::DFS_PathFinder, schedule, cache, problem_spec, env_graph; extra_T=400, primary_objective=SumOfMakeSpans)
     cost_model = construct_composite_cost_model(
         primary_objective(schedule,cache),
         FullCostModel(maximum,TravelTime()),
@@ -683,28 +684,35 @@ function construct_a_star_cost_model(astar_model::DFS_PathFinder, schedule, cach
     heuristic_model = construct_composite_heuristic(ph,ph,NullHeuristic())
     cost_model, heuristic_model
 end
-construct_a_star_cost_model(solver::PC_TAPF_Solver, args...; kwargs...) = construct_a_star_cost_model(solver.astar_model, args...; kwargs...)
+construct_cost_model(solver::PC_TAPF_Solver, args...; kwargs...) = construct_cost_model(solver.astar_model, args...; kwargs...)
 
-function construct_search_env(solver,schedule, problem_spec, env_graph;
+function construct_search_env(solver, schedule, problem_spec, env_graph;
         primary_objective=SumOfMakeSpans,
         extra_T=400,
         kwargs...
     )
     cache = initialize_planning_cache(schedule;kwargs...)
     N = problem_spec.N                                          # number of robots
-    cost_model, heuristic_model = construct_a_star_cost_model(solver, schedule, cache, problem_spec, env_graph; primary_objective=primary_objective, extra_T=extra_T)
+    cost_model, heuristic_model = construct_cost_model(
+        solver, schedule, cache, problem_spec, env_graph;
+        primary_objective=primary_objective, extra_T=extra_T)
     low_level_env = PCCBS.LowLevelEnv(
         graph=env_graph, cost_model=cost_model, heuristic=heuristic_model)
     base_route_plan = get_initial_solution(schedule,low_level_env)
 
     search_env = SearchEnv(schedule=schedule, cache=cache, env=low_level_env,
-        problem_spec=problem_spec, num_agents=N, base_solution=base_route_plan)
+        problem_spec=problem_spec, num_agents=N, route_plan=base_route_plan)
     return search_env
 end
-# function construct_search_env(solver,project_spec, problem_spec, robot_ICs, assignments, env_graph;kwargs...)
-#     schedule = construct_project_schedule(project_spec, problem_spec, robot_ICs, assignments)
-#     construct_search_env(solver,schedule, problem_spec, env_graph;kwargs...)
-# end
+function construct_search_env(solver,schedule::OperatingSchedule,
+        env::SearchEnv;
+        primary_objective=typeof(env.problem_spec.cost_function),
+        t0 = env.cache.t0,
+        tF = env.cache.tF,
+        kwargs...)
+    construct_search_env(solver,schedule,env.problem_spec,env.env;
+        primary_objective=primary_objective,t0=t0,tF=tF,kwargs...)
+end
 
 update_cost_model!(model::C,env::S) where {C,S<:SearchEnv} = nothing
 function update_cost_model!(model::C,env::S) where {C<:MultiDeadlineCost,S<:SearchEnv}
@@ -722,7 +730,9 @@ update_cost_model!(env::S) where {S<:SearchEnv} = update_cost_model!(env.cost_mo
 
     `v` is the vertex id
 """
-function update_env!(solver::S,env::E,route_plan::L,v::Int,path::P,agent_id::Int=get_path_spec(env.schedule,v).agent_id) where {S<:PC_TAPF_Solver,E<:SearchEnv,P<:Path,L<:LowLevelSolution}
+function update_env!(solver,env::SearchEnv,route_plan::L,v::Int,path::P,
+        agent_id::Int=get_path_spec(env.schedule,v).agent_id
+        ) where {P<:Path,L<:LowLevelSolution}
     cache = env.cache
     schedule = env.schedule
 
@@ -812,27 +822,29 @@ function CRCBS.build_env(solver, env::E, node::N, schedule_node::T, v::Int, path
         # base_path = extend_path(cbs_env,base_path,env.cache.t0[v])
         extend_path!(cbs_env,base_path,env.cache.t0[v])
     end
-    log_info(2,solver.l3_verbosity,
-    "LOW LEVEL SEARCH: v=$(v), node=$(string(schedule_node)), deadline=$(deadline), ",
-    "local_slack=$(env.cache.slack[v]), slack=$(env.cache.slack[v]), goal=$(string(cbs_env.goal)),
-    ")
+    # log_info(2,solver.l3_verbosity,
+    # "LOW LEVEL SEARCH: v=$(v), node=$(string(schedule_node)), deadline=$(deadline), ",
+    # "local_slack=$(env.cache.slack[v]), slack=$(env.cache.slack[v]), goal=$(string(cbs_env.goal)),
+    # ")
     return cbs_env, base_path
 end
-CRCBS.build_env(solver, env::E, node::N, v::Int) where {E<:SearchEnv,N<:ConstraintTreeNode} = build_env(solver, env, node, get_node_from_vtx(env.schedule,v), v)
-function CRCBS.build_env(solver, env::E, node::N, schedule_node::TEAM_ACTION, v::Int) where {E<:SearchEnv,N<:ConstraintTreeNode}
+CRCBS.build_env(solver, env::SearchEnv, node::ConstraintTreeNode, v::Int) = build_env(solver, env, node, get_node_from_vtx(env.schedule,v), v)
+function CRCBS.build_env(solver, env::E, node::N, schedule_node::TEAM_ACTION, v::Int;kwargs...) where {E<:SearchEnv,N<:ConstraintTreeNode}
     envs = []
     starts = Vector{PCCBS.State}()
     meta_cost = MetaCost(Vector{get_cost_type(env)}(),get_initial_cost(env.env))
     # path_specs = Vector{PathSpec}()
     for (i, sub_node) in enumerate(schedule_node.instructions)
         # if i == 1 # leader
-            ph = PerfectHeuristic(env.dist_function.dist_mtxs[schedule_node.shape][i])
-            heuristic = construct_composite_heuristic(ph,NullHeuristic(),ph,ph,NullHeuristic())
+        ph = PerfectHeuristic(env.dist_function.dist_mtxs[schedule_node.shape][i])
+        # heuristic = construct_heuristic_model(solver,env_graph;ph=ph)
+        heuristic = construct_composite_heuristic(ph,NullHeuristic(),ph,ph,NullHeuristic())
         # else
         #     heuristic = get_heuristic_model(env.env)
         # end
         cbs_env, base_path = build_env(solver,env,node,sub_node,v,generate_path_spec(env.schedule,env.problem_spec,sub_node);
             heuristic=heuristic,
+            kwargs...
         ) # TODO need problem_spec here
         push!(envs, cbs_env)
         push!(starts, get_final_state(base_path))
@@ -878,7 +890,7 @@ function plan_path!(solver::PC_TAPF_Solver, env::SearchEnv, node::N, schedule_no
                 # TODO replan with empty conflict table
                 log_info(-1,solver.l4_verbosity,"A*: replanning without conflict cost", string(schedule_node))
                 solver.num_A_star_iterations = 0
-                cost_model, heuristic_model = construct_a_star_cost_model(solver.astar_model, schedule, cache, env.problem_spec, env.env.graph;
+                cost_model, heuristic_model = construct_cost_model(solver.astar_model, schedule, cache, env.problem_spec, env.env.graph;
                     primary_objective=env.problem_spec.cost_function)
                 cbs_env, base_path = build_env(solver, env, node, schedule_node, v;cost_model=cost_model,heuristic=heuristic_model)
                 path, cost = path_finder(solver, cbs_env, base_path, heuristic)
@@ -1047,7 +1059,7 @@ function CRCBS.low_level_search!(
         path_finder=A_star
         ) where {S<:PC_TAPF_Solver,E<:SearchEnv,N<:ConstraintTreeNode}
 
-    reset_solution!(node,env.base_solution)
+    reset_solution!(node,env.route_plan)
     while length(env.cache.node_queue) > 0
         if !(plan_next_path!(solver,env,node;heuristic=heuristic,path_finder=path_finder))
             return false
@@ -1073,10 +1085,10 @@ function CRCBS.initialize_root_node(env::SearchEnv)
     N = env.num_agents
     # It is important to only have N starts! Does not matter if they are invalid states.
     dummy_mapf = MAPF(env.env,map(i->PCCBS.State(),1:N),map(i->PCCBS.State(),1:N))
-    initialize_root_node(dummy_mapf,deepcopy(env.base_solution))
+    initialize_root_node(dummy_mapf,deepcopy(env.route_plan))
 end
 function CRCBS.initialize_child_search_node(node::N,env::SearchEnv) where {N<:ConstraintTreeNode}
-    initialize_child_search_node(node,deepcopy(env.base_solution))
+    initialize_child_search_node(node,deepcopy(env.route_plan))
 end
 function CRCBS.default_solution(env::SearchEnv)
     N = env.num_agents
@@ -1123,8 +1135,6 @@ function CRCBS.low_level_search!(
     )
     search_env = SearchEnv(pc_mapf.env,cache=cache)
     for i in 1:solver.isps_model.n_repair_iters
-        # reset_cache!(pc_mapf.env.cache, pc_mapf.env.schedule) # DEBUG This line appears to be carrying over all delays introduced in the cache...
-        # valid_flag = low_level_search!(solver, pc_mapf.env, node)
         cache = initialize_planning_cache(pc_mapf.env.schedule;
             t0=deepcopy(pc_mapf.env.cache.t0),
             tF=deepcopy(pc_mapf.env.cache.tF)
@@ -1529,7 +1539,7 @@ function CRCBS.solve!(
     search_env = mapf.env
     update_planning_cache!(solver,search_env) # NOTE to get rid of all nodes that don't need planning but are in the active set
 
-    route_plan = deepcopy(search_env.base_solution)
+    route_plan = deepcopy(search_env.route_plan)
     paths = get_paths(route_plan)
     envs = Vector{PCCBS.LowLevelEnv}([PCCBS.LowLevelEnv() for p in paths])
     cbs_node = initialize_root_node(search_env)
@@ -1559,7 +1569,7 @@ function CRCBS.solve!(
 
         throw(AssertionError("ERROR in DFS! Failed to find a valid route plan!"))
     end
-    # for (path,base_path,env) in zip(paths,search_env.base_solution.paths,envs)
+    # for (path,base_path,env) in zip(paths,search_env.route_plan.paths,envs)
     #     c = base_path.cost
     #     for p in path.path_nodes[length(base_path)+1:end]
     #         c = accumulate_cost(env,c,get_transition_cost(env,p.s,p.a,p.sp))
@@ -1670,7 +1680,7 @@ function high_level_search!(solver::P, base_search_env::SearchEnv,  optimizer;
                         t0 = base_search_env.cache.t0,
                         tF = base_search_env.cache.tF
                         ) # TODO pass in previous route_plan
-                    env = SearchEnv(env,base_solution=base_search_env.base_solution)
+                    env = SearchEnv(env,route_plan=base_search_env.route_plan)
                     pc_mapf = PC_MAPF(env);
                     ##### Call CBS Search Routine (LEVEL 2) #####
                     route_plan, cache, cost = solve!(solver,pc_mapf);
@@ -1685,7 +1695,7 @@ function high_level_search!(solver::P, base_search_env::SearchEnv,  optimizer;
                 end
             end
         catch e
-            if isa(e, SolverException)
+            if isa(e, AbstractSolverException)
                 log_info(-1,solver.l1_verbosity,e.msg)
                 # if isa(e, SolverAstarMaxOutException)
                 #     throw(e)
@@ -1725,6 +1735,9 @@ function high_level_search!(milp_model::M, args...;kwargs...) where {M<:TaskGrap
     high_level_search!(args...;milp_model=milp_model,kwargs...)
 end
 
+################################################################################
+################################# Replanning ###################################
+################################################################################
 export
     get_env_snapshot,
     trim_route_plan
@@ -2185,7 +2198,7 @@ function replan!(solver, replan_model, search_env, env_graph, problem_spec, rout
     tF = map(v->get(new_cache.tF, v, t_commit), vertices(get_graph(new_schedule)))
     base_search_env = construct_search_env(solver, new_schedule, search_env.problem_spec, env_graph;t0=t0,tF=tF)
     trimmed_route_plan = trim_route_plan(base_search_env, route_plan, t_commit)
-    base_search_env = SearchEnv(base_search_env, base_solution=trimmed_route_plan)
+    base_search_env = SearchEnv(base_search_env, route_plan=trimmed_route_plan)
     base_search_env, solver
 end
 replan!(solver, replan_model::NullReplanner, search_env, args...;kwargs...) = search_env

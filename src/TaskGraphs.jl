@@ -35,6 +35,8 @@ include("utils.jl")
 @reexport using TaskGraphs.TaskGraphsUtils
 include("path_planning.jl")
 @reexport using TaskGraphs.PathPlanning
+include("pc_tapf_solvers.jl")
+@reexport using TaskGraphs.Solvers
 include("helpers.jl")
 @reexport using TaskGraphs.Helpers
 include("profiling.jl")

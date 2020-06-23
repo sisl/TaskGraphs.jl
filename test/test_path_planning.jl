@@ -132,7 +132,7 @@ end
 #         project_schedule = search_env.schedule
 #         N = search_env.num_agents
 #
-#         route_plan = deepcopy(search_env.base_solution)
+#         route_plan = deepcopy(search_env.route_plan)
 #         paths = get_paths(route_plan)
 #         envs = Vector{PCCBS.LowLevelEnv}([PCCBS.LowLevelEnv() for i in 1:N])
 #         cbs_node = initialize_root_node(search_env)
@@ -221,7 +221,7 @@ end
 #     )
 #     search_env = construct_search_env(solver, project_schedule, problem_spec, env_graph;primary_objective=cost_model)
 #
-#     route_plan = deepcopy(search_env.base_solution)
+#     route_plan = deepcopy(search_env.route_plan)
 #     paths = get_paths(route_plan)
 #     envs = Vector{PCCBS.LowLevelEnv}([PCCBS.LowLevelEnv() for p in paths])
 #     cbs_node = initialize_root_node(search_env)
@@ -266,7 +266,7 @@ end
 #     project_schedule = search_env.schedule
 #     N = search_env.num_agents
 #
-#     route_plan = deepcopy(search_env.base_solution)
+#     route_plan = deepcopy(search_env.route_plan)
 #     paths = get_paths(route_plan)
 #     envs = Vector{PCCBS.LowLevelEnv}([PCCBS.LowLevelEnv() for i in 1:N])
 #     cbs_node = initialize_root_node(search_env)
