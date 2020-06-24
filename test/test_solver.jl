@@ -18,12 +18,6 @@ let
     TaskGraphs.Solvers.reset_solver!(logger)
 end
 let
-    NBSSolver(
-        assignment_model=TaskGraphsMILPSolver(AssignmentMILP()),
-        route_planner=
-    )
-end
-let
     # init search env
     for (i, f) in enumerate([
         initialize_toy_problem_1,
@@ -40,12 +34,12 @@ let
                 costs = Float64[]
                 project_spec, problem_spec, robot_ICs, assignments, env_graph = f(;verbose=false);
                 for solver in [
-                        NBSSolver(assignment_model=AssignmentMILP()),
-                        NBSSolver(assignment_model=AdjacencyMILP()),
-                        NBSSolver(assignment_model=SparseAdjacencyMILP()),
-                        NBSSolver(assignment_model=GreedyAssignment(),iteration_limit=2),
+                        TaskGraphsMILPSolver(AssignmentMILP()),
+                        # TaskGraphsMILPSolver(AdjacencyMILP()),
+                        TaskGraphsMILPSolver(SparseAdjacencyMILP()),
+                        # GreedyAssignment(),
                         ]
-                    # @show i, f, solver.nbs_model
+                    @show i, f, solver
                     # construct search env
                     schedule = construct_partial_project_schedule(
                         project_spec,
@@ -59,16 +53,19 @@ let
                         env_graph;
                         primary_objective=cost_model,
                         )
-                    # solve
-                    solution, cost = solve!(solver,search_env;
+                    # solve task assignment problem
+                    prob = formulate_assignment_problem(solver,search_env;
                         optimizer=Gurobi.Optimizer,
-                        )
-
-                    if !isa(solver.assignment_model,GreedyAssignment)
+                    )
+                    sched, cost = solve_assignment_problem!(solver,prob,search_env)
+                    # solve
+                    # solution, cost = solve!(solver,search_env;
+                    #     optimizer=Gurobi.Optimizer,
+                    #     )
+                    if !isa(solver.milp,GreedyAssignment)
                         push!(costs, cost[1])
                     end
-                    @test validate(solution.schedule)
-                    @test validate(solution.schedule, convert_to_vertex_lists(solution.route_plan), solution.cache.t0, solution.cache.tF)
+                    @test validate(sched)
                     @test cost[1] != Inf
                 end
                 @test all(costs .== costs[1])

@@ -1701,7 +1701,7 @@ function formulate_optimization_problem(N,M,G,D,Δt,Δt_collect,Δt_deliver,to0_
         end
     end
     # cost depends only on root node(s)
-    if cost_model == SumOfMakeSpans
+    if cost_model <: SumOfMakeSpans
         @variable(model, T[1:length(root_nodes)])
         for (i,project_head) in enumerate(root_nodes)
             for v in project_head
@@ -1710,7 +1710,7 @@ function formulate_optimization_problem(N,M,G,D,Δt,Δt_collect,Δt_deliver,to0_
         end
         @objective(model, Min, sum(map(i->T[i]*get(weights,i,0.0), 1:length(root_nodes))))
         # @objective(model, Min, sum(map(v->tof[v]*get(weights,v,0.0), root_nodes)))
-    elseif cost_model == MakeSpan
+    elseif cost_model <: MakeSpan
         @variable(model, T)
         @constraint(model, T .>= tof .+ Δt)
         @objective(model, Min, T)
@@ -2037,7 +2037,7 @@ function formulate_schedule_milp(project_schedule::OperatingSchedule,problem_spe
     @constraint(model, X .== Xa .+ Xj)
 
     # Formulate Objective
-    if cost_model == SumOfMakeSpans
+    if cost_model <: SumOfMakeSpans
         root_nodes = project_schedule.root_nodes
         @variable(model, T[1:length(root_nodes)])
         for (i,project_head) in enumerate(root_nodes)
@@ -2046,7 +2046,7 @@ function formulate_schedule_milp(project_schedule::OperatingSchedule,problem_spe
             end
         end
         cost1 = @expression(model, sum(map(v->tF[v]*get(project_schedule.weights,v,0.0), root_nodes)))
-    elseif cost_model == MakeSpan
+    elseif cost_model <: MakeSpan
         @variable(model, T)
         @constraint(model, T .>= tF)
         cost1 = @expression(model, T)
@@ -2197,7 +2197,7 @@ function formulate_milp(milp_model::SparseAdjacencyMILP,project_schedule::Operat
     @expression(model, X, Xa .+ Xj) # Make X an expression rather than a variable
 
     # Formulate Objective
-    if cost_model == SumOfMakeSpans
+    if cost_model <: SumOfMakeSpans
         root_nodes = project_schedule.root_nodes
         @variable(model, T[1:length(root_nodes)])
         for (i,project_head) in enumerate(root_nodes)
@@ -2206,7 +2206,7 @@ function formulate_milp(milp_model::SparseAdjacencyMILP,project_schedule::Operat
             end
         end
         cost1 = @expression(model, sum(map(v->tF[v]*get(project_schedule.weights,v,0.0), root_nodes)))
-    elseif cost_model == MakeSpan
+    elseif cost_model <: MakeSpan
         @variable(model, T)
         @constraint(model, T .>= tF)
         cost1 = @expression(model, T)
@@ -2419,9 +2419,9 @@ reflect the appropriate valid IDs (e.g., `Action` nodes are populated with
 the correct `RobotID`s)
 Returns `false` if the new edges cause cycles in the project graph.
 """
-function update_project_schedule!(project_schedule::P,problem_spec::T,adj_matrix,DEBUG::Bool=false) where {P<:OperatingSchedule,T<:ProblemSpec}
+function update_project_schedule!(schedule::P,problem_spec::T,adj_matrix,DEBUG::Bool=false) where {P<:OperatingSchedule,T<:ProblemSpec}
     # Add all new edges to project schedule
-    G = get_graph(project_schedule)
+    G = get_graph(schedule)
     # remove existing edges first, so that there is no carryover between consecutive MILP iterations
     for e in collect(edges(G))
         rem_edge!(G, e)
@@ -2435,10 +2435,10 @@ function update_project_schedule!(project_schedule::P,problem_spec::T,adj_matrix
         end
     end
     # DEBUG ? @assert(is_cyclic(G) == false) : nothing
-    # @assert !is_cyclic(G) "update_project_schedule!() -------> is_cyclic(G)"
+    # @assert !is_cyclic(G) "update_schedule!() -------> is_cyclic(G)"
     try
-        propagate_valid_ids!(project_schedule,problem_spec)
-        @assert validate(project_schedule)
+        propagate_valid_ids!(schedule,problem_spec)
+        @assert validate(schedule)
     catch e
         if isa(e, AssertionError)
             println(e.msg)
@@ -2466,28 +2466,28 @@ reflect the appropriate valid IDs (e.g., `Action` nodes are populated with
 the correct `RobotID`s)
 Returns `false` if the new edges cause cycles in the project graph.
 """
-function update_project_schedule!(milp_model::M,
-        project_schedule::P,
-        problem_spec::T,
-        adj_matrix,
+function update_project_schedule!(model::TaskGraphsMILP,
+        project_schedule::OperatingSchedule,
+        problem_spec::ProblemSpec,
+        adj_matrix::A,
         DEBUG::Bool=false
-    ) where {M<:TaskGraphsMILP,P<:OperatingSchedule,T<:ProblemSpec}
+    ) where {A<:AbstractMatrix}
     update_project_schedule!(project_schedule,problem_spec,adj_matrix,DEBUG)
 end
-function update_project_schedule!(milp_model::M,
-        schedule::P,
-        problem_spec::T,
+function update_project_schedule!(model::TaskGraphsMILP,
+        project_schedule::OperatingSchedule,
+        problem_spec::ProblemSpec,
         DEBUG::Bool=false
-    ) where {M<:TaskGraphsMILP,P<:OperatingSchedule,T<:ProblemSpec}
-    update_project_schedule!(milp_model,schedule,problem_spec,
+    )
+    update_project_schedule!(model,project_schedule,problem_spec,
         get_assignment_matrix(model),DEBUG)
 end
-function update_project_schedule!(milp_model::AssignmentMILP,
-        project_schedule::P,
-        problem_spec::T,
-        assignment_matrix,
+function update_project_schedule!(model::AssignmentMILP,
+        project_schedule::OperatingSchedule,
+        problem_spec::ProblemSpec,
+        assignment_matrix::A,
         DEBUG::Bool=false
-    ) where {P<:OperatingSchedule,T<:ProblemSpec}
+    ) where {A<:AbstractMatrix}
     N = length(get_robot_ICs(project_schedule))
     M = length(get_object_ICs(project_schedule))
     # assignment_dict, assignments = get_assignment_dict(assignment_matrix,problem_spec.N,problem_spec.M)

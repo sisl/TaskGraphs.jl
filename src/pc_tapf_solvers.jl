@@ -170,6 +170,10 @@ Low-level proritized path planner that employs Slack-and-Collision-Aware A*.
 end
 search_trait(solver::PrioritizedAStarSC) = Prioritized()
 
+export
+    construct_heuristic_model,
+    construct_cost_model
+
 """
     construct_heuristic_model(solver,env_graph;kwargs...)
 
@@ -333,6 +337,9 @@ function plan_path!(solver::AStarSC, env::SearchEnv, node::N,
     return true
 end
 
+export
+    ISPS
+
 """
     ISPSPlanner
 
@@ -446,6 +453,9 @@ function CRCBS.low_level_search!(solver::ISPS, pc_mapf::M, node::N,
     return search_env, valid_flag
 end
 
+export
+    CBSRoutePlanner
+
 """
     CBSRoutePlanner
 
@@ -526,6 +536,9 @@ function CRCBS.solve!(
     return SearchEnv(search_env,cache=mapf.env.cache,route_plan=solution)
     # return solution, mapf.env.cache, cost
 end
+
+export
+    DFSRoutePlanner
 
 """
     DFSRoutePlanner
@@ -630,11 +643,11 @@ function CRCBS.solve!(solver::NBSSolver{A,P,C}, base_search_env::SearchEnv;kwarg
     while optimality_gap(solver) > 0
         try
             update_assignment_problem!(solver, assignment_problem, base_search_env)
-            schedule, lower_bound = solve_assignment_problem!(
+            schedule, l_bound = solve_assignment_problem!(
                 assignment_solver(solver),
                 assignment_problem,
                 base_search_env;kwargs...)
-            set_lower_bound!(solver,lower_bound)
+            set_lower_bound!(solver,l_bound)
             if optimality_gap(solver) > 0
                 env = plan_route!(
                     route_planner(solver),
@@ -677,39 +690,6 @@ function CRCBS.solve!(solver, env_graph, project_spec::ProjectSpec, problem_spec
         kwargs...)
 end
 
-
-export
-    solve_assignment_problem!
-
-"""
-    solve_assignment_problem!(solver,base_search_env;kwargs...)
-
-Solve the "assignment problem"--i.e., the relaxation of the full PC-TAPF problem
-wherein we ignore collisions--using the algorithm encoded by solver.
-"""
-function solve_assignment_problem!(solver::S, model, base_search_env;
-        t0_ = Dict{AbstractID,Int}(get_vtx_id(base_search_env.schedule, v)=>t0 for (v,t0) in enumerate(base_search_env.cache.t0)),
-        tF_ = Dict{AbstractID,Int}(get_vtx_id(base_search_env.schedule, v)=>tF for (v,tF) in enumerate(base_search_env.cache.tF)),
-        TimeLimit=min(deadline(solver)-time(),runtime_limit(solver)),
-        buffer=5.0, # to give some extra time to the path planner if the milp terminates late.
-        kwargs...) where {S<:TaskGraphsMILPSolver}
-
-    # enter_assignment!(solver)
-    optimize!(model)
-    if primal_status(model) != MOI.FEASIBLE_POINT
-        throw(SolverException("Assignment problem is infeasible -- in `solve_assignment_problem!()`"))
-    end
-    if termination_status(model) == MOI.OPTIMAL
-        lower_bound = max(lower_bound, Int(round(value(objective_function(model)))) )
-    else
-        lower_bound = max(lower_bound, Int(round(value(objective_bound(model)))) )
-    end
-    set_lower_bound!(solver,lower_bound)
-    schedule = deepcopy(base_search_env.schedule)
-    update_project_schedule!(model, schedule, base_search_env.problem_spec)
-    schedule, lower_bound
-end
-
 export
     formulate_assignment_problem
 
@@ -721,7 +701,7 @@ reconstructed from scratch) on each call to `update_assignment_problem!` prior
 to being resolved.
 """
 function formulate_assignment_problem(solver,base_search_env::SearchEnv;
-        cost_model=typeof(base_search_env.problem_spec.cost_function),
+        cost_model=base_search_env.problem_spec.cost_function,
         # optimizer=get_optimizer(solver), #TODO where to pass in the optimizer?
         kwargs...)
 
@@ -748,6 +728,40 @@ function update_assignment_problem!(solver, model::TaskGraphsMILPSolver, base_se
 end
 
 export
+    solve_assignment_problem!
+
+"""
+    solve_assignment_problem!(solver,base_search_env;kwargs...)
+
+Solve the "assignment problem"--i.e., the relaxation of the full PC-TAPF problem
+wherein we ignore collisions--using the algorithm encoded by solver.
+"""
+function solve_assignment_problem!(solver::S, model, base_search_env;
+        t0_ = Dict{AbstractID,Int}(get_vtx_id(base_search_env.schedule, v)=>t0 for (v,t0) in enumerate(base_search_env.cache.t0)),
+        tF_ = Dict{AbstractID,Int}(get_vtx_id(base_search_env.schedule, v)=>tF for (v,tF) in enumerate(base_search_env.cache.tF)),
+        TimeLimit=min(deadline(solver)-time(),runtime_limit(solver)),
+        buffer=5.0, # to give some extra time to the path planner if the milp terminates late.
+        kwargs...) where {S<:TaskGraphsMILPSolver}
+
+    # enter_assignment!(solver)
+    l_bound = lower_bound(solver)
+    optimize!(model)
+    if primal_status(model) != MOI.FEASIBLE_POINT
+        throw(SolverException("Assignment problem is infeasible -- in `solve_assignment_problem!()`"))
+    end
+    if termination_status(model) == MOI.OPTIMAL
+        l_bound = max(l_bound, Int(round(value(objective_function(model)))) )
+    else
+        l_bound = max(l_bound, Int(round(value(objective_bound(model)))) )
+    end
+    set_lower_bound!(solver,l_bound)
+    schedule = deepcopy(base_search_env.schedule)
+    update_project_schedule!(model, schedule, base_search_env.problem_spec)
+    schedule, l_bound
+end
+
+
+export
     plan_route!
 
 """
@@ -763,14 +777,14 @@ Outputs:
 - A `SearchEnv` the contains a valid solution
 """
 function plan_route!(
-        solver::CBSRoutePlanner,
+        solver,
         schedule,
         base_search_env;
         kwargs...)
 
-    env = construct_search_env(solver,schedule, base_search_env;kwargs...)
-    route_plan, cache, cost = solve!(solver,PC_MAPF(env));
-    SearchEnv(env,cache=cache), cost
+    env = construct_search_env(solver, schedule, base_search_env;kwargs...)
+    route_plan, cache, cost = solve!(solver, PC_MAPF(env));
+    SearchEnv(env, cache=cache), cost
 end
 
 end

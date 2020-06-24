@@ -210,7 +210,7 @@ let
         N,M,pickup_zones,dropoff_zones,free_zones,dist_matrix)
 
     project_schedule = construct_partial_project_schedule(project_spec,problem_spec,robot_ICs)
-    model = formulate_milp(AssignmentMILP(),project_schedule,problem_spec;cost_model=MakeSpan())
+    model = formulate_milp(AssignmentMILP(),project_schedule,problem_spec;cost_model=MakeSpan)
     optimize!(model)
     @test termination_status(model) == MOI.OPTIMAL
     cost = Int(round(value(objective_function(model))))
