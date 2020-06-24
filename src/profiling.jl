@@ -293,7 +293,7 @@ function construct_replanner_result_dataframe(problem_dir,results_dir,N_problems
 end
 
 function profile_task_assignment(solver, project_spec, problem_spec, robot_ICs, env_graph, dist_matrix;
-    primary_objective=SumOfMakeSpans,kwargs...)
+    primary_objective=SumOfMakeSpans(),kwargs...)
 
     project_schedule = construct_partial_project_schedule(project_spec, problem_spec, robot_ICs)
     model = formulate_milp(solver.nbs_model,project_schedule,problem_spec)
@@ -315,7 +315,7 @@ function profile_task_assignment(solver, project_spec, problem_spec, robot_ICs, 
     results_dict
 end
 function profile_low_level_search_and_repair(solver, project_spec, problem_spec, robot_ICs, env_graph,dist_matrix,adj_matrix;
-    primary_objective=SumOfMakeSpans)
+    primary_objective=SumOfMakeSpans())
 
     # solver = PC_TAPF_Solver(verbosity=0,LIMIT_A_star_iterations=10*nv(env_graph));
     project_schedule = construct_partial_project_schedule(project_spec,problem_spec,robot_ICs)
@@ -347,7 +347,7 @@ function profile_low_level_search_and_repair(solver, project_spec, problem_spec,
     end
 end
 function profile_low_level_search(solver, project_spec, problem_spec, robot_ICs, env_graph,dist_matrix,adj_matrix;
-    primary_objective=SumOfMakeSpans)
+    primary_objective=SumOfMakeSpans())
 
     # solver = PC_TAPF_Solver(verbosity=0,LIMIT_A_star_iterations=10*nv(env_graph));
     project_schedule = construct_partial_project_schedule(project_spec,problem_spec,robot_ICs)
@@ -379,7 +379,7 @@ function profile_low_level_search(solver, project_spec, problem_spec, robot_ICs,
     end
 end
 function profile_full_solver(solver, project_spec, problem_spec, robot_ICs, env_graph,dist_matrix;
-        primary_objective=SumOfMakeSpans,save_paths=false,kwargs...)
+        primary_objective=SumOfMakeSpans(),save_paths=false,kwargs...)
     # Solve the problem
     # solver = PC_TAPF_Solver(verbosity=0,LIMIT_A_star_iterations=5*nv(env_graph));
 
@@ -437,7 +437,7 @@ function compile_solver_results(solver, solution, cost, search_env, optimality_g
     dict
 end
 function profile_replanning(replan_model, fallback_model, solver, fallback_solver, project_list, env_graph, dist_matrix, solver_config,problem_config;
-        primary_objective=SumOfMakeSpans, kwargs...
+        primary_objective=SumOfMakeSpans(), kwargs...
     )
 
     solver_template             = deepcopy(solver)
@@ -603,7 +603,7 @@ function run_profiling(MODE=:nothing;
     TimeLimit=solver_template.time_limit,
     OutputFlag=0,
     Presolve = -1,
-    primary_objective=SumOfMakeSpans
+    primary_objective=SumOfMakeSpans()
     )
     # solver profiling
     env_filename = string(ENVIRONMENT_DIR,"/env_",env_id,".toml")
@@ -761,7 +761,7 @@ function run_replanner_profiling(MODE=:nothing;
         OutputFlag      = get(solver_config,:OutputFlag,    0),
         Presolve        = get(solver_config,:Presolve,      -1),
         initial_problem_id = 1,
-        primary_objective=SumOfMakeSpans,
+        primary_objective=SumOfMakeSpans(),
         time_out_buffer=1
     )
     # solver profiling

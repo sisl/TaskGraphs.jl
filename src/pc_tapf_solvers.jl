@@ -2,6 +2,7 @@ module Solvers
 
 using Parameters
 using MathOptInterface, JuMP
+using GraphUtils
 
 using CRCBS
 using ..TaskGraphs
@@ -144,6 +145,9 @@ abstract type SearchTrait end
 struct Prioritized <: SearchTrait end
 struct NonPrioritized <: SearchTrait end
 
+export
+    AStarSC
+
 """
     AStarSC
 
@@ -159,6 +163,9 @@ Fields:
 end
 search_trait(solver::AStarSC) = NonPrioritized()
 
+export
+    PrioritizedAStarSC
+
 """
     PrioritizedAStarSC
 
@@ -171,8 +178,7 @@ end
 search_trait(solver::PrioritizedAStarSC) = Prioritized()
 
 export
-    construct_heuristic_model,
-    construct_cost_model
+    construct_heuristic_model
 
 """
     construct_heuristic_model(solver,env_graph;kwargs...)
@@ -196,6 +202,9 @@ function construct_heuristic_model(solver, args...;kwargs...)
     construct_heuristic_model(search_trait(solver),solver,args...;kwargs...)
 end
 
+export
+    construct_cost_model
+
 """
     construct_cost_model(solver::AStarSC, args...;kwargs...)
 
@@ -205,12 +214,12 @@ because it encourages depth first search. If we were to replace terms 3-5 with
 SumOfTravelTime(), we would get worst-case exponentially slow breadth-first
 search!
 """
-function construct_cost_model(trait::NonPrioritized,
+function TaskGraphs.construct_cost_model(trait::NonPrioritized,
         solver, schedule, cache, problem_spec, env_graph;
-        extra_T=400, primary_objective=SumOfMakeSpans)
+        extra_T=400, primary_objective=SumOfMakeSpans())
     N = problem_spec.N
     cost_model = construct_composite_cost_model(
-        primary_objective(schedule,cache),
+        typeof(primary_objective)(schedule,cache),
         HardConflictCost(env_graph,maximum(cache.tF)+extra_T, N),
         SumOfTravelDistance(),
         FullCostModel(sum,NullCost()), # SumOfTravelTime(),
@@ -221,7 +230,7 @@ function construct_cost_model(trait::NonPrioritized,
     # heuristic_model = construct_composite_heuristic(ph,NullHeuristic(),ph,ph,NullHeuristic())
     cost_model, heuristic_model
 end
-function construct_cost_model(trait::Prioritized,args...;kwargs...)
+function TaskGraphs.construct_cost_model(trait::Prioritized,args...;kwargs...)
     c, h = construct_cost_model(NonPrioritized(),args...;kwargs...)
     # switch the first two elements of the cost and heuristic models
     cost_model = construct_composite_cost_model(
@@ -236,7 +245,7 @@ function construct_cost_model(trait::Prioritized,args...;kwargs...)
     )
     cost_model, heuristic
 end
-function construct_cost_model(solver, args...;kwargs...)
+function TaskGraphs.construct_cost_model(solver, args...;kwargs...)
     construct_cost_model(search_trait(solver),solver,args...;kwargs...)
 end
 
@@ -349,7 +358,7 @@ Path planner that employs Incremental Slack-Prioritized Search.
     low_level_planner::L = L()
     logger::SolverLogger{C} = SolverLogger{C}()
 end
-construct_cost_model(solver::ISPS,args...;kwargs...) = construct_cost_model(solver.low_level_planner,args...;kwargs...)
+TaskGraphs.construct_cost_model(solver::ISPS,args...;kwargs...) = construct_cost_model(solver.low_level_planner,args...;kwargs...)
 search_trait(solver::ISPS) = search_trait(solver.low_level_planner)
 function set_best_cost!(solver::ISPS,cost)
     set_best_cost!(get_logger(solver),cost)
@@ -465,7 +474,7 @@ Path planner that employs Conflict-Based Search
     low_level_planner::L = L()
     logger::SolverLogger{C} = SolverLogger{C}()
 end
-construct_cost_model(solver::CBSRoutePlanner,args...;kwargs...) = construct_cost_model(solver.low_level_planner,args...;kwargs...)
+TaskGraphs.construct_cost_model(solver::CBSRoutePlanner,args...;kwargs...) = construct_cost_model(solver.low_level_planner,args...;kwargs...)
 search_trait(solver::CBSRoutePlanner) = search_trait(solver.low_level_planner)
 function set_best_cost!(solver::CBSRoutePlanner,cost)
     set_best_cost!(get_logger(solver),cost)
@@ -553,11 +562,11 @@ function construct_heuristic_model(solver::DFSRoutePlanner,env_graph;
         kwargs...)
     construct_composite_heuristic(ph,ph,NullHeuristic())
 end
-function construct_cost_model(solver::DFSRoutePlanner,
+function TaskGraphs.construct_cost_model(solver::DFSRoutePlanner,
         schedule, cache, problem_spec, env_graph;
-        extra_T=400, primary_objective=SumOfMakeSpans, kwargs...)
+        extra_T=400, primary_objective=SumOfMakeSpans(), kwargs...)
     cost_model = construct_composite_cost_model(
-        primary_objective(schedule,cache),
+        typeof(primary_objective)(schedule,cache),
         FullCostModel(maximum,TravelTime()),
         FullCostModel(maximum,TravelDistance())
         )
@@ -602,14 +611,14 @@ The input to the route planner is the PC-TAPF problem spec along with the
 `OperatingSchedule` that comes from the assignment solution.
 """
 @with_kw struct NBSSolver{A,P,C} <: AbstractPCTAPFSolver
-    assigment_model ::A     = SparseAdjacencyMILP()
+    assignment_model ::A     = SparseAdjacencyMILP()
     path_planner    ::P     = CBSRoutePlanner{ISPS{AStarSC{C},C},C}()
     logger          ::SolverLogger{C} = SolverLogger{C}()
 end
 assignment_solver(solver::NBSSolver) = solver.assignment_model
 route_planner(solver::NBSSolver) = solver.path_planner
-construct_cost_model(solver::NBSSolver,args...;kwargs...) = construct_cost_model(route_planner(solver),args...;kwargs...)
-search_trait(solver::ISPS) = search_trait(solver.low_level_planner)
+TaskGraphs.construct_cost_model(solver::NBSSolver,args...;kwargs...) = construct_cost_model(route_planner(solver),args...;kwargs...)
+search_trait(solver::NBSSolver) = search_trait(route_planner(solver))
 function set_best_cost!(solver::NBSSolver,cost)
     set_best_cost!(get_logger(solver),cost)
     set_best_cost!(route_planner(solver),cost)
@@ -673,7 +682,7 @@ function CRCBS.solve!(solver::NBSSolver{A,P,C}, base_search_env::SearchEnv;kwarg
     return best_env, cost
 end
 function CRCBS.solve!(solver, env_graph, schedule::OperatingSchedule, problem_spec::ProblemSpec;
-    primary_objective=SumOfMakeSpans,
+    primary_objective=SumOfMakeSpans(),
     kwargs...)
     base_search_env = construct_search_env(solver,schedule,problem_spec,env_graph;primary_objective=primary_objective)
     # @show base_search_env.cache.t0

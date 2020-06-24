@@ -112,7 +112,7 @@ function construct_task_graphs_problem(
         dist_matrix;
         Δt_collect=zeros(length(s0)),
         Δt_deliver=zeros(length(sF)),
-        cost_function=SumOfMakeSpans,
+        cost_function=SumOfMakeSpans(),
         task_shapes=map(o->(1,1),s0),
         shape_dict=Dict{Int,Dict{Tuple{Int,Int},Vector{Int}}}(s=>Dict{Tuple{Int,Int},Vector{Int}}() for s in vcat(s0,sF))
         ) where {P<:ProjectSpec}
@@ -187,7 +187,7 @@ function construct_task_graphs_problem(
         Δt_collect=zeros(length(object_ICs)),
         Δt_deliver=zeros(length(object_ICs)),
         Δt_process=zeros(length(operations));
-        cost_function=SumOfMakeSpans
+        cost_function=SumOfMakeSpans()
         ) where {P<:ProjectSpec}
     # select subset of pickup, dropoff and free locations to instantiate objects and robots
     # r0,s0,sF        = get_random_problem_instantiation(N,M,pickup_vtxs,dropoff_vtxs,free_vtxs)

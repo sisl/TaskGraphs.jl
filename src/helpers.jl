@@ -64,7 +64,7 @@ function initialize_toy_problem(r0,s0,sF,dist_function)
 end
 
 # This is a place to put reusable problem initializers for testing
-function initialize_toy_problem_1(;cost_function=SumOfMakeSpans,verbose=false)
+function initialize_toy_problem_1(;cost_function=SumOfMakeSpans(),verbose=false)
     N = 2                  # num robots
     M = 3                  # num delivery tasks
     vtx_grid = initialize_dense_vtx_grid(4,4)
@@ -105,7 +105,7 @@ end
     robot 2 will do [4-8-32]. The key thing is that robot 1 will need to wait
     until robot 2 is finished before robot 1 can do its second task
 """
-function initialize_toy_problem_2(;cost_function=SumOfMakeSpans,verbose=false)
+function initialize_toy_problem_2(;cost_function=SumOfMakeSpans(),verbose=false)
     N = 2                  # num robots
     M = 3                  # num delivery tasks
     vtx_grid = initialize_dense_vtx_grid(8,4)
@@ -161,7 +161,7 @@ end
     Third operation:
         robot 2 does [8-12-16]
 """
-function initialize_toy_problem_3(;cost_function=SumOfMakeSpans,verbose=false,Δt_op=0,Δt_collect=[0,0,0,0],Δt_deliver=[0,0,0,0])
+function initialize_toy_problem_3(;cost_function=SumOfMakeSpans(),verbose=false,Δt_op=0,Δt_collect=[0,0,0,0],Δt_deliver=[0,0,0,0])
     N = 2                  # num robots
     M = 4                  # num delivery tasks
     vtx_grid = initialize_dense_vtx_grid(8,4)
@@ -219,7 +219,7 @@ end
         robot 1 does [2-2-8]
         robot 2 does [4-4-6]
 """
-function initialize_toy_problem_4(;cost_function=SumOfMakeSpans,verbose=false)
+function initialize_toy_problem_4(;cost_function=SumOfMakeSpans(),verbose=false)
     N = 2                  # num robots
     M = 2                  # num delivery tasks
     vtx_grid = initialize_dense_vtx_grid(3,3)
@@ -272,7 +272,7 @@ end
         robot 1 does [3-11]
         robot 2 does [15-7]
 """
-function initialize_toy_problem_5(;cost_function=SumOfMakeSpans,verbose=false)
+function initialize_toy_problem_5(;cost_function=SumOfMakeSpans(),verbose=false)
     N = 2                  # num robots
     M = 2                  # num delivery tasks
     vtx_grid = initialize_dense_vtx_grid(4,4)
@@ -318,7 +318,7 @@ end
     robot 2 will do [4-8-32]. The key thing is that robot 1 will need to wait
     until robot 2 is finished before robot 1 can do its second task
 """
-function initialize_toy_problem_6(;cost_function=SumOfMakeSpans,verbose=false,Δt_op=1,Δt_collect=[0,0,0],Δt_deliver=[0,0,0])
+function initialize_toy_problem_6(;cost_function=SumOfMakeSpans(),verbose=false,Δt_op=1,Δt_collect=[0,0,0],Δt_deliver=[0,0,0])
     N = 2                  # num robots
     M = 3                  # num delivery tasks
     vtx_grid = initialize_dense_vtx_grid(8,4)
@@ -355,7 +355,7 @@ end
     Robot 2 will have to sit and wait at the pickup station, meaning that robot 1 will have to go around
     if robot 2 is on the critical path
 """
-function initialize_toy_problem_7(;cost_function=SumOfMakeSpans,verbose=false,Δt_op=0,Δt_collect=[0,4,0],Δt_deliver=[0,0,0])
+function initialize_toy_problem_7(;cost_function=SumOfMakeSpans(),verbose=false,Δt_op=0,Δt_collect=[0,4,0],Δt_deliver=[0,0,0])
     N = 2                  # num robots
     M = 3                  # num delivery tasks
     vtx_grid = initialize_dense_vtx_grid(4,4)
@@ -387,7 +387,7 @@ end
     two-headed project. Robot 1 does the first half of the first head, and
     robot 2 handles the first half of the second head, and then they swap.
 """
-function initialize_toy_problem_8(;cost_function=SumOfMakeSpans,verbose=false,Δt_op=0,Δt_collect=[0,0,0,0],Δt_deliver=[0,0,0,0])
+function initialize_toy_problem_8(;cost_function=SumOfMakeSpans(),verbose=false,Δt_op=0,Δt_collect=[0,0,0,0],Δt_deliver=[0,0,0,0])
     N = 2                  # num robots
     M = 4                  # num delivery tasks
     vtx_grid = initialize_dense_vtx_grid(8,4)
@@ -427,7 +427,7 @@ export
 """
     Project with station-sharing. Station 5 needs to accessed by both robots for picking up their objects.
 """
-function initialize_toy_problem_9(;cost_function=SumOfMakeSpans,verbose=false,Δt_op=0,Δt_collect=[0,0],Δt_deliver=[0,0])
+function initialize_toy_problem_9(;cost_function=SumOfMakeSpans(),verbose=false,Δt_op=0,Δt_collect=[0,0],Δt_deliver=[0,0])
     N = 2                  # num robots
     M = 2                  # num delivery tasks
     vtx_grid = initialize_dense_vtx_grid(4,4)
@@ -471,7 +471,7 @@ export
     This leads to a double delay that will not be caught without backtracking
     in ISPS. Hence, the solver will return a solution with T = 9.
 """
-function initialize_toy_problem_10(;cost_function=MakeSpan,verbose=false,Δt_op=0,Δt_collect=[0,0,0,0,0,0],Δt_deliver=[0,0,0,0,0,0])
+function initialize_toy_problem_10(;cost_function=MakeSpan(),verbose=false,Δt_op=0,Δt_collect=[0,0,0,0,0,0],Δt_deliver=[0,0,0,0,0,0])
     N = 4                  # num robots
     M = 4                  # num delivery tasks
     vtx_grid = initialize_dense_vtx_grid(13,11)

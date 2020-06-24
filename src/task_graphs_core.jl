@@ -68,7 +68,7 @@ Elements:
     to0_::Dict{Int,Float64} = Dict{Int,Float64}() # object start times
     root_nodes::Vector{Set{Int}} = [get_all_root_nodes(graph)]
     weights::Dict{Int,Float64} = Dict{Int,Float64}(v=>1.0 for v in 1:length(root_nodes))
-    cost_function::F        = SumOfMakeSpans
+    cost_function::F        = SumOfMakeSpans()
     r0::Vector{Int} = zeros(N)
     s0::Vector{Int} = zeros(M) # pickup stations for each task
     sF::Vector{Int} = zeros(M) # delivery station for each task
@@ -1553,6 +1553,30 @@ function add_job_shop_constraints!(milp_model::AssignmentMILP,schedule::Operatin
     add_job_shop_constraints!(schedule,spec,model)
 end
 
+
+"""
+    get_objective_expr
+
+Helper for setting the objective function for a milp model
+"""
+function get_objective_expr(milp::AssignmentMILP, f::SumOfMakeSpans,model,root_nodes,weights,tof,Δt)
+    @variable(model, T[1:length(root_nodes)])
+    for (i,project_head) in enumerate(root_nodes)
+        for v in project_head
+            @constraint(model, T[i] >= tof[v] + Δt[v])
+        end
+    end
+    cost1 = @expression(model, sum(map(i->T[i]*get(weights,i,0.0), 1:length(root_nodes))))
+    # @objective(model, Min, sum(map(v->tof[v]*get(weights,v,0.0), root_nodes)))
+    # model
+end
+function get_objective_expr(milp::AssignmentMILP, f::MakeSpan,model,root_nodes,weights,tof,Δt)
+    @variable(model, T)
+    @constraint(model, T .>= tof .+ Δt)
+    T
+    # @objective(model, Min, T)
+end
+
 """
     formulate_optimization_problem()
 
@@ -1599,7 +1623,7 @@ function formulate_optimization_problem(N,M,G,D,Δt,Δt_collect,Δt_deliver,to0_
     task_groups = Vector{Vector{Int}}(),
     shapes = [(1,1) for j in 1:M],
     assignments=Dict{Int64,Int64}(),
-    cost_model=MakeSpan,
+    cost_model=MakeSpan(),
     t0_ = Dict(),
     tF_ = Dict(),
     Mm = 10000,
@@ -1701,21 +1725,24 @@ function formulate_optimization_problem(N,M,G,D,Δt,Δt_collect,Δt_deliver,to0_
         end
     end
     # cost depends only on root node(s)
-    if cost_model <: SumOfMakeSpans
-        @variable(model, T[1:length(root_nodes)])
-        for (i,project_head) in enumerate(root_nodes)
-            for v in project_head
-                @constraint(model, T[i] >= tof[v] + Δt[v])
-            end
-        end
-        @objective(model, Min, sum(map(i->T[i]*get(weights,i,0.0), 1:length(root_nodes))))
-        # @objective(model, Min, sum(map(v->tof[v]*get(weights,v,0.0), root_nodes)))
-    elseif cost_model <: MakeSpan
-        @variable(model, T)
-        @constraint(model, T .>= tof .+ Δt)
-        @objective(model, Min, T)
-    end
-    AssignmentMILP(model)
+    # if cost_model <: SumOfMakeSpans
+    #     @variable(model, T[1:length(root_nodes)])
+    #     for (i,project_head) in enumerate(root_nodes)
+    #         for v in project_head
+    #             @constraint(model, T[i] >= tof[v] + Δt[v])
+    #         end
+    #     end
+    #     @objective(model, Min, sum(map(i->T[i]*get(weights,i,0.0), 1:length(root_nodes))))
+    #     # @objective(model, Min, sum(map(v->tof[v]*get(weights,v,0.0), root_nodes)))
+    # elseif cost_model <: MakeSpan
+    #     @variable(model, T)
+    #     @constraint(model, T .>= tof .+ Δt)
+    #     @objective(model, Min, T)
+    # end
+    milp = AssignmentMILP(model)
+    cost1 = get_objective_expr(milp, cost_model, milp.model,root_nodes,weights,tof,Δt)
+    @objective(milp.model, Min, cost1)
+    milp
 end
 function formulate_optimization_problem(spec::T,optimizer;
     kwargs...
@@ -1862,7 +1889,7 @@ function formulate_schedule_milp(project_schedule::OperatingSchedule,problem_spe
         t0_ = Dict{AbstractID,Float64}(), # dictionary of initial times. Default is empty
         tF_ = Dict{AbstractID,Float64}(), # dictionary of initial times. Default is empty
         Mm = 10000, # for big M constraints
-        cost_model = SumOfMakeSpans,
+        cost_model = SumOfMakeSpans(),
     )
     G = get_graph(project_schedule);
     assignments = [];
@@ -2037,25 +2064,27 @@ function formulate_schedule_milp(project_schedule::OperatingSchedule,problem_spe
     @constraint(model, X .== Xa .+ Xj)
 
     # Formulate Objective
-    if cost_model <: SumOfMakeSpans
-        root_nodes = project_schedule.root_nodes
-        @variable(model, T[1:length(root_nodes)])
-        for (i,project_head) in enumerate(root_nodes)
-            for v in project_head
-                @constraint(model, T[i] >= tF[v])
-            end
-        end
-        cost1 = @expression(model, sum(map(v->tF[v]*get(project_schedule.weights,v,0.0), root_nodes)))
-    elseif cost_model <: MakeSpan
-        @variable(model, T)
-        @constraint(model, T .>= tF)
-        cost1 = @expression(model, T)
-    end
+    # if cost_model <: SumOfMakeSpans
+    #     root_nodes = project_schedule.root_nodes
+    #     @variable(model, T[1:length(root_nodes)])
+    #     for (i,project_head) in enumerate(root_nodes)
+    #         for v in project_head
+    #             @constraint(model, T[i] >= tF[v])
+    #         end
+    #     end
+    #     cost1 = @expression(model, sum(map(v->tF[v]*get(project_schedule.weights,v,0.0), root_nodes)))
+    # elseif cost_model <: MakeSpan
+    #     @variable(model, T)
+    #     @constraint(model, T .>= tF)
+    #     cost1 = @expression(model, T)
+    # end
     # sparsity_cost = @expression(model, (0.5/(nv(G)^2))*sum(Xa)) # cost term to encourage sparse X. Otherwise the solver may add pointless edges
     sparsity_cost = @expression(model, (0.5/(nv(G)^2))*sum(X)) # cost term to encourage sparse X. Otherwise the solver may add pointless edges
-    @objective(model, Min, cost1 + sparsity_cost)
     # @objective(model, Min, cost1 )
-    AdjacencyMILP(model=model) #, job_shop_variables
+    milp = AdjacencyMILP(model=model) #, job_shop_variables
+    cost1 = get_objective_expr(milp,cost_model,milp.model,project_schedule,tF)
+    @objective(milp.model, Min, cost1 + sparsity_cost)
+    milp
 end
 function formulate_milp(milp_model::AdjacencyMILP,project_schedule::OperatingSchedule,problem_spec::ProblemSpec;
     optimizer=Gurobi.Optimizer,
@@ -2070,7 +2099,7 @@ function formulate_milp(milp_model::SparseAdjacencyMILP,project_schedule::Operat
         t0_ = Dict{AbstractID,Float64}(), # dictionary of initial times. Default is empty
         tF_ = Dict{AbstractID,Float64}(), # dictionary of initial times. Default is empty
         Mm = 10000, # for big M constraints
-        cost_model = SumOfMakeSpans,
+        cost_model = SumOfMakeSpans(),
         job_shop=milp_model.job_shop
     )
 
@@ -2197,25 +2226,43 @@ function formulate_milp(milp_model::SparseAdjacencyMILP,project_schedule::Operat
     @expression(model, X, Xa .+ Xj) # Make X an expression rather than a variable
 
     # Formulate Objective
-    if cost_model <: SumOfMakeSpans
-        root_nodes = project_schedule.root_nodes
-        @variable(model, T[1:length(root_nodes)])
-        for (i,project_head) in enumerate(root_nodes)
-            for v in project_head
-                @constraint(model, T[i] >= tF[v])
-            end
+    # if cost_model <: SumOfMakeSpans
+    #     root_nodes = project_schedule.root_nodes
+    #     @variable(model, T[1:length(root_nodes)])
+    #     for (i,project_head) in enumerate(root_nodes)
+    #         for v in project_head
+    #             @constraint(model, T[i] >= tF[v])
+    #         end
+    #     end
+    #     cost1 = @expression(model, sum(map(v->tF[v]*get(project_schedule.weights,v,0.0), root_nodes)))
+    # elseif cost_model <: MakeSpan
+    #     @variable(model, T)
+    #     @constraint(model, T .>= tF)
+    #     cost1 = @expression(model, T)
+    # end
+    # # sparsity_cost = @expression(model, (0.5/(nv(G)^2))*sum(Xa)) # cost term to encourage sparse X. Otherwise the solver may add pointless edges
+    # # sparsity_cost = @expression(model, (0.5/(nv(G)^2))*sum(X)) # cost term to encourage sparse X. Otherwise the solver may add pointless edges
+    # # @objective(model, Min, cost1 + sparsity_cost)
+    # @objective(model, Min, cost1)
+    milp = SparseAdjacencyMILP(model,Xa,Xj, milp_model.job_shop) #, job_shop_variables
+    cost1 = get_objective_expr(milp,cost_model,milp.model,project_schedule,tF)
+    @objective(milp.model, Min, cost1)
+    milp
+end
+function get_objective_expr(milp,f::SumOfMakeSpans,model,project_schedule,tF)
+    root_nodes = project_schedule.root_nodes
+    @variable(model, T[1:length(root_nodes)])
+    for (i,project_head) in enumerate(root_nodes)
+        for v in project_head
+            @constraint(model, T[i] >= tF[v])
         end
-        cost1 = @expression(model, sum(map(v->tF[v]*get(project_schedule.weights,v,0.0), root_nodes)))
-    elseif cost_model <: MakeSpan
-        @variable(model, T)
-        @constraint(model, T .>= tF)
-        cost1 = @expression(model, T)
     end
-    # sparsity_cost = @expression(model, (0.5/(nv(G)^2))*sum(Xa)) # cost term to encourage sparse X. Otherwise the solver may add pointless edges
-    # sparsity_cost = @expression(model, (0.5/(nv(G)^2))*sum(X)) # cost term to encourage sparse X. Otherwise the solver may add pointless edges
-    # @objective(model, Min, cost1 + sparsity_cost)
-    @objective(model, Min, cost1)
-    SparseAdjacencyMILP(model,Xa,Xj, milp_model.job_shop) #, job_shop_variables
+    cost1 = @expression(model, sum(map(v->tF[v]*get(project_schedule.weights,v,0.0), root_nodes)))
+end
+function get_objective_expr(milp,f::MakeSpan,model,project_schedule,tF)
+    @variable(model, T)
+    @constraint(model, T .>= tF) # TODO Maybe the number of constraints here causes a slowdown that could be addressed by only adding constraints on terminal nodes?
+    cost1 = @expression(model, T)
 end
 
 export
@@ -2228,7 +2275,7 @@ export
 @with_kw struct GreedyAssignment{C} <: TaskGraphsMILP
     schedule::OperatingSchedule   = OperatingSchedule()
     problem_spec::ProblemSpec   = ProblemSpec()
-    cost_model::C               = SumOfMakeSpans
+    cost_model::C               = SumOfMakeSpans()
     # X::M                        = sparse(zeros(Int,nv(project_schedule),nv(project_schedule)))
     t0::Vector{Int}             = zeros(Int,nv(schedule))
     # cost::Float64               = Inf
@@ -2238,13 +2285,15 @@ exclude_solutions!(model::GreedyAssignment) = nothing # exclude most recent solu
 JuMP.termination_status(model::GreedyAssignment)    = MOI.OPTIMAL
 JuMP.primal_status(model::GreedyAssignment)         = MOI.FEASIBLE_POINT
 get_assignment_matrix(model::GreedyAssignment)      = adjacency_matrix(get_graph(model.schedule))
-function JuMP.objective_function(model::GreedyAssignment)
+function JuMP.objective_function(model::GreedyAssignment{SumOfMakeSpans})
     t0,tF,slack,local_slack = process_schedule(model.schedule;t0=model.t0)
-    if model.cost_model == MakeSpan
-        return maximum(tF[model.schedule.root_nodes])
-    elseif model.cost_model == SumOfMakeSpans
-        return sum(tF[model.schedule.root_nodes] .* map(v->model.schedule.weights[v], model.schedule.root_nodes))
-    end
+    return sum(tF[model.schedule.root_nodes] .* map(v->model.schedule.weights[v], model.schedule.root_nodes))
+end
+function JuMP.objective_function(model::GreedyAssignment{MakeSpan})
+    t0,tF,slack,local_slack = process_schedule(model.schedule;t0=model.t0)
+    return maximum(tF[model.schedule.root_nodes])
+end
+function JuMP.objective_function(model::GreedyAssignment)
     println("UNKNOWN COST FUNCTION!")
     return Inf
 end
@@ -2252,7 +2301,7 @@ JuMP.objective_bound(model::GreedyAssignment)       = objective_function(model)
 JuMP.value(c::Real) = c
 function formulate_milp(milp_model::GreedyAssignment,project_schedule::OperatingSchedule,problem_spec::ProblemSpec;
         t0_ = Dict{AbstractID,Float64}(),
-        cost_model = SumOfMakeSpans,
+        cost_model = SumOfMakeSpans(),
         kwargs...
     )
 

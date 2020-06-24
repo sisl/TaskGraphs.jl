@@ -639,55 +639,60 @@ function CRCBS.MakeSpan(schedule::S,cache::C) where {S<:OperatingSchedule,C<:Pla
         map(k->schedule.weights[k], schedule.root_nodes),
         cache.tF[schedule.root_nodes])
 end
-CRCBS.get_infeasible_cost(astar_model,args...) = (Inf,Inf,Inf,Inf,Inf)
-CRCBS.get_infeasible_cost(astar_model::DFS_PathFinder,args...) = (Inf,Inf,Inf)
-function construct_cost_model(astar_model, schedule, cache, problem_spec, env_graph; extra_T=400, primary_objective=SumOfMakeSpans)
-    N = problem_spec.N
-    # NOTE: This particular setting of cost model is crucial for good performance of A_star, because it encourages depth first search. If we were to replace them with SumOfTravelTime(), we would get worst-case exponentially slow breadth-first search!
-    cost_model = construct_composite_cost_model(
-        primary_objective(schedule,cache),
-        HardConflictCost(env_graph,maximum(cache.tF)+extra_T, N),
-        SumOfTravelDistance(),
-        FullCostModel(sum,NullCost()), # SumOfTravelTime(),
-        FullCostModel(sum,TransformCostModel(c->-1*c,TravelTime()))
-    )
-    ph = PerfectHeuristic(get_dist_matrix(env_graph))
-    heuristic_model = construct_composite_heuristic(ph,NullHeuristic(),ph,ph,NullHeuristic())
-    cost_model, heuristic_model
-end
-function construct_cost_model(astar_model::PrioritizedAStarModel, schedule, cache, problem_spec, env_graph; extra_T=400, primary_objective=SumOfMakeSpans)
-    N = problem_spec.N
-    cost_model = construct_composite_cost_model(
-        HardConflictCost(env_graph,maximum(cache.tF)+extra_T, N),
-        primary_objective(schedule,cache),
-        SumOfTravelDistance(),
-        FullCostModel(sum,NullCost()), # SumOfTravelTime(),
-        FullCostModel(sum,TransformCostModel(c->-1*c,TravelTime())),
-    )
-    ph = PerfectHeuristic(get_dist_matrix(env_graph))
-    heuristic_model = construct_composite_heuristic(
-        NullHeuristic(),
-        ph,
-        ph,
-        ph,
-        NullHeuristic(),
-        )
-    cost_model, heuristic_model
-end
-function construct_cost_model(astar_model::DFS_PathFinder, schedule, cache, problem_spec, env_graph; extra_T=400, primary_objective=SumOfMakeSpans)
-    cost_model = construct_composite_cost_model(
-        primary_objective(schedule,cache),
-        FullCostModel(maximum,TravelTime()),
-        FullCostModel(maximum,TravelDistance())
-        )
-    ph = PerfectHeuristic(get_dist_matrix(env_graph))
-    heuristic_model = construct_composite_heuristic(ph,ph,NullHeuristic())
-    cost_model, heuristic_model
-end
-construct_cost_model(solver::PC_TAPF_Solver, args...; kwargs...) = construct_cost_model(solver.astar_model, args...; kwargs...)
+# CRCBS.get_infeasible_cost(astar_model,args...) = (Inf,Inf,Inf,Inf,Inf)
+# CRCBS.get_infeasible_cost(astar_model::DFS_PathFinder,args...) = (Inf,Inf,Inf)
+# function construct_cost_model(astar_model, schedule, cache, problem_spec, env_graph; extra_T=400, primary_objective=SumOfMakeSpans())
+#     N = problem_spec.N
+#     # NOTE: This particular setting of cost model is crucial for good performance of A_star, because it encourages depth first search. If we were to replace them with SumOfTravelTime(), we would get worst-case exponentially slow breadth-first search!
+#     cost_model = construct_composite_cost_model(
+#         typeof(primary_objective)(schedule,cache),
+#         HardConflictCost(env_graph,maximum(cache.tF)+extra_T, N),
+#         SumOfTravelDistance(),
+#         FullCostModel(sum,NullCost()), # SumOfTravelTime(),
+#         FullCostModel(sum,TransformCostModel(c->-1*c,TravelTime()))
+#     )
+#     ph = PerfectHeuristic(get_dist_matrix(env_graph))
+#     heuristic_model = construct_composite_heuristic(ph,NullHeuristic(),ph,ph,NullHeuristic())
+#     cost_model, heuristic_model
+# end
+# function construct_cost_model(astar_model::PrioritizedAStarModel, schedule, cache, problem_spec, env_graph; extra_T=400, primary_objective=SumOfMakeSpans())
+#     N = problem_spec.N
+#     cost_model = construct_composite_cost_model(
+#         HardConflictCost(env_graph,maximum(cache.tF)+extra_T, N),
+#         typeof(primary_objective)(schedule,cache),
+#         SumOfTravelDistance(),
+#         FullCostModel(sum,NullCost()), # SumOfTravelTime(),
+#         FullCostModel(sum,TransformCostModel(c->-1*c,TravelTime())),
+#     )
+#     ph = PerfectHeuristic(get_dist_matrix(env_graph))
+#     heuristic_model = construct_composite_heuristic(
+#         NullHeuristic(),
+#         ph,
+#         ph,
+#         ph,
+#         NullHeuristic(),
+#         )
+#     cost_model, heuristic_model
+# end
+# function construct_cost_model(astar_model::DFS_PathFinder, schedule, cache, problem_spec, env_graph; extra_T=400, primary_objective=SumOfMakeSpans())
+#     cost_model = construct_composite_cost_model(
+#         primary_objective(schedule,cache),
+#         FullCostModel(maximum,TravelTime()),
+#         FullCostModel(maximum,TravelDistance())
+#         )
+#     ph = PerfectHeuristic(get_dist_matrix(env_graph))
+#     heuristic_model = construct_composite_heuristic(ph,ph,NullHeuristic())
+#     cost_model, heuristic_model
+# end
+# construct_cost_model(solver::PC_TAPF_Solver, args...; kwargs...) = construct_cost_model(solver.astar_model, args...; kwargs...)
+
+export
+    construct_cost_model
+
+function construct_cost_model end
 
 function construct_search_env(solver, schedule, problem_spec, env_graph;
-        primary_objective=SumOfMakeSpans,
+        primary_objective=SumOfMakeSpans(),
         extra_T=400,
         kwargs...
     )
@@ -706,7 +711,7 @@ function construct_search_env(solver, schedule, problem_spec, env_graph;
 end
 function construct_search_env(solver,schedule::OperatingSchedule,
         env::SearchEnv;
-        primary_objective=typeof(env.problem_spec.cost_function),
+        primary_objective=env.problem_spec.cost_function,
         t0 = env.cache.t0,
         tF = env.cache.tF,
         kwargs...)
