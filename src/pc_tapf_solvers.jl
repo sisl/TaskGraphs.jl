@@ -65,8 +65,8 @@ gap (including upper and lower bound), etc.
     start_time      ::Float64       = time()
     runtime_limit   ::Float64       = 100.0
     deadline        ::Float64       = Inf
-    lower_bound     ::C             = typemax(C)
-    best_cost       ::C             = typemin(C)
+    lower_bound     ::C             = typemin(C)
+    best_cost       ::C             = typemax(C)
     verbosity       ::Int           = 0
     DEBUG           ::Bool          = false
 end
@@ -118,6 +118,8 @@ function reset_solver!(logger::SolverLogger)
 end
 CRCBS.get_infeasible_cost(logger::SolverLogger{C}) where {C} = typemax(C)
 CRCBS.get_infeasible_cost(solver) = get_infeasible_cost(get_logger(solver))
+CRCBS.get_cost_type(logger::SolverLogger{C}) where {C} = C
+CRCBS.get_cost_type(solver) = get_cost_type(get_logger(solver))
 Base.typemin(c::Type{NTuple{N,R}}) where {N,R} = NTuple{N,R}(map(i->typemin(R),1:N))
 Base.typemin(c::NTuple{N,R}) where {N,R} = typemin(typeof(c))
 Base.typemax(c::Type{NTuple{N,R}}) where {N,R} = NTuple{N,R}(map(i->typemax(R),1:N))
@@ -161,6 +163,7 @@ Fields:
     logger::SolverLogger{C} = SolverLogger{C}()
     replan::Bool            = false
 end
+AStarSC() = AStarSC{NTuple{5,Float64}}()
 search_trait(solver::AStarSC) = NonPrioritized()
 
 export
@@ -350,14 +353,16 @@ export
     ISPS
 
 """
-    ISPSPlanner
+    ISPS
 
 Path planner that employs Incremental Slack-Prioritized Search.
 """
 @with_kw struct ISPS{L,C}
-    low_level_planner::L = L()
-    logger::SolverLogger{C} = SolverLogger{C}()
+    low_level_planner::L = AStarSC()
+    logger::SolverLogger{C} = SolverLogger{get_cost_type(low_level_planner)}()
 end
+ISPS(planner) = ISPS(planner,SolverLogger{get_cost_type(planner)}())
+ISPS() = ISPS(AStarSC())
 TaskGraphs.construct_cost_model(solver::ISPS,args...;kwargs...) = construct_cost_model(solver.low_level_planner,args...;kwargs...)
 search_trait(solver::ISPS) = search_trait(solver.low_level_planner)
 function set_best_cost!(solver::ISPS,cost)
@@ -398,7 +403,7 @@ function plan_next_path!(solver::ISPS, env::SearchEnv, node::N;
         else
             # enter_a_star!(solver)
             # dummy path
-            path = Path{PCCBS.State,PCCBS.Action,get_cost_type(env.env)}(
+            path = Path{PCCBS.State,PCCBS.Action,get_get_cost_type(env.env)}(
                 s0=PCCBS.State(-1, -1),
                 cost=get_initial_cost(env.env)
                 )
@@ -471,9 +476,10 @@ export
 Path planner that employs Conflict-Based Search
 """
 @with_kw struct CBSRoutePlanner{L,C}
-    low_level_planner::L = L()
-    logger::SolverLogger{C} = SolverLogger{C}()
+    low_level_planner::L    = ISPS()
+    logger::SolverLogger{C} = SolverLogger{get_cost_type(low_level_planner)}()
 end
+CBSRoutePlanner(planner) = CBSRoutePlanner(planner,SolverLogger{get_cost_type(planner)}())
 TaskGraphs.construct_cost_model(solver::CBSRoutePlanner,args...;kwargs...) = construct_cost_model(solver.low_level_planner,args...;kwargs...)
 search_trait(solver::CBSRoutePlanner) = search_trait(solver.low_level_planner)
 function set_best_cost!(solver::CBSRoutePlanner,cost)
@@ -487,7 +493,7 @@ function CRCBS.solve!(
         path_finder=A_star)
 
     # enter_cbs!(solver)
-    priority_queue = PriorityQueue{Tuple{ConstraintTreeNode,PlanningCache},get_cost_type(mapf.env)}()
+    priority_queue = PriorityQueue{Tuple{ConstraintTreeNode,PlanningCache},get_get_cost_type(mapf.env)}()
     root_node = initialize_root_node(mapf) #TODO initialize with a partial solution when replanning
     search_env, valid_flag = low_level_search!(
         solver.low_level_planner,mapf,root_node;path_finder=path_finder)
@@ -586,7 +592,7 @@ Wrapper for MILP solver for assignment problem.
 """
 @with_kw struct TaskGraphsMILPSolver{M,C}
     milp::M = SparseAdjacencyMILP()
-    logger::SolverLogger{C} = SolverLogger{C}()
+    logger::SolverLogger{C} = SolverLogger{Int}()
 end
 TaskGraphsMILPSolver(milp) = TaskGraphsMILPSolver(milp,SolverLogger{Int}())
 function TaskGraphs.formulate_milp(solver::TaskGraphsMILPSolver,args...;kwargs...)
@@ -611,10 +617,11 @@ The input to the route planner is the PC-TAPF problem spec along with the
 `OperatingSchedule` that comes from the assignment solution.
 """
 @with_kw struct NBSSolver{A,P,C} <: AbstractPCTAPFSolver
-    assignment_model ::A     = SparseAdjacencyMILP()
-    path_planner    ::P     = CBSRoutePlanner{ISPS{AStarSC{C},C},C}()
-    logger          ::SolverLogger{C} = SolverLogger{C}()
+    assignment_model::A     = TaskGraphsMILPSolver()
+    path_planner    ::P     = CBSRoutePlanner()
+    logger          ::SolverLogger{C} = SolverLogger{get_cost_type(path_planner)}()
 end
+NBSSolver(a,b) = NBSSolver(a,b,SolverLogger{get_cost_type(b)}())
 assignment_solver(solver::NBSSolver) = solver.assignment_model
 route_planner(solver::NBSSolver) = solver.path_planner
 TaskGraphs.construct_cost_model(solver::NBSSolver,args...;kwargs...) = construct_cost_model(route_planner(solver),args...;kwargs...)

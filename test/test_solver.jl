@@ -18,8 +18,12 @@ let
     TaskGraphs.Solvers.reset_solver!(logger)
 end
 let
-    NBSSolver()
+    AStarSC()
+    AStarSC{Int}()
+    ISPS()
     CBSRoutePlanner()
+    TaskGraphsMILPSolver()
+    NBSSolver()
 end
 let
     # init search env
@@ -38,13 +42,11 @@ let
                 costs = Float64[]
                 project_spec, problem_spec, robot_ICs, assignments, env_graph = f(;verbose=false);
                 for solver in [
-                        NBSSolver(TaskGraphsMILPSolver(AssignmentMILP()), TaskGraphs.AStarSC{Float64}(), SolverLogger{Float64}())
-                        # NBSSolver(TaskGraphsMILPSolver(AdjacencyMILP()), TaskGraphs.AStarSC{Float64}(), SolverLogger{Float64}())
-                        NBSSolver(TaskGraphsMILPSolver(SparseAdjacencyMILP()), TaskGraphs.AStarSC{Float64}(), SolverLogger{Float64}())
-                        NBSSolver(TaskGraphsMILPSolver(GreedyAssignment()), TaskGraphs.AStarSC{Float64}(), SolverLogger{Float64}())
+                        NBSSolver(assignment_model = TaskGraphsMILPSolver(AssignmentMILP())),
+                        NBSSolver(assignment_model = TaskGraphsMILPSolver(SparseAdjacencyMILP())),
+                        NBSSolver(assignment_model = TaskGraphsMILPSolver(GreedyAssignment())),
                         ]
-                    @show i, f, solver
-                    # construct search env
+                    # @show i, f, solver
                     schedule = construct_partial_project_schedule(
                         project_spec,
                         problem_spec,
@@ -57,21 +59,28 @@ let
                         env_graph;
                         primary_objective=cost_model,
                         )
-                    # solve task assignment problem
                     prob = formulate_assignment_problem(solver.assignment_model,search_env;
                         optimizer=Gurobi.Optimizer,
                     )
                     sched, cost = solve_assignment_problem!(solver.assignment_model,prob,search_env)
-                    # solve
+                    rp = CBSRoutePlanner(
+                        ISPS(
+                            AStarSC{NTuple{5,Float64}}(),
+                        )
+                    )
+                    # # break down the solution process here:
+
                     # solution, cost = solve!(solver,search_env;
                     #     optimizer=Gurobi.Optimizer,
                     #     )
                     if !isa(solver.assignment_model.milp,GreedyAssignment)
-                        push!(costs, cost[1])
+                        push!(costs, cost)
                     end
                     @test validate(sched)
-                    @test cost[1] != Inf
+                    @test cost != typemax(Int)
+                    @test cost != Inf
                 end
+                @show costs
                 @test all(costs .== costs[1])
             end
         end
