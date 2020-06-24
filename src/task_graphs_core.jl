@@ -1286,7 +1286,8 @@ with each vertex in the `schedule`. Slack for each vertex is represented as
 a vector in order to handle multi-headed projects.
 """
 function process_schedule(schedule::P; t0=zeros(Int,nv(schedule)),
-        tF=zeros(Int,nv(schedule))
+        tF=zeros(Int,nv(schedule)),
+        kwargs...
     ) where {P<:OperatingSchedule}
 
     G = get_graph(schedule)

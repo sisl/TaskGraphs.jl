@@ -433,6 +433,7 @@ function CRCBS.get_start(env::SearchEnv,v::Int)
     start_time  = env.cache.t0[v]
     PCCBS.State(start_vtx,start_time)
 end
+CRCBS.get_cost(env::SearchEnv) = get_cost(env.route_plan)
 
 # """
 #     Trim path for replanning
@@ -715,7 +716,7 @@ function construct_search_env(solver,schedule::OperatingSchedule,
         t0 = env.cache.t0,
         tF = env.cache.tF,
         kwargs...)
-    construct_search_env(solver,schedule,env.problem_spec,env.env;
+    construct_search_env(solver,schedule,env.problem_spec,env.env.graph;
         primary_objective=primary_objective,t0=t0,tF=tF,kwargs...)
 end
 

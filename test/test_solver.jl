@@ -18,12 +18,26 @@ let
     TaskGraphs.Solvers.reset_solver!(logger)
 end
 let
+    @test (1,0,0,0,0) < 2
+    @test (1,0,0,0,0) <= 1
+    @test (1,0,0,0,0) >= 1
+    @test (1,0,0,0,0) > 0
+
+    @test 2 > (1,0,0,0,0)
+    @test 1 >= (1,0,0,0,0)
+    @test 1 <= (1,0,0,0,0)
+    @test 0 < (1,0,0,0,0)
+end
+let
     AStarSC()
     AStarSC{Int}()
     ISPS()
     CBSRoutePlanner()
     TaskGraphsMILPSolver()
     NBSSolver()
+    solver = NBSSolver()
+    TaskGraphs.Solvers.best_cost(solver)
+
 end
 let
     # init search env
@@ -63,13 +77,7 @@ let
                         optimizer=Gurobi.Optimizer,
                     )
                     sched, cost = solve_assignment_problem!(solver.assignment_model,prob,search_env)
-                    rp = CBSRoutePlanner(
-                        ISPS(
-                            AStarSC{NTuple{5,Float64}}(),
-                        )
-                    )
                     # # break down the solution process here:
-
                     # solution, cost = solve!(solver,search_env;
                     #     optimizer=Gurobi.Optimizer,
                     #     )
@@ -85,4 +93,80 @@ let
             end
         end
     end
+end
+let
+    # init search env
+    f = initialize_toy_problem_2
+    cost_model = SumOfMakeSpans()
+    project_spec, problem_spec, robot_ICs, assignments, env_graph = f(;verbose=false)
+    solver = NBSSolver(assignment_model = TaskGraphsMILPSolver(AssignmentMILP()))
+    project_schedule = construct_partial_project_schedule(
+        project_spec,
+        problem_spec,
+        robot_ICs,
+        )
+    base_search_env = construct_search_env(
+        solver,
+        project_schedule,
+        problem_spec,
+        env_graph;
+        primary_objective=cost_model,
+        )
+    prob = formulate_assignment_problem(solver.assignment_model,base_search_env;
+        optimizer=Gurobi.Optimizer,
+    )
+    sched, cost = solve_assignment_problem!(solver.assignment_model,prob,base_search_env)
+    @test validate(sched)
+    # Test AStarSC
+    let
+        search_env = construct_search_env(solver,deepcopy(sched),base_search_env)
+        path_planner = AStarSC()
+        node = initialize_root_node(search_env)
+        # plan for Robot Start
+        node_id = RobotID(1)
+        schedule_node = get_node_from_id(search_env.schedule, node_id)
+        println(string(schedule_node))
+        v = get_vtx(search_env.schedule, node_id)
+        @test plan_path!(path_planner, search_env, node, schedule_node, v)
+        # plan for GO
+        v2 = outneighbors(search_env.schedule,v)[1]
+        schedule_node = get_node_from_vtx(search_env.schedule, v2)
+        println(string(schedule_node))
+        @test plan_path!(path_planner, search_env, node, schedule_node, v2)
+        @show convert_to_vertex_lists(node.solution)
+    end
+    # Test ISPS
+    let
+        search_env = construct_search_env(solver,deepcopy(sched),base_search_env)
+        path_planner = ISPS()
+        node = initialize_root_node(search_env)
+        low_level_search!(path_planner,search_env,node)
+        @show convert_to_vertex_lists(node.solution)
+    end
+    let
+        search_env = construct_search_env(solver,deepcopy(sched),base_search_env)
+        path_planner = ISPS()
+        node = initialize_root_node(search_env)
+        low_level_search!(path_planner,PC_MAPF(search_env),node)
+        @show convert_to_vertex_lists(node.solution)
+    end
+    # Test CBS
+    let
+        search_env = construct_search_env(solver,deepcopy(sched),base_search_env)
+        path_planner = CBSRoutePlanner()
+        env = solve!(path_planner,PC_MAPF(search_env))
+        @show convert_to_vertex_lists(env.route_plan)
+    end
+    let
+        path_planner = CBSRoutePlanner()
+        env = plan_route!(path_planner,deepcopy(sched),base_search_env)
+        @show convert_to_vertex_lists(env.route_plan)
+    end
+    # test NBS
+    let
+        env, cost = solve!(solver,base_search_env;optimizer=Gurobi.Optimizer)
+        @test validate(env.schedule)
+        @test validate(env.schedule,convert_to_vertex_lists(env.route_plan), env.cache.t0, env.cache.tF)
+    end
+
 end
