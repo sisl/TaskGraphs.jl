@@ -424,8 +424,9 @@ export
             1:num_agents),
         cost_model = cost_model,
         costs = map(i->get_initial_cost(cost_model), 1:num_agents),
-        cost  = aggregate_costs(cost_model,
-            map(i->get_initial_cost(cost_model), 1:num_agents)),
+        cost = get_infeasible_cost(cost_model),
+        # cost  = aggregate_costs(cost_model,
+        #     map(i->get_initial_cost(cost_model), 1:num_agents)),
         )
 end
 function CRCBS.get_start(env::SearchEnv,v::Int)

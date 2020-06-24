@@ -1,3 +1,4 @@
+
 let
     SolverLogger{Int}()
     SolverLogger{Float64}()
@@ -38,68 +39,21 @@ let
     solver = NBSSolver()
     TaskGraphs.Solvers.best_cost(solver)
 
+    NBSSolver(TaskGraphsMILPSolver(),CBSRoutePlanner())
+    # NBSSolver(
+    #     TaskGraphsMILPSolver(),
+    #     CBSRoutePlanner(),
+    #     iteration_limit=2
+    #     )
+
 end
+
 let
     # init search env
-    for (i, f) in enumerate([
-        initialize_toy_problem_1,
-        initialize_toy_problem_2,
-        initialize_toy_problem_3,
-        initialize_toy_problem_4,
-        initialize_toy_problem_5,
-        initialize_toy_problem_6,
-        initialize_toy_problem_7,
-        initialize_toy_problem_8,
-        ])
-        for cost_model in [SumOfMakeSpans(), MakeSpan()]
-            let
-                costs = Float64[]
-                project_spec, problem_spec, robot_ICs, assignments, env_graph = f(;verbose=false);
-                for solver in [
-                        NBSSolver(assignment_model = TaskGraphsMILPSolver(AssignmentMILP())),
-                        NBSSolver(assignment_model = TaskGraphsMILPSolver(SparseAdjacencyMILP())),
-                        NBSSolver(assignment_model = TaskGraphsMILPSolver(GreedyAssignment())),
-                        ]
-                    # @show i, f, solver
-                    schedule = construct_partial_project_schedule(
-                        project_spec,
-                        problem_spec,
-                        robot_ICs,
-                        )
-                    search_env = construct_search_env(
-                        solver,
-                        schedule,
-                        problem_spec,
-                        env_graph;
-                        primary_objective=cost_model,
-                        )
-                    prob = formulate_assignment_problem(solver.assignment_model,search_env;
-                        optimizer=Gurobi.Optimizer,
-                    )
-                    sched, cost = solve_assignment_problem!(solver.assignment_model,prob,search_env)
-                    # # break down the solution process here:
-                    # solution, cost = solve!(solver,search_env;
-                    #     optimizer=Gurobi.Optimizer,
-                    #     )
-                    if !isa(solver.assignment_model.milp,GreedyAssignment)
-                        push!(costs, cost)
-                    end
-                    @test validate(sched)
-                    @test cost != typemax(Int)
-                    @test cost != Inf
-                end
-                @show costs
-                @test all(costs .== costs[1])
-            end
-        end
-    end
-end
-let
-    # init search env
-    f = initialize_toy_problem_2
+    f = initialize_toy_problem_4
     cost_model = SumOfMakeSpans()
     project_spec, problem_spec, robot_ICs, assignments, env_graph = f(;verbose=false)
-    solver = NBSSolver(assignment_model = TaskGraphsMILPSolver(AssignmentMILP()))
+    solver = NBSSolver(assignment_model = TaskGraphsMILPSolver(GreedyAssignment()))
     project_schedule = construct_partial_project_schedule(
         project_spec,
         problem_spec,
@@ -164,9 +118,135 @@ let
     end
     # test NBS
     let
+        solver = NBSSolver(assignment_model = TaskGraphsMILPSolver(GreedyAssignment()))
+        TaskGraphs.Solvers.set_iteration_limit!(solver,3)
         env, cost = solve!(solver,base_search_env;optimizer=Gurobi.Optimizer)
+        @show convert_to_vertex_lists(env.route_plan)
+        # @show TaskGraphs.Solvers.get_logger(solver)
+        # @show TaskGraphs.Solvers.optimality_gap(solver) > 0
         @test validate(env.schedule)
         @test validate(env.schedule,convert_to_vertex_lists(env.route_plan), env.cache.t0, env.cache.tF)
     end
 
+end
+
+let
+    # init search env
+    for (i, f) in enumerate([
+        initialize_toy_problem_1,
+        initialize_toy_problem_2,
+        initialize_toy_problem_3,
+        initialize_toy_problem_4,
+        initialize_toy_problem_5,
+        initialize_toy_problem_6,
+        initialize_toy_problem_7,
+        initialize_toy_problem_8,
+        ])
+        for cost_model in [SumOfMakeSpans(), MakeSpan()]
+            let
+                costs = Float64[]
+                project_spec, problem_spec, robot_ICs, assignments, env_graph = f(;verbose=false);
+                for solver in [
+                        NBSSolver(assignment_model = TaskGraphsMILPSolver(AssignmentMILP())),
+                        NBSSolver(assignment_model = TaskGraphsMILPSolver(SparseAdjacencyMILP())),
+                        NBSSolver(assignment_model = TaskGraphsMILPSolver(GreedyAssignment())),
+                        ]
+                    # @show i, f, solver
+                    schedule = construct_partial_project_schedule(
+                        project_spec,
+                        problem_spec,
+                        robot_ICs,
+                        )
+                    search_env = construct_search_env(
+                        solver,
+                        schedule,
+                        problem_spec,
+                        env_graph;
+                        primary_objective=cost_model,
+                        )
+                    prob = formulate_assignment_problem(solver.assignment_model,search_env;
+                        optimizer=Gurobi.Optimizer,
+                    )
+                    sched, cost = solve_assignment_problem!(solver.assignment_model,prob,search_env)
+                    # # break down the solution process here:
+                    # solution, cost = solve!(solver,search_env;
+                    #     optimizer=Gurobi.Optimizer,
+                    #     )
+                    if !isa(solver.assignment_model.milp,GreedyAssignment)
+                        push!(costs, cost)
+                    end
+                    @test validate(sched)
+                    @test cost != typemax(Int)
+                    @test cost != Inf
+                end
+                @show costs
+                @test all(costs .== costs[1])
+            end
+        end
+    end
+end
+
+let
+    # init search env
+    for (i, f) in enumerate([
+        initialize_toy_problem_1,
+        initialize_toy_problem_2,
+        initialize_toy_problem_3,
+        initialize_toy_problem_4,
+        initialize_toy_problem_5,
+        initialize_toy_problem_6,
+        initialize_toy_problem_7,
+        initialize_toy_problem_8,
+        ])
+        for cost_model in [SumOfMakeSpans(), MakeSpan()]
+            let
+                costs = Float64[]
+                project_spec, problem_spec, robot_ICs, assignments, env_graph = f(;verbose=false);
+                for solver in [
+                        NBSSolver(assignment_model = TaskGraphsMILPSolver(AssignmentMILP())),
+                        NBSSolver(assignment_model = TaskGraphsMILPSolver(SparseAdjacencyMILP())),
+                        NBSSolver(assignment_model = TaskGraphsMILPSolver(GreedyAssignment())),
+                        ]
+                    @show i, f, solver
+                    TaskGraphs.Solvers.set_iteration_limit!(solver,1)
+                    schedule = construct_partial_project_schedule(
+                        project_spec,
+                        problem_spec,
+                        robot_ICs,
+                        )
+                    base_search_env = construct_search_env(
+                        solver,
+                        schedule,
+                        problem_spec,
+                        env_graph;
+                        primary_objective=cost_model,
+                        )
+                    env, cost = solve!(solver,base_search_env;optimizer=Gurobi.Optimizer)
+                    @show convert_to_vertex_lists(env.route_plan)
+                    # prob = formulate_assignment_problem(solver.assignment_model,search_env;
+                    #     optimizer=Gurobi.Optimizer,
+                    # )
+                    # sched, cost = solve_assignment_problem!(solver.assignment_model,prob,search_env)
+                    # # break down the solution process here:
+                    # solution, cost = solve!(solver,search_env;
+                    #     optimizer=Gurobi.Optimizer,
+                    #     )
+                    if !isa(solver.assignment_model.milp,GreedyAssignment)
+                        push!(costs, cost[1])
+                    end
+                    @test validate(env.schedule)
+                    @test validate(
+                        env.schedule,
+                        convert_to_vertex_lists(env.route_plan),
+                        env.cache.t0,
+                        env.cache.tF
+                        )
+                    @test cost != typemax(Int)
+                    @test cost != Inf
+                end
+                @show costs
+                @test all(costs .== costs[1])
+            end
+        end
+    end
 end

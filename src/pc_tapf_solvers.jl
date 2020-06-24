@@ -85,6 +85,13 @@ best_cost(logger)         = get_logger(logger).best_cost
 verbosity(logger)         = get_logger(logger).verbosity
 debug(logger)             = get_logger(logger).DEBUG
 
+export
+    optimality_gap,
+    set_lower_bound!,
+    set_iteration_limit!,
+    increment_iteration_count!,
+    set_best_cost!
+
 optimality_gap(logger) = best_cost(logger) .- lower_bound(logger)
 function check_time(logger)
     t = time()
@@ -96,6 +103,14 @@ end
 function enforce_time_limit(logger)
     if check_time(logger)
         throw(SolverException("Solver time limit exceeded!"))
+    end
+end
+function check_iterations(logger)
+    iterations(logger) > iteration_limit(logger)
+end
+function enforce_iteration_limit(logger)
+    if check_iterations(logger)
+        throw(SolverException("Solver iterations exceeded!"))
     end
 end
 
@@ -110,6 +125,9 @@ function set_lower_bound!(logger::SolverLogger{NTuple{N,T}},val::R) where {N,T<:
 end
 function set_best_cost!(logger::SolverLogger,val)
     logger.best_cost = val
+end
+function set_iteration_limit!(logger,val)
+    get_logger(logger).iteration_limit = val
 end
 function reset_solver!(logger::SolverLogger)
     logger.iterations = 0
@@ -328,7 +346,7 @@ export
 """
 function plan_path!(solver::AStarSC, env::SearchEnv, node::N,
         schedule_node::T, v::Int;
-        path_finder=A_star,
+        path_finder=CRCBS.A_star,
         kwargs...) where {N<:ConstraintTreeNode,T}
 
     cache = env.cache
@@ -406,7 +424,7 @@ export
 """
 function plan_next_path!(solver::ISPS, env::SearchEnv, node::N;
         heuristic=get_heuristic_cost,
-        path_finder=A_star
+        kwargs...
         ) where {N<:ConstraintTreeNode}
 
     valid_flag = true
@@ -420,15 +438,15 @@ function plan_next_path!(solver::ISPS, env::SearchEnv, node::N;
             # enter_a_star!(solver)
             try
                 valid_flag = plan_path!(solver.low_level_planner,env,node,schedule_node,v;
-                    heuristic=heuristic,path_finder=path_finder)
+                    heuristic=heuristic)
             catch e
                 if isa(e, SolverException)
-                    log_info(-1, solver, e.msg)
+                    # log_info(-1, solver, e.msg)
+                    showerror(stdout, e, catch_backtrace())
                     valid_flag = false
-                    # exit_a_star!(solver)
                     return valid_flag
                 else
-                    throw(e)
+                    rethrow(e)
                 end
             end
         else
@@ -452,14 +470,15 @@ end
 """
 function CRCBS.low_level_search!(solver::ISPS, env::E, node::N;
         heuristic=get_heuristic_cost,
-        path_finder=A_star
+        kwargs...
         ) where {E<:SearchEnv,N<:ConstraintTreeNode}
 
     reset_solution!(node,env.route_plan)
     while length(env.cache.node_queue) > 0
-        if !(plan_next_path!(solver,env,node;heuristic=heuristic,path_finder=path_finder))
+        if !(plan_next_path!(solver,env,node;heuristic=heuristic))
             return false
         end
+        enforce_time_limit(solver)
     end
     # log_info(0,solver,"LOW_LEVEL_SEARCH: Returning consistent route plan with cost ", get_cost(node.solution))
     # log_info(1,solver,"LOW_LEVEL_SEARCH: max path length = ", maximum(map(p->length(p), convert_to_vertex_lists(node.solution))))
@@ -471,7 +490,8 @@ end
 """
 function CRCBS.low_level_search!(solver::ISPS, pc_mapf::M, node::N,
         idxs::Vector{Int}=Vector{Int}();
-        heuristic=get_heuristic_cost, path_finder=A_star
+        heuristic=get_heuristic_cost,
+        kwargs...
         ) where {M<:PC_MAPF,N<:ConstraintTreeNode}
 
     # enter_low_level!(solver)
@@ -521,13 +541,13 @@ end
 function CRCBS.solve!(
         solver::CBSRoutePlanner,
         mapf::M where {M<:PC_MAPF},
-        path_finder=A_star)
+        )
 
     # enter_cbs!(solver)
     priority_queue = PriorityQueue{Tuple{ConstraintTreeNode,PlanningCache},get_cost_type(mapf.env)}()
     root_node = initialize_root_node(mapf) #TODO initialize with a partial solution when replanning
     search_env, valid_flag = low_level_search!(
-        solver.low_level_planner,mapf,root_node;path_finder=path_finder)
+        solver.low_level_planner,mapf,root_node)
     detect_conflicts!(root_node.conflict_table,root_node.solution;t0=max(minimum(mapf.env.cache.t0), 1))
     if valid_flag
         enqueue!(priority_queue, (root_node,search_env.cache) => root_node.cost)
@@ -559,20 +579,21 @@ function CRCBS.solve!(
                     search_env, valid_flag = low_level_search!(
                         solver.low_level_planner,
                         mapf, new_node,
-                        [get_agent_id(constraint)];
-                        path_finder=path_finder)
+                        [get_agent_id(constraint)])
                     if valid_flag
                         detect_conflicts!(new_node.conflict_table,new_node.solution,[get_agent_id(constraint)];t0=max(minimum(search_env.cache.t0), 1)) # update conflicts related to this agent
                         enqueue!(priority_queue, (new_node,search_env.cache) => new_node.cost)
                     end
                 end
             end
+            enforce_time_limit(solver)
+            enforce_iteration_limit(solver)
         catch e
             if isa(e, SolverException)
                 # log_info(-1,solver,e.msg)
                 break
             else
-                throw(e)
+                rethrow(e)
             end
         end
     end
@@ -695,21 +716,28 @@ function CRCBS.solve!(solver::NBSSolver{A,P,C}, base_search_env::SearchEnv;kwarg
                 assignment_problem,
                 base_search_env;kwargs...)
             set_lower_bound!(solver,l_bound)
+            @show optimality_gap(solver)
             if optimality_gap(solver) > 0
                 env = plan_route!(
                     route_planner(solver),
                     schedule,
                     base_search_env;kwargs...)
                 if get_cost(env) < best_cost(solver)
+                    @show get_cost(env), best_cost(solver)
                     best_env = env
                     set_best_cost!(solver,get_cost(env))
                 end
             end
             increment_iteration_count!(solver)
             enforce_time_limit(solver)
+            if check_iterations(solver)
+                log_info(1,solver,
+                    "NBS: Reached iteration limit of $(iteration_limit(solver)).")
+                break
+            end
         catch e
-            bt = catch_backtrace()
             if isa(e, SolverException)
+                bt = catch_backtrace()
                 showerror(stdout, e, bt)
                 # log_info(-1, solver, sprint(showerror, e, bt))
                 break
