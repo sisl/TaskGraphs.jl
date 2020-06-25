@@ -1,115 +1,7 @@
-# Verify that all solvers can solve all example problems
-let
-
-    for (i, f) in enumerate([
-        initialize_toy_problem_1,
-        initialize_toy_problem_2,
-        initialize_toy_problem_3,
-        initialize_toy_problem_4,
-        initialize_toy_problem_5,
-        initialize_toy_problem_6,
-        initialize_toy_problem_7,
-        initialize_toy_problem_8,
-        ])
-        for cost_model in [SumOfMakeSpans, MakeSpan]
-            let
-                costs = Float64[]
-                project_spec, problem_spec, robot_ICs, assignments, env_graph = f(;verbose=false);
-                for solver in [
-                        PC_TAPF_Solver(nbs_model=AssignmentMILP()),
-                        PC_TAPF_Solver(nbs_model=AdjacencyMILP()),
-                        PC_TAPF_Solver(nbs_model=SparseAdjacencyMILP()),
-                        PC_TAPF_Solver(nbs_model=GreedyAssignment(),LIMIT_assignment_iterations=2),
-                        ]
-                    # solver = PC_TAPF_Solver(nbs_model=milp_model,l3_verbosity=0)
-                    # @show i, f, solver.nbs_model
-                    solution, assignment, cost, env = high_level_search!(
-                        solver,
-                        env_graph,
-                        project_spec,
-                        problem_spec,
-                        robot_ICs,
-                        Gurobi.Optimizer;
-                        primary_objective=cost_model,
-                        )
-                    if !isa(solver.nbs_model,GreedyAssignment)
-                        push!(costs, cost[1])
-                    end
-                    @test validate(env.schedule)
-                    @test validate(env.schedule, convert_to_vertex_lists(solution), env.cache.t0, env.cache.tF)
-                    @test cost[1] != Inf
-                end
-                @test all(costs .== costs[1])
-            end
-        end
-    end
-end
-
-# Test that optimal collision-free planners obtain the correct costs
-let
-
-    for (i, (f,cost)) in enumerate([
-        (initialize_toy_problem_3,10),
-        (initialize_toy_problem_4,3),
-        (initialize_toy_problem_5,4),
-        ])
-        cost_model = MakeSpan
-        milp_model = SparseAdjacencyMILP()
-        let
-            project_spec, problem_spec, robot_ICs, assignments, env_graph = f(;verbose=false);
-            # get optimistic task assignment
-            solver = PC_TAPF_Solver()
-            schedule = construct_partial_project_schedule(project_spec,problem_spec,robot_ICs)
-            model = formulate_milp(milp_model,schedule,problem_spec;cost_model=cost_model)
-            optimize!(model)
-            @test termination_status(model) == MOI.OPTIMAL
-            update_project_schedule!(model,schedule,problem_spec,get_assignment_matrix(model))
-
-            # test path planning given optimistic task assignment
-            env = construct_search_env(solver,schedule,problem_spec,env_graph;primary_objective=cost_model);
-            pc_mapf = PC_MAPF(env)
-            solution, _, _ = solve!(solver,pc_mapf)
-            # path1 = convert_to_vertex_lists(node.solution.paths[1])
-            # path2 = convert_to_vertex_lists(node.solution.paths[2])
-            # @show path1
-            # @show path2
-
-            @test get_primary_cost(solver,get_cost(solution)) == cost
-        end
-    end
-end
-
-# verify that ISPS+A*sc avoids a collision by exploiting slack
-let
-    project_spec, problem_spec, robot_ICs, assignments, env_graph = initialize_toy_problem_3(;verbose=false);
-
-    solver = PC_TAPF_Solver()
-    schedule = construct_partial_project_schedule(project_spec,problem_spec,robot_ICs)
-    milp_model = SparseAdjacencyMILP()
-    cost_model=MakeSpan
-    model = formulate_milp(milp_model,schedule,problem_spec;cost_model=cost_model)
-    optimize!(model)
-    @test termination_status(model) == MOI.OPTIMAL
-    cost = Int(round(value(objective_function(model))))
-    update_project_schedule!(milp_model,schedule,problem_spec,get_assignment_matrix(model))
-    env = construct_search_env(solver,schedule,problem_spec,env_graph;primary_objective=cost_model);
-    pc_mapf = PC_MAPF(env)
-    node = initialize_root_node(pc_mapf)
-    low_level_search!(solver,env,node);
-
-    path1 = convert_to_vertex_lists(node.solution.paths[1])
-    path2 = convert_to_vertex_lists(node.solution.paths[2])
-    @test path2[2] == 5 # test that robot 2 will indeed wait for robot 1
-    @test path1 == [2, 6, 10, 14, 18, 22, 26, 30, 31, 32, 32]
-    @test path2 == [5, 5, 6,  7,  8,  12, 12, 12, 12, 12, 16]
-    # @show path1
-    # @show path2
-end
-
 # # Test prioritized dfs planner
 # let
 #     cost_model = MakeSpan
-#     project_spec, problem_spec, robot_ICs, assignments, env_graph = initialize_toy_problem_1(;verbose=false);
+#     project_spec, problem_spec, robot_ICs, _, env_graph = initialize_toy_problem_1(;verbose=false);
 #
 #     milp_model = SparseAdjacencyMILP()
 #     # milp_model = GreedyAssignment()
@@ -203,7 +95,7 @@ end
 # end
 # let
 #     cost_model = MakeSpan
-#     project_spec, problem_spec, robot_ICs, assignments, env_graph = initialize_toy_problem_4(;verbose=false);
+#     project_spec, problem_spec, robot_ICs, _, env_graph = initialize_toy_problem_4(;verbose=false);
 #
 #     milp_model = SparseAdjacencyMILP()
 #     # milp_model = GreedyAssignment()
@@ -244,7 +136,7 @@ end
 # end
 # let
 #     cost_model = MakeSpan
-#     project_spec, problem_spec, robot_ICs, assignments, env_graph = initialize_toy_problem_3(;verbose=false);
+#     project_spec, problem_spec, robot_ICs, _, env_graph = initialize_toy_problem_3(;verbose=false);
 #
 #     milp_model = SparseAdjacencyMILP()
 #     # milp_model = GreedyAssignment()
@@ -299,7 +191,7 @@ end
 #                 initialize_toy_problem_7,
 #                 initialize_toy_problem_8,
 #             ])
-#         project_spec, problem_spec, robot_ICs, assignments, env_graph = f(;verbose=false);
+#         project_spec, problem_spec, robot_ICs, _, env_graph = f(;verbose=false);
 #         milp_model = GreedyAssignment()
 #         project_schedule = construct_partial_project_schedule(project_spec,problem_spec,map(i->robot_ICs[i], 1:problem_spec.N))
 #         model = formulate_milp(milp_model,project_schedule,problem_spec;cost_model=cost_model)

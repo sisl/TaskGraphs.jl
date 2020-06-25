@@ -43,6 +43,16 @@ let
     add_operation!(spec,op3)
     @test has_edge(spec.graph, spec.op_id_to_vtx[get_id(op1)], spec.op_id_to_vtx[get_id(op2)])
     @test has_edge(spec.graph, spec.op_id_to_vtx[get_id(op2)], spec.op_id_to_vtx[get_id(op3)])
+
+end
+let
+    def = SimpleProblemDef(
+        project_spec = ProjectSpec(),
+        r0 = [1,2,3],
+        s0 = [1,2,3],
+        sF = [1,2,3],
+    )
+    @test length(def.shapes) == length(def.s0)
 end
 # ProjectSpec
 let
@@ -152,7 +162,7 @@ let
 end
 # Test process_schedule
 let
-    project_spec, problem_spec, robot_ICs, optimal_assignments, env_graph = initialize_toy_problem_1()
+    project_spec, problem_spec, robot_ICs, _, env_graph = initialize_toy_problem_1()
 
     project_schedule = construct_partial_project_schedule(project_spec,problem_spec,robot_ICs)
     model = formulate_milp(AssignmentMILP(),project_schedule,problem_spec;cost_model=MakeSpan())
@@ -176,8 +186,7 @@ let
     end
 end
 let
-    project_spec, problem_spec, robot_ICs, optimal_assignments, env_graph = initialize_toy_problem_1()
-    assignment_dict = Dict(k=>v for (k,v) in enumerate(optimal_assignments))
+    project_spec, problem_spec, robot_ICs, _, env_graph = initialize_toy_problem_1()
 
     filename = "/tmp/project_spec.toml"
     open(filename, "w") do io

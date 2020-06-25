@@ -354,12 +354,14 @@ function CRCBS.MakeSpan(schedule::S,cache::C) where {S<:OperatingSchedule,C<:Pla
 end
 
 export
-    construct_cost_model
+    construct_cost_model,
+    construct_heuristic_model
 
 function construct_cost_model end
+function construct_heuristic_model end
 
-function construct_search_env(solver, schedule, problem_spec, env_graph;
-        primary_objective=SumOfMakeSpans(),
+function construct_search_env(solver, schedule, problem_spec, env_graph,
+        primary_objective=problem_spec.cost_function;
         extra_T=400,
         kwargs...
     )
@@ -377,13 +379,12 @@ function construct_search_env(solver, schedule, problem_spec, env_graph;
     return search_env
 end
 function construct_search_env(solver,schedule::OperatingSchedule,
-        env::SearchEnv;
-        primary_objective=env.problem_spec.cost_function,
+        env::SearchEnv,primary_objective=env.problem_spec.cost_function;
         t0 = env.cache.t0,
         tF = env.cache.tF,
         kwargs...)
-    construct_search_env(solver,schedule,env.problem_spec,env.env.graph;
-        primary_objective=primary_objective,t0=t0,tF=tF,kwargs...)
+    construct_search_env(solver,schedule,env.problem_spec,env.env.graph,
+        primary_objective;t0=t0,tF=tF,kwargs...)
 end
 
 update_cost_model!(model::C,env::S) where {C,S<:SearchEnv} = nothing
@@ -512,8 +513,8 @@ function CRCBS.build_env(solver, env::E, node::N, schedule_node::TEAM_ACTION, v:
     for (i, sub_node) in enumerate(schedule_node.instructions)
         # if i == 1 # leader
         ph = PerfectHeuristic(env.dist_function.dist_mtxs[schedule_node.shape][i])
-        # heuristic = construct_heuristic_model(solver,env_graph;ph=ph)
-        heuristic = construct_composite_heuristic(ph,NullHeuristic(),ph,ph,NullHeuristic())
+        heuristic = construct_heuristic_model(solver,env.env.graph;ph=ph)
+        # heuristic = construct_composite_heuristic(ph,NullHeuristic(),ph,ph,NullHeuristic())
         # else
         #     heuristic = get_heuristic_model(env.env)
         # end
@@ -587,14 +588,5 @@ end
 CRCBS.initialize_root_node(pc_mapf::P) where {P<:PC_MAPF} = initialize_root_node(pc_mapf.env)
 CRCBS.default_solution(pc_mapf::M) where {M<:PC_MAPF} = default_solution(pc_mapf.env)
 CRCBS.initialize_child_search_node(node::N,pc_mapf::PC_MAPF) where {N<:ConstraintTreeNode} = initialize_child_search_node(node,pc_mapf.env)
-
-function CRCBS.check_termination_criteria(solver::S,env::E,cost_so_far,s) where {S<:PC_TAPF_Solver,E<:AbstractLowLevelEnv}
-    # solver.num_A_star_iterations += 1
-    if solver.num_A_star_iterations > solver.LIMIT_A_star_iterations
-        # throw(SolverAstarMaxOutException(string("# MAX OUT: A* limit of ",solver.LIMIT_A_star_iterations," exceeded.")))
-        return true
-    end
-    return false
-end
 
 end # PathPlanning module

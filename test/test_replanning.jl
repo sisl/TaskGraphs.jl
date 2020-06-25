@@ -1,6 +1,6 @@
 # Freeze assignments
 let
-    project_spec, problem_spec, robot_ICs, assignments, env_graph = initialize_toy_problem_6(;
+    project_spec, problem_spec, robot_ICs, _, env_graph = initialize_toy_problem_6(;
         verbose=false);
     cost_model = SumOfMakeSpans()
     solver = NBSSolver()

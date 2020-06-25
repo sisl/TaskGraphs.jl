@@ -258,3 +258,12 @@ end
 function read_solver(io)
     read_solver(TOML.parsefile(io))
 end
+
+function CRCBS.check_termination_criteria(solver::S,env::E,cost_so_far,s) where {S<:PC_TAPF_Solver,E<:AbstractLowLevelEnv}
+    # solver.num_A_star_iterations += 1
+    if solver.num_A_star_iterations > solver.LIMIT_A_star_iterations
+        # throw(SolverAstarMaxOutException(string("# MAX OUT: A* limit of ",solver.LIMIT_A_star_iterations," exceeded.")))
+        return true
+    end
+    return false
+end

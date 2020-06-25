@@ -49,7 +49,7 @@ function print_toy_problem_specs(prob_name,vtx_grid,r0,s0,sF,project_spec,delive
     print("\n\n")
 end
 
-function initialize_toy_problem(r0,s0,sF,dist_function)
+function initialize_toy_problem(r0,s0,sF)
     N = length(r0)
     M = length(s0)
     object_ICs = Vector{OBJECT_AT}([OBJECT_AT(o,s0[o]) for o in 1:M]) # initial_conditions
@@ -59,7 +59,11 @@ function initialize_toy_problem(r0,s0,sF,dist_function)
         robot_ICs[r] = ROBOT_AT(r,sF[r-N][1])
     end
     # Drs, Dss = cached_pickup_and_delivery_distances(r0,s0,sF,dist_function)
-    project_spec = ProjectSpec( M=M, initial_conditions=object_ICs, final_conditions=object_FCs)
+    project_spec = ProjectSpec(
+        M=M,
+        initial_conditions=object_ICs,
+        final_conditions=object_FCs,
+        )
     project_spec, robot_ICs
 end
 
@@ -78,32 +82,32 @@ function initialize_toy_problem_1(;cost_function=SumOfMakeSpans(),verbose=false)
     #  5   6   7   8
     #  9  10  11  12
     # 13  14  15  16
-    env_graph = construct_factory_env_from_vtx_grid(vtx_grid)
-    dist_matrix = get_dist_matrix(env_graph)
     r0 = [1,4]
     s0 = [5,8,14]
     sF = [13,12,15]
+    env_graph = construct_factory_env_from_vtx_grid(
+        vtx_grid;
+    )
+    project_spec, robot_ICs = initialize_toy_problem(r0,s0,sF)
 
-    project_spec, robot_ICs = initialize_toy_problem(r0,s0,sF,(v1,v2)->dist_matrix[v1,v2])
     add_operation!(project_spec,construct_operation(project_spec,-1,[1,2],[3],0))
     add_operation!(project_spec,construct_operation(project_spec,-1,[3],  [], 0))
     assignment_dict = Dict(1=>[1,3],2=>[2])
-    assignments = [1,2,1]
-    # assignments = [1,2,3]
 
-    project_spec, problem_spec, object_ICs, object_FCs, robot_ICs = construct_task_graphs_problem(
-        project_spec,r0,s0,sF,dist_matrix;cost_function=cost_function)
-    if verbose
-        problem_description = """
-        #### TOY PROBLEM 1 ####
-        r0 = [1,4]
-        s0 = [5,8,14]
-        sF = [13,12,15]
-        assignment_dict = Dict(1=>[1,3],2=>[2])
-        """
-        print_toy_problem_specs(problem_description,vtx_grid,r0,s0,sF,project_spec)
-    end
-    return project_spec, problem_spec, robot_ICs, assignments, env_graph
+    def = SimpleProblemDef(project_spec,r0,s0,sF)
+    project_spec, problem_spec, _, _, robot_ICs = construct_task_graphs_problem(
+        def,env_graph;cost_function=cost_function)
+    # if verbose
+    #     problem_description = """
+    #     #### TOY PROBLEM 1 ####
+    #     r0 = [1,4]
+    #     s0 = [5,8,14]
+    #     sF = [13,12,15]
+    #     assignment_dict = Dict(1=>[1,3],2=>[2])
+    #     """
+    #     print_toy_problem_specs(problem_description,vtx_grid,r0,s0,sF,project_spec)
+    # end
+    return project_spec, problem_spec, robot_ICs, assignment_dict, env_graph
 end
 
 """
@@ -127,21 +131,21 @@ function initialize_toy_problem_2(;cost_function=SumOfMakeSpans(),verbose=false)
     # 21  22  23  24
     # 25  26  27  28
     # 29  30  31  32
-    env_graph = construct_factory_env_from_vtx_grid(vtx_grid)
-    dist_matrix = get_dist_matrix(env_graph)
     r0 = [1,4]
     s0 = [5,8,13]
     sF = [9,32,17]
+    env_graph = construct_factory_env_from_vtx_grid(
+        vtx_grid;
+    )
+    project_spec, robot_ICs = initialize_toy_problem(r0,s0,sF)
 
-    project_spec, robot_ICs = initialize_toy_problem(r0,s0,sF,(v1,v2)->dist_matrix[v1,v2])
     add_operation!(project_spec,construct_operation(project_spec,-1,[1,2],[3],0))
     add_operation!(project_spec,construct_operation(project_spec,-1,[3],  [], 0))
-    # assignments = [1,2,3]
     assignment_dict = Dict(1=>[1,3],2=>[2])
-    assignments = [1,2,1]
 
-    project_spec, problem_spec, object_ICs, object_FCs, robot_ICs = construct_task_graphs_problem(
-        project_spec,r0,s0,sF,dist_matrix;cost_function=cost_function)
+    def = SimpleProblemDef(project_spec,r0,s0,sF)
+    project_spec, problem_spec, _, _, robot_ICs = construct_task_graphs_problem(
+        def,env_graph;cost_function=cost_function)
     if verbose
         problem_description = """
             TOY PROBLEM 2
@@ -156,7 +160,7 @@ function initialize_toy_problem_2(;cost_function=SumOfMakeSpans(),verbose=false)
         """
         print_toy_problem_specs(problem_description,vtx_grid,r0,s0,sF,project_spec)
     end
-    return project_spec, problem_spec, robot_ICs, assignments, env_graph
+    return project_spec, problem_spec, robot_ICs, assignment_dict, env_graph
 end
 
 """
@@ -183,22 +187,23 @@ function initialize_toy_problem_3(;cost_function=SumOfMakeSpans(),verbose=false,
     # 21  22  23  24
     # 25  26  27  28
     # 29  30  31  32
-    env_graph = construct_factory_env_from_vtx_grid(vtx_grid)
-    dist_matrix = get_dist_matrix(env_graph)
     r0 = [2,5]
     s0 = [2,30,7,12]
     sF = [30,32,8,16]
+    env_graph = construct_factory_env_from_vtx_grid(
+        vtx_grid;
+    )
+    project_spec, robot_ICs = initialize_toy_problem(r0,s0,sF)
 
-    project_spec, robot_ICs = initialize_toy_problem(r0,s0,sF,(v1,v2)->dist_matrix[v1,v2])
     add_operation!(project_spec,construct_operation(project_spec,-1,[1],[2],0.0))
     add_operation!(project_spec,construct_operation(project_spec,-1,[2,3],[4],0.0))
     add_operation!(project_spec,construct_operation(project_spec,-1,[4],  [], 0.0))
-    # assignments = [1,2,3]
     assignment_dict = Dict(1=>[1,2],2=>[3,4])
-    assignments = [2,2,1,1]
 
-    project_spec, problem_spec, object_ICs, object_FCs, robot_ICs = construct_task_graphs_problem(
-        project_spec,r0,s0,sF,dist_matrix;Δt_collect=Δt_collect,Δt_deliver=Δt_deliver,cost_function=cost_function)
+    def = SimpleProblemDef(project_spec,r0,s0,sF)
+    project_spec, problem_spec, _, _, robot_ICs = construct_task_graphs_problem(
+        def,env_graph;cost_function=cost_function)
+
     if verbose
         problem_description = """
 
@@ -215,7 +220,7 @@ function initialize_toy_problem_3(;cost_function=SumOfMakeSpans(),verbose=false,
         """
         print_toy_problem_specs(problem_description,vtx_grid,r0,s0,sF,project_spec)
     end
-    return project_spec, problem_spec, robot_ICs, assignments, env_graph
+    return project_spec, problem_spec, robot_ICs, assignment_dict, env_graph
 end
 
 
@@ -236,19 +241,21 @@ function initialize_toy_problem_4(;cost_function=SumOfMakeSpans(),verbose=false)
     # 1  2  3
     # 4  5  6
     # 7  8  9
-    env_graph = construct_factory_env_from_vtx_grid(vtx_grid)
-    dist_matrix = get_dist_matrix(env_graph)
     r0 = [2,4]
     s0 = [2,4]
     sF = [8,6]
+    env_graph = construct_factory_env_from_vtx_grid(
+        vtx_grid;
+    )
 
-    project_spec, robot_ICs = initialize_toy_problem(r0,s0,sF,(v1,v2)->dist_matrix[v1,v2])
+    project_spec, robot_ICs = initialize_toy_problem(r0,s0,sF)
     add_operation!(project_spec,construct_operation(project_spec,-1,[1,2],[],0))
-    # assignments = [1,2]
     assignment_dict = Dict(1=>[1],2=>[2])
-    assignments = [1,2]
 
-    project_spec, problem_spec, object_ICs, object_FCs, robot_ICs = construct_task_graphs_problem(project_spec,r0,s0,sF,dist_matrix;cost_function=cost_function)
+    def = SimpleProblemDef(project_spec,r0,s0,sF)
+    project_spec, problem_spec, _, _, robot_ICs = construct_task_graphs_problem(
+        def,env_graph;cost_function=cost_function)
+
     if verbose
         problem_description = """
 
@@ -268,7 +275,7 @@ function initialize_toy_problem_4(;cost_function=SumOfMakeSpans(),verbose=false)
         """
         print_toy_problem_specs(problem_description,vtx_grid,r0,s0,sF,project_spec)
     end
-    return project_spec, problem_spec, robot_ICs, assignments, env_graph
+    return project_spec, problem_spec, robot_ICs, assignment_dict, env_graph
 end
 
 
@@ -290,19 +297,21 @@ function initialize_toy_problem_5(;cost_function=SumOfMakeSpans(),verbose=false)
     # 5   6   7   8
     # 9  10  11  12
     # 13  14  15  16
-    env_graph = construct_factory_env_from_vtx_grid(vtx_grid)
-    dist_matrix = get_dist_matrix(env_graph)
     r0 = [3,15]
     s0 = [3,15]
     sF = [11,7]
+    env_graph = construct_factory_env_from_vtx_grid(
+        vtx_grid;
+    )
 
-    project_spec, robot_ICs = initialize_toy_problem(r0,s0,sF,(v1,v2)->dist_matrix[v1,v2])
+    project_spec, robot_ICs = initialize_toy_problem(r0,s0,sF)
     add_operation!(project_spec,construct_operation(project_spec,-1,[1,2],[],0))
-    # assignments = [1,2]
     assignment_dict = Dict(1=>[1],2=>[2])
-    assignments = [1,2]
 
-    project_spec, problem_spec, object_ICs, object_FCs, robot_ICs = construct_task_graphs_problem(project_spec,r0,s0,sF,dist_matrix;cost_function=cost_function)
+    def = SimpleProblemDef(project_spec,r0,s0,sF)
+    project_spec, problem_spec, _, _, robot_ICs = construct_task_graphs_problem(
+        def,env_graph;cost_function=cost_function)
+
     if verbose
         problem_description =
         """
@@ -319,7 +328,7 @@ function initialize_toy_problem_5(;cost_function=SumOfMakeSpans(),verbose=false)
         """
         print_toy_problem_specs(problem_description,vtx_grid,r0,s0,sF,project_spec)
     end
-    return project_spec, problem_spec, robot_ICs, assignments, env_graph
+    return project_spec, problem_spec, robot_ICs, assignment_dict, env_graph
 end
 
 """
@@ -340,24 +349,26 @@ function initialize_toy_problem_6(;cost_function=SumOfMakeSpans(),verbose=false,
     # 21  22  23  24
     # 25  26  27  28
     # 29  30  31  32
-    env_graph = construct_factory_env_from_vtx_grid(vtx_grid)
-    dist_matrix = get_dist_matrix(env_graph)
     r0 = [1,4]
     s0 = [5,12,13]
     sF = [9,32,17]
+    env_graph = construct_factory_env_from_vtx_grid(
+        vtx_grid;
+    )
 
-    project_spec, robot_ICs = initialize_toy_problem(r0,s0,sF,(v1,v2)->dist_matrix[v1,v2])
+    project_spec, robot_ICs = initialize_toy_problem(r0,s0,sF)
     add_operation!(project_spec,construct_operation(project_spec,-1,[1,2],[3],Δt_op))
     add_operation!(project_spec,construct_operation(project_spec,-1,[3],  [], Δt_op))
-    # assignments = [1,2,3]
     assignment_dict = Dict(1=>[1,3],2=>[2])
-    assignments = [1,2,1]
 
-    project_spec, problem_spec, object_ICs, object_FCs, robot_ICs = construct_task_graphs_problem(project_spec,r0,s0,sF,dist_matrix;Δt_collect=Δt_collect,Δt_deliver=Δt_deliver,cost_function=cost_function)
+    def = SimpleProblemDef(project_spec,r0,s0,sF)
+    project_spec, problem_spec, _, _, robot_ICs = construct_task_graphs_problem(
+        def,env_graph;cost_function=cost_function)
+
     if verbose
         print_toy_problem_specs("TOY PROBLEM 6",vtx_grid,r0,s0,sF,project_spec)
     end
-    return project_spec, problem_spec, robot_ICs, assignments, env_graph
+    return project_spec, problem_spec, robot_ICs, assignment_dict, env_graph
 end
 
 
@@ -373,24 +384,26 @@ function initialize_toy_problem_7(;cost_function=SumOfMakeSpans(),verbose=false,
     #  5   6   7   8
     #  9  10  11  12
     # 13  14  15  16
-    env_graph = construct_factory_env_from_vtx_grid(vtx_grid)
-    dist_matrix = get_dist_matrix(env_graph)
     r0 = [2,9]
     s0 = [6,10,15]
     sF = [14,12,16]
+    env_graph = construct_factory_env_from_vtx_grid(
+        vtx_grid;
+    )
 
-    project_spec, robot_ICs = initialize_toy_problem(r0,s0,sF,(v1,v2)->dist_matrix[v1,v2])
+    project_spec, robot_ICs = initialize_toy_problem(r0,s0,sF)
     add_operation!(project_spec,construct_operation(project_spec,-1,[1,2],[3],Δt_op))
     add_operation!(project_spec,construct_operation(project_spec,-1,[3],  [], Δt_op))
-    # assignments = [1,2,3]
     assignment_dict = Dict(1=>[1,3],2=>[2])
-    assignments = [1,2,1]
 
-    project_spec, problem_spec, object_ICs, object_FCs, robot_ICs = construct_task_graphs_problem(project_spec,r0,s0,sF,dist_matrix;Δt_collect=Δt_collect,Δt_deliver=Δt_deliver,cost_function=cost_function)
+    def = SimpleProblemDef(project_spec,r0,s0,sF)
+    project_spec, problem_spec, _, _, robot_ICs = construct_task_graphs_problem(
+        def,env_graph;cost_function=cost_function)
+
     if verbose
         print_toy_problem_specs("TOY PROBLEM 7",vtx_grid,r0,s0,sF,project_spec)
     end
-    return project_spec, problem_spec, robot_ICs, assignments, env_graph
+    return project_spec, problem_spec, robot_ICs, assignment_dict, env_graph
 end
 
 """
@@ -411,27 +424,29 @@ function initialize_toy_problem_8(;cost_function=SumOfMakeSpans(),verbose=false,
     # 21  22  23  24
     # 25  26  27  28
     # 29  30  31  32
-    env_graph = construct_factory_env_from_vtx_grid(vtx_grid)
-    dist_matrix = get_dist_matrix(env_graph)
     r0 = [1,29]
     s0 = [5,25,12,24]
     sF = [8,28,9,21]
+    env_graph = construct_factory_env_from_vtx_grid(
+        vtx_grid;
+    )
 
-    project_spec, robot_ICs = initialize_toy_problem(r0,s0,sF,(v1,v2)->dist_matrix[v1,v2])
+    project_spec, robot_ICs = initialize_toy_problem(r0,s0,sF)
     add_operation!(project_spec,construct_operation(project_spec,-1,[1],[4],Δt_op))
     add_operation!(project_spec,construct_operation(project_spec,-1,[2],[3],Δt_op))
     add_operation!(project_spec,construct_operation(project_spec,-1,[4],[],Δt_op))
     add_operation!(project_spec,construct_operation(project_spec,-1,[3],[],Δt_op))
-    # assignments = [1,2,3,4]
     assignment_dict = Dict(1=>[1,3],2=>[2,4])
-    assignments = [1,2,1,2]
 
-    project_spec, problem_spec, object_ICs, object_FCs, robot_ICs = construct_task_graphs_problem(project_spec,r0,s0,sF,dist_matrix;Δt_collect=Δt_collect,Δt_deliver=Δt_deliver,cost_function=cost_function)
+    def = SimpleProblemDef(project_spec,r0,s0,sF)
+    project_spec, problem_spec, _, _, robot_ICs = construct_task_graphs_problem(
+        def,env_graph;cost_function=cost_function)
+
 
     if verbose
         print_toy_problem_specs("TOY PROBLEM 8",vtx_grid,r0,s0,sF,project_spec)
     end
-    return project_spec, problem_spec, robot_ICs, assignments, env_graph
+    return project_spec, problem_spec, robot_ICs, assignment_dict, env_graph
 end
 
 export
@@ -447,19 +462,21 @@ function initialize_toy_problem_9(;cost_function=SumOfMakeSpans(),verbose=false,
     #  5   6   7   8
     #  9  10  11  12
     # 13  14  15  16
-    env_graph = construct_factory_env_from_vtx_grid(vtx_grid)
-    dist_matrix = get_dist_matrix(env_graph)
     r0 = [1,13]
     s0 = [5,5]
     sF = [8,6]
+    env_graph = construct_factory_env_from_vtx_grid(
+        vtx_grid;
+    )
 
-    project_spec, robot_ICs = initialize_toy_problem(r0,s0,sF,(v1,v2)->dist_matrix[v1,v2])
+    project_spec, robot_ICs = initialize_toy_problem(r0,s0,sF)
     add_operation!(project_spec,construct_operation(project_spec,-1,[1],[],Δt_op))
     add_operation!(project_spec,construct_operation(project_spec,-1,[2],[],Δt_op))
-    project_spec, problem_spec, object_ICs, object_FCs, robot_ICs = construct_task_graphs_problem(project_spec,r0,s0,sF,dist_matrix;Δt_collect=Δt_collect,Δt_deliver=Δt_deliver,cost_function=cost_function)
-    # assignments = [1,2]
     assignment_dict = Dict(1=>[1],2=>[2])
-    assignments = [1,2]
+
+    def = SimpleProblemDef(project_spec,r0,s0,sF)
+    project_spec, problem_spec, _, _, robot_ICs = construct_task_graphs_problem(
+        def,env_graph;cost_function=cost_function)
 
     if verbose
         print_toy_problem_specs("""
@@ -468,7 +485,7 @@ function initialize_toy_problem_9(;cost_function=SumOfMakeSpans(),verbose=false,
             Project with station-sharing. Station 5 needs to accessed by both robots for picking up their objects.
             """,vtx_grid,r0,s0,sF,project_spec,problem_spec.graph)
     end
-    return project_spec, problem_spec, robot_ICs, assignments, env_graph
+    return project_spec, problem_spec, robot_ICs, assignment_dict, env_graph
 end
 
 
@@ -514,22 +531,24 @@ function initialize_toy_problem_10(;cost_function=MakeSpan(),verbose=false,Δt_o
     #
     #     [1]
 
-    env_graph = construct_factory_env_from_vtx_grid(vtx_grid)
-    dist_matrix = get_dist_matrix(env_graph)
     r0 = [15,34,137, 5       ]
     s0 = [15,34,137, 5, 27,49 ]
     sF = [22,42,60,  27,49,71]
+    env_graph = construct_factory_env_from_vtx_grid(
+        vtx_grid;
+    )
 
-    project_spec, robot_ICs = initialize_toy_problem(r0,s0,sF,(v1,v2)->dist_matrix[v1,v2])
+    project_spec, robot_ICs = initialize_toy_problem(r0,s0,sF)
     add_operation!(project_spec,construct_operation(project_spec,-1,[1,2,3,6],[],Δt_op))
     # add_operation!(project_spec,construct_operation(project_spec,-1,[2],[],Δt_op))
     add_operation!(project_spec,construct_operation(project_spec,-1,[4],[5],Δt_op))
     add_operation!(project_spec,construct_operation(project_spec,-1,[5],[6],Δt_op))
     # add_operation!(project_spec,construct_operation(project_spec,-1,[4],[],Δt_op))
-    project_spec, problem_spec, object_ICs, object_FCs, robot_ICs = construct_task_graphs_problem(project_spec,r0,s0,sF,dist_matrix;Δt_collect=Δt_collect,Δt_deliver=Δt_deliver,cost_function=cost_function)
-    # assignments = [1,2]
     assignment_dict = Dict(1=>[1],2=>[2],3=>[3],4=>[4,5,6])
-    assignments = [1,2,3,4,4,4]
+
+    def = SimpleProblemDef(project_spec,r0,s0,sF)
+    project_spec, problem_spec, _, _, robot_ICs = construct_task_graphs_problem(
+        def,env_graph;cost_function=cost_function)
 
     if verbose
         print_toy_problem_specs("""
@@ -541,7 +560,88 @@ function initialize_toy_problem_10(;cost_function=MakeSpan(),verbose=false,Δt_o
             in ISPS. Hence, the solver will return a solution with T = 9.
             """,vtx_grid,r0,s0,sF,project_spec,problem_spec.graph)
     end
-    return project_spec, problem_spec, robot_ICs, assignments, env_graph
+    return project_spec, problem_spec, robot_ICs, assignment_dict, env_graph
 end
+
+export
+    initialize_toy_problem_11
+
+"""
+    #### TOY PROBLEM 11 ####
+
+    Requires collaborative transport: Robots 1 and 2 transport object 1 while
+    robot 3 transports object 2. Robot 3 will need to move over to let the other
+    robots pass.
+
+"""
+function initialize_toy_problem_11(;
+        cost_function = SumOfMakeSpans(),
+        verbose = false,
+    )
+    N = 3                  # num robots
+    M = 3                  # num delivery tasks
+    vtx_grid = initialize_dense_vtx_grid(4, 4)
+    # 1   2   3   4
+    # 5   6   7   8
+    # 9  10  11  12
+    # 13  14  15  16
+    r0 = [2, 4, 11]
+    s0 = [2, 7, 13]
+    sF = [14, 3, 9]
+    env_graph = construct_factory_env_from_vtx_grid(
+        vtx_grid;
+    )
+    shapes = [(1, 2), (1, 1), (1, 1)]
+
+    project_spec, robot_ICs = initialize_toy_problem(r0, s0, sF)
+    add_operation!(
+        project_spec,
+        construct_operation(project_spec, -1, [1, 2], [3], 0),
+    )
+    add_operation!(
+        project_spec,
+        construct_operation(project_spec, -1, [3], [], 0),
+    )
+    assignment_dict = Dict(1 => [1, 3], 2 => [1], 3 => [2])
+
+    def = SimpleProblemDef(project_spec,r0,s0,sF,shapes)
+    project_spec, problem_spec, _, _, robot_ICs = construct_task_graphs_problem(
+        def,env_graph;cost_function=cost_function)
+
+    return project_spec, problem_spec, robot_ICs, assignment_dict, env_graph
+end
+
+export
+    init_env_1,
+    init_env_2,
+    init_env_3
+
+init_env_1() = construct_regular_factory_world(;
+    n_obstacles_x=2,
+    n_obstacles_y=2,
+    obs_width = [4;4], # obs_w = 8/n
+    obs_offset = [4;4],
+    env_pad = [1;1],
+    env_offset = [1,1],
+    env_scale = 1
+)
+init_env_2() = construct_regular_factory_world(;
+    n_obstacles_x=4,
+    n_obstacles_y=4,
+    obs_width = [2;2],
+    obs_offset = [2;2],
+    env_pad = [1;1],
+    env_offset = [1,1],
+    env_scale = 1
+)
+init_env_3() = construct_regular_factory_world(;
+    n_obstacles_x=8,
+    n_obstacles_y=8,
+    obs_width = [1;1],
+    obs_offset = [1;1],
+    env_pad = [1;1],
+    env_offset = [1,1],
+    env_scale = 1
+)
 
 end

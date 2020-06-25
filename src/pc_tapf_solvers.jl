@@ -149,6 +149,7 @@ function reset_solver!(logger::SolverLogger)
     logger.iterations = 0
     logger.best_cost = typemax(logger.best_cost)
     logger.lower_bound = typemin(logger.lower_bound)
+    logger.start_time = time()
     logger
 end
 CRCBS.get_infeasible_cost(logger::SolverLogger{C}) where {C} = typemax(C)
@@ -282,20 +283,20 @@ end
 search_trait(solver::PrioritizedAStarSC) = Prioritized()
 primary_cost(::PrioritizedAStarSC,cost::NTuple{5,Float64}) = cost[2]
 
-export
-    construct_heuristic_model
+# export
+#     construct_heuristic_model
 
 """
     construct_heuristic_model(solver,env_graph;kwargs...)
 
 Construct the heuristic model to be used by solver.
 """
-function construct_heuristic_model(trait::NonPrioritized,solver,env_graph;
+function TaskGraphs.construct_heuristic_model(trait::NonPrioritized,solver,env_graph;
         ph = PerfectHeuristic(get_dist_matrix(env_graph)),
         kwargs...)
     construct_composite_heuristic(ph,NullHeuristic(),ph,ph,NullHeuristic())
 end
-function construct_heuristic_model(trait::Prioritized,args...;kwargs...)
+function TaskGraphs.construct_heuristic_model(trait::Prioritized,args...;kwargs...)
     h = construct_heuristic_model(NonPrioritized(),args...;kwargs...)
     construct_composite_heuristic(
         h.cost_models[2],
@@ -303,12 +304,12 @@ function construct_heuristic_model(trait::Prioritized,args...;kwargs...)
         h.cost_models[3:end]...
     )
 end
-function construct_heuristic_model(solver, args...;kwargs...)
+function TaskGraphs.construct_heuristic_model(solver, args...;kwargs...)
     construct_heuristic_model(search_trait(solver),solver,args...;kwargs...)
 end
 
-export
-    construct_cost_model
+# export
+#     construct_cost_model
 
 """
     construct_cost_model(solver::AStarSC, args...;kwargs...)
@@ -360,11 +361,10 @@ export
 """
     update_route_plan!()
 """
-function update_route_plan!(solver,env,route_plan,schedule,v,path,cost,schedule_node)
+function update_route_plan!(solver,env,route_plan,schedule,v,path,cost,schedule_node,agent_id = get_path_spec(schedule, v).agent_id)
     # add to solution
     # log_info(3,solver,string("agent_path = ", convert_to_vertex_lists(path)))
     # log_info(3,solver,string("cost = ", get_cost(path)))
-    agent_id = get_path_spec(schedule, v).agent_id
     set_solution_path!(route_plan, path, agent_id)
     set_path_cost!(route_plan, cost, agent_id)
     # update
@@ -387,7 +387,7 @@ function update_route_plan!(solver,env,route_plan,schedule,v,meta_path,meta_cost
             # path.cost = accumulate_cost(cbs_env, get_cost(path), get_transition_cost(cbs_env, p.s, p.a, p.sp))
         end
         path.cost = get_cost(new_path)
-        update_route_plan!(solver,route_plan,schedule,v,path,path.cost,sub_node)
+        update_route_plan!(solver,env,route_plan,schedule,v,path,path.cost,sub_node,agent_id)
         # update_env!(solver,env,route_plan,v,path,agent_id)
         # Print for debugging
         # @show agent_id
@@ -774,7 +774,7 @@ function CRCBS.solve!(solver::NBSSolver{A,P,C}, base_search_env::SearchEnv;kwarg
             enforce_time_limit(solver)
             if check_iterations(solver)
                 log_info(1,solver,
-                    "NBS: Reached iteration limit of $(iteration_limit(solver)).")
+                    "NBS: Reached $(iteration_limit(solver))-iteration limit.")
                 break
             end
         catch e
@@ -791,21 +791,16 @@ function CRCBS.solve!(solver::NBSSolver{A,P,C}, base_search_env::SearchEnv;kwarg
     return best_env, best_cost(solver)
 end
 function CRCBS.solve!(solver, env_graph, schedule::OperatingSchedule, problem_spec::ProblemSpec;
-    primary_objective=SumOfMakeSpans(),
     kwargs...)
-    base_search_env = construct_search_env(solver,schedule,problem_spec,env_graph;primary_objective=primary_objective)
+    base_search_env = construct_search_env(solver,schedule,problem_spec,env_graph;kwargs...)
     # @show base_search_env.cache.t0
-    solve!(solver, base_search_env;
-        primary_objective=primary_objective,
-        kwargs...
-    )
+    solve!(solver, base_search_env;kwargs...)
 end
 function CRCBS.solve!(solver, env_graph, project_spec::ProjectSpec, problem_spec::ProblemSpec,
         robot_ICs;kwargs...)
     schedule = construct_partial_project_schedule(
         project_spec,problem_spec,map(i->robot_ICs[i], 1:problem_spec.N))
-    solve!(solver, env_graph, schedule, problem_spec;
-        kwargs...)
+    solve!(solver, env_graph, schedule, problem_spec;kwargs...)
 end
 
 export
@@ -819,14 +814,14 @@ reconstructed from scratch) on each call to `update_assignment_problem!` prior
 to being resolved.
 """
 function formulate_assignment_problem(solver,base_search_env::SearchEnv;
-        cost_model=base_search_env.problem_spec.cost_function,
+        # cost_model=base_search_env.problem_spec.cost_function,
         # optimizer=get_optimizer(solver), #TODO where to pass in the optimizer?
         kwargs...)
 
     project_schedule    = base_search_env.schedule
     problem_spec        = base_search_env.problem_spec
     formulate_milp(solver,project_schedule,problem_spec;
-        cost_model=cost_model,
+        cost_model=base_search_env.problem_spec.cost_function,
         # optimizer=optimizer,
         kwargs...)
 end

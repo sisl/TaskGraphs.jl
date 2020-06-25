@@ -747,28 +747,6 @@ function delete_nodes!(schedule::OperatingSchedule, vtxs::Vector{Int})
     schedule
 end
 
-"""
-    get_task_sequences
-
-Returns a dict mapping robot i => task sequence. The Vector `assignments`
-must map task j -> robot i (including dummy robots).
-"""
-function get_task_sequences(N::Int,M::Int,assignments)
-    task_sequences = Dict{Int,Vector{Int}}()
-    for i in 1:N
-        robot_id = i
-        seq = Vector{Int}()
-        for j in 1:M
-            if assignments[j] == robot_id
-                push!(seq, j)
-                robot_id = j + N
-            end
-        end
-        task_sequences[i] = seq
-    end
-    task_sequences
-end
-
 export
     validate,
     sanity_check
@@ -1451,23 +1429,12 @@ exclude_current_solution!(args...) = exclude_solutions!(args...)
 
 export
     get_assignment_matrix,
-    get_assignment_vector,
     get_assignment_dict
 
 function get_assignment_matrix(model::M) where {M<:JuMP.Model}
     Matrix{Int}(min.(1, round.(value.(model[:X])))) # guarantees binary matrix
 end
 get_assignment_matrix(model::TaskGraphsMILP) = get_assignment_matrix(model.model)
-function get_assignment_vector(assignment_matrix,M)
-    assignments = -ones(Int,M)
-    for j in 1:M
-        r = findfirst(assignment_matrix[:,j] .== 1)
-        if r != nothing
-            assignments[j] = r
-        end
-    end
-    assignments
-end
 
 """
     get_assignment_dict(assignment_matrix,N,M)
@@ -1490,13 +1457,6 @@ function get_assignment_dict(assignment_matrix,N,M)
         end
     end
     assignment_dict
-    assignments = zeros(Int,M)
-    for (robot_id, task_list) in assignment_dict
-        for task_id in task_list
-            assignments[task_id] = robot_id
-        end
-    end
-    assignment_dict, assignments
 end
 
 export
@@ -2540,8 +2500,7 @@ function update_project_schedule!(model::AssignmentMILP,
     ) where {A<:AbstractMatrix}
     N = length(get_robot_ICs(project_schedule))
     M = length(get_object_ICs(project_schedule))
-    # assignment_dict, assignments = get_assignment_dict(assignment_matrix,problem_spec.N,problem_spec.M)
-    assignment_dict, assignments = get_assignment_dict(assignment_matrix,N,M)
+    assignment_dict = get_assignment_dict(assignment_matrix,N,M)
     G = get_graph(project_schedule)
     adj_matrix = adjacency_matrix(G)
     for (robot_id, task_list) in assignment_dict
