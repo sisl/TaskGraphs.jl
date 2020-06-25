@@ -64,6 +64,12 @@ function initialize_toy_problem(r0,s0,sF,dist_function)
 end
 
 # This is a place to put reusable problem initializers for testing
+"""
+    initialize_toy_problem_1
+
+Optimal MakeSpan = 5
+Optimal SumOfMakeSpans = 5
+"""
 function initialize_toy_problem_1(;cost_function=SumOfMakeSpans(),verbose=false)
     N = 2                  # num robots
     M = 3                  # num delivery tasks
@@ -103,7 +109,11 @@ end
 """
     In this problem robot 1 will first do [1-5-9], then [9-13-17]
     robot 2 will do [4-8-32]. The key thing is that robot 1 will need to wait
-    until robot 2 is finished before robot 1 can do its second task
+    until robot 2 is finished before robot 1 can do its second task.
+
+    Optimal paths:
+    Optimal MakeSpan = 8
+    Optimal SumOfMakeSpans = 8
 """
 function initialize_toy_problem_2(;cost_function=SumOfMakeSpans(),verbose=false)
     N = 2                  # num robots
@@ -386,6 +396,8 @@ end
 """
     two-headed project. Robot 1 does the first half of the first head, and
     robot 2 handles the first half of the second head, and then they swap.
+    Optimal MakeSpan = 8
+    Optimal SumOfMakeSpans = 16
 """
 function initialize_toy_problem_8(;cost_function=SumOfMakeSpans(),verbose=false,Δt_op=0,Δt_collect=[0,0,0,0],Δt_deliver=[0,0,0,0])
     N = 2                  # num robots

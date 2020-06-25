@@ -8,22 +8,6 @@ using DataStructures
 using CRCBS
 using ..TaskGraphs
 
-# export
-#     PC_TAPF_Solver,
-#     reset_solver!,
-#     enter_assignment!,
-#     exit_assignment!,
-#     enter_cbs!,
-#     exit_cbs!,
-#     enter_low_level!,
-#     exit_low_level!,
-#     enter_a_star!,
-#     exit_a_star!,
-#     read_solver,
-#     read_solver,
-#     log_info
-
-
 export
     SolverException
 
@@ -75,6 +59,15 @@ end
 get_logger(solver) = solver.logger
 get_logger(logger::SolverLogger) = logger
 
+export
+    iterations,
+    iteration_limit,
+    start_time,
+    runtime_limit,
+    deadline,
+    best_cost,
+    verbosity
+
 iterations(logger)        = get_logger(logger).iterations
 iteration_limit(logger)   = get_logger(logger).iteration_limit
 start_time(logger)        = get_logger(logger).start_time
@@ -85,12 +78,23 @@ best_cost(logger)         = get_logger(logger).best_cost
 verbosity(logger)         = get_logger(logger).verbosity
 debug(logger)             = get_logger(logger).DEBUG
 
+abstract type SearchTrait end
+struct Prioritized <: SearchTrait end
+struct NonPrioritized <: SearchTrait end
+function search_trait end
+
+get_primary_cost(::NonPrioritized,model,cost) = cost[1]
+get_primary_cost(::Prioritized,model,cost) = cost[2]
+get_primary_cost(solver,cost) = get_primary_cost(search_trait(solver),solver,cost)
+
 export
     optimality_gap,
     set_lower_bound!,
     set_iteration_limit!,
+    set_runtime_limit!,
     increment_iteration_count!,
-    set_best_cost!
+    set_best_cost!,
+    reset_solver!
 
 optimality_gap(logger) = best_cost(logger) .- lower_bound(logger)
 function check_time(logger)
@@ -120,11 +124,23 @@ end
 function set_lower_bound!(logger::SolverLogger,val)
     logger.lower_bound = val
 end
+# function set_runtime_time_limit!(logger::SolverLogger,val)
+#     logger.runtime_limit = val
+# end
+function CRCBS.set_deadline!(solver,val)
+    get_logger(solver).deadline = val
+end
+function set_runtime_limit!(solver,val)
+    get_logger(solver).runtime_limit = val
+end
 function set_lower_bound!(logger::SolverLogger{NTuple{N,T}},val::R) where {N,T<:Real,R<:Real}
     logger.lower_bound = NTuple{N,R}((R(val),zeros(R,N-1)...))
 end
-function set_best_cost!(logger::SolverLogger,val)
+function set_best_cost!(logger::SolverLogger{C},val::C) where {C}
     logger.best_cost = val
+end
+function set_best_cost!(logger::SolverLogger{NTuple{N,T}},val::R) where {N,T<:Real,R<:Real}
+    logger.best_cost = NTuple{N,R}((R(val),zeros(R,N-1)...))
 end
 function set_iteration_limit!(logger,val)
     get_logger(logger).iteration_limit = val
@@ -175,9 +191,9 @@ TaskGraphs.log_info(limit::Int,solver,msg...) = log_info(limit,verbosity(solver)
 #     logger::SolverLogger{C}
 # end
 
-abstract type SearchTrait end
-struct Prioritized <: SearchTrait end
-struct NonPrioritized <: SearchTrait end
+low_level(solver) = solver.low_level_planner
+primary_cost(solver,cost) = cost[1]
+primary_cost_type(solver) = Float64
 
 export
     AStarSC
@@ -204,6 +220,52 @@ function CRCBS.check_termination_criteria(solver,env::E,cost_so_far,s) where {E<
     end
     return false
 end
+function CRCBS.logger_step_a_star!(solver::AStarSC, env::MetaAgentCBS.LowLevelEnv, base_path, s, q_cost)
+    increment_iteration_count!(solver)
+    check_iterations(solver)
+    log_info(2,solver,"A* iter $(iterations(solver)): s = $(string(s)), q_cost = $q_cost")
+end
+function CRCBS.logger_step_a_star!(solver::AStarSC, env, base_path, s, q_cost)
+    increment_iteration_count!(solver)
+    # if solver.DEBUG
+    #     push!(solver.search_history, s)
+    # end
+    if check_iterations(solver)
+        # if solver.DEBUG
+        #     # Dump env to JLD2 environment
+        #     filename = joinpath(DEBUG_PATH,string("A_star_dump_",get_debug_file_id(),".jld2"))
+        #     mkpath(DEBUG_PATH)
+        #     log_info(-1,solver,"Dumping A* env to $filename")
+        #     agent_id = env.agent_idx
+        #     history = map(s->(s.vtx,s.t),solver.search_history)
+        #     start   = (get_final_state(base_path).vtx,get_final_state(base_path).t)
+        #     goal    = (env.goal.vtx,env.goal.t)
+        #     idx = isa(solver.AStarSC) ? 2 : 1
+        #     paths   = env.cost_model.cost_models[idx].model.table.paths
+        #     state_constraints = map(c->(c.a,(c.v.s.vtx,c.v.sp.vtx),c.t),collect(env.constraints.state_constraints))
+        #     action_constraints = map(c->(c.a,(c.v.s.vtx,c.v.sp.vtx),c.t),collect(env.constraints.action_constraints))
+        #     @save filename agent_id history start goal paths state_constraints action_constraints
+        #     # @assert false "making a bogus assertion to hack my way out of this block"
+        # end
+        # throw(SolverAstarMaxOutException(string("# MAX OUT: A* limit of ",solver.LIMIT_A_star_iterations," exceeded.")))
+    end
+    log_info(2,solver,"A* iter $(iterations(solver)): s = $(string(s)), q_cost = $q_cost")
+end
+function CRCBS.logger_enter_a_star!(solver::AStarSC)
+    log_info(1,solver,"A*: entering...")
+    @assert(iterations(solver) == 0, "A*: ERROR: iterations = $(iterations(solver)) at entry")
+end
+function CRCBS.logger_enqueue_a_star!(solver::AStarSC,env,s,a,sp,h_cost)
+    log_info(2,solver,"A* exploring $(string(s)) -- $(string(sp)), h_cost = $h_cost")
+end
+function CRCBS.logger_exit_a_star!(solver::AStarSC, path, cost, status)
+    # empty!(solver.search_history)
+    if status == false
+        log_info(-1,solver,"A*: failed to find feasible path. Returning path of cost $cost")
+    else
+        log_info(0,solver,"A*: returning optimal path with cost $cost")
+    end
+end
 
 export
     PrioritizedAStarSC
@@ -218,6 +280,7 @@ Low-level proritized path planner that employs Slack-and-Collision-Aware A*.
     replan::Bool            = false
 end
 search_trait(solver::PrioritizedAStarSC) = Prioritized()
+primary_cost(::PrioritizedAStarSC,cost::NTuple{5,Float64}) = cost[2]
 
 export
     construct_heuristic_model
@@ -353,6 +416,7 @@ function plan_path!(solver::AStarSC, env::SearchEnv, node::N,
     schedule = env.schedule
     node_id = get_vtx_id(schedule,v)
 
+    reset_solver!(solver)
     cbs_env, base_path = build_env(solver, env, node, schedule_node, v)
     ### PATH PLANNING ###
     # solver.DEBUG ? validate(base_path,v) : nothing
@@ -409,11 +473,13 @@ Path planner that employs Incremental Slack-Prioritized Search.
     )
 end
 ISPS(planner) = ISPS(low_level_planner=planner)
-TaskGraphs.construct_cost_model(solver::ISPS,args...;kwargs...) = construct_cost_model(solver.low_level_planner,args...;kwargs...)
-search_trait(solver::ISPS) = search_trait(solver.low_level_planner)
+TaskGraphs.construct_cost_model(solver::ISPS,args...;kwargs...) = construct_cost_model(low_level(solver),args...;kwargs...)
+search_trait(solver::ISPS) = search_trait(low_level(solver))
+primary_cost(solver::ISPS,cost) = primary_cost(low_level(solver),cost)
+primary_cost_type(solver::ISPS) = primary_cost_type(low_level(solver))
 function set_best_cost!(solver::ISPS,cost)
     set_best_cost!(get_logger(solver),cost)
-    set_best_cost!(solver.low_level_planner,cost)
+    set_best_cost!(low_level(solver),cost)
 end
 
 export
@@ -437,7 +503,7 @@ function plan_next_path!(solver::ISPS, env::SearchEnv, node::N;
         if get_path_spec(env.schedule, v).plan_path == true
             # enter_a_star!(solver)
             try
-                valid_flag = plan_path!(solver.low_level_planner,env,node,schedule_node,v;
+                valid_flag = plan_path!(low_level(solver),env,node,schedule_node,v;
                     heuristic=heuristic)
             catch e
                 if isa(e, SolverException)
@@ -495,6 +561,7 @@ function CRCBS.low_level_search!(solver::ISPS, pc_mapf::M, node::N,
         ) where {M<:PC_MAPF,N<:ConstraintTreeNode}
 
     # enter_low_level!(solver)
+    reset_solver!(solver)
     valid_flag = true
     cache = initialize_planning_cache(pc_mapf.env.schedule;
         t0=deepcopy(pc_mapf.env.cache.t0),
@@ -531,11 +598,13 @@ Path planner that employs Conflict-Based Search
     logger::SolverLogger{C} = SolverLogger{get_cost_type(low_level_planner)}()
 end
 CBSRoutePlanner(planner) = CBSRoutePlanner(low_level_planner=planner)
-TaskGraphs.construct_cost_model(solver::CBSRoutePlanner,args...;kwargs...) = construct_cost_model(solver.low_level_planner,args...;kwargs...)
-search_trait(solver::CBSRoutePlanner) = search_trait(solver.low_level_planner)
+TaskGraphs.construct_cost_model(solver::CBSRoutePlanner,args...;kwargs...) = construct_cost_model(low_level(solver),args...;kwargs...)
+search_trait(solver::CBSRoutePlanner) = search_trait(low_level(solver))
+primary_cost(solver::CBSRoutePlanner,cost) = primary_cost(low_level(solver),cost)
+primary_cost_type(solver::CBSRoutePlanner) = primary_cost_type(low_level(solver))
 function set_best_cost!(solver::CBSRoutePlanner,cost)
     set_best_cost!(get_logger(solver),cost)
-    set_best_cost!(solver.low_level_planner,cost)
+    set_best_cost!(low_level(solver),cost)
 end
 
 function CRCBS.solve!(
@@ -544,10 +613,11 @@ function CRCBS.solve!(
         )
 
     # enter_cbs!(solver)
+    reset_solver!(solver)
     priority_queue = PriorityQueue{Tuple{ConstraintTreeNode,PlanningCache},get_cost_type(mapf.env)}()
     root_node = initialize_root_node(mapf) #TODO initialize with a partial solution when replanning
     search_env, valid_flag = low_level_search!(
-        solver.low_level_planner,mapf,root_node)
+        low_level(solver),mapf,root_node)
     detect_conflicts!(root_node.conflict_table,root_node.solution;t0=max(minimum(mapf.env.cache.t0), 1))
     if valid_flag
         enqueue!(priority_queue, (root_node,search_env.cache) => root_node.cost)
@@ -570,14 +640,13 @@ function CRCBS.solve!(
             # otherwise, create constraints and branch
             constraints = generate_constraints_from_conflict(conflict)
             for constraint in constraints
-                # new_node = initialize_child_search_node(node)
                 new_node = initialize_child_search_node(node,mapf)
                 if CRCBS.add_constraint!(new_node,constraint)
                     increment_iteration_count!(solver)
                     # log_info(1,solver,string("CBS: adding constraint", string(constraint)))
                     # step_cbs!(solver,constraint)
                     search_env, valid_flag = low_level_search!(
-                        solver.low_level_planner,
+                        low_level(solver),
                         mapf, new_node,
                         [get_agent_id(constraint)])
                     if valid_flag
@@ -590,7 +659,7 @@ function CRCBS.solve!(
             enforce_iteration_limit(solver)
         catch e
             if isa(e, SolverException)
-                # log_info(-1,solver,e.msg)
+                showerror(stdout, e, catch_backtrace())
                 break
             else
                 rethrow(e)
@@ -602,36 +671,6 @@ function CRCBS.solve!(
     solution, cost = default_solution(mapf)
     return SearchEnv(search_env,cache=mapf.env.cache,route_plan=solution)
     # return solution, mapf.env.cache, cost
-end
-
-export
-    DFSRoutePlanner
-
-"""
-    DFSRoutePlanner
-
-Prioritized Depth-First Search route planner.
-"""
-@with_kw struct DFSRoutePlanner{C}
-    logger::SolverLogger{C} = SolverLogger{C}()
-end
-function construct_heuristic_model(solver::DFSRoutePlanner,env_graph;
-        ph = PerfectHeuristic(get_dist_matrix(env_graph)),
-        kwargs...)
-    construct_composite_heuristic(ph,ph,NullHeuristic())
-end
-function TaskGraphs.construct_cost_model(solver::DFSRoutePlanner,
-        schedule, cache, problem_spec, env_graph;
-        extra_T=400, primary_objective=SumOfMakeSpans(), kwargs...)
-    cost_model = construct_composite_cost_model(
-        typeof(primary_objective)(schedule,cache),
-        FullCostModel(maximum,TravelTime()),
-        FullCostModel(maximum,TravelDistance())
-        )
-    heuristic_model = construct_heuristic_model(solver,env_graph;kwargs...)
-    # ph = PerfectHeuristic(get_dist_matrix(env_graph))
-    # heuristic_model = construct_composite_heuristic(ph,ph,NullHeuristic())
-    cost_model, heuristic_model
 end
 
 export
@@ -652,7 +691,9 @@ function TaskGraphs.formulate_milp(solver::TaskGraphsMILPSolver,args...;kwargs..
 end
 
 export
-    NBSSolver
+    NBSSolver,
+    assignment_solver,
+    route_planner
 
 """
     NBSSolver{A,P}
@@ -671,13 +712,15 @@ The input to the route planner is the PC-TAPF problem spec along with the
 @with_kw struct NBSSolver{A,P,C} <: AbstractPCTAPFSolver
     assignment_model::A     = TaskGraphsMILPSolver()
     path_planner    ::P     = CBSRoutePlanner()
-    logger          ::SolverLogger{C} = SolverLogger{get_cost_type(path_planner)}()
+    logger          ::SolverLogger{C} = SolverLogger{primary_cost_type(path_planner)}()
 end
-NBSSolver(a,b) = NBSSolver(a,b,SolverLogger{get_cost_type(b)}())
+NBSSolver(a,b) = NBSSolver(assignment_model=a,path_planner=b)
 assignment_solver(solver::NBSSolver) = solver.assignment_model
 route_planner(solver::NBSSolver) = solver.path_planner
 TaskGraphs.construct_cost_model(solver::NBSSolver,args...;kwargs...) = construct_cost_model(route_planner(solver),args...;kwargs...)
 search_trait(solver::NBSSolver) = search_trait(route_planner(solver))
+primary_cost(solver::NBSSolver,cost) = primary_cost(route_planner(solver),cost)
+primary_cost_type(solver::NBSSolver) = primary_cost_type(route_planner(solver))
 function set_best_cost!(solver::NBSSolver,cost)
     set_best_cost!(get_logger(solver),cost)
     set_best_cost!(route_planner(solver),cost)
@@ -706,6 +749,7 @@ Outputs:
 """
 function CRCBS.solve!(solver::NBSSolver{A,P,C}, base_search_env::SearchEnv;kwargs...) where {A,P,C}
     best_env = SearchEnv() # TODO match type of base_search_env for type stability
+    set_best_cost!(solver, primary_cost(solver, get_cost(best_env)))
     assignment_problem = formulate_assignment_problem(assignment_solver(solver), base_search_env;
         kwargs...)
     while optimality_gap(solver) > 0
@@ -716,16 +760,14 @@ function CRCBS.solve!(solver::NBSSolver{A,P,C}, base_search_env::SearchEnv;kwarg
                 assignment_problem,
                 base_search_env;kwargs...)
             set_lower_bound!(solver,l_bound)
-            @show optimality_gap(solver)
             if optimality_gap(solver) > 0
-                env = plan_route!(
+                env, cost = plan_route!(
                     route_planner(solver),
                     schedule,
                     base_search_env;kwargs...)
-                if get_cost(env) < best_cost(solver)
-                    @show get_cost(env), best_cost(solver)
+                if cost < best_cost(solver)
                     best_env = env
-                    set_best_cost!(solver,get_cost(env))
+                    set_best_cost!(solver,cost)
                 end
             end
             increment_iteration_count!(solver)
@@ -746,8 +788,7 @@ function CRCBS.solve!(solver::NBSSolver{A,P,C}, base_search_env::SearchEnv;kwarg
             end
         end
     end
-    cost = get_cost(best_env)
-    return best_env, cost
+    return best_env, best_cost(solver)
 end
 function CRCBS.solve!(solver, env_graph, schedule::OperatingSchedule, problem_spec::ProblemSpec;
     primary_objective=SumOfMakeSpans(),
@@ -860,7 +901,8 @@ function plan_route!(
         kwargs...)
 
     env = construct_search_env(solver, schedule, base_search_env;kwargs...)
-    search_env = solve!(solver, PC_MAPF(env))
+    solution = solve!(solver, PC_MAPF(env))
+    solution, primary_cost(solver,get_cost(solution))
 end
 
 end

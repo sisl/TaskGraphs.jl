@@ -29,6 +29,7 @@ let
     @test 1 <= (1,0,0,0,0)
     @test 0 < (1,0,0,0,0)
 end
+# test solver initialization
 let
     AStarSC()
     AStarSC{Int}()
@@ -38,16 +39,9 @@ let
     NBSSolver()
     solver = NBSSolver()
     TaskGraphs.Solvers.best_cost(solver)
-
     NBSSolver(TaskGraphsMILPSolver(),CBSRoutePlanner())
-    # NBSSolver(
-    #     TaskGraphsMILPSolver(),
-    #     CBSRoutePlanner(),
-    #     iteration_limit=2
-    #     )
-
 end
-
+# in-depth testing of solver stages on a single problem
 let
     # init search env
     f = initialize_toy_problem_4
@@ -113,12 +107,13 @@ let
     end
     let
         path_planner = CBSRoutePlanner()
-        env = plan_route!(path_planner,deepcopy(sched),base_search_env)
+        env, cost = plan_route!(path_planner,deepcopy(sched),base_search_env)
         @show convert_to_vertex_lists(env.route_plan)
     end
     # test NBS
     let
         solver = NBSSolver(assignment_model = TaskGraphsMILPSolver(GreedyAssignment()))
+        # solver = NBSSolver(assignment_model = TaskGraphsMILPSolver())
         TaskGraphs.Solvers.set_iteration_limit!(solver,3)
         env, cost = solve!(solver,base_search_env;optimizer=Gurobi.Optimizer)
         @show convert_to_vertex_lists(env.route_plan)
@@ -127,9 +122,8 @@ let
         @test validate(env.schedule)
         @test validate(env.schedule,convert_to_vertex_lists(env.route_plan), env.cache.t0, env.cache.tF)
     end
-
 end
-
+# test task assignment
 let
     # init search env
     for (i, f) in enumerate([
@@ -185,7 +179,7 @@ let
         end
     end
 end
-
+# test full solver
 let
     # init search env
     for (i, f) in enumerate([
@@ -207,7 +201,7 @@ let
                         NBSSolver(assignment_model = TaskGraphsMILPSolver(SparseAdjacencyMILP())),
                         NBSSolver(assignment_model = TaskGraphsMILPSolver(GreedyAssignment())),
                         ]
-                    @show i, f, solver
+                    # @show i, f, solver
                     TaskGraphs.Solvers.set_iteration_limit!(solver,1)
                     schedule = construct_partial_project_schedule(
                         project_spec,
@@ -222,7 +216,7 @@ let
                         primary_objective=cost_model,
                         )
                     env, cost = solve!(solver,base_search_env;optimizer=Gurobi.Optimizer)
-                    @show convert_to_vertex_lists(env.route_plan)
+                    # @show convert_to_vertex_lists(env.route_plan)
                     # prob = formulate_assignment_problem(solver.assignment_model,search_env;
                     #     optimizer=Gurobi.Optimizer,
                     # )
@@ -244,8 +238,74 @@ let
                     @test cost != typemax(Int)
                     @test cost != Inf
                 end
-                @show costs
+                # @show costs
                 @test all(costs .== costs[1])
+            end
+        end
+    end
+end
+# Test that optimal collision-free planners obtain the correct costs
+let
+    cost_model = MakeSpan()
+    for (i, (f,expected_cost)) in enumerate([
+        (initialize_toy_problem_1,5),
+        (initialize_toy_problem_2,8),
+        (initialize_toy_problem_3,10),
+        (initialize_toy_problem_4,3),
+        (initialize_toy_problem_5,4),
+        ])
+        for solver in [
+                NBSSolver(assignment_model = TaskGraphsMILPSolver(AssignmentMILP())),
+                NBSSolver(assignment_model = TaskGraphsMILPSolver(SparseAdjacencyMILP())),
+                ]
+            let
+                project_spec, problem_spec, robot_ICs, assignments, env_graph = f(;verbose=false);
+                schedule = construct_partial_project_schedule(
+                    project_spec,
+                    problem_spec,
+                    robot_ICs,
+                    )
+                base_search_env = construct_search_env(
+                    solver,
+                    schedule,
+                    problem_spec,
+                    env_graph;
+                    primary_objective=cost_model,
+                    )
+                env, cost = solve!(solver,base_search_env;optimizer=Gurobi.Optimizer)
+                @test expected_cost == cost
+            end
+        end
+    end
+    cost_model = SumOfMakeSpans()
+    for (i, (f,expected_cost)) in enumerate([
+        (initialize_toy_problem_1,5),
+        (initialize_toy_problem_2,8),
+        (initialize_toy_problem_3,10),
+        (initialize_toy_problem_4,3),
+        (initialize_toy_problem_5,4),
+        (initialize_toy_problem_8,16),
+        ])
+        for solver in [
+                NBSSolver(assignment_model = TaskGraphsMILPSolver(AssignmentMILP())),
+                NBSSolver(assignment_model = TaskGraphsMILPSolver(SparseAdjacencyMILP())),
+                ]
+            let
+                project_spec, problem_spec, robot_ICs, assignments, env_graph = f(;verbose=false);
+                schedule = construct_partial_project_schedule(
+                    project_spec,
+                    problem_spec,
+                    robot_ICs,
+                    )
+                base_search_env = construct_search_env(
+                    solver,
+                    schedule,
+                    problem_spec,
+                    env_graph;
+                    primary_objective=cost_model,
+                    )
+                env, cost = solve!(solver,base_search_env;optimizer=Gurobi.Optimizer)
+                @test expected_cost == cost
             end
         end
     end

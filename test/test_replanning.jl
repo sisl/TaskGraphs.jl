@@ -2,16 +2,36 @@
 let
     project_spec, problem_spec, robot_ICs, assignments, env_graph = initialize_toy_problem_6(;
         verbose=false);
-    env = construct_search_env(project_spec, problem_spec, robot_ICs, assignments, env_graph)
-    pc_mapf = PC_MAPF(env)
-    node = initialize_root_node(pc_mapf)
-    solver = PC_TAPF_Solver(verbosity=0)
+    cost_model = SumOfMakeSpans()
+    solver = NBSSolver()
+    project_schedule = construct_partial_project_schedule(
+        project_spec,
+        problem_spec,
+        robot_ICs,
+        )
+    base_search_env = construct_search_env(
+        solver,
+        project_schedule,
+        problem_spec,
+        env_graph;
+        primary_objective=cost_model,
+        )
+    env, cost = solve!(solver,base_search_env;optimizer=Gurobi.Optimizer)
 
-    cost_model = SumOfMakeSpans
-    solution, assignment, cost, search_env = high_level_search!(
-        SparseAdjacencyMILP(),
-        solver, env_graph, project_spec, problem_spec, robot_ICs, Gurobi.Optimizer;
-        cost_model=cost_model);
+    replan_model = MergeAndBalance()
+
+    new_proj_spec, _, _, _, _ = initialize_toy_problem_1(;verbose=false)
+
+
+    request = Replanning.ProjectRequest(
+        construct_partial_project_schedule(new_proj_spec,problem_spec),
+        2,
+        2
+    )
+
+    remap_object_ids!(request.schedule,env.schedule)
+    replan!(solver,replan_model,env,request;commit_threshold=1)
+
     # let
     #     t = 0
     #     assignment_dict = freeze_assignments!(search_env.schedule, search_env.cache, t)
