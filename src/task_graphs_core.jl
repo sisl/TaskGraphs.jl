@@ -14,6 +14,10 @@ using SparseArrays
 # using ..FactoryWorlds
 using ..TaskGraphs
 
+function TOML.print(io,dict::Dict{Symbol,A}) where {A}
+    TOML.print(io,Dict(string(k)=>v for (k,v) in dict))
+end
+
 export
     get_debug_file_id,
     reset_debug_file_id!

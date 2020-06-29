@@ -13,6 +13,136 @@ using GraphUtils
 using CRCBS
 using ..TaskGraphs
 
+export ScalarFeature
+
+"""
+    ScalarFeature
+
+Abstract type for features that may be reported about the solution to a PC-TAPF
+    or sequential task assignment problem
+"""
+abstract type ScalarFeature{T} end
+
+export
+    RunTime,
+    SolutionCost,
+    OptimalityGap,
+    OptimalFlag,
+    FeasibleFlag,
+    NumConflicts
+
+struct RunTime          <: ScalarFeature{Float64} end
+struct SolutionCost     <: ScalarFeature{Float64} end
+struct OptimalityGap    <: ScalarFeature{Float64} end
+struct OptimalFlag      <: ScalarFeature{Bool} end
+struct FeasibleFlag     <: ScalarFeature{Bool} end
+struct NumConflicts     <: ScalarFeature{Int} end
+
+export extract_feature
+
+"""
+    extract_feature(solution,model,solution,solve_time)
+
+Function must be implemented to extract features from solutions
+Args:
+- solver (pc_tapf solver)
+- model <: ScalarFeature
+- solution <: SearchEnv
+"""
+function extract_feature end
+
+extract_feature(solver,feats::Tuple,args...) = (
+    extract_feature(solver,feats[1],args...),
+    extract_feature(solver,feats[2:end],args...)...
+    )
+extract_feature(solver,feats::Tuple{T},args...) where {T<:ScalarFeature} = extract_feature(solver,feats[1],args...)
+
+extract_feature(solver,::RunTime,       solution,solve_time) = solve_time
+extract_feature(solver,::SolutionCost,  solution,solve_time) = get_cost(solution)
+extract_feature(solver,::OptimalityGap, solution,solve_time) = optimality_gap(solver)
+extract_feature(solver,::OptimalFlag,   solution,solve_time) = optimality_gap(solver) <= 0
+extract_feature(solver,::FeasibleFlag,  solution,solve_time) = get_cost(solution) < typemax(Int)
+extract_feature(solver,::NumConflicts,  solution,solve_time) = count_conflicts(detect_conflicts(solution.route_plan))
+
+export feature_type
+
+"""
+    feature_type(feat::ScalarFeature{T}) where {T} = T
+"""
+feature_type(feat::ScalarFeature{T}) where {T} = T
+
+export
+    load_feature,
+    store_feature!
+
+"""
+    load_feature(dict::Dict{S,R},feat::T) where {S<:AbstractString,R,T}
+
+Read the value from dict corresponding to feature `feat`
+"""
+load_feature(dict::Dict{S,R},feat::T) where {S<:AbstractString,R,T} = dict[String(Symbol(T))]
+load_feature(dict::Dict{S,R},feats::Tuple) where {S<:AbstractString,R} = map(feat->load_feature(dict,feat),feats)
+
+"""
+    store_feature!(dict::Dict{S,R},feat::T,val) where {S<:AbstractString,R,T}
+
+Store the value `val` corresponding to feature `feat` into `dict`
+"""
+function store_feature!(dict::Dict{S,R},feat::T,val) where {S<:AbstractString,R,T}
+    dict[String(Symbol(T))] = val
+    dict
+end
+function store_feature!(dict::Dict{S,R},feats::Tuple,vals::Tuple) where {S<:AbstractString,R,T}
+    for (feat,val) in zip(feats,vals)
+        store_feature!(dict,feat,val)
+    end
+    dict
+end
+to_string_dict(dict::Dict{Symbol,A}) where {A} = Dict(string(k)=>v for (k,v) in dict)
+
+function init_dataframe(feats::Tuple)
+    df = DataFrame()
+    for feat in (RunTime(),SolutionCost(),OptimalityGap())
+        df[!,Symbol(typeof(feat))] = feature_type(feat)[]
+    end
+    df
+end
+
+"""
+    instantiate_random_pctapf_problem()
+"""
+function instantiate_random_pctapf_problem(env::GridFactoryEnvironment,config)
+    N                   = get(config,:N,30)
+    M                   = get(config,:M,10)
+    max_parents         = get(config,:max_parents,3)
+    depth_bias          = get(config,:depth_bias,0.4)
+    dt_min              = get(config,:dt_min,0)
+    dt_max              = get(config,:dt_max,0)
+    # dt_collect          = get(config,:dt_collect,0)
+    # dt_deliver          = get(config,:dt_deliver,0)
+    task_sizes          = get(config,:task_sizes,(1=>1.0,2=>0.0,4=>0.0))
+    # num_projects        = get(config,:num_projects,10)
+    # arrival_interval    = get(config,:arrival_interval,40)
+
+    r0,s0,sF = get_random_problem_instantiation(N,M,get_pickup_zones(env),
+        get_dropoff_zones(env),get_free_zones(env))
+    project_spec = construct_random_project_spec(M,s0,sF;
+        max_parents=max_parents,
+        depth_bias=depth_bias,
+        Δt_min=dt_min,
+        Δt_max=dt_max)
+    shapes = choose_random_object_sizes(M,Dict(task_sizes...))
+    problem_def = SimpleProblemDef(project_spec,r0,s0,sF,shapes)
+end
+
+"""
+    instantiate_random_pctapf_sequence()
+"""
+function instantiate_random_pctapf_sequence(env::GridFactoryEnvironment,config)
+    num_projects        = get(config,:num_projects,10)
+    projects = map(i->instantiate_random_pctapf_problem(env,config), 1:num_projects)
+end
+
 export
     init_data_frame,
     add_assignment_only_row!,
@@ -292,14 +422,27 @@ function construct_replanner_result_dataframe(problem_dir,results_dir,N_problems
     )
 end
 
-function profile_task_assignment(solver, project_spec, problem_spec, robot_ICs, env_graph, dist_matrix;
-    primary_objective=SumOfMakeSpans(),kwargs...)
+function profile_task_assignment(solver, project_spec, problem_spec, robot_ICs, env_graph, dist_matrix=get_dist_matrix(factory_env);
+    primary_objective=SumOfMakeSpans(),
+    feats = (RunTime(),SolutionCost(),OptimalityGap(),OptimalFlag(),FeasibleFlag(),NumConflicts()),
+    kwargs...)
 
     project_schedule = construct_partial_project_schedule(project_spec, problem_spec, robot_ICs)
-    model = formulate_milp(solver.nbs_model,project_schedule,problem_spec)
+    base_search_env = construct_search_env(
+        solver,
+        project_schedule,
+        problem_spec,
+        env_graph
+        )
+    assignment_problem = formulate_assignment_problem(assignment_solver(solver), base_search_env;
+        kwargs...)
 
-    retval, elapsed_time, byte_ct, gc_time, mem_ct = @timed optimize!(model)
+    (schedule, l_bound), elapsed_time, _, _, _ = solve_assignment_problem!(
+                assignment_solver(solver),
+                assignment_problem,
+                base_search_env;kwargs...)
 
+    result_feats = extract_feature(solver,schedule,elapsed_time)
     optimal = (termination_status(model) == MOI.OPTIMAL);
     feasible = (primal_status(model) == MOI.FEASIBLE_POINT)
     assignment_matrix = get_assignment_matrix(model)
@@ -436,7 +579,7 @@ function compile_solver_results(solver, solution, cost, search_env, optimality_g
     dict["cost"] = collect(cost)
     dict
 end
-function profile_replanning(replan_model, fallback_model, solver, fallback_solver, project_list, env_graph, dist_matrix, solver_config,problem_config;
+function profile_replanning(replan_model, fallback_model, solver, fallback_solver, project_list, env_graph, solver_config,problem_config;
         primary_objective=SumOfMakeSpans(), kwargs...
     )
 
@@ -453,7 +596,7 @@ function profile_replanning(replan_model, fallback_model, solver, fallback_solve
     idx = 1
     t_arrival = 0
     def = project_list[idx]
-    project_spec, problem_spec, _, _, robot_ICs = construct_task_graphs_problem(def, dist_matrix;
+    project_spec, problem_spec, _, _, robot_ICs = construct_task_graphs_problem(def, env_graph;
         Δt_collect=map(i->get(problem_config,:dt_collect,0), def.s0),
         Δt_deliver=map(i->get(problem_config,:dt_deliver,0), def.s0),
         cost_function=primary_objective,
@@ -581,106 +724,44 @@ function profile_replanning(replan_model, fallback_model, solver, fallback_solve
     results_dict
 end
 
-
-function run_profiling(MODE=:nothing;
-    num_tasks = [10,20,30,40,50,60],
-    num_robots = [10,20,30,40],
-    depth_biases = [0.1,0.4,0.7,1.0],
-    max_parent_settings = [3],
-    task_size_distributions = [
-        (1=>1.0,2=>0.0,4=>0.0)
-        ],
-    num_trials = 4,
-    env_id = 2,
-    initial_problem_id = 1,
-    problem_dir = PROBLEM_DIR,
-    results_dir = RESULTS_DIR,
-    Δt_min=0,
-    Δt_max=0,
-    Δt_collect=0,
-    Δt_deliver=0,
-    solver_template=PC_TAPF_Solver(),
-    TimeLimit=solver_template.time_limit,
-    OutputFlag=0,
-    Presolve = -1,
-    primary_objective=SumOfMakeSpans()
-    )
-    # solver profiling
-    env_filename = string(ENVIRONMENT_DIR,"/env_",env_id,".toml")
-    factory_env = read_env(env_filename)
-    env_graph = factory_env
-    dist_matrix = get_dist_matrix(env_graph)
-    dist_mtx_map = DistMatrixMap(factory_env.vtx_map,factory_env.vtxs)
-
-    Random.seed!(1)
-    problem_id = initial_problem_id-1;
-    # run tests and push results into table
-    for (M,N,task_sizes,max_parents,depth_bias,trial) in Base.Iterators.product(
-        num_tasks,num_robots,task_size_distributions,max_parent_settings,depth_biases,1:num_trials
+function run_profiling(solver,MODE=:nothing;
+        solver_config = Dict(),
+        base_problem_dir = get(solver_config,:problem_dir, PROBLEM_DIR),
+        base_results_dir = get(solver_config,:results_dir, RESULTS_DIR),
+        problem_configs = Vector{Dict}(),
+        OutputFlag      = get(solver_config,:OutputFlag,    0),
+        Presolve        = get(solver_config,:Presolve,      -1),
+        initial_problem_id = 1,
+        primary_objective = SumOfMakeSpans(),
+        seed = 1,
         )
-        # try
+    if !isdir(base_problem_dir)
+        mkdir(base_problem_dir)
+    end
+    env_ids = Set(map(config->config[:env_id],problem_configs))
+    envs = Dict(i=>read_env(joinpath(ENVIRONMENT_DIR,"env_$i.toml")) for i in env_ids)
+
+    problem_id = initial_problem_id-1;
+    Random.seed!(seed)
+    for problem_config in problem_configs
+        num_trials          = get(problem_config,:num_trials,1)
+        factory_env = envs[problem_config[:env_id]]
+        for trial in num_trials
+            # try
             problem_id += 1 # moved this to the beginning so it doesn't get skipped
-            problem_filename = joinpath(problem_dir,string("problem",problem_id,".toml"))
-            config_filename = joinpath(problem_dir,string("config",problem_id,".toml"))
+            problem_filename = joinpath(base_problem_dir,"problem$problem_id.toml")
+            config_filename = joinpath(base_problem_dir,"config$problem_id.toml")
             if MODE == :write
-                # initialize a random problem
-                if !isdir(problem_dir)
-                    mkdir(problem_dir)
-                end
                 if isfile(problem_filename)
                     println("file ",problem_filename," already exists. Skipping ...")
                     continue # don't overwrite existing files
                 end
-                r0,s0,sF = get_random_problem_instantiation(N,M,get_pickup_zones(factory_env),get_dropoff_zones(factory_env),
-                        get_free_zones(factory_env))
-                project_spec = construct_random_project_spec(M,s0,sF;max_parents=max_parents,depth_bias=depth_bias,Δt_min=Δt_min,Δt_max=Δt_max)
-                shapes = choose_random_object_sizes(M,Dict(task_sizes...))
-                problem_def = SimpleProblemDef(project_spec,r0,s0,sF,shapes)
-                # Save the problem
+                problem_def = instantiate_random_pctapf_problem(factory_env,problem_config)
                 open(problem_filename, "w") do io
                     TOML.print(io, TOML.parse(problem_def))
                 end
                 open(config_filename, "w") do io
-                    TOML.print(io, Dict(
-                        "N"=>N,
-                        "M"=>M,
-                        "max_parents"=>max_parents,
-                        "depth_bias"=>depth_bias,
-                        "min_process_time"=>Δt_min,
-                        "max_process_time"=>Δt_max,
-                        "env_id"=>env_id
-                        )
-                    )
-                end
-            elseif MODE == :write_replanning_problems
-                # initialize a random problem
-                if !isdir(problem_dir)
-                    mkdir(problem_dir)
-                end
-                if isfile(problem_filename)
-                    println("file ",problem_filename," already exists. Skipping ...")
-                    continue # don't overwrite existing files
-                end
-                r0,s0,sF = get_random_problem_instantiation(N,M,get_pickup_zones(factory_env),get_dropoff_zones(factory_env),
-                        get_free_zones(factory_env))
-                project_spec = construct_random_project_spec(M,s0,sF;max_parents=max_parents,depth_bias=depth_bias,Δt_min=Δt_min,Δt_max=Δt_max)
-                shapes = choose_random_object_sizes(M,Dict(task_sizes...))
-                problem_def = SimpleProblemDef(project_spec,r0,s0,sF,shapes)
-                # Save the problem
-                open(problem_filename, "w") do io
-                    TOML.print(io, TOML.parse(problem_def))
-                end
-                open(config_filename, "w") do io
-                    TOML.print(io, Dict(
-                        "N"=>N,
-                        "M"=>M,
-                        "max_parents"=>max_parents,
-                        "depth_bias"=>depth_bias,
-                        "min_process_time"=>Δt_min,
-                        "max_process_time"=>Δt_max,
-                        "env_id"=>env_id
-                        )
-                    )
+                    TOML.print(io,to_string_dict(problem_config))
                 end
             elseif MODE != :nothing
                 subdir = joinpath(results_dir,string(MODE))
@@ -693,36 +774,26 @@ function run_profiling(MODE=:nothing;
                     continue # don't overwrite existing files
                 end
                 assignment_filename = joinpath(results_dir,string(:assignment_only),string("results",problem_id,".toml"))
-                # Load the problem
                 problem_def = read_problem_def(problem_filename)
-                project_spec, r0, s0, sF = problem_def.project_spec,problem_def.r0,problem_def.s0,problem_def.sF
-                # @show problem_def.shapes
-                # @show map(o->factory_env.expanded_zones[s0[o]][problem_def.shapes[o]], 1:M)
                 project_spec, problem_spec, _, _, robot_ICs = construct_task_graphs_problem(
-                    project_spec, r0, s0, sF,
-                    dist_mtx_map;
-                    Δt_collect=map(i->Δt_collect, s0),
-                    Δt_deliver=map(i->Δt_deliver, s0),
-                    # dist_matrix;
+                    problem_def,
+                    factory_env;
+                    Δt_collect=map(i->get(problem_config,:dt_collect,0), problem_def.s0),
+                    Δt_deliver=map(i->get(problem_config,:dt_deliver,0), problem_def.s0),
                     cost_function=primary_objective,
-                    task_shapes=problem_def.shapes,
-                    shape_dict=factory_env.expanded_zones,
                     );
-                # problem_spec = ProblemSpec(problem_spec, D=dist_mtx_map)
 
-                solver = PC_TAPF_Solver(solver_template,start_time=time());
+                hard_reset!(solver)
                 if MODE == :assignment_only
                     results_dict = profile_task_assignment(solver, project_spec, problem_spec, robot_ICs, env_graph, dist_matrix;
                         primary_objective=primary_objective,TimeLimit=TimeLimit,OutputFlag=OutputFlag,Presolve=Presolve)
                 end
                 if MODE == :low_level_search_without_repair
-                    # assignments = read_assignment(assignment_filename)
                     adj_matrix = read_sparse_matrix(assignment_filename)
                     results_dict = profile_low_level_search(solver, project_spec, problem_spec, robot_ICs,env_graph,dist_matrix,adj_matrix;
                         primary_objective=primary_objective)
                 end
                 if MODE == :low_level_search_with_repair
-                    # assignments = read_assignment(assignment_filename)
                     adj_matrix = read_sparse_matrix(assignment_filename)
                     results_dict = profile_low_level_search_and_repair(solver, project_spec, problem_spec, robot_ICs,env_graph,dist_matrix,adj_matrix;
                         primary_objective=primary_objective)
@@ -731,121 +802,80 @@ function run_profiling(MODE=:nothing;
                     results_dict = profile_full_solver(solver, project_spec, problem_spec, robot_ICs,env_graph,dist_matrix;
                         primary_objective=primary_objective,TimeLimit=TimeLimit,OutputFlag=OutputFlag,Presolve=Presolve)
                 end
-                println("PROFILER: ",typeof(solver.nbs_model)," --- ",string(MODE), " --- Solved problem ",problem_id," in ",results_dict["time"]," seconds! \n\n")
-                # print the results
+                println("PROFILER: ",typeof(solver)," --- ",string(MODE), " --- Solved problem ",problem_id," in ",results_dict["time"]," seconds! \n\n")
                 open(results_filename, "w") do io
                     TOML.print(io, results_dict)
                 end
             end
-        # catch e
-        #     if typeof(e) <: AssertionError
-        #         println(e.msg)
-        #     else
-        #         throw(e)
-        #     end
-        # end
+            # catch e
+            #     if typeof(e) <: AssertionError
+            #         println(e.msg)
+            #     else
+            #         throw(e)
+            #     end
+            # end
+        end
     end
 end
 
+
 function run_replanner_profiling(MODE=:nothing;
-        solver_config=Dict(),
+        solver_config = Dict(),
         base_problem_dir = get(solver_config,:problem_dir, PROBLEM_DIR),
         base_results_dir = get(solver_config,:results_dir, RESULTS_DIR),
         replan_model = get(solver_config,:replan_model,  MergeAndBalance()),
-        fallback_model  = get(solver_config,:fallback_model,ReassignFreeRobots()),
-        env_id =  get(solver_config,:env_id,2),
+        fallback_model = get(solver_config,:fallback_model,ReassignFreeRobots()),
+        env_id = get(solver_config,:env_id,2),
         problem_configs=Vector{Dict}(),
-        solver_template=PC_TAPF_Solver(),
-        fallback_solver_template = PC_TAPF_Solver(),
-        # TimeLimit       = get(solver_config,:nbs_time_limit, solver_template.time_limit),
+        solver = NBSSolver(), # TODO Remove templates so we just have to call reset! instead of initializing new solvers.
+        fallback_solver = NBSSolver(),
         OutputFlag      = get(solver_config,:OutputFlag,    0),
         Presolve        = get(solver_config,:Presolve,      -1),
         initial_problem_id = 1,
-        primary_objective=SumOfMakeSpans(),
-        time_out_buffer=1
+        primary_objective = SumOfMakeSpans(),
+        time_out_buffer = 1
     )
     # solver profiling
-    env_filename = string(ENVIRONMENT_DIR,"/env_",env_id,".toml")
-    factory_env = read_env(env_filename)
-    env_graph = factory_env
-    dist_matrix = get_dist_matrix(env_graph)
-    dist_mtx_map = DistMatrixMap(factory_env.vtx_map,factory_env.vtxs)
+    env_ids = Set(map(config->config[:env_id],problem_configs))
+    envs = Dict(i=>read_env(joinpath(ENVIRONMENT_DIR,"env_$i.toml")) for i in env_ids)
 
     Random.seed!(1)
     folder_id = initial_problem_id-1;
     # run tests and push results into table
     for problem_config in problem_configs
         num_trials          = get(problem_config,:num_trials,1)
-        max_parents         = get(problem_config,:max_parents,3)
-        depth_bias          = get(problem_config,:depth_bias,0.4)
-        dt_min              = get(problem_config,:dt_min,0)
-        dt_max              = get(problem_config,:dt_max,0)
-        dt_collect          = get(problem_config,:dt_collect,0)
-        dt_deliver          = get(problem_config,:dt_deliver,0)
-        task_sizes          = get(problem_config,:task_sizes,(1=>1.0,2=>0.0,4=>0.0))
-        N                   = get(problem_config,:N,30)
-        M                   = get(problem_config,:M,10)
-        num_projects        = get(problem_config,:num_projects,10)
-        arrival_interval    = get(problem_config,:arrival_interval,40)
+        factory_env = envs[problem_config[:env_id]]
         for trial in 1:num_trials
         # try
             folder_id += 1 # moved this to the beginning so it doesn't get skipped
             problem_dir = joinpath(base_problem_dir,string("stream",folder_id))
-
-            already_written = false
             if MODE == :write
                 if !isdir(problem_dir)
                     mkpath(problem_dir)
+                elseif length(readdir(problem_dir)) > 1
+                    println("directory ",problem_dir," appears to be full.",
+                        " Skipping write to avoid overwriting files.")
+                    continue
                 end
-                # for problem_id in
                 config_filename = joinpath(problem_dir,string("stream_config.toml"))
                 open(config_filename, "w") do io
-                    TOML.print(io, Dict(
-                        "N"=>N,
-                        "M"=>M,
-                        "max_parents"=>max_parents,
-                        "arrival_interval"=>arrival_interval,
-                        "num_projects"=>num_projects,
-                        "depth_bias"=>depth_bias,
-                        "min_process_time"=>dt_min,
-                        "max_process_time"=>dt_max,
-                        "env_id"=>env_id
-                        )
-                    )
+                    TOML.print(io,problem_config)
                 end
-                for problem_id in 1:num_projects
+                project_sequence = instantiate_random_pctapf_sequence(factory_env,config)
+                for (problem_id,problem_def) in enumerate(project_sequence)
                     problem_filename = joinpath(problem_dir,string("problem",problem_id,".toml"))
                     config_filename = joinpath(problem_dir,string("config",problem_id,".toml"))
-                    if already_written
-                        continue
-                    end
                     if isfile(problem_filename)
                         println("file ",problem_filename," already exists. Skipping write for this and all other problem files")
                         already_written=true
-                        continue # don't overwrite existing files
+                        break
                     end
-                    # initialize a random problem
-                    r0,s0,sF = get_random_problem_instantiation(N,M,get_pickup_zones(factory_env),get_dropoff_zones(factory_env),get_free_zones(factory_env))
-                    project_spec = construct_random_project_spec(M,s0,sF;max_parents=max_parents,depth_bias=depth_bias,Δt_min=dt_min,Δt_max=dt_max)
-                    shapes = choose_random_object_sizes(M,Dict(task_sizes...))
-                    problem_def = SimpleProblemDef(project_spec,r0,s0,sF,shapes)
                     # Save the problem
                     open(problem_filename, "w") do io
                         TOML.print(io, TOML.parse(problem_def))
                     end
                     open(config_filename, "w") do io
-                        TOML.print(io, Dict(
-                            "N"=>N,
-                            "M"=>M,
-                            "max_parents"=>max_parents,
-                            "arrival_interval"=>arrival_interval,
-                            "num_projects"=>num_projects,
-                            "depth_bias"=>depth_bias,
-                            "min_process_time"=>dt_min,
-                            "max_process_time"=>dt_max,
-                            "env_id"=>env_id
-                            )
-                        )
+                        TOML.print(io,problem_config)
                     end
                 end
             elseif mode != nothing
@@ -858,31 +888,30 @@ function run_replanner_profiling(MODE=:nothing;
                     println("file ",results_filename," already exists. Skipping ...")
                     continue # don't overwrite existing files
                 end
-                project_list = SimpleProblemDef[]
-                for problem_id in 1:num_projects
-                    problem_filename = joinpath(problem_dir,string("problem",problem_id,".toml"))
-                    config_filename = joinpath(problem_dir,string("config",problem_id,".toml"))
-                    # config_filename = joinpath(problem_dir,string("config",problem_id,".toml"))
-                    problem_def = read_problem_def(problem_filename)
-                    push!(project_list, problem_def)
-                end
+                fnames = map(i->joinpath(problem_dir,string("problem",i,".toml")))
+                project_list = map(fname->read_problem_def(fname),fnames)
 
-                solver = PC_TAPF_Solver(solver_template,
-                    # time_limit=get(problem_config,:commit_threshold, solver_template.time_limit) - time_out_buffer,
-                    start_time=time());
-                fallback_solver = PC_TAPF_Solver(fallback_solver_template,
-                    # time_limit=get(problem_config,:fallback_commit_threshold, solver_template.time_limit) - time_out_buffer,
-                    start_time=time());
-                # TimeLimit = solver.time_limit - get(solver_config,:route_planning_buffer, 2)
+                hard_reset_solver!(solver)
+                hard_reset_solver!(fallback_solver)
 
-                results_dict = profile_replanning(replan_model,fallback_model,solver, fallback_solver, project_list, env_graph, dist_matrix, solver_config,problem_config;
-                        primary_objective=primary_objective,
-                        # TimeLimit=TimeLimit,
-                        OutputFlag=OutputFlag,
-                        Presolve=Presolve
-                    )
+                results_dict = profile_replanning(
+                    replan_model,
+                    fallback_model,
+                    solver,
+                    fallback_solver,
+                    project_list,
+                    factory_env,
+                    solver_config,
+                    problem_config;
+                    primary_objective = primary_objective,
+                    OutputFlag = OutputFlag,
+                    Presolve = Presolve
+                )
 
-                println("PROFILER: ",typeof(replan_model),"-",typeof(fallback_model)," --- ",string(MODE), " --- Solved problem ",folder_id," in ",results_dict["time"]," seconds! \n\n")
+                println("PROFILER: ",
+                    typeof(replan_model),"-",typeof(fallback_model)," --- ",
+                    string(MODE), " --- Solved problem ",folder_id," in ",
+                    results_dict["time"]," seconds! \n\n")
                 # print the results
                 open(results_filename, "w") do io
                     TOML.print(io, results_dict)
@@ -900,6 +929,8 @@ function run_replanner_profiling(MODE=:nothing;
 end
 
 export
+    get_problem_config_1,
+    get_problem_config_2,
     get_replanning_config_1,
     get_replanning_config_2,
     get_replanning_config_3,
@@ -907,6 +938,92 @@ export
     get_replanning_config_5,
     get_replanning_config_6
 
+function get_problem_config_1()
+    base_solver_configs = [
+        Dict(
+        :env_id=>2,
+        :OutputFlag => 0,
+        :Presolve => -1,
+        ),
+    ]
+    solver_configs = Dict[]
+    for dicts in Base.Iterators.product(base_solver_configs)
+        push!(solver_configs,merge(dicts...))
+    end
+    task_configs = map(i->Dict(:num_tasks=>i),[10,20])
+    robot_configs = map(i->Dict(:num_tasks=>i),[10,20])
+    depth_bias_configs = map(i->Dict(:depth_bias=>i),[0.4])
+    base_configs = [
+        Dict(
+            :num_trials => 1,
+            :max_parents => 3,
+            :dt_min => 0,
+            :dt_max => 0,
+            :dt_collect => 0,
+            :dt_deliver => 0,
+            :task_sizes => (1=>1.0,2=>0.0,4=>0.0),
+            :save_paths => false,
+            :env_id=>2,
+            )
+    ]
+    problem_configs = Dict[]
+    for dicts in Base.Iterators.product(base_configs,task_configs,robot_configs,depth_bias_configs)
+        push!(problem_configs,merge(dicts...))
+    end
+
+    solvers = [
+        NBSSolver(),
+    ]
+
+    base_dir            = joinpath("/scratch/task_graphs_experiments")
+    base_problem_dir    = joinpath(base_dir,"problem_instances")
+    base_results_dir    = joinpath(base_dir,"results")
+
+    base_problem_dir, base_results_dir, solver_configs, problem_configs, solvers
+end
+function get_problem_config_2()
+    base_solver_configs = [
+        Dict(
+        :env_id=>2,
+        :OutputFlag => 0,
+        :Presolve => -1,
+        ),
+    ]
+    solver_configs = Dict[]
+    for dicts in Base.Iterators.product(base_solver_configs)
+        push!(solver_configs,merge(dicts...))
+    end
+    task_configs = map(i->Dict(:num_tasks=>i),[10,20,30,40,50,60])
+    robot_configs = map(i->Dict(:num_tasks=>i),[10,20,30,40])
+    depth_bias_configs = map(i->Dict(:depth_bias=>i),[0.1,0.4,0.7,1.0])
+    base_configs = [
+        Dict(
+            :num_trials => 4,
+            :max_parents => 3,
+            :dt_min => 0,
+            :dt_max => 0,
+            :dt_collect => 0,
+            :dt_deliver => 0,
+            :task_sizes => (1=>1.0,2=>0.0,4=>0.0),
+            :save_paths => false,
+            :env_id=>2,
+            )
+    ]
+    problem_configs = Dict[]
+    for dicts in Base.Iterators.product(base_configs,task_configs,robot_configs,depth_bias_configs)
+        push!(problem_configs,merge(dicts...))
+    end
+
+    solvers = [
+        NBSSolver(),
+    ]
+
+    base_dir            = joinpath("/scratch/task_graphs_experiments")
+    base_problem_dir    = joinpath(base_dir,"problem_instances")
+    base_results_dir    = joinpath(base_dir,"results")
+
+    base_problem_dir, base_results_dir, solver_configs, problem_configs, solvers
+end
 function get_replanning_config_1()
     base_solver_configs = [
         Dict(
@@ -943,6 +1060,8 @@ function get_replanning_config_1()
             :dt_collect => 0,
             :dt_deliver => 0,
             :task_sizes => (1=>1.0,2=>0.0,4=>0.0),
+            :save_paths => false,
+            :env_id=>2,
             )
     ]
     stream_configs = [
@@ -1023,7 +1142,8 @@ function get_replanning_config_2()
             :dt_deliver => 0,
             :task_sizes => (1=>1.0,2=>0.0,4=>0.0),
             :num_projects => 40,
-            :save_paths => false
+            :save_paths => false,
+            :env_id=>2,
             )
     ]
     stream_configs = [
@@ -1107,7 +1227,8 @@ function get_replanning_config_3()
             :dt_deliver => 0,
             :task_sizes => (1=>1.0,2=>0.0,4=>0.0),
             :num_projects => 40,
-            :save_paths => false
+            :save_paths => false,
+            :env_id=>2,
             )
     ]
     stream_configs = [
@@ -1194,7 +1315,8 @@ function get_replanning_config_4()
             :dt_deliver => 0,
             :task_sizes => (1=>1.0,2=>0.0,4=>0.0),
             :num_projects => 40,
-            :save_paths => false
+            :save_paths => false,
+            :env_id=>2,
             )
     ]
     stream_configs = [
@@ -1281,7 +1403,8 @@ function get_replanning_config_5()
             :dt_deliver => 0,
             :task_sizes => (1=>1.0,2=>0.0,4=>0.0),
             :num_projects => 40,
-            :save_paths => false
+            :save_paths => false,
+            :env_id=>2,
             )
     ]
     stream_configs = [
@@ -1366,7 +1489,8 @@ function get_replanning_config_6()
             :dt_deliver => 0,
             :task_sizes => (1=>1.0,2=>0.0,4=>0.0),
             :num_projects => 40,
-            :save_paths => false
+            :save_paths => false,
+            :env_id=>2,
             )
     ]
     stream_configs = [

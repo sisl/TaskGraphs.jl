@@ -1,4 +1,36 @@
 let
+    solver = NBSSolver()
+    solution = SearchEnv()
+    solve_time = 0.01
+
+    extract_feature(solver,RunTime(),solution,solve_time)
+    extract_feature(solver,SolutionCost(),solution,solve_time)
+    extract_feature(solver,OptimalityGap(),solution,solve_time)
+    extract_feature(solver,OptimalFlag(),solution,solve_time)
+    extract_feature(solver,FeasibleFlag(),solution,solve_time)
+    extract_feature(solver,NumConflicts(),solution,solve_time)
+
+    feats = extract_feature(solver,(RunTime(),SolutionCost(),OptimalityGap()),solution,solve_time)
+    @test isa(feats,NTuple{3,Float64})
+
+    feature_dict = Dict{String,Float64}()
+    store_feature!(feature_dict,RunTime(),0.01)
+    load_feature(feature_dict,RunTime())
+
+    filename = "/tmp/dummy.toml"
+    open(filename,"w") do io
+        TOML.print(io, feature_dict)
+    end
+    dict = TOML.parsefile(filename)
+    load_feature(dict,RunTime())
+
+    df = DataFrame()
+    for feat in (RunTime(),SolutionCost(),OptimalityGap())
+        df[!,Symbol(typeof(feat))] = feature_type(feat)[]
+    end
+    df
+end
+let
 
     println("WARMING UP")
 
@@ -11,51 +43,19 @@ let
         # :assignment_only,
         # :low_level_search_without_repair,
         # :low_level_search_with_repair,
-        :full_solver
+        # :full_solver
         ]
-    milp_models = [
-        # AssignmentMILP(),
-        # AdjacencyMILP(),
-        # SparseAdjacencyMILP(),
-        GreedyAssignment(),
-    ]
-    for milp_model in milp_models
+    problem_dir, results_dir, solver_configs, problem_configs, solvers = get_problem_config_1()
+
+    for solver in solvers
         for mode in modes
-            run_profiling(mode;
-                num_tasks=[30],
-                num_robots=[30],
-                depth_biases=[0.1],
-                task_size_distributions = [
-                    ( 1=>1.0, 2=>0.0, 4=>0.0 ),
-                    # ( 1=>1.0, 2=>1.0, 4=>0.0 ),
-                    # ( 1=>1.0, 2=>1.0, 4=>1.0 ),
-                    # ( 1=>0.0, 2=>1.0, 4=>1.0 ),
-                    ],
-                num_trials=1,
-                Δt_collect=1,
-                Δt_deliver=1,
-                primary_objective=MakeSpan,
-                problem_dir = dummy_problem_dir,
-                results_dir = joinpath(dummy_results_dir, string(typeof(milp_model))),
-                # milp_model = milp_model,
-                OutputFlag=0,
-                Presolve = -1, # automatic setting (-1), off (0), conservative (1), or aggressive (2)
-                TimeLimit = 20,
-                solver_template = PC_TAPF_Solver(
-                    nbs_model=milp_model,
-                    cbs_model = PrioritizedDFSPlanner(),
-                    astar_model = DFS_PathFinder(),
-                    # astar_model = PrioritizedAStarModel(),
-                    LIMIT_assignment_iterations = 1,
-                    # best_cost= (Inf,Inf,Inf,Inf,Inf),
-                    verbosity=0,
-                    l1_verbosity=2,
-                    l2_verbosity=2,
-                    l3_verbosity=1,
-                    l4_verbosity=0,
-                    LIMIT_A_star_iterations=8000,
-                    time_limit=25
-                    )
+            run_profiling(solver,mode;
+                problem_configs = problem_configs,
+                primary_objective = MakeSpan(),
+                base_problem_dir = dummy_problem_dir,
+                base_results_dir = joinpath(
+                    dummy_results_dir,
+                    string(typeof(assignment_solver(solver)))),
                 )
         end
         run(pipeline(`rm -rf $dummy_problem_dir`, stdout=devnull, stderr=devnull))

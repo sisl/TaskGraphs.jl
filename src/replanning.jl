@@ -368,6 +368,13 @@ end
     route_planning_buffer::Float64 = 2
 end
 
+@with_kw struct FullReplanner{R,S,F}
+    replanner::R = MergeAndBalance()
+    solver::S = NBSSolver()
+    fallback::F = NBSSolver(
+        assignment_model=TaskGraphsMILPSolver(GreedyAssignment()))
+end
+
 get_timeout_buffer(replan_model) = replan_model.time_out_buffer
 get_route_planning_buffer(replan_model) = replan_model.route_planning_buffer
 

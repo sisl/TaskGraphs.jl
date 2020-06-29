@@ -47,6 +47,7 @@ gap (including upper and lower bound), etc.
 @with_kw mutable struct SolverLogger{C}
     iterations      ::Int           = 0
     iteration_limit ::Int           = 100
+    max_iterations  ::Int           = 0
     start_time      ::Float64       = time()
     runtime_limit   ::Float64       = 100.0
     deadline        ::Float64       = Inf
@@ -62,6 +63,7 @@ get_logger(logger::SolverLogger) = logger
 export
     iterations,
     iteration_limit,
+    max_iterations,
     start_time,
     runtime_limit,
     deadline,
@@ -70,6 +72,7 @@ export
 
 iterations(logger)        = get_logger(logger).iterations
 iteration_limit(logger)   = get_logger(logger).iteration_limit
+max_iterations(logger)    = get_logger(logger).max_iterations
 start_time(logger)        = get_logger(logger).start_time
 runtime_limit(logger)     = get_logger(logger).runtime_limit
 deadline(logger)          = get_logger(logger).deadline
@@ -94,7 +97,8 @@ export
     set_runtime_limit!,
     increment_iteration_count!,
     set_best_cost!,
-    reset_solver!
+    reset_solver!,
+    hard_reset_solver!
 
 optimality_gap(logger) = best_cost(logger) .- lower_bound(logger)
 function check_time(logger)
@@ -118,8 +122,12 @@ function enforce_iteration_limit(logger)
     end
 end
 
+function set_max_iterations!(logger::SolverLogger,val::Int)
+    logger.max_iterations = val
+end
 function increment_iteration_count!(logger::SolverLogger)
     logger.iterations += 1
+    set_max_iterations!(logger,max(iterations(logger),max_iterations(logger)))
 end
 function set_lower_bound!(logger::SolverLogger,val)
     logger.lower_bound = val
@@ -145,12 +153,29 @@ end
 function set_iteration_limit!(logger,val)
     get_logger(logger).iteration_limit = val
 end
+
+"""
+    reset_solver!(solver)
+
+Resets iteration counts and start times.
+"""
+
 function reset_solver!(logger::SolverLogger)
     logger.iterations = 0
     logger.best_cost = typemax(logger.best_cost)
     logger.lower_bound = typemin(logger.lower_bound)
     logger.start_time = time()
     logger
+end
+"""
+    hard_reset_solver!(solver)
+
+To be called when no information (other than iteration and time limits) needs to
+be stored.
+"""
+function hard_reset_solver!(logger::SolverLogger)
+    reset_solver!(logger)
+    set_max_iterations!(logger,0)
 end
 CRCBS.get_infeasible_cost(logger::SolverLogger{C}) where {C} = typemax(C)
 CRCBS.get_infeasible_cost(solver) = get_infeasible_cost(get_logger(solver))
@@ -162,11 +187,6 @@ Base.typemax(c::Type{NTuple{N,R}}) where {N,R} = NTuple{N,R}(map(i->typemax(R),1
 Base.typemax(c::NTuple{N,R}) where {N,R} = typemax(typeof(c))
 Base.NTuple{N,R}() where {N,R} = NTuple{N,R}(map(i->R(0), 1:N))
 
-# Base.:(>)(a::NTuple{N,R},b::Real) where {N,R} = a[1] > b
-# Base.:(<)(a::NTuple{N,R},b::Real) where {N,R} = a[1] < b
-# Base.:(<=)(a::NTuple{N,R},b::Real) where {N,R} = a[1] <= b
-# Base.:(>=)(a::NTuple{N,R},b::Real) where {N,R} = a[1] >= b
-# Base.:(>)(a::NTuple{N,R},b::Real) where {N,R} = a[1] > b
 for op = (:(>), :(<), :(>=), :(<=))
     eval(quote
         Base.$op(a::NTuple{N,T},b::R) where {N,T<:Real,R<:Real} = $op(a[1],b)
@@ -178,6 +198,7 @@ increment_iteration_count!(solver)  = increment_iteration_count!(solver.logger)
 set_lower_bound!(solver,val)        = set_lower_bound!(solver.logger,val)
 set_best_cost!(solver,val)          = set_best_cost!(solver.logger,val)
 reset_solver!(solver)               = reset_solver!(solver.logger)
+hard_reset_solver!(solver)          = hard_reset_solver!(solver.logger)
 
 TaskGraphs.log_info(limit::Int,solver,msg...) = log_info(limit,verbosity(solver),msg...)
 
@@ -481,6 +502,10 @@ function set_best_cost!(solver::ISPS,cost)
     set_best_cost!(get_logger(solver),cost)
     set_best_cost!(low_level(solver),cost)
 end
+function hard_reset_solver!(solver::ISPS)
+    hard_reset_solver!(get_logger(solver))
+    hard_reset_solver!(low_level(solver))
+end
 
 export
     plan_next_path!
@@ -606,6 +631,10 @@ function set_best_cost!(solver::CBSRoutePlanner,cost)
     set_best_cost!(get_logger(solver),cost)
     set_best_cost!(low_level(solver),cost)
 end
+function hard_reset_solver!(solver::CBSRoutePlanner)
+    hard_reset_solver!(get_logger(solver))
+    hard_reset_solver!(low_level(solver))
+end
 
 function CRCBS.solve!(
         solver::CBSRoutePlanner,
@@ -724,6 +753,10 @@ primary_cost_type(solver::NBSSolver) = primary_cost_type(route_planner(solver))
 function set_best_cost!(solver::NBSSolver,cost)
     set_best_cost!(get_logger(solver),cost)
     set_best_cost!(route_planner(solver),cost)
+end
+function hard_reset_solver!(solver::NBSSolver)
+    hard_reset_solver!(get_logger(solver.logger))
+    hard_reset_solver!(route_planner(solver))
 end
 
 """
@@ -863,14 +896,16 @@ function solve_assignment_problem!(solver::S, model, base_search_env;
         throw(SolverException("Assignment problem is infeasible -- in `solve_assignment_problem!()`"))
     end
     if termination_status(model) == MOI.OPTIMAL
-        l_bound = max(l_bound, Int(round(value(objective_function(model)))) )
-    else
-        l_bound = max(l_bound, Int(round(value(objective_bound(model)))) )
+        @assert Int(round(value(objective_function(model)))) == Int(round(value(objective_bound(model))))
+    #     l_bound = max(l_bound, Int(round(value(objective_function(model)))) )
+    # else
+    #     l_bound = max(l_bound, Int(round(value(objective_bound(model)))) )
     end
-    set_lower_bound!(solver,l_bound)
+    set_lower_bound!(solver, Int(round(value(objective_bound(model)))) )
+    set_best_cost!(solver, Int(round(value(objective_function(model)))) )
     schedule = deepcopy(base_search_env.schedule)
     update_project_schedule!(model, schedule, base_search_env.problem_spec)
-    schedule, l_bound
+    schedule, lower_bound(solver) 
 end
 
 

@@ -202,7 +202,7 @@ function initialize_toy_problem_3(;cost_function=SumOfMakeSpans(),verbose=false,
 
     def = SimpleProblemDef(project_spec,r0,s0,sF)
     project_spec, problem_spec, _, _, robot_ICs = construct_task_graphs_problem(
-        def,env_graph;cost_function=cost_function)
+        def,env_graph;cost_function=cost_function,Δt_collect=Δt_collect,Δt_deliver=Δt_deliver)
 
     if verbose
         problem_description = """
@@ -363,7 +363,7 @@ function initialize_toy_problem_6(;cost_function=SumOfMakeSpans(),verbose=false,
 
     def = SimpleProblemDef(project_spec,r0,s0,sF)
     project_spec, problem_spec, _, _, robot_ICs = construct_task_graphs_problem(
-        def,env_graph;cost_function=cost_function)
+        def,env_graph;cost_function=cost_function,Δt_collect=Δt_collect,Δt_deliver=Δt_deliver)
 
     if verbose
         print_toy_problem_specs("TOY PROBLEM 6",vtx_grid,r0,s0,sF,project_spec)
@@ -398,7 +398,7 @@ function initialize_toy_problem_7(;cost_function=SumOfMakeSpans(),verbose=false,
 
     def = SimpleProblemDef(project_spec,r0,s0,sF)
     project_spec, problem_spec, _, _, robot_ICs = construct_task_graphs_problem(
-        def,env_graph;cost_function=cost_function)
+        def,env_graph;cost_function=cost_function,Δt_collect=Δt_collect,Δt_deliver=Δt_deliver)
 
     if verbose
         print_toy_problem_specs("TOY PROBLEM 7",vtx_grid,r0,s0,sF,project_spec)
@@ -440,7 +440,7 @@ function initialize_toy_problem_8(;cost_function=SumOfMakeSpans(),verbose=false,
 
     def = SimpleProblemDef(project_spec,r0,s0,sF)
     project_spec, problem_spec, _, _, robot_ICs = construct_task_graphs_problem(
-        def,env_graph;cost_function=cost_function)
+        def,env_graph;cost_function=cost_function,Δt_collect=Δt_collect,Δt_deliver=Δt_deliver)
 
 
     if verbose
@@ -476,7 +476,7 @@ function initialize_toy_problem_9(;cost_function=SumOfMakeSpans(),verbose=false,
 
     def = SimpleProblemDef(project_spec,r0,s0,sF)
     project_spec, problem_spec, _, _, robot_ICs = construct_task_graphs_problem(
-        def,env_graph;cost_function=cost_function)
+        def,env_graph;cost_function=cost_function,Δt_collect=Δt_collect,Δt_deliver=Δt_deliver)
 
     if verbose
         print_toy_problem_specs("""
@@ -548,7 +548,7 @@ function initialize_toy_problem_10(;cost_function=MakeSpan(),verbose=false,Δt_o
 
     def = SimpleProblemDef(project_spec,r0,s0,sF)
     project_spec, problem_spec, _, _, robot_ICs = construct_task_graphs_problem(
-        def,env_graph;cost_function=cost_function)
+        def,env_graph;cost_function=cost_function,Δt_collect=Δt_collect,Δt_deliver=Δt_deliver)
 
     if verbose
         print_toy_problem_specs("""

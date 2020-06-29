@@ -41,6 +41,20 @@ let
     TaskGraphs.Solvers.best_cost(solver)
     NBSSolver(TaskGraphsMILPSolver(),CBSRoutePlanner())
 end
+let
+    solver = NBSSolver()
+    increment_iteration_count!(solver)
+    increment_iteration_count!(route_planner(solver))
+    @test max_iterations(solver) == 1
+    @test iterations(solver) == 1
+    reset_solver!(solver)
+    @test max_iterations(solver) == 1
+    @test iterations(solver) == 0
+    hard_reset_solver!(solver)
+    @test max_iterations(solver) == 0
+    @test max_iterations(route_planner(solver)) == 0
+    @test iterations(solver) == 0
+end
 # in-depth testing of solver stages on a single problem
 let
     # init search env
@@ -160,10 +174,6 @@ let
                         optimizer=Gurobi.Optimizer,
                     )
                     sched, cost = solve_assignment_problem!(solver.assignment_model,prob,search_env)
-                    # # break down the solution process here:
-                    # solution, cost = solve!(solver,search_env;
-                    #     optimizer=Gurobi.Optimizer,
-                    #     )
                     if !isa(solver.assignment_model.milp,GreedyAssignment)
                         push!(costs, cost)
                     end
@@ -381,9 +391,8 @@ let
     println("Test non-zero collection time:")
     Δt_deliver_1 = 1
     for (Δt_collect_2, true_cost) in zip([0,1,2,3,4],[6,7,8,8,8])
-
         solver = NBSSolver()
-        cost_model=MakeSpan()
+        cost_model = MakeSpan()
         project_spec, problem_spec, robot_ICs, _, env_graph = initialize_toy_problem_7(;
             cost_function=cost_model,
             verbose=false,
