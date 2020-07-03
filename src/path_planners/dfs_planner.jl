@@ -105,7 +105,7 @@ function update_planning_cache!(solver,env)
         done = true
         for v in collect(cache.active_set)
             if get_path_spec(schedule,v).plan_path==false
-                path = Path{PCCBS.State,PCCBS.Action,get_cost_type(env.env)}(
+                path = Path{PCCBS.State,PCCBS.Action,cost_type(env.env)}(
                     s0=PCCBS.State(-1, -1),
                     cost=get_initial_cost(env.env)
                     )

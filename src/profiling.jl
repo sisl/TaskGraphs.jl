@@ -51,18 +51,21 @@ Args:
 """
 function extract_feature end
 
-extract_feature(solver,feats::Tuple,args...) = (
-    extract_feature(solver,feats[1],args...),
-    extract_feature(solver,feats[2:end],args...)...
-    )
-extract_feature(solver,feats::Tuple{T},args...) where {T<:ScalarFeature} = extract_feature(solver,feats[1],args...)
+extract_feature(solver,feats::Tuple,args...) = map(feat->extract_feature(solver,feat,args...),feats)
 
 extract_feature(solver,::RunTime,       solution,solve_time) = solve_time
-extract_feature(solver,::SolutionCost,  solution,solve_time) = get_cost(solution)
+extract_feature(solver,::SolutionCost,  solution,solve_time) = best_cost(solver)
 extract_feature(solver,::OptimalityGap, solution,solve_time) = optimality_gap(solver)
 extract_feature(solver,::OptimalFlag,   solution,solve_time) = optimality_gap(solver) <= 0
-extract_feature(solver,::FeasibleFlag,  solution,solve_time) = get_cost(solution) < typemax(Int)
+extract_feature(solver,::FeasibleFlag,  solution,solve_time) = best_cost(solver) < typemax(typeof(best_cost(solver)))
 extract_feature(solver,::NumConflicts,  solution,solve_time) = count_conflicts(detect_conflicts(solution.route_plan))
+
+function extract_feature_dict(solver,feats::Tuple,args...)
+    Dict(Symbol(typeof(feat))=>extract_feature(solver,feat,args...) for feat in feats)
+end
+function extract_feature_dict(solver,feat::ScalarFeature,args...)
+    Dict(Symbol(typeof(feat))=>extract_feature(solver,feat,args...))
+end
 
 export feature_type
 
@@ -422,9 +425,8 @@ function construct_replanner_result_dataframe(problem_dir,results_dir,N_problems
     )
 end
 
-function profile_task_assignment(solver, project_spec, problem_spec, robot_ICs, env_graph, dist_matrix=get_dist_matrix(factory_env);
-    primary_objective=SumOfMakeSpans(),
-    feats = (RunTime(),SolutionCost(),OptimalityGap(),OptimalFlag(),FeasibleFlag(),NumConflicts()),
+function profile_task_assignment(solver, project_spec, problem_spec, robot_ICs, env_graph;
+    feats = (RunTime(),SolutionCost(),OptimalityGap(),OptimalFlag(),FeasibleFlag()),
     kwargs...)
 
     project_schedule = construct_partial_project_schedule(project_spec, problem_spec, robot_ICs)
@@ -437,34 +439,30 @@ function profile_task_assignment(solver, project_spec, problem_spec, robot_ICs, 
     assignment_problem = formulate_assignment_problem(assignment_solver(solver), base_search_env;
         kwargs...)
 
-    (schedule, l_bound), elapsed_time, _, _, _ = solve_assignment_problem!(
+    (schedule, l_bound), elapsed_time, _, _, _ = @timed solve_assignment_problem!(
                 assignment_solver(solver),
                 assignment_problem,
                 base_search_env;kwargs...)
 
-    result_feats = extract_feature(solver,schedule,elapsed_time)
-    optimal = (termination_status(model) == MOI.OPTIMAL);
-    feasible = (primal_status(model) == MOI.FEASIBLE_POINT)
-    assignment_matrix = get_assignment_matrix(model)
-    cost = Int(round(value(objective_function(model))))
-    optimality_gap = cost - Int(round(objective_bound(model)))
-
-    results_dict = TOML.parse(sparse(assignment_matrix))
-    results_dict["time"] = elapsed_time
-    results_dict["optimal"] = optimal
-    results_dict["optimality_gap"] = Int(optimality_gap)
-    results_dict["feasible"] = feasible
-    results_dict["cost"] = cost
-    results_dict
+    results = Dict{String,Any}()
+    for feat in feats
+        store_feature!(results,feat,extract_feature(solver,feat,schedule,elapsed_time))
+    end
+    assignment_matrix = get_assignment_matrix(assignment_problem)
+    merge!(results, TOML.parse(sparse(assignment_matrix)))
+    results
 end
-function profile_low_level_search_and_repair(solver, project_spec, problem_spec, robot_ICs, env_graph,dist_matrix,adj_matrix;
-    primary_objective=SumOfMakeSpans())
-
+function profile_low_level_search_and_repair(solver, project_spec, problem_spec,
+        robot_ICs, env_graph,adj_matrix;kwargs...)
     # solver = PC_TAPF_Solver(verbosity=0,LIMIT_A_star_iterations=10*nv(env_graph));
-    project_schedule = construct_partial_project_schedule(project_spec,problem_spec,robot_ICs)
-    if update_project_schedule!(solver.nbs_model,project_schedule, problem_spec, adj_matrix)
-        env = construct_search_env(solver,project_schedule, problem_spec, env_graph;
-            primary_objective=primary_objective); # TODO pass in t0_ here (maybe get it straight from model?)
+    project_schedule = construct_partial_project_schedule(project_spec, problem_spec, robot_ICs)
+    base_search_env = construct_search_env(
+        solver,
+        project_schedule,
+        problem_spec,
+        env_graph
+        )
+    if update_project_schedule!(assignment_solver(solver).milp, project_schedule, problem_spec, adj_matrix)
         pc_mapf = PC_MAPF(env);
         node = initialize_root_node(pc_mapf)
         (search_env, valid_flag), elapsed_time, byte_ct, gc_time, mem_ct = @timed low_level_search!(solver, pc_mapf, node)
@@ -734,6 +732,7 @@ function run_profiling(solver,MODE=:nothing;
         initial_problem_id = 1,
         primary_objective = SumOfMakeSpans(),
         seed = 1,
+        optimizer=Gurobi.Optimizer
         )
     if !isdir(base_problem_dir)
         mkdir(base_problem_dir)
@@ -764,7 +763,7 @@ function run_profiling(solver,MODE=:nothing;
                     TOML.print(io,to_string_dict(problem_config))
                 end
             elseif MODE != :nothing
-                subdir = joinpath(results_dir,string(MODE))
+                subdir = joinpath(base_results_dir,string(MODE))
                 results_filename = joinpath(subdir,string("results",problem_id,".toml"))
                 if !isdir(subdir)
                     mkpath(subdir)
@@ -773,7 +772,7 @@ function run_profiling(solver,MODE=:nothing;
                     println("file ",results_filename," already exists. Skipping ...")
                     continue # don't overwrite existing files
                 end
-                assignment_filename = joinpath(results_dir,string(:assignment_only),string("results",problem_id,".toml"))
+                assignment_filename = joinpath(base_results_dir,string(:assignment_only),string("results",problem_id,".toml"))
                 problem_def = read_problem_def(problem_filename)
                 project_spec, problem_spec, _, _, robot_ICs = construct_task_graphs_problem(
                     problem_def,
@@ -783,26 +782,26 @@ function run_profiling(solver,MODE=:nothing;
                     cost_function=primary_objective,
                     );
 
-                hard_reset!(solver)
+                hard_reset_solver!(solver)
                 if MODE == :assignment_only
-                    results_dict = profile_task_assignment(solver, project_spec, problem_spec, robot_ICs, env_graph, dist_matrix;
-                        primary_objective=primary_objective,TimeLimit=TimeLimit,OutputFlag=OutputFlag,Presolve=Presolve)
+                    results_dict = profile_task_assignment(solver, project_spec, problem_spec, robot_ICs, factory_env;
+                        primary_objective=primary_objective,OutputFlag=OutputFlag,Presolve=Presolve)
                 end
                 if MODE == :low_level_search_without_repair
                     adj_matrix = read_sparse_matrix(assignment_filename)
-                    results_dict = profile_low_level_search(solver, project_spec, problem_spec, robot_ICs,env_graph,dist_matrix,adj_matrix;
+                    results_dict = profile_low_level_search(solver, project_spec, problem_spec, robot_ICs,factory_env,dist_matrix,adj_matrix;
                         primary_objective=primary_objective)
                 end
                 if MODE == :low_level_search_with_repair
                     adj_matrix = read_sparse_matrix(assignment_filename)
-                    results_dict = profile_low_level_search_and_repair(solver, project_spec, problem_spec, robot_ICs,env_graph,dist_matrix,adj_matrix;
+                    results_dict = profile_low_level_search_and_repair(solver, project_spec, problem_spec, robot_ICs,factory_env,dist_matrix,adj_matrix;
                         primary_objective=primary_objective)
                 end
                 if MODE == :full_solver
-                    results_dict = profile_full_solver(solver, project_spec, problem_spec, robot_ICs,env_graph,dist_matrix;
+                    results_dict = profile_full_solver(solver, project_spec, problem_spec, robot_ICs,factory_env,dist_matrix;
                         primary_objective=primary_objective,TimeLimit=TimeLimit,OutputFlag=OutputFlag,Presolve=Presolve)
                 end
-                println("PROFILER: ",typeof(solver)," --- ",string(MODE), " --- Solved problem ",problem_id," in ",results_dict["time"]," seconds! \n\n")
+                println("PROFILER: ",typeof(solver)," --- ",string(MODE), " --- Solved problem ",problem_id," in ",results_dict["RunTime"]," seconds! \n\n")
                 open(results_filename, "w") do io
                     TOML.print(io, results_dict)
                 end

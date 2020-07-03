@@ -107,7 +107,7 @@ let
     env = construct_factory_env_from_vtx_grid(vtx_grid)
     for i in 1:3
         for j in 1:3
-            @show env.expanded_zones[vtx_grid[i,j]]
+            # @show env.expanded_zones[vtx_grid[i,j]]
         end
     end
 end

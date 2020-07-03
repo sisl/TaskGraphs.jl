@@ -3,20 +3,20 @@ let
     SolverLogger{Int}()
     SolverLogger{Float64}()
     logger = SolverLogger{NTuple{3,Float64}}()
-    TaskGraphs.Solvers.iterations(logger)
-    TaskGraphs.Solvers.iterations(logger)
-    TaskGraphs.Solvers.iteration_limit(logger)
-    TaskGraphs.Solvers.start_time(logger)
-    TaskGraphs.Solvers.runtime_limit(logger)
-    TaskGraphs.Solvers.deadline(logger)
-    JuMP.lower_bound(logger)
-    TaskGraphs.Solvers.best_cost(logger)
-    TaskGraphs.Solvers.verbosity(logger)
-    TaskGraphs.Solvers.debug(logger)
-    TaskGraphs.Solvers.increment_iteration_count!(logger)
-    TaskGraphs.Solvers.set_lower_bound!(logger,(0.0,0.0,0.0))
-    TaskGraphs.Solvers.set_best_cost!(logger,(0.0,0.0,0.0))
-    TaskGraphs.Solvers.reset_solver!(logger)
+    iterations(logger)
+    iterations(logger)
+    iteration_limit(logger)
+    start_time(logger)
+    runtime_limit(logger)
+    deadline(logger)
+    CRCBS.lower_bound(logger)
+    best_cost(logger)
+    verbosity(logger)
+    debug(logger)
+    increment_iteration_count!(logger)
+    set_lower_bound!(logger,(0.0,0.0,0.0))
+    set_best_cost!(logger,(0.0,0.0,0.0))
+    reset_solver!(logger)
 end
 let
     @test (1,0,0,0,0) < 2
@@ -34,12 +34,12 @@ let
     AStarSC()
     AStarSC{Int}()
     ISPS()
-    CBSRoutePlanner()
+    CBS_Solver()
     TaskGraphsMILPSolver()
     NBSSolver()
     solver = NBSSolver()
     TaskGraphs.Solvers.best_cost(solver)
-    NBSSolver(TaskGraphsMILPSolver(),CBSRoutePlanner())
+    NBSSolver(TaskGraphsMILPSolver(),CBS_Solver())
 end
 let
     solver = NBSSolver()
@@ -94,34 +94,41 @@ let
         schedule_node = get_node_from_vtx(search_env.schedule, v2)
         println(string(schedule_node))
         @test plan_path!(path_planner, search_env, node, schedule_node, v2)
-        @show convert_to_vertex_lists(node.solution)
+        # @show convert_to_vertex_lists(node.solution)
     end
     # Test ISPS
     let
         search_env = construct_search_env(solver,deepcopy(sched),base_search_env)
         path_planner = ISPS()
-        node = initialize_root_node(search_env)
-        low_level_search!(path_planner,search_env,node)
-        @show convert_to_vertex_lists(node.solution)
+        # node = initialize_root_node(search_env)
+        valid_flag = low_level_search!(path_planner,search_env)#,node)
+        # @show convert_to_vertex_lists(node.solution)
+        # @show convert_to_vertex_lists(search_env.route_plan)
+    end
+    let
+        search_env = construct_search_env(solver,deepcopy(sched),base_search_env)
+        path_planner = ISPS()
+        solution = solve!(path_planner,PC_MAPF(search_env))
+        # @show convert_to_vertex_lists(solution.route_plan)
     end
     let
         search_env = construct_search_env(solver,deepcopy(sched),base_search_env)
         path_planner = ISPS()
         node = initialize_root_node(search_env)
         low_level_search!(path_planner,PC_MAPF(search_env),node)
-        @show convert_to_vertex_lists(node.solution)
+        # @show convert_to_vertex_lists(node.solution)
     end
     # Test CBS
     let
         search_env = construct_search_env(solver,deepcopy(sched),base_search_env)
-        path_planner = CBSRoutePlanner()
+        path_planner = CBS_Solver(ISPS())
         env = solve!(path_planner,PC_MAPF(search_env))
-        @show convert_to_vertex_lists(env.route_plan)
+        # @show convert_to_vertex_lists(env.route_plan)
     end
     let
-        path_planner = CBSRoutePlanner()
+        path_planner = CBS_Solver(ISPS())
         env, cost = plan_route!(path_planner,deepcopy(sched),base_search_env)
-        @show convert_to_vertex_lists(env.route_plan)
+        # @show convert_to_vertex_lists(env.route_plan)
     end
     # test NBS
     let
@@ -129,7 +136,7 @@ let
         # solver = NBSSolver(assignment_model = TaskGraphsMILPSolver())
         TaskGraphs.Solvers.set_iteration_limit!(solver,3)
         env, cost = solve!(solver,base_search_env;optimizer=Gurobi.Optimizer)
-        @show convert_to_vertex_lists(env.route_plan)
+        # @show convert_to_vertex_lists(env.route_plan)
         # @show TaskGraphs.Solvers.get_logger(solver)
         # @show TaskGraphs.Solvers.optimality_gap(solver) > 0
         @test validate(env.schedule)
@@ -181,7 +188,7 @@ let
                     @test cost != typemax(Int)
                     @test cost != Inf
                 end
-                @show costs
+                # @show costs
                 @test all(costs .== costs[1])
             end
         end

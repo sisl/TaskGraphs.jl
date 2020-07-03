@@ -131,7 +131,7 @@ let
                     optimize!(model)
                     optimal = (termination_status(model) == MathOptInterface.OPTIMAL)
                     optimal_TA_cost = Int(round(value(objective_function(model))))
-                    @show i, cost_model
+                    # @show i, cost_model
                     @test optimal == true
                     @test optimal_TA_cost == costs[i]
                 end

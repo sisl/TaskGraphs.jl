@@ -58,5 +58,5 @@ let
     project_spec, problem_spec, robot_ICs, assignments, env_graph = initialize_toy_problem_6(;
         verbose=false);
     # construct a partial project schedule
-    construct_project_schedule(project_spec, problem_spec, robot_ICs)
+    construct_partial_project_schedule(project_spec, problem_spec, robot_ICs)
 end

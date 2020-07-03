@@ -22,11 +22,11 @@ end
 end
 Base.:(==)(s1::S,s2::S) where {S<:State} = hash(s1) == hash(s2)
 # LowLevelEnv
-@with_kw struct LowLevelEnv{C<:AbstractCostModel,H<:AbstractCostModel,N,I} <: AbstractLowLevelEnv{State,Action,C}
+@with_kw struct LowLevelEnv{C<:AbstractCostModel,H<:AbstractCostModel,N,I,T} <: AbstractLowLevelEnv{State,Action,C}
     graph::GridFactoryEnvironment   = GridFactoryEnvironment()
     schedule_node::N                = nothing
     node_id::I                      = nothing
-    constraints::ConstraintTable    = ConstraintTable()
+    constraints::T                  = ConstraintTable{PathNode{State,Action}}()
     goal::State                     = State()
     agent_idx::Int                  = -1
     heuristic::H                    = NullHeuristic()
@@ -115,7 +115,7 @@ CRCBS.get_next_state(s::State,a::Action) = State(a.e.dst,s.t+a.Δt)
 CRCBS.get_next_state(env::LowLevelEnv,s::State,a::Action) = get_next_state(s,a)
 # get_transition_cost
 function CRCBS.get_transition_cost(env::E,c::TravelTime,s::State,a::Action,sp::State) where {E<:LowLevelEnv}
-    return get_cost_type(c)(a.Δt)
+    return cost_type(c)(a.Δt)
 end
 function CRCBS.get_transition_cost(env::E,c::C,s::State,a::Action,sp::State) where {E<:LowLevelEnv,C<:ConflictCostModel}
     state_conflict_value = get_conflict_value(c, env.agent_idx, sp.vtx, sp.t)

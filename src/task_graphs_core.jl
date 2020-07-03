@@ -2065,7 +2065,8 @@ function formulate_milp(milp_model::SparseAdjacencyMILP,project_schedule::Operat
         tF_ = Dict{AbstractID,Float64}(), # dictionary of initial times. Default is empty
         Mm = 10000, # for big M constraints
         cost_model = SumOfMakeSpans(),
-        job_shop=milp_model.job_shop
+        job_shop=milp_model.job_shop,
+        kwargs...
     )
 
     # println("NBS TIME LIMIT: TimeLimit = $TimeLimit")

@@ -24,11 +24,11 @@ let
     dict = TOML.parsefile(filename)
     load_feature(dict,RunTime())
 
-    df = DataFrame()
-    for feat in (RunTime(),SolutionCost(),OptimalityGap())
-        df[!,Symbol(typeof(feat))] = feature_type(feat)[]
-    end
-    df
+    # df = DataFrame()
+    # for feat in (RunTime(),SolutionCost(),OptimalityGap())
+    #     df[!,Symbol(typeof(feat))] = feature_type(feat)[]
+    # end
+    # df
 end
 let
 
@@ -40,9 +40,9 @@ let
     run(pipeline(`rm -rf $dummy_results_dir`, stdout=devnull, stderr=devnull))
     modes = [
         :write,
-        # :assignment_only,
+        :assignment_only,
         # :low_level_search_without_repair,
-        # :low_level_search_with_repair,
+        :low_level_search_with_repair,
         # :full_solver
         ]
     problem_dir, results_dir, solver_configs, problem_configs, solvers = get_problem_config_1()
@@ -55,11 +55,11 @@ let
                 base_problem_dir = dummy_problem_dir,
                 base_results_dir = joinpath(
                     dummy_results_dir,
-                    string(typeof(assignment_solver(solver)))),
+                    string(typeof(assignment_solver(solver).milp))),
                 )
         end
-        run(pipeline(`rm -rf $dummy_problem_dir`, stdout=devnull, stderr=devnull))
-        run(pipeline(`rm -rf $dummy_results_dir`, stdout=devnull, stderr=devnull))
+        # run(pipeline(`rm -rf $dummy_problem_dir`, stdout=devnull, stderr=devnull))
+        # run(pipeline(`rm -rf $dummy_results_dir`, stdout=devnull, stderr=devnull))
     end
 end
 let

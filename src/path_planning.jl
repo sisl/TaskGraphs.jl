@@ -39,7 +39,7 @@ function CRCBS.get_initial_solution(schedule::OperatingSchedule,env::E) where {E
         push!(starts, State(vtx = get_id(get_location_id(robot_ics[k])), t = 0))
     end
     cost_model = get_cost_model(env)
-    paths = map(s->Path{State,Action,get_cost_type(cost_model)}(s0=s, cost=get_initial_cost(cost_model)), starts)
+    paths = map(s->Path{State,Action,cost_type(cost_model)}(s0=s, cost=get_initial_cost(cost_model)), starts)
     costs = map(p->get_cost(p), paths)
     cost = aggregate_costs(cost_model, costs)
     LowLevelSolution(paths=paths, cost_model=cost_model,costs=costs, cost=cost)
@@ -70,14 +70,14 @@ include("legacy/pc_tapf_solver.jl")
 #     msg::String = ""
 # end
 # Helpers for printing
-export
-    log_info
-
-function log_info(limit::Int,verbosity::Int,msg...)
-    if verbosity > limit
-        println("[ logger ]: ",msg...)
-    end
-end
+# export
+#     log_info
+#
+# function log_info(limit::Int,verbosity::Int,msg...)
+#     if verbosity > limit
+#         println("[ logger ]: ",msg...)
+#     end
+# end
 
 export
     PlanningCache,
@@ -158,7 +158,7 @@ export
     cost_model::C                   = get_cost_model(env)
     num_agents::Int                 = length(get_robot_ICs(schedule))
     route_plan::S                = LowLevelSolution(
-        paths = map(i->Path{State,Action,get_cost_type(cost_model)}(),
+        paths = map(i->Path{State,Action,cost_type(cost_model)}(),
             1:num_agents),
         cost_model = cost_model,
         costs = map(i->get_initial_cost(cost_model), 1:num_agents),
@@ -475,7 +475,7 @@ function CRCBS.build_env(solver, env::E, node::N, schedule_node::T, v::Int, path
         base_path = get_paths(node.solution)[agent_id]
         # log_info(0,solver,string("initializing base path for node ",v," of type ",typeof(schedule_node)))
         # start_vtx = path_spec.start_vtx
-        # base_path = Path{PCCBS.State,PCCBS.Action,get_cost_type(cbs_env)}(
+        # base_path = Path{PCCBS.State,PCCBS.Action,cost_type(cbs_env)}(
         #     s0=PCCBS.State(start_vtx, 0), # TODO fix start time
         #     cost=get_initial_cost(cbs_env)
         #     )
@@ -508,7 +508,7 @@ For COLLABORATIVE transport problems
 function CRCBS.build_env(solver, env::E, node::N, schedule_node::TEAM_ACTION, v::Int;kwargs...) where {E<:SearchEnv,N<:ConstraintTreeNode}
     envs = []
     starts = Vector{PCCBS.State}()
-    meta_cost = MetaCost(Vector{get_cost_type(env)}(),get_initial_cost(env.env))
+    meta_cost = MetaCost(Vector{cost_type(env)}(),get_initial_cost(env.env))
     # path_specs = Vector{PathSpec}()
     for (i, sub_node) in enumerate(schedule_node.instructions)
         # if i == 1 # leader
@@ -527,7 +527,7 @@ function CRCBS.build_env(solver, env::E, node::N, schedule_node::TEAM_ACTION, v:
         push!(meta_cost.independent_costs, get_cost(base_path))
     end
     meta_env = MetaAgentCBS.construct_meta_env([envs...], get_cost_model(env))
-    meta_path = Path{MetaAgentCBS.State{PCCBS.State},MetaAgentCBS.Action{PCCBS.Action},MetaCost{get_cost_type(env)}}(
+    meta_path = Path{MetaAgentCBS.State{PCCBS.State},MetaAgentCBS.Action{PCCBS.Action},MetaCost{cost_type(env)}}(
         s0 = MetaAgentCBS.State(starts),
         cost = MetaCost(meta_cost.independent_costs, aggregate_costs(get_cost_model(meta_env), meta_cost.independent_costs))
     )
@@ -560,7 +560,7 @@ export
 
 
 CRCBS.get_cost_model(env::E) where {E<:SearchEnv}   = get_cost_model(env.env)
-CRCBS.get_cost_type(env::E) where {E<:SearchEnv}    = get_cost_type(env.env)
+CRCBS.cost_type(env::E) where {E<:SearchEnv}    = cost_type(env.env)
 function CRCBS.initialize_root_node(env::SearchEnv)
     N = env.num_agents
     # It is important to only have N starts! Does not matter if they are invalid states.
