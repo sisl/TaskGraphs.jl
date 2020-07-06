@@ -32,52 +32,8 @@ struct PC_TAPF{L<:LowLevelSolution}
     initial_route_plan::L             # initial condition
 end
 
-function CRCBS.get_initial_solution(schedule::OperatingSchedule,env::E) where {E<:PCCBS.LowLevelEnv}
-    starts = State[]
-    robot_ics = get_robot_ICs(schedule)
-    for k in sort(collect(keys(robot_ics)))
-        push!(starts, State(vtx = get_id(get_location_id(robot_ics[k])), t = 0))
-    end
-    cost_model = get_cost_model(env)
-    paths = map(s->Path{State,Action,cost_type(cost_model)}(s0=s, cost=get_initial_cost(cost_model)), starts)
-    costs = map(p->get_cost(p), paths)
-    cost = aggregate_costs(cost_model, costs)
-    LowLevelSolution(paths=paths, cost_model=cost_model,costs=costs, cost=cost)
-end
 
 include("legacy/pc_tapf_solver.jl")
-
-
-# export
-#     AbstractSolverException,
-#     SolverTimeOutException,
-#     SolverMilpMaxOutException,
-#     SolverAstarMaxOutException,
-#     read_solver
-#
-# abstract type AbstractSolverException end
-#
-# @with_kw struct SolverTimeOutException <: AbstractSolverException
-#     msg::String = ""
-# end
-# @with_kw struct SolverMilpMaxOutException <: AbstractSolverException
-#     msg::String = ""
-# end
-# @with_kw struct SolverCBSMaxOutException <: AbstractSolverException
-#     msg::String = ""
-# end
-# @with_kw struct SolverAstarMaxOutException <: AbstractSolverException
-#     msg::String = ""
-# end
-# Helpers for printing
-# export
-#     log_info
-#
-# function log_info(limit::Int,verbosity::Int,msg...)
-#     if verbosity > limit
-#         println("[ logger ]: ",msg...)
-#     end
-# end
 
 export
     PlanningCache,
@@ -172,7 +128,12 @@ function CRCBS.get_start(env::SearchEnv,v::Int)
     start_time  = env.cache.t0[v]
     PCCBS.State(start_vtx,start_time)
 end
-CRCBS.get_cost(env::SearchEnv) = get_cost(env.route_plan)
+# CRCBS.get_cost(env::SearchEnv) = get_cost(env.route_plan)
+CRCBS.get_cost_model(env::SearchEnv) = get_cost_model(env.env)
+CRCBS.num_agents(env::SearchEnv) = env.num_agents
+for op in [:get_cost,:cost_type,:state_type,:action_type]
+    @eval CRCBS.$op(env::SearchEnv,args...) = $op(env.route_plan,args...)
+end
 
 # function reverse_propagate_delay!(solver,cache,schedule,delay_vec)
 #     buffer = zeros(nv(schedule))
@@ -360,6 +321,19 @@ export
 function construct_cost_model end
 function construct_heuristic_model end
 
+function CRCBS.get_initial_solution(schedule::OperatingSchedule,env::E) where {E<:PCCBS.LowLevelEnv}
+    starts = State[]
+    robot_ics = get_robot_ICs(schedule)
+    for k in sort(collect(keys(robot_ics)))
+        push!(starts, State(vtx = get_id(get_location_id(robot_ics[k])), t = 0))
+    end
+    cost_model = get_cost_model(env)
+    paths = map(s->Path{State,Action,cost_type(cost_model)}(s0=s, cost=get_initial_cost(cost_model)), starts)
+    costs = map(p->get_cost(p), paths)
+    cost = aggregate_costs(cost_model, costs)
+    LowLevelSolution(paths=paths, cost_model=cost_model,costs=costs, cost=cost)
+end
+CRCBS.get_initial_solution(env::SearchEnv) = get_initial_solution(env.schedule,env.env)
 function construct_search_env(solver, schedule, problem_spec, env_graph,
         primary_objective=problem_spec.cost_function;
         extra_T=400,
@@ -558,24 +532,6 @@ end
 export
     PC_MAPF
 
-
-CRCBS.get_cost_model(env::E) where {E<:SearchEnv}   = get_cost_model(env.env)
-CRCBS.cost_type(env::E) where {E<:SearchEnv}    = cost_type(env.env)
-function CRCBS.initialize_root_node(env::SearchEnv)
-    N = env.num_agents
-    # It is important to only have N starts! Does not matter if they are invalid states.
-    dummy_mapf = MAPF(env.env,map(i->PCCBS.State(),1:N),map(i->PCCBS.State(),1:N))
-    initialize_root_node(dummy_mapf,deepcopy(env.route_plan))
-end
-function CRCBS.initialize_child_search_node(node::N,env::SearchEnv) where {N<:ConstraintTreeNode}
-    initialize_child_search_node(node,deepcopy(env.route_plan))
-end
-function CRCBS.default_solution(env::SearchEnv)
-    N = env.num_agents
-    dummy_mapf = MAPF(env.env,map(i->PCCBS.State(),1:N),map(i->PCCBS.State(),1:N))
-    default_solution(dummy_mapf)
-end
-
 """
     `PC_MAPF`
 
@@ -585,8 +541,32 @@ end
 struct PC_MAPF{E<:SearchEnv} <: AbstractMAPF
     env::E
 end
-CRCBS.initialize_root_node(pc_mapf::P) where {P<:PC_MAPF} = initialize_root_node(pc_mapf.env)
-CRCBS.default_solution(pc_mapf::M) where {M<:PC_MAPF} = default_solution(pc_mapf.env)
+function CRCBS.initialize_root_node(env::SearchEnv)
+    N = env.num_agents
+    # It is important to only have N starts! Does not matter if they are invalid states.
+    dummy_mapf = MAPF(env.env,map(i->PCCBS.State(),1:N),map(i->PCCBS.State(),1:N))
+    initialize_root_node(dummy_mapf,deepcopy(env.route_plan))
+end
+
+function CRCBS.initialize_root_node(env::SearchEnv,solution=env)
+    ConstraintTreeNode(
+        solution    = solution,
+        cost        = get_cost(solution),
+        constraints = Dict(
+            i=>ConstraintTable{node_type(solution)}(a=i) for i in 1:num_agents(env)
+            ),
+        id = 1)
+end
+CRCBS.initialize_root_node(solver,pc_mapf::PC_MAPF,solution=mapf.env) = initialize_root_node(pc_mapf.env,solution)
+function CRCBS.initialize_child_search_node(node::N,env::SearchEnv) where {N<:ConstraintTreeNode}
+    initialize_child_search_node(node,deepcopy(env.route_plan))
+end
 CRCBS.initialize_child_search_node(node::N,pc_mapf::PC_MAPF) where {N<:ConstraintTreeNode} = initialize_child_search_node(node,pc_mapf.env)
+function CRCBS.default_solution(env::SearchEnv)
+    N = env.num_agents
+    dummy_mapf = MAPF(env.env,map(i->PCCBS.State(),1:N),map(i->PCCBS.State(),1:N))
+    default_solution(dummy_mapf)
+end
+CRCBS.default_solution(pc_mapf::M) where {M<:PC_MAPF} = default_solution(pc_mapf.env)
 
 end # PathPlanning module

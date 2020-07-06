@@ -23,17 +23,6 @@ iterations, optimality gap (including upper and lower bound), etc.
 """
 abstract type AbstractPCTAPFSolver end
 
-# """
-#     BiLevelPlanner
-#
-# Generic type of bi-level planner.
-# """
-# struct BiLevelPlanner{A,B,C}
-#     high_level::A
-#     low_level::B
-#     logger::SolverLogger{C}
-# end
-
 abstract type SearchTrait end
 struct Prioritized <: SearchTrait end
 struct NonPrioritized <: SearchTrait end
@@ -382,9 +371,8 @@ end
     low_level_search!
 """
 function CRCBS.low_level_search!(solver::ISPS, pc_mapf::M,
-        node::N=initialize_root_node(pc_mapf),
+        node::N=initialize_root_node(solver,pc_mapf),
         idxs::Vector{Int}=Vector{Int}();
-        heuristic=get_heuristic_cost,
         kwargs...
     ) where {M<:PC_MAPF,N<:ConstraintTreeNode}
 
@@ -429,15 +417,15 @@ search_trait(solver::CBS_Solver) = search_trait(low_level(solver))
 primary_cost(solver::CBS_Solver,cost) = primary_cost(low_level(solver),cost)
 primary_cost_type(solver::CBS_Solver) = primary_cost_type(low_level(solver))
 
+
 function CRCBS.solve!(
         solver::CBS_Solver,
         mapf::M where {M<:PC_MAPF},
         )
 
-    # enter_cbs!(solver)
     reset_solver!(solver)
     priority_queue = PriorityQueue{Tuple{ConstraintTreeNode,PlanningCache},cost_type(mapf.env)}()
-    root_node = initialize_root_node(mapf) #TODO initialize with a partial solution when replanning
+    root_node = initialize_root_node(solver,mapf) #TODO initialize with a partial solution when replanning
     search_env, valid_flag = low_level_search!(solver,mapf,root_node)
     detect_conflicts!(root_node.conflict_table,root_node.solution;t0=max(minimum(mapf.env.cache.t0), 1))
     if valid_flag
@@ -449,23 +437,15 @@ function CRCBS.solve!(
     while length(priority_queue) > 0
         try
             node,cache = dequeue!(priority_queue)
-            # log_info(1,solver,string("CBS: node.cost = ",get_cost(node.solution)))
-            # check for conflicts
             conflict = get_next_conflict(node.conflict_table)
             if !CRCBS.is_valid(conflict)
-                # log_info(-1,solver,string("CBS: valid route plan found after ",solver.num_CBS_iterations," CBS iterations! Cost = ",node.cost))
                 return SearchEnv(search_env,cache=cache,route_plan=node.solution)
-                # return node.solution, cache, node.cost
             end
-            # log_info(1,solver,string("CBS: ", string(conflict)))
-            # otherwise, create constraints and branch
             constraints = generate_constraints_from_conflict(conflict)
             for constraint in constraints
                 new_node = initialize_child_search_node(node,mapf)
                 if CRCBS.add_constraint!(new_node,constraint)
                     increment_iteration_count!(solver)
-                    # log_info(1,solver,string("CBS: adding constraint", string(constraint)))
-                    # step_cbs!(solver,constraint)
                     search_env, valid_flag = low_level_search!(
                         low_level(solver),
                         mapf, new_node,
@@ -487,11 +467,8 @@ function CRCBS.solve!(
             end
         end
     end
-    # log_info(-1,solver,"CBS: no solution found. Returning default solution")
-    # exit_cbs!(solver)
     solution, cost = default_solution(mapf)
     return SearchEnv(search_env,cache=mapf.env.cache,route_plan=solution)
-    # return solution, mapf.env.cache, cost
 end
 
 export
