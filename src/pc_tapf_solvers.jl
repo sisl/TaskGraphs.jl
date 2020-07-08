@@ -132,8 +132,8 @@ SumOfTravelTime(), we would get worst-case exponentially slow breadth-first
 search!
 """
 function TaskGraphs.construct_cost_model(trait::NonPrioritized,
-        solver, schedule, cache, problem_spec, env_graph;
-        extra_T=400, primary_objective=SumOfMakeSpans())
+        solver, schedule, cache, problem_spec, env_graph, primary_objective=SumOfMakeSpans();
+        extra_T::Int=400)
     N = problem_spec.N
     cost_model = construct_composite_cost_model(
         typeof(primary_objective)(schedule,cache),
@@ -143,9 +143,16 @@ function TaskGraphs.construct_cost_model(trait::NonPrioritized,
         FullCostModel(sum,TransformCostModel(c->-1*c,TravelTime()))
     )
     heuristic_model = construct_heuristic_model(trait,solver,env_graph)
-    # ph = PerfectHeuristic(get_dist_matrix(env_graph))
-    # heuristic_model = construct_composite_heuristic(ph,NullHeuristic(),ph,ph,NullHeuristic())
     cost_model, heuristic_model
+end
+function TaskGraphs.construct_cost_model(trait::SearchTrait,
+        solver, env::SearchEnv,
+        primary_objective=env.problem_spec.cost_function
+        ;
+        kwargs...)
+    construct_cost_model(trait,solver,
+        env.schedule, env.cache, env.problem_spec, env.env.graph,
+        primary_objective;kwargs...)
 end
 function TaskGraphs.construct_cost_model(trait::Prioritized,args...;kwargs...)
     c, h = construct_cost_model(NonPrioritized(),args...;kwargs...)
@@ -172,18 +179,17 @@ export
 """
     update_route_plan!()
 """
-function update_route_plan!(solver,env,route_plan,schedule,v,path,cost,schedule_node,agent_id = get_path_spec(schedule, v).agent_id)
+function update_route_plan!(solver,env,v,path,cost,schedule_node,agent_id = get_path_spec(env.schedule, v).agent_id)
     # add to solution
     # log_info(3,solver,string("agent_path = ", convert_to_vertex_lists(path)))
     # log_info(3,solver,string("cost = ", get_cost(path)))
-    set_solution_path!(route_plan, path, agent_id)
-    set_path_cost!(route_plan, cost, agent_id)
-    # update
-    update_env!(solver,env,route_plan,v,path)
-    route_plan.cost = aggregate_costs(get_cost_model(env.env),get_path_costs(route_plan))
-    return route_plan
+    set_solution_path!(env, path, agent_id)
+    set_path_cost!(env, cost, agent_id)
+    update_env!(solver,env,v,path)
+    set_cost!(env,aggregate_costs(get_cost_model(env),get_path_costs(env)))
+    return env
 end
-function update_route_plan!(solver,env,route_plan,schedule,v,meta_path,meta_cost,schedule_node::TEAM_ACTION)
+function update_route_plan!(solver,env,v,meta_path,meta_cost,schedule_node::TEAM_ACTION)
     # add to solution
     paths = MetaAgentCBS.split_path(meta_path)
     # @show length(paths)
@@ -192,13 +198,13 @@ function update_route_plan!(solver,env,route_plan,schedule,v,meta_path,meta_cost
     # @show length(schedule_node.instructions)
     for (new_path, sub_node) in zip(paths, schedule_node.instructions)
         agent_id = get_id(get_robot_id(sub_node))
-        path = get_paths(route_plan)[agent_id]
+        path = get_paths(env)[agent_id]
         for p in new_path.path_nodes
             push!(path, p)
             # path.cost = accumulate_cost(cbs_env, get_cost(path), get_transition_cost(cbs_env, p.s, p.a, p.sp))
         end
-        path.cost = get_cost(new_path)
-        update_route_plan!(solver,env,route_plan,schedule,v,path,path.cost,sub_node,agent_id)
+        set_cost!(path,get_cost(new_path))
+        update_route_plan!(solver,env,v,path,path.cost,sub_node,agent_id)
         # update_env!(solver,env,route_plan,v,path,agent_id)
         # Print for debugging
         # @show agent_id
@@ -206,12 +212,13 @@ function update_route_plan!(solver,env,route_plan,schedule,v,meta_path,meta_cost
         log_info(3,solver,string("agent_path = ", convert_to_vertex_lists(path)))
         log_info(3,solver,string("cost = ", get_cost(new_path)))
     end
-    return route_plan
+    return env
 end
 
 export
     plan_path!
 
+path_finder(solver::AStarSC,args...) = CRCBS.a_star(solver,args...)
 """
     plan_path!
 
@@ -220,28 +227,25 @@ export
 """
 function plan_path!(solver::AStarSC, env::SearchEnv, node::N,
         schedule_node::T, v::Int;
-        path_finder=CRCBS.A_star,
         kwargs...) where {N<:ConstraintTreeNode,T}
 
     cache = env.cache
-    schedule = env.schedule
-    node_id = get_vtx_id(schedule,v)
+    node_id = get_vtx_id(env.schedule,v)
 
     reset_solver!(solver)
     cbs_env, base_path = build_env(solver, env, node, schedule_node, v)
     ### PATH PLANNING ###
     # solver.DEBUG ? validate(base_path,v) : nothing
-    path, cost = path_finder(solver, cbs_env, base_path, get_heuristic_cost)
+    path, cost = path_finder(solver, cbs_env, base_path)
     @assert get_cost(path) == cost
     if cost == get_infeasible_cost(cbs_env)
         if solver.replan == true
             log_info(-1,solver,"A*: replanning without conflict cost", string(schedule_node))
             reset_solver!(solver)
-            cost_model, _ = construct_cost_model(
-                solver, schedule, cache, env.problem_spec, env.env.graph;
+            cost_model, _ = construct_cost_model(solver, env;
                 primary_objective=env.problem_spec.cost_function)
             cbs_env, base_path = build_env(solver, env, node, schedule_node, v;cost_model=cost_model)
-            path, cost = path_finder(solver, cbs_env, base_path, heuristic)
+            path, cost = path_finder(solver, cbs_env, base_path)
         end
         if cost == get_infeasible_cost(cbs_env)
             log_info(-1,solver,"A*: returned infeasible path for node ", string(schedule_node))
@@ -252,17 +256,17 @@ function plan_path!(solver::AStarSC, env::SearchEnv, node::N,
     #####################
     log_info(2,solver,string("A* iterations = ",iterations(solver)))
     # Make sure every robot sticks around for the entire time horizon
-    if is_terminal_node(get_graph(schedule),v)
+    if is_terminal_node(get_graph(env.schedule),v)
         log_info(2,solver,"ISPS: Extending terminal node")
         extend_path!(cbs_env,path,maximum(cache.tF))
         # solver.DEBUG ? validate(path,v) : nothing
     end
     # add to solution
-    update_route_plan!(solver,env,node.solution,schedule,v,path,cost,schedule_node)
+    update_route_plan!(solver,env,v,path,cost,schedule_node)
     # node.solution.cost = aggregate_costs(get_cost_model(env.env),get_path_costs(node.solution))
-    node.cost = get_cost(node.solution)
-    if node.cost >= best_cost(solver)
-        log_info(0,solver,"ISPS: node.cost >= best_cost(solver) ... Exiting early")
+    # node.cost = get_cost(node.solution)
+    if get_cost(node) >= best_cost(solver)
+        log_info(0,solver,"ISPS: get_cost(node) >= best_cost(solver) ... Exiting early")
         return false
     end
 
@@ -304,7 +308,6 @@ export
     `plan_next_path`
 """
 function plan_next_path!(solver::ISPS, env::SearchEnv, node::N;
-        heuristic=get_heuristic_cost,
         kwargs...
         ) where {N<:ConstraintTreeNode}
 
@@ -318,8 +321,7 @@ function plan_next_path!(solver::ISPS, env::SearchEnv, node::N;
         if get_path_spec(env.schedule, v).plan_path == true
             # enter_a_star!(solver)
             try
-                valid_flag = plan_path!(low_level(solver),env,node,schedule_node,v;
-                    heuristic=heuristic)
+                valid_flag = plan_path!(low_level(solver),env,node,schedule_node,v)
             catch e
                 if isa(e, SolverException)
                     # log_info(-1, solver, e.msg)
@@ -349,17 +351,16 @@ end
     Computes all paths specified by the project schedule and updates the
     solution in the ConstraintTreeNode::node accordingly.
 """
-function CRCBS.low_level_search!(solver::ISPS, env::E,
-        node::N=initialize_root_node(env);
-        heuristic=get_heuristic_cost,
+function CRCBS.low_level_search!(solver::ISPS, node::N, env::SearchEnv=node.solution;
         kwargs...
-        ) where {E<:SearchEnv,N<:ConstraintTreeNode}
+        ) where {N<:ConstraintTreeNode}
 
-    reset_solution!(node,env.route_plan)
+    # reset_route_plan!(node,env.route_plan)
     while length(env.cache.node_queue) > 0
-        if !(plan_next_path!(solver,env,node;heuristic=heuristic))
+        if !(plan_next_path!(solver,env,node))
             return false
         end
+        # @show convert_to_vertex_lists(env.route_plan)
         enforce_time_limit(solver)
     end
     # log_info(0,solver,"LOW_LEVEL_SEARCH: Returning consistent route plan with cost ", get_cost(node.solution))
@@ -379,26 +380,41 @@ function CRCBS.low_level_search!(solver::ISPS, pc_mapf::M,
     # enter_low_level!(solver)
     reset_solver!(solver)
     valid_flag = true
-    cache = initialize_planning_cache(pc_mapf.env.schedule;
-        t0=deepcopy(pc_mapf.env.cache.t0),
-        tF=deepcopy(pc_mapf.env.cache.tF)
-    )
-    search_env = SearchEnv(pc_mapf.env,cache=cache)
+    # cache = initialize_planning_cache(pc_mapf.env.schedule;
+    #     t0=deepcopy(pc_mapf.env.cache.t0),
+    #     tF=deepcopy(pc_mapf.env.cache.tF)
+    # )
+    # search_env = SearchEnv(pc_mapf.env,cache=cache)
+    search_env = node.solution
     for i in 1:iteration_limit(solver)
         increment_iteration_count!(solver)
-        cache = initialize_planning_cache(pc_mapf.env.schedule;
-            t0=deepcopy(pc_mapf.env.cache.t0),
-            tF=deepcopy(pc_mapf.env.cache.tF)
-        )
-        search_env = SearchEnv(pc_mapf.env,cache=cache)
-        valid_flag = low_level_search!(solver, search_env, node)
+        # reset solution
+        reset_cache!(
+            search_env.cache,
+            search_env.schedule,
+            pc_mapf.env.cache.t0,
+            pc_mapf.env.cache.tF)
+        reset_route_plan!(node,
+            pc_mapf.env.route_plan)
+        # search_env.cache.t0 .= pc_mapf.env.t0
+        # search_env.cache.tF .= pc_mapf.env.tF
+        # cache = initialize_planning_cache(pc_mapf.env.schedule;
+        #     t0=deepcopy(pc_mapf.env.cache.t0),
+        #     tF=deepcopy(pc_mapf.env.cache.tF)
+        # )
+        # search_env = SearchEnv(pc_mapf.env,cache=cache)
+        valid_flag = low_level_search!(solver, node)
         if valid_flag == false
             log_info(0,solver,"ISPS: failed on ",i,"th repair iteration.")
             break
         end
     end
     # exit_low_level!(solver)
-    return search_env, valid_flag
+    # return search_env, valid_flag
+    return valid_flag
+end
+function CRCBS.low_level_search!(solver::CBS_Solver, pc_mapf::PC_MAPF,node::ConstraintTreeNode,args...;kwargs...)
+    low_level_search!(low_level(solver),pc_mapf,node,args...;kwargs...)
 end
 
 """
@@ -406,10 +422,11 @@ end
 
 Solve a PC-MAPF problem with the ISPS algorithm.
 """
-function CRCBS.solve!(solver::ISPS,mapf::M) where {M<:PC_MAPF}
-    # node = initialize_root_node(mapf)
-    search_env, valid_flag = low_level_search!(solver,mapf)#,node)
-    return search_env
+
+function CRCBS.solve!(solver::ISPS,pc_mapf::PC_MAPF)
+    node = initialize_root_node(solver,pc_mapf)
+    valid_flag = low_level_search!(solver,pc_mapf,node)#,node)
+    return node.solution, get_cost(node.solution)
 end
 
 TaskGraphs.construct_cost_model(solver::CBS_Solver,args...;kwargs...) = construct_cost_model(low_level(solver),args...;kwargs...)
@@ -417,59 +434,59 @@ search_trait(solver::CBS_Solver) = search_trait(low_level(solver))
 primary_cost(solver::CBS_Solver,cost) = primary_cost(low_level(solver),cost)
 primary_cost_type(solver::CBS_Solver) = primary_cost_type(low_level(solver))
 
-
-function CRCBS.solve!(
-        solver::CBS_Solver,
-        mapf::M where {M<:PC_MAPF},
-        )
-
-    reset_solver!(solver)
-    priority_queue = PriorityQueue{Tuple{ConstraintTreeNode,PlanningCache},cost_type(mapf.env)}()
-    root_node = initialize_root_node(solver,mapf) #TODO initialize with a partial solution when replanning
-    search_env, valid_flag = low_level_search!(solver,mapf,root_node)
-    detect_conflicts!(root_node.conflict_table,root_node.solution;t0=max(minimum(mapf.env.cache.t0), 1))
-    if valid_flag
-        enqueue!(priority_queue, (root_node,search_env.cache) => root_node.cost)
-    else
-        # log_info(-1,solver,"CBS: first call to low_level_search returned infeasible.")
-    end
-
-    while length(priority_queue) > 0
-        try
-            node,cache = dequeue!(priority_queue)
-            conflict = get_next_conflict(node.conflict_table)
-            if !CRCBS.is_valid(conflict)
-                return SearchEnv(search_env,cache=cache,route_plan=node.solution)
-            end
-            constraints = generate_constraints_from_conflict(conflict)
-            for constraint in constraints
-                new_node = initialize_child_search_node(node,mapf)
-                if CRCBS.add_constraint!(new_node,constraint)
-                    increment_iteration_count!(solver)
-                    search_env, valid_flag = low_level_search!(
-                        low_level(solver),
-                        mapf, new_node,
-                        [get_agent_id(constraint)])
-                    if valid_flag
-                        detect_conflicts!(new_node.conflict_table,new_node.solution,[get_agent_id(constraint)];t0=max(minimum(search_env.cache.t0), 1)) # update conflicts related to this agent
-                        enqueue!(priority_queue, (new_node,search_env.cache) => new_node.cost)
-                    end
-                end
-            end
-            enforce_time_limit(solver)
-            enforce_iteration_limit(solver)
-        catch e
-            if isa(e, SolverException)
-                showerror(stdout, e, catch_backtrace())
-                break
-            else
-                rethrow(e)
-            end
-        end
-    end
-    solution, cost = default_solution(mapf)
-    return SearchEnv(search_env,cache=mapf.env.cache,route_plan=solution)
-end
+CRCBS.solve!(solver::CBS_Solver,pc_mapf::PC_MAPF) = CRCBS.cbs!(solver,pc_mapf)
+# function CRCBS.solve!(
+#         solver::CBS_Solver,
+#         mapf::M where {M<:PC_MAPF},
+#         )
+#
+#     reset_solver!(solver)
+#     priority_queue = PriorityQueue{Tuple{ConstraintTreeNode,PlanningCache},cost_type(mapf.env)}()
+#     root_node = initialize_root_node(solver,mapf) #TODO initialize with a partial solution when replanning
+#     search_env, valid_flag = low_level_search!(solver,mapf,root_node)
+#     detect_conflicts!(root_node.conflict_table,root_node.solution;t0=max(minimum(mapf.env.cache.t0), 1))
+#     if valid_flag
+#         enqueue!(priority_queue, (root_node,search_env.cache) => root_node.cost)
+#     else
+#         # log_info(-1,solver,"CBS: first call to low_level_search returned infeasible.")
+#     end
+#
+#     while length(priority_queue) > 0
+#         try
+#             node,cache = dequeue!(priority_queue)
+#             conflict = get_next_conflict(node.conflict_table)
+#             if !CRCBS.is_valid(conflict)
+#                 return SearchEnv(search_env,cache=cache,route_plan=node.solution)
+#             end
+#             constraints = generate_constraints_from_conflict(conflict)
+#             for constraint in constraints
+#                 new_node = initialize_child_search_node(node,mapf)
+#                 if CRCBS.add_constraint!(new_node,constraint)
+#                     increment_iteration_count!(solver)
+#                     search_env, valid_flag = low_level_search!(
+#                         low_level(solver),
+#                         mapf, new_node,
+#                         [get_agent_id(constraint)])
+#                     if valid_flag
+#                         detect_conflicts!(new_node.conflict_table,new_node.solution,[get_agent_id(constraint)];t0=max(minimum(search_env.cache.t0), 1)) # update conflicts related to this agent
+#                         enqueue!(priority_queue, (new_node,search_env.cache) => new_node.cost)
+#                     end
+#                 end
+#             end
+#             enforce_time_limit(solver)
+#             enforce_iteration_limit(solver)
+#         catch e
+#             if isa(e, SolverException)
+#                 showerror(stdout, e, catch_backtrace())
+#                 break
+#             else
+#                 rethrow(e)
+#             end
+#         end
+#     end
+#     solution, cost = default_solution(mapf)
+#     return SearchEnv(search_env,cache=mapf.env.cache,route_plan=solution)
+# end
 
 export
     TaskGraphsMILPSolver
@@ -699,7 +716,7 @@ function plan_route!(
         kwargs...)
 
     env = construct_search_env(solver, schedule, base_search_env;kwargs...)
-    solution = solve!(solver, PC_MAPF(env))
+    solution, cost = solve!(solver, PC_MAPF(env))
     solution, primary_cost(solver,get_cost(solution))
 end
 

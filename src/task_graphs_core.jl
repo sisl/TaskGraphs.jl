@@ -467,20 +467,14 @@ constraint between them.
     root_nodes          ::Vector{Int}           = Vector{Int}() # list of "project heads"
     weights             ::Dict{Int,Float64}     = Dict{Int,Float64}() # weights corresponding to project heads
 end
-
-Base.zero(schedule::OperatingSchedule{G}) where {G}                           = OperatingSchedule(graph=G())
-LightGraphs.edges(schedule::OperatingSchedule)                                = edges(schedule.graph)
-LightGraphs.edgetype(schedule::OperatingSchedule{G}, args...) where {G}       = edgetype(schedule.graph, args...)
-LightGraphs.has_edge(schedule::OperatingSchedule{G}, args...) where {G}       = has_edge(schedule.graph, args...)
-LightGraphs.has_vertex(schedule::OperatingSchedule{G}, args...) where {G}     = has_vertex(schedule.graph, args...)
-LightGraphs.inneighbors(schedule::OperatingSchedule{G}, args...) where {G}    = inneighbors(schedule.graph, args...)
-# LightGraphs.is_directed(schedule::OperatingSchedule{G}, args...) where {G}    = is_directed(schedule.graph, args...)
-# LightGraphs.is_directed(schedule::OperatingSchedule, args...)                 = true
-LightGraphs.is_directed(schedule::OperatingSchedule)                          = true
-LightGraphs.ne(schedule::OperatingSchedule{G}, args...) where {G}             = ne(schedule.graph, args...)
-LightGraphs.nv(schedule::OperatingSchedule{G}, args...) where {G}             = nv(schedule.graph, args...)
-LightGraphs.outneighbors(schedule::OperatingSchedule{G}, args...) where {G}   = outneighbors(schedule.graph, args...)
-LightGraphs.vertices(schedule::OperatingSchedule{G}, args...) where {G}       = vertices(schedule.graph, args...)
+Base.zero(schedule::OperatingSchedule{G}) where {G} = OperatingSchedule(graph=G())
+LightGraphs.edges(schedule::OperatingSchedule) = edges(schedule.graph)
+LightGraphs.is_directed(schedule::OperatingSchedule) = true
+for op in [
+    :edgetype,:has_edge,:has_vertex,:inneighbors,:ne,:nv,:outneighbors,:vertices
+    ]
+    @eval LightGraphs.$op(sched::OperatingSchedule,args...) = $op(sched.graph,args...)
+end
 
 get_graph(schedule::P) where {P<:OperatingSchedule}       = schedule.graph
 get_vtx_ids(schedule::P) where {P<:OperatingSchedule}     = schedule.vtx_ids
@@ -1267,8 +1261,8 @@ Compute the optimistic start and end times, along with the slack associated
 with each vertex in the `schedule`. Slack for each vertex is represented as
 a vector in order to handle multi-headed projects.
 """
-function process_schedule(schedule::P; t0=zeros(Int,nv(schedule)),
-        tF=zeros(Int,nv(schedule)),
+function process_schedule(schedule::P,t0=zeros(Int,nv(schedule)),
+        tF=zeros(Int,nv(schedule));
         kwargs...
     ) where {P<:OperatingSchedule}
 
@@ -2252,11 +2246,11 @@ JuMP.termination_status(model::GreedyAssignment)    = MOI.OPTIMAL
 JuMP.primal_status(model::GreedyAssignment)         = MOI.FEASIBLE_POINT
 get_assignment_matrix(model::GreedyAssignment)      = adjacency_matrix(get_graph(model.schedule))
 function JuMP.objective_function(model::GreedyAssignment{SumOfMakeSpans})
-    t0,tF,slack,local_slack = process_schedule(model.schedule;t0=model.t0)
+    t0,tF,slack,local_slack = process_schedule(model.schedule,model.t0)
     return sum(tF[model.schedule.root_nodes] .* map(v->model.schedule.weights[v], model.schedule.root_nodes))
 end
 function JuMP.objective_function(model::GreedyAssignment{MakeSpan})
-    t0,tF,slack,local_slack = process_schedule(model.schedule;t0=model.t0)
+    t0,tF,slack,local_slack = process_schedule(model.schedule,model.t0)
     return maximum(tF[model.schedule.root_nodes])
 end
 function JuMP.objective_function(model::GreedyAssignment)

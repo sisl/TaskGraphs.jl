@@ -96,33 +96,42 @@ let
         @test plan_path!(path_planner, search_env, node, schedule_node, v2)
         # @show convert_to_vertex_lists(node.solution)
     end
+    let
+        search_env = construct_search_env(solver,deepcopy(sched),base_search_env)
+        node = initialize_root_node(search_env)
+        path_planner = ISPS()
+        for i in 1:nv(search_env.schedule)
+            @test plan_next_path!(path_planner,node.solution,node)
+        end
+    end
     # Test ISPS
     let
         search_env = construct_search_env(solver,deepcopy(sched),base_search_env)
         path_planner = ISPS()
-        # node = initialize_root_node(search_env)
-        valid_flag = low_level_search!(path_planner,search_env)#,node)
+        node = initialize_root_node(search_env)
+        @test low_level_search!(path_planner,node)#,node)
         # @show convert_to_vertex_lists(node.solution)
         # @show convert_to_vertex_lists(search_env.route_plan)
     end
     let
         search_env = construct_search_env(solver,deepcopy(sched),base_search_env)
         path_planner = ISPS()
-        solution = solve!(path_planner,PC_MAPF(search_env))
+        solution, cost = solve!(path_planner,PC_MAPF(search_env))
         # @show convert_to_vertex_lists(solution.route_plan)
     end
     let
         search_env = construct_search_env(solver,deepcopy(sched),base_search_env)
         path_planner = ISPS()
         node = initialize_root_node(search_env)
-        low_level_search!(path_planner,PC_MAPF(search_env),node)
+        @test low_level_search!(path_planner,PC_MAPF(search_env),node)
         # @show convert_to_vertex_lists(node.solution)
     end
     # Test CBS
     let
         search_env = construct_search_env(solver,deepcopy(sched),base_search_env)
+        pc_mapf = PC_MAPF(search_env)
         path_planner = CBS_Solver(ISPS())
-        env = solve!(path_planner,PC_MAPF(search_env))
+        solution, cost = solve!(path_planner,pc_mapf)
         # @show convert_to_vertex_lists(env.route_plan)
     end
     let
