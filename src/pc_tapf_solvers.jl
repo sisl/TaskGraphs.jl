@@ -433,60 +433,7 @@ TaskGraphs.construct_cost_model(solver::CBS_Solver,args...;kwargs...) = construc
 search_trait(solver::CBS_Solver) = search_trait(low_level(solver))
 primary_cost(solver::CBS_Solver,cost) = primary_cost(low_level(solver),cost)
 primary_cost_type(solver::CBS_Solver) = primary_cost_type(low_level(solver))
-
 CRCBS.solve!(solver::CBS_Solver,pc_mapf::PC_MAPF) = CRCBS.cbs!(solver,pc_mapf)
-# function CRCBS.solve!(
-#         solver::CBS_Solver,
-#         mapf::M where {M<:PC_MAPF},
-#         )
-#
-#     reset_solver!(solver)
-#     priority_queue = PriorityQueue{Tuple{ConstraintTreeNode,PlanningCache},cost_type(mapf.env)}()
-#     root_node = initialize_root_node(solver,mapf) #TODO initialize with a partial solution when replanning
-#     search_env, valid_flag = low_level_search!(solver,mapf,root_node)
-#     detect_conflicts!(root_node.conflict_table,root_node.solution;t0=max(minimum(mapf.env.cache.t0), 1))
-#     if valid_flag
-#         enqueue!(priority_queue, (root_node,search_env.cache) => root_node.cost)
-#     else
-#         # log_info(-1,solver,"CBS: first call to low_level_search returned infeasible.")
-#     end
-#
-#     while length(priority_queue) > 0
-#         try
-#             node,cache = dequeue!(priority_queue)
-#             conflict = get_next_conflict(node.conflict_table)
-#             if !CRCBS.is_valid(conflict)
-#                 return SearchEnv(search_env,cache=cache,route_plan=node.solution)
-#             end
-#             constraints = generate_constraints_from_conflict(conflict)
-#             for constraint in constraints
-#                 new_node = initialize_child_search_node(node,mapf)
-#                 if CRCBS.add_constraint!(new_node,constraint)
-#                     increment_iteration_count!(solver)
-#                     search_env, valid_flag = low_level_search!(
-#                         low_level(solver),
-#                         mapf, new_node,
-#                         [get_agent_id(constraint)])
-#                     if valid_flag
-#                         detect_conflicts!(new_node.conflict_table,new_node.solution,[get_agent_id(constraint)];t0=max(minimum(search_env.cache.t0), 1)) # update conflicts related to this agent
-#                         enqueue!(priority_queue, (new_node,search_env.cache) => new_node.cost)
-#                     end
-#                 end
-#             end
-#             enforce_time_limit(solver)
-#             enforce_iteration_limit(solver)
-#         catch e
-#             if isa(e, SolverException)
-#                 showerror(stdout, e, catch_backtrace())
-#                 break
-#             else
-#                 rethrow(e)
-#             end
-#         end
-#     end
-#     solution, cost = default_solution(mapf)
-#     return SearchEnv(search_env,cache=mapf.env.cache,route_plan=solution)
-# end
 
 export
     TaskGraphsMILPSolver

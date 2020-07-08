@@ -131,7 +131,8 @@ let
         search_env = construct_search_env(solver,deepcopy(sched),base_search_env)
         pc_mapf = PC_MAPF(search_env)
         path_planner = CBS_Solver(ISPS())
-        solution, cost = solve!(path_planner,pc_mapf)
+        # solution, cost = solve!(path_planner,pc_mapf)
+        solution, cost = CRCBS.cbs!(path_planner,pc_mapf)
         # @show convert_to_vertex_lists(env.route_plan)
     end
     let

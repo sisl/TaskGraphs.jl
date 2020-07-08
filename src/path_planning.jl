@@ -489,6 +489,7 @@ For COLLABORATIVE transport problems
 """
 function CRCBS.build_env(solver, env::E, node::N, schedule_node::TEAM_ACTION, v::Int;kwargs...) where {E<:SearchEnv,N<:ConstraintTreeNode}
     envs = []
+    agent_idxs = Int[]
     starts = Vector{PCCBS.State}()
     meta_cost = MetaCost(Vector{cost_type(env)}(),get_initial_cost(env.env))
     # path_specs = Vector{PathSpec}()
@@ -505,6 +506,7 @@ function CRCBS.build_env(solver, env::E, node::N, schedule_node::TEAM_ACTION, v:
             kwargs...
         ) # TODO need problem_spec here
         push!(envs, cbs_env)
+        push!(agent_idxs, get_id(get_robot_id(sub_node)))
         push!(starts, get_final_state(base_path))
         push!(meta_cost.independent_costs, get_cost(base_path))
     end
@@ -582,7 +584,7 @@ function CRCBS.cbs_update_conflict_table!(solver,mapf::PC_MAPF,node,constraint)
     t0 = max(minimum(search_env.cache.t0), 1) # This is particularly relevant for replanning, where we don't care to look for conflicts way back in the past.
     detect_conflicts!(node.conflict_table,search_env.route_plan,idxs,t0)
 end
-CRCBS.detect_conflicts!(table,env::SearchEnv,args...) = detect_conflicts!(table,env.solution,args...)
+CRCBS.detect_conflicts!(table,env::SearchEnv,args...) = detect_conflicts!(table,env.route_plan,args...)
 
 
 end # PathPlanning module
