@@ -1,45 +1,14 @@
-
-let
-    SolverLogger{Int}()
-    SolverLogger{Float64}()
-    logger = SolverLogger{NTuple{3,Float64}}()
-    iterations(logger)
-    iterations(logger)
-    iteration_limit(logger)
-    start_time(logger)
-    runtime_limit(logger)
-    deadline(logger)
-    CRCBS.lower_bound(logger)
-    best_cost(logger)
-    verbosity(logger)
-    debug(logger)
-    increment_iteration_count!(logger)
-    set_lower_bound!(logger,(0.0,0.0,0.0))
-    set_best_cost!(logger,(0.0,0.0,0.0))
-    reset_solver!(logger)
-end
-let
-    @test (1,0,0,0,0) < 2
-    @test (1,0,0,0,0) <= 1
-    @test (1,0,0,0,0) >= 1
-    @test (1,0,0,0,0) > 0
-
-    @test 2 > (1,0,0,0,0)
-    @test 1 >= (1,0,0,0,0)
-    @test 1 <= (1,0,0,0,0)
-    @test 0 < (1,0,0,0,0)
-end
 # test solver initialization
 let
     AStarSC()
     AStarSC{Int}()
     ISPS()
-    CBS_Solver()
+    CBSSolver()
     TaskGraphsMILPSolver()
     NBSSolver()
     solver = NBSSolver()
-    TaskGraphs.Solvers.best_cost(solver)
-    NBSSolver(TaskGraphsMILPSolver(),CBS_Solver())
+    best_cost(solver)
+    NBSSolver(TaskGraphsMILPSolver(),CBSSolver())
 end
 let
     solver = NBSSolver()
@@ -58,7 +27,7 @@ end
 # in-depth testing of solver stages on a single problem
 let
     # init search env
-    f = initialize_toy_problem_4
+    f = pctapf_problem_4
     cost_model = SumOfMakeSpans()
     project_spec, problem_spec, robot_ICs, _, env_graph = f(;cost_function=cost_model,verbose=false)
     solver = NBSSolver(assignment_model = TaskGraphsMILPSolver(GreedyAssignment()))
@@ -100,8 +69,18 @@ let
         search_env = construct_search_env(solver,deepcopy(sched),base_search_env)
         node = initialize_root_node(search_env)
         path_planner = ISPS()
-        for i in 1:nv(search_env.schedule)
+        @test plan_next_path!(path_planner,node.solution,node)
+        # @test plan_next_path!(path_planner,node.solution,node)
+        # @test plan_next_path!(path_planner,node.solution,node)
+        # @test plan_next_path!(path_planner,node.solution,node)
+        # @test plan_next_path!(path_planner,node.solution,node)
+        # NOTE Weird stream of output here
+        # for i in 1:nv(search_env.schedule)
+        # for i in 1:1
+        while true
+            # @code_warntype plan_next_path!(path_planner,node.solution,node)
             @test plan_next_path!(path_planner,node.solution,node)
+            break
         end
     end
     # Test ISPS
@@ -130,13 +109,14 @@ let
     let
         search_env = construct_search_env(solver,deepcopy(sched),base_search_env)
         pc_mapf = PC_MAPF(search_env)
-        path_planner = CBS_Solver(ISPS())
-        # solution, cost = solve!(path_planner,pc_mapf)
-        solution, cost = CRCBS.cbs!(path_planner,pc_mapf)
-        # @show convert_to_vertex_lists(env.route_plan)
+        path_planner = CBSSolver(ISPS())
+        solution, cost = solve!(path_planner,pc_mapf)
+        # solution, cost = CRCBS.cbs!(path_planner,pc_mapf)
+        # @show convert_to_vertex_lists(solution.route_plan)
     end
     let
-        path_planner = CBS_Solver(ISPS())
+        # NOTE Freezing here
+        path_planner = CBSSolver(ISPS())
         env, cost = plan_route!(path_planner,deepcopy(sched),base_search_env)
         # @show convert_to_vertex_lists(env.route_plan)
     end
@@ -157,14 +137,14 @@ end
 let
     # init search env
     for (i, f) in enumerate([
-        initialize_toy_problem_1,
-        initialize_toy_problem_2,
-        initialize_toy_problem_3,
-        initialize_toy_problem_4,
-        initialize_toy_problem_5,
-        initialize_toy_problem_6,
-        initialize_toy_problem_7,
-        initialize_toy_problem_8,
+        pctapf_problem_1,
+        pctapf_problem_2,
+        pctapf_problem_3,
+        pctapf_problem_4,
+        pctapf_problem_5,
+        pctapf_problem_6,
+        pctapf_problem_7,
+        pctapf_problem_8,
         ])
         for cost_model in [SumOfMakeSpans(), MakeSpan()]
             let
@@ -208,14 +188,14 @@ end
 let
     # init search env
     for (i, f) in enumerate([
-        initialize_toy_problem_1,
-        initialize_toy_problem_2,
-        initialize_toy_problem_3,
-        initialize_toy_problem_4,
-        initialize_toy_problem_5,
-        initialize_toy_problem_6,
-        initialize_toy_problem_7,
-        initialize_toy_problem_8,
+        pctapf_problem_1,
+        pctapf_problem_2,
+        pctapf_problem_3,
+        pctapf_problem_4,
+        pctapf_problem_5,
+        pctapf_problem_6,
+        pctapf_problem_7,
+        pctapf_problem_8,
         ])
         for cost_model in [SumOfMakeSpans(), MakeSpan()]
             let
@@ -272,11 +252,11 @@ end
 let
     cost_model = MakeSpan()
     for (i, (f,expected_cost)) in enumerate([
-        (initialize_toy_problem_1,5),
-        (initialize_toy_problem_2,8),
-        (initialize_toy_problem_3,10),
-        (initialize_toy_problem_4,3),
-        (initialize_toy_problem_5,4),
+        (pctapf_problem_1,5),
+        (pctapf_problem_2,8),
+        (pctapf_problem_3,10),
+        (pctapf_problem_4,3),
+        (pctapf_problem_5,4),
         ])
         for solver in [
                 NBSSolver(assignment_model = TaskGraphsMILPSolver(AssignmentMILP())),
@@ -302,12 +282,12 @@ let
     end
     cost_model = SumOfMakeSpans()
     for (i, (f,expected_cost)) in enumerate([
-        (initialize_toy_problem_1,5),
-        (initialize_toy_problem_2,8),
-        (initialize_toy_problem_3,10),
-        (initialize_toy_problem_4,3),
-        (initialize_toy_problem_5,4),
-        (initialize_toy_problem_8,16),
+        (pctapf_problem_1,5),
+        (pctapf_problem_2,8),
+        (pctapf_problem_3,10),
+        (pctapf_problem_4,3),
+        (pctapf_problem_5,4),
+        (pctapf_problem_8,16),
         ])
         for solver in [
                 NBSSolver(assignment_model = TaskGraphsMILPSolver(AssignmentMILP())),
@@ -336,7 +316,7 @@ end
 let
     solver = NBSSolver()
     cost_model = MakeSpan()
-    project_spec, problem_spec, robot_ICs, _, env_graph = initialize_toy_problem_3(;cost_function=cost_model,verbose=false);
+    project_spec, problem_spec, robot_ICs, _, env_graph = pctapf_problem_3(;cost_function=cost_model,verbose=false);
     project_schedule = construct_partial_project_schedule(project_spec,problem_spec,robot_ICs)
     base_search_env = construct_search_env(
         solver,
@@ -351,11 +331,11 @@ let
 
     env = construct_search_env(solver,project_schedule,base_search_env)
     pc_mapf = PC_MAPF(env)
-    node = initialize_root_node(pc_mapf)
-    low_level_search!(route_planner(solver).low_level_planner,env,node);
+    node = initialize_root_node(solver,pc_mapf)
+    low_level_search!(route_planner(solver),pc_mapf,node)
 
-    path1 = convert_to_vertex_lists(node.solution.paths[1])
-    path2 = convert_to_vertex_lists(node.solution.paths[2])
+    path1 = convert_to_vertex_lists(node.solution.route_plan.paths[1])
+    path2 = convert_to_vertex_lists(node.solution.route_plan.paths[2])
     @test path2[2] == 5 # test that robot 2 will indeed wait for robot 1
     @test path1 == [2, 6, 10, 14, 18, 22, 26, 30, 31, 32, 32]
     @test path2 == [5, 5, 6,  7,  8,  12, 12, 12, 12, 12, 16]
@@ -373,7 +353,7 @@ let
         let
             solver = NBSSolver()
             cost_model=MakeSpan()
-            project_spec, problem_spec, robot_ICs, _, env_graph = initialize_toy_problem_6(;
+            project_spec, problem_spec, robot_ICs, _, env_graph = pctapf_problem_6(;
                 cost_function=cost_model,
                 verbose=false,
                 Δt_op=Δt
@@ -410,7 +390,7 @@ let
     for (Δt_collect_2, true_cost) in zip([0,1,2,3,4],[6,7,8,8,8])
         solver = NBSSolver()
         cost_model = MakeSpan()
-        project_spec, problem_spec, robot_ICs, _, env_graph = initialize_toy_problem_7(;
+        project_spec, problem_spec, robot_ICs, _, env_graph = pctapf_problem_7(;
             cost_function=cost_model,
             verbose=false,
             Δt_op=0,
@@ -438,7 +418,7 @@ end
 let
     cost_model = MakeSpan()
     for (i, (f,expected_cost,expected_paths)) in enumerate([
-        (initialize_toy_problem_11, 6, [
+        (pctapf_problem_11, 6, [
             [2, 2, 6, 10, 14, 13, 9],
             [4, 3, 7, 11, 15, 15, 15],
             [11, 7, 8, 4, 3, 3, 3]

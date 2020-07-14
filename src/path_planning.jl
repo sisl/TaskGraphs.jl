@@ -1,17 +1,17 @@
-module PathPlanning
-
-using Parameters
-using LightGraphs
-using MetaGraphs
-using DataStructures
-using MathOptInterface, JuMP
-using TOML
-using JLD2, FileIO
-
-using GraphUtils
-using CRCBS
-
-using ..TaskGraphs
+# module PathPlanning
+#
+# using Parameters
+# using LightGraphs
+# using MetaGraphs
+# using DataStructures
+# using MathOptInterface, JuMP
+# using TOML
+# using JLD2, FileIO
+#
+# using GraphUtils
+# using CRCBS
+#
+# using ..TaskGraphs
 
 
 export
@@ -60,8 +60,8 @@ function isps_queue_cost(schedule::OperatingSchedule,cache::PlanningCache,v::Int
     return (Int(path_spec.plan_path), minimum(cache.slack[v]))
 end
 
-function initialize_planning_cache(schedule::OperatingSchedule,t0_=zeros(nv(schedule)),tF_=zeros(nv(schedule));kwargs...)
-    t0,tF,slack,local_slack = process_schedule(schedule,t0_,tF_;kwargs...);
+function initialize_planning_cache(schedule::OperatingSchedule,t0_=zeros(nv(schedule)),tF_=zeros(nv(schedule)))
+    t0,tF,slack,local_slack = process_schedule(schedule,t0_,tF_)
     # allowable_slack = map(i->minimum(i),slack) # soft deadline (can be tightened as necessary)
     # allowable_slack = map(i->i==Inf ? typemax(Int) : Int(i), allowable_slack) # initialize deadline at infinity
     cache = PlanningCache(t0=t0,tF=tF,slack=slack,local_slack=local_slack) #,max_deadline=allowable_slack)
@@ -82,7 +82,7 @@ end
     complete)
 """
 function reset_cache!(cache::PlanningCache,schedule::OperatingSchedule,t0=cache.t0,tF=cache.tF)
-    t0,tF,slack,local_slack = process_schedule(schedule,t0=t0,tF=tF)
+    t0,tF,slack,local_slack = process_schedule(schedule,t0,tF)
     cache.t0            .= t0
     cache.tF            .= tF
     cache.slack         .= slack
@@ -136,7 +136,7 @@ for op in [
     @eval CRCBS.$op(env::SearchEnv,args...) = $op(env.route_plan,args...)
 end
 
-initialize_planning_cache(env::SearchEnv) = initialize_planning_cache(env.schedule,t0=env.cache.t0,tF=env.cache.t0)
+initialize_planning_cache(env::SearchEnv) = initialize_planning_cache(env.schedule,deepcopy(env.cache.t0),deepcopy(env.cache.tF))
 # function reverse_propagate_delay!(solver,cache,schedule,delay_vec)
 #     buffer = zeros(nv(schedule))
 #     for v in reverse(topological_sort_by_dfs(get_graph(schedule)))
@@ -344,7 +344,7 @@ function construct_search_env(solver, schedule, problem_spec, env_graph,
         extra_T=400,
         kwargs...
     )
-    cache = initialize_planning_cache(schedule,t0,tF;kwargs...)
+    cache = initialize_planning_cache(schedule,t0,tF)
     N = problem_spec.N                                          # number of robots
     cost_model, heuristic_model = construct_cost_model(
         solver, schedule, cache, problem_spec, env_graph, primary_objective;
@@ -587,4 +587,4 @@ end
 CRCBS.detect_conflicts!(table,env::SearchEnv,args...) = detect_conflicts!(table,env.route_plan,args...)
 
 
-end # PathPlanning module
+# end # PathPlanning module

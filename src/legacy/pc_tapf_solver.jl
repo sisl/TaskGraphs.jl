@@ -31,7 +31,7 @@ end
 end
 struct DFS_PathFinder <: AbstractPathFinderModel end
 
-@with_kw mutable struct PC_TAPF_Solver{M,C,I,A,T} <: AbstractMAPFSolver
+@with_kw mutable struct PC_TAPF_Solver{M,C,I,A,T} 
     # TODO parameterize by MILP Solver, CBS solver, ISPS solver, A_star solver
     nbs_model                   ::M = SparseAdjacencyMILP()
     cbs_model                   ::C = DefaultCBSModel()

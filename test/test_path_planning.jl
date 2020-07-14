@@ -1,6 +1,6 @@
 # test SearchEnv
 let
-    project_spec, problem_spec, robot_ICs, _, env_graph = initialize_toy_problem_4()
+    project_spec, problem_spec, robot_ICs, _, env_graph = pctapf_problem_4()
     solver = NBSSolver()
     project_schedule = construct_partial_project_schedule(
         project_spec,
@@ -85,7 +85,7 @@ end
 # # Test prioritized dfs planner
 # let
 #     cost_model = MakeSpan
-#     project_spec, problem_spec, robot_ICs, _, env_graph = initialize_toy_problem_1(;verbose=false);
+#     project_spec, problem_spec, robot_ICs, _, env_graph = pctapf_problem_1(;verbose=false);
 #
 #     milp_model = SparseAdjacencyMILP()
 #     # milp_model = GreedyAssignment()
@@ -179,7 +179,7 @@ end
 # end
 # let
 #     cost_model = MakeSpan
-#     project_spec, problem_spec, robot_ICs, _, env_graph = initialize_toy_problem_4(;verbose=false);
+#     project_spec, problem_spec, robot_ICs, _, env_graph = pctapf_problem_4(;verbose=false);
 #
 #     milp_model = SparseAdjacencyMILP()
 #     # milp_model = GreedyAssignment()
@@ -220,7 +220,7 @@ end
 # end
 # let
 #     cost_model = MakeSpan
-#     project_spec, problem_spec, robot_ICs, _, env_graph = initialize_toy_problem_3(;verbose=false);
+#     project_spec, problem_spec, robot_ICs, _, env_graph = pctapf_problem_3(;verbose=false);
 #
 #     milp_model = SparseAdjacencyMILP()
 #     # milp_model = GreedyAssignment()
@@ -266,14 +266,14 @@ end
 #
 #     cost_model = MakeSpan
 #     for (i, f) in enumerate([
-#                 initialize_toy_problem_1,
-#                 initialize_toy_problem_2,
-#                 initialize_toy_problem_3,
-#                 initialize_toy_problem_4,
-#                 initialize_toy_problem_5,
-#                 initialize_toy_problem_6,
-#                 initialize_toy_problem_7,
-#                 initialize_toy_problem_8,
+#                 pctapf_problem_1,
+#                 pctapf_problem_2,
+#                 pctapf_problem_3,
+#                 pctapf_problem_4,
+#                 pctapf_problem_5,
+#                 pctapf_problem_6,
+#                 pctapf_problem_7,
+#                 pctapf_problem_8,
 #             ])
 #         project_spec, problem_spec, robot_ICs, _, env_graph = f(;verbose=false);
 #         milp_model = GreedyAssignment()

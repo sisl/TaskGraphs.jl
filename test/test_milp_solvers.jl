@@ -3,14 +3,14 @@
 let
 
     for (i, f) in enumerate([
-        initialize_toy_problem_1,
-        initialize_toy_problem_2,
-        initialize_toy_problem_3,
-        initialize_toy_problem_4,
-        initialize_toy_problem_5,
-        initialize_toy_problem_6,
-        initialize_toy_problem_7,
-        initialize_toy_problem_8,
+        pctapf_problem_1,
+        pctapf_problem_2,
+        pctapf_problem_3,
+        pctapf_problem_4,
+        pctapf_problem_5,
+        pctapf_problem_6,
+        pctapf_problem_7,
+        pctapf_problem_8,
     ])
         for cost_model in [MakeSpan(), SumOfMakeSpans()]
             costs = Float64[]
@@ -61,8 +61,8 @@ end
 let
 
     for (f, costs) in [
-        (initialize_toy_problem_4, [2, 2]),
-        (initialize_toy_problem_8, [8, 16]),
+        (pctapf_problem_4, [2, 2]),
+        (pctapf_problem_8, [8, 16]),
     ]
         for milp_model in [AssignmentMILP(), SparseAdjacencyMILP()]
             for (i, cost_model) in enumerate([MakeSpan(), SumOfMakeSpans()])
@@ -109,7 +109,7 @@ let
                     problem_spec,
                     robot_ICs,
                     _,
-                    env_graph = initialize_toy_problem_9(
+                    env_graph = pctapf_problem_9(
                         ;
                         cost_function = cost_model,
                         verbose = false,
@@ -141,7 +141,7 @@ let
 end
 # Job shop constraints
 let
-    project_spec, problem_spec, robot_ICs, _, env_graph = initialize_toy_problem_9(;
+    project_spec, problem_spec, robot_ICs, _, env_graph = pctapf_problem_9(;
         verbose=false,Δt_op=0,Δt_collect=[0,0],Δt_deliver=[0,0]
         );
     cost_model=SumOfMakeSpans()

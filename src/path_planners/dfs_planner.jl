@@ -1,12 +1,12 @@
-module DFSPlanner
-
-using Parameters
-using LightGraphs
-using DataStructures
-using JLD2, FileIO
-using CRCBS
-
-using ..TaskGraphs
+# module DFSPlanner
+#
+# using Parameters
+# using LightGraphs
+# using DataStructures
+# using JLD2, FileIO
+# using CRCBS
+#
+# using ..TaskGraphs
 
 export
     DFSRoutePlanner
@@ -24,7 +24,7 @@ function construct_heuristic_model(solver::DFSRoutePlanner,env_graph;
         kwargs...)
     construct_composite_heuristic(ph,ph,NullHeuristic())
 end
-function TaskGraphs.construct_cost_model(solver::DFSRoutePlanner,
+function construct_cost_model(solver::DFSRoutePlanner,
         schedule, cache, problem_spec, env_graph;
         extra_T=400, primary_objective=SumOfMakeSpans(), kwargs...)
     cost_model = construct_composite_cost_model(
@@ -407,4 +407,4 @@ function CRCBS.solve!(
     return route_plan, search_env.cache, cost
 end
 
-end
+# end

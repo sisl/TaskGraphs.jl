@@ -162,7 +162,7 @@ let
 end
 # Test process_schedule
 let
-    project_spec, problem_spec, robot_ICs, _, env_graph = initialize_toy_problem_1()
+    project_spec, problem_spec, robot_ICs, _, env_graph = pctapf_problem_1()
 
     project_schedule = construct_partial_project_schedule(project_spec,problem_spec,robot_ICs)
     model = formulate_milp(AssignmentMILP(),project_schedule,problem_spec;cost_model=MakeSpan())
@@ -176,7 +176,7 @@ let
     @test t0[get_vtx(project_schedule,RobotID(2))] == 0
     # try with perturbed start times
     t0[get_vtx(project_schedule,RobotID(2))] = 1
-    t0,tF,slack,local_slack = process_schedule(project_schedule;t0=t0)
+    t0,tF,slack,local_slack = process_schedule(project_schedule,t0)
     @test t0[get_vtx(project_schedule,RobotID(1))] == 0
     @test t0[get_vtx(project_schedule,RobotID(2))] == 1
 
@@ -186,7 +186,7 @@ let
     end
 end
 let
-    project_spec, problem_spec, robot_ICs, _, env_graph = initialize_toy_problem_1()
+    project_spec, problem_spec, robot_ICs, _, env_graph = pctapf_problem_1()
 
     filename = "/tmp/project_spec.toml"
     open(filename, "w") do io

@@ -6,8 +6,12 @@ using LightGraphs, MetaGraphs
 using GraphUtils
 using LinearAlgebra
 using DataStructures
-using JuMP
+using JuMP, MathOptInterface
+using Gurobi
 using TOML
+using CRCBS
+using SparseArrays
+using JLD2, FileIO
 
 export
     DEBUG_PATH,
@@ -30,19 +34,19 @@ include("planning_predicates.jl")
 @reexport using TaskGraphs.PlanningPredicates
 include("pccbs.jl")
 include("task_graphs_core.jl")
-@reexport using TaskGraphs.TaskGraphsCore
+# @reexport using TaskGraphs.TaskGraphsCore
 include("utils.jl")
-@reexport using TaskGraphs.TaskGraphsUtils
+# @reexport using TaskGraphs.TaskGraphsUtils
 include("path_planning.jl")
-@reexport using TaskGraphs.PathPlanning
+# @reexport using TaskGraphs.PathPlanning
 include("pc_tapf_solvers.jl")
-@reexport using TaskGraphs.Solvers
+# @reexport using TaskGraphs.Solvers
 include("path_planners/dfs_planner.jl")
-@reexport using TaskGraphs.DFSPlanner
+# @reexport using TaskGraphs.DFSPlanner
 include("replanning.jl")
-@reexport using TaskGraphs.Replanning
+# @reexport using TaskGraphs.Replanning
 include("helpers.jl")
-@reexport using TaskGraphs.Helpers
+# @reexport using TaskGraphs.Helpers
 include("profiling.jl")
 @reexport using TaskGraphs.SolverProfiling
 

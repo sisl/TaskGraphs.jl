@@ -17,7 +17,7 @@ include(joinpath(pathof(TaskGraphs),"../..","test/notebooks/render_tools.jl"))
 # for f in *.svg; do inkscape -z $f -e $f.png; done
 
 let
-    project_spec, problem_spec, robot_ICs, assignments, env_graph = initialize_toy_problem_1(;verbose=false);
+    project_spec, problem_spec, robot_ICs, assignments, env_graph = pctapf_problem_1(;verbose=false);
     project_schedule = construct_partial_project_schedule(
         project_spec,
         problem_spec,
@@ -29,7 +29,7 @@ end
 
 # Backtracking motivating example
 let
-    f = initialize_toy_problem_10
+    f = pctapf_problem_10
     cost_model = MakeSpan
     project_spec, problem_spec, robot_ICs, assignments, env_graph = f(;cost_function=cost_model,verbose=true)
     solver = PC_TAPF_Solver(nbs_model=AssignmentMILP(),l1_verbosity=2,l2_verbosity=2,l3_verbosity=0)
@@ -644,17 +644,17 @@ end
 let
 
     i = 1
-    f = initialize_toy_problem_1
+    f = pctapf_problem_1
     cost_model = MakeSpan
     for (i, f) in enumerate([
-                initialize_toy_problem_1,
-                initialize_toy_problem_2,
-                initialize_toy_problem_3,
-                initialize_toy_problem_4,
-                initialize_toy_problem_5,
-                initialize_toy_problem_6,
-                initialize_toy_problem_7,
-                initialize_toy_problem_8,
+                pctapf_problem_1,
+                pctapf_problem_2,
+                pctapf_problem_3,
+                pctapf_problem_4,
+                pctapf_problem_5,
+                pctapf_problem_6,
+                pctapf_problem_7,
+                pctapf_problem_8,
             ])
         project_spec, problem_spec, robot_ICs, assignments, env_graph = f(;verbose=false);
         milp_model = GreedyAssignment()
@@ -765,7 +765,7 @@ end
 let
 
     # init env
-    project_spec, problem_spec, robot_ICs, assignments, env_graph = initialize_toy_problem_3(;verbose=false);
+    project_spec, problem_spec, robot_ICs, assignments, env_graph = pctapf_problem_3(;verbose=false);
     primary_objective=MakeSpan
     # define solver
     solver = PC_TAPF_Solver()

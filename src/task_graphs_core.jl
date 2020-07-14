@@ -1,18 +1,16 @@
-module TaskGraphsCore
+# module TaskGraphsCore
 
-using Parameters
-using LightGraphs, MetaGraphs
-using GraphUtils
-using DataStructures
-using JuMP
-using Gurobi
-using TOML
-using CRCBS
-using SparseArrays
-
-# using ..PlanningPredicates
-# using ..FactoryWorlds
-using ..TaskGraphs
+# using Parameters
+# using LightGraphs, MetaGraphs
+# using GraphUtils
+# using DataStructures
+# using JuMP
+# using Gurobi
+# using TOML
+# using CRCBS
+# using SparseArrays
+#
+# using ..TaskGraphs
 
 function TOML.print(io,dict::Dict{Symbol,A}) where {A}
     TOML.print(io,Dict(string(k)=>v for (k,v) in dict))
@@ -27,15 +25,6 @@ get_debug_file_id() = Int(global DEBUG_ID_COUNTER += 1)
 function reset_debug_file_id!()
     global DEBUG_ID_COUNTER = 0
 end
-
-# export
-#     EnvironmentState
-#
-# @with_kw struct EnvironmentState
-#     robot_states::Vector{ROBOT_AT}      = Vector{ROBOT_AT}()
-#     object_states::Vector{OBJECT_AT}    = Vector{OBJECT_AT}()
-#     object_id_map::Dict{ObjectID,Int}   = Dict{ObjectID,Int}(get_object_id(o)=>i for (i,o) in enumerate(object_states))
-# end
 
 export
     ProblemSpec
@@ -476,13 +465,13 @@ for op in [
     @eval LightGraphs.$op(sched::OperatingSchedule,args...) = $op(sched.graph,args...)
 end
 
-get_graph(schedule::P) where {P<:OperatingSchedule}       = schedule.graph
+CRCBS.get_graph(schedule::P) where {P<:OperatingSchedule}       = schedule.graph
 get_vtx_ids(schedule::P) where {P<:OperatingSchedule}     = schedule.vtx_ids
 get_root_nodes(schedule::P) where {P<:OperatingSchedule}  = schedule.root_nodes
 get_root_node_weights(schedule::P) where {P<:OperatingSchedule}  = schedule.weights
 
 get_node_from_id(schedule::P,id::A) where {P<:OperatingSchedule,A<:AbstractID}= schedule.planning_nodes[id]
-get_vtx(schedule::P,id::A) where {P<:OperatingSchedule,A<:AbstractID}         = get(schedule.vtx_map, id, -1)
+CRCBS.get_vtx(schedule::P,id::A) where {P<:OperatingSchedule,A<:AbstractID}         = get(schedule.vtx_map, id, -1)
 get_vtx_id(schedule::P,v::Int) where {P<:OperatingSchedule}                   = schedule.vtx_ids[v]
 get_node_from_vtx(schedule::P,v::Int) where {P<:OperatingSchedule}= schedule.planning_nodes[schedule.vtx_ids[v]]
 
@@ -1262,8 +1251,7 @@ with each vertex in the `schedule`. Slack for each vertex is represented as
 a vector in order to handle multi-headed projects.
 """
 function process_schedule(schedule::P,t0=zeros(Int,nv(schedule)),
-        tF=zeros(Int,nv(schedule));
-        kwargs...
+        tF=zeros(Int,nv(schedule))
     ) where {P<:OperatingSchedule}
 
     G = get_graph(schedule)
@@ -2525,4 +2513,4 @@ end
 # end
 
 
-end # module TaskGraphCore
+# end # module TaskGraphCore

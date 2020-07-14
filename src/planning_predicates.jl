@@ -2,7 +2,6 @@ module PlanningPredicates
 
 using Parameters
 
-
 export
     reset_task_id_counter!,
     get_unique_task_id,

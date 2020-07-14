@@ -1,12 +1,12 @@
-module Solvers
-
-using Parameters
-using MathOptInterface, JuMP
-using GraphUtils
-using DataStructures
-
-using CRCBS
-using ..TaskGraphs
+# module Solvers
+#
+# using Parameters
+# using MathOptInterface, JuMP
+# using GraphUtils
+# using DataStructures
+#
+# using CRCBS
+# using ..TaskGraphs
 
 """
     AbstractPCTAPFSolver
@@ -28,9 +28,9 @@ struct Prioritized <: SearchTrait end
 struct NonPrioritized <: SearchTrait end
 function search_trait end
 
-get_primary_cost(::NonPrioritized,model,cost) = cost[1]
-get_primary_cost(::Prioritized,model,cost) = cost[2]
-get_primary_cost(solver,cost) = get_primary_cost(search_trait(solver),solver,cost)
+# get_primary_cost(::NonPrioritized,model,cost) = cost[1]
+# get_primary_cost(::Prioritized,model,cost) = cost[2]
+# get_primary_cost(solver,cost) = get_primary_cost(search_trait(solver),solver,cost)
 
 primary_cost(solver,cost) = cost[1]
 primary_cost_type(solver) = Float64
@@ -102,12 +102,12 @@ primary_cost(::PrioritizedAStarSC,cost::NTuple{5,Float64}) = cost[2]
 
 Construct the heuristic model to be used by solver.
 """
-function TaskGraphs.construct_heuristic_model(trait::NonPrioritized,solver,env_graph;
+function construct_heuristic_model(trait::NonPrioritized,solver,env_graph;
         ph = PerfectHeuristic(get_dist_matrix(env_graph)),
         kwargs...)
     construct_composite_heuristic(ph,NullHeuristic(),ph,ph,NullHeuristic())
 end
-function TaskGraphs.construct_heuristic_model(trait::Prioritized,args...;kwargs...)
+function construct_heuristic_model(trait::Prioritized,args...;kwargs...)
     h = construct_heuristic_model(NonPrioritized(),args...;kwargs...)
     construct_composite_heuristic(
         h.cost_models[2],
@@ -115,7 +115,7 @@ function TaskGraphs.construct_heuristic_model(trait::Prioritized,args...;kwargs.
         h.cost_models[3:end]...
     )
 end
-function TaskGraphs.construct_heuristic_model(solver, args...;kwargs...)
+function construct_heuristic_model(solver, args...;kwargs...)
     construct_heuristic_model(search_trait(solver),solver,args...;kwargs...)
 end
 
@@ -131,7 +131,7 @@ because it encourages depth first search. If we were to replace terms 3-5 with
 SumOfTravelTime(), we would get worst-case exponentially slow breadth-first
 search!
 """
-function TaskGraphs.construct_cost_model(trait::NonPrioritized,
+function construct_cost_model(trait::NonPrioritized,
         solver, schedule, cache, problem_spec, env_graph, primary_objective=SumOfMakeSpans();
         extra_T::Int=400)
     N = problem_spec.N
@@ -145,7 +145,7 @@ function TaskGraphs.construct_cost_model(trait::NonPrioritized,
     heuristic_model = construct_heuristic_model(trait,solver,env_graph)
     cost_model, heuristic_model
 end
-function TaskGraphs.construct_cost_model(trait::SearchTrait,
+function construct_cost_model(trait::SearchTrait,
         solver, env::SearchEnv,
         primary_objective=env.problem_spec.cost_function
         ;
@@ -154,7 +154,7 @@ function TaskGraphs.construct_cost_model(trait::SearchTrait,
         env.schedule, env.cache, env.problem_spec, env.env.graph,
         primary_objective;kwargs...)
 end
-function TaskGraphs.construct_cost_model(trait::Prioritized,args...;kwargs...)
+function construct_cost_model(trait::Prioritized,args...;kwargs...)
     c, h = construct_cost_model(NonPrioritized(),args...;kwargs...)
     # switch the first two elements of the cost and heuristic models
     cost_model = construct_composite_cost_model(
@@ -169,7 +169,7 @@ function TaskGraphs.construct_cost_model(trait::Prioritized,args...;kwargs...)
     )
     cost_model, heuristic
 end
-function TaskGraphs.construct_cost_model(solver, args...;kwargs...)
+function construct_cost_model(solver, args...;kwargs...)
     construct_cost_model(search_trait(solver),solver,args...;kwargs...)
 end
 
@@ -288,7 +288,7 @@ Path planner that employs Incremental Slack-Prioritized Search.
     )
 end
 ISPS(planner) = ISPS(low_level_planner=planner)
-TaskGraphs.construct_cost_model(solver::ISPS,args...;kwargs...) = construct_cost_model(low_level(solver),args...;kwargs...)
+construct_cost_model(solver::ISPS,args...;kwargs...) = construct_cost_model(low_level(solver),args...;kwargs...)
 search_trait(solver::ISPS) = search_trait(low_level(solver))
 primary_cost(solver::ISPS,cost) = primary_cost(low_level(solver),cost)
 primary_cost_type(solver::ISPS) = primary_cost_type(low_level(solver))
@@ -307,24 +307,19 @@ export
 """
     `plan_next_path`
 """
-function plan_next_path!(solver::ISPS, env::SearchEnv, node::N;
-        kwargs...
+function plan_next_path!(solver::ISPS, env::SearchEnv, node::N
         ) where {N<:ConstraintTreeNode}
 
     valid_flag = true
-    if length(env.cache.node_queue) > 0
+    if ~isempty(env.cache.node_queue)
         v,priority = dequeue_pair!(env.cache.node_queue)
         node_id = get_vtx_id(env.schedule,v)
         schedule_node = get_node_from_id(env.schedule,node_id)
-        # log_info(1,solver,"ISPS: dequeuing v = ",v," - ",string(schedule_node)," with priority ",priority)
-        # step_low_level!(solver,schedule_node,env.cache.t0[v],env.cache.tF[v],get_path_spec(env.schedule, v).plan_path)
         if get_path_spec(env.schedule, v).plan_path == true
-            # enter_a_star!(solver)
             try
                 valid_flag = plan_path!(low_level(solver),env,node,schedule_node,v)
             catch e
                 if isa(e, SolverException)
-                    # log_info(-1, solver, e.msg)
                     showerror(stdout, e, catch_backtrace())
                     valid_flag = false
                     return valid_flag
@@ -333,16 +328,13 @@ function plan_next_path!(solver::ISPS, env::SearchEnv, node::N;
                 end
             end
         else
-            # enter_a_star!(solver)
-            # dummy path
+            # dummy path - update planning cache only
             path = Path{PCCBS.State,PCCBS.Action,cost_type(env.env)}(
                 s0=PCCBS.State(-1, -1),
                 cost=get_initial_cost(env.env)
                 )
-            # update planning cache only
             update_planning_cache!(solver,env,v,path) # NOTE I think this is all we need, since there is no actual path to update
         end
-        # exit_a_star!(solver)
     end
     return valid_flag
 end
@@ -363,8 +355,6 @@ function CRCBS.low_level_search!(solver::ISPS, node::N, env::SearchEnv=node.solu
         # @show convert_to_vertex_lists(env.route_plan)
         enforce_time_limit(solver)
     end
-    # log_info(0,solver,"LOW_LEVEL_SEARCH: Returning consistent route plan with cost ", get_cost(node.solution))
-    # log_info(1,solver,"LOW_LEVEL_SEARCH: max path length = ", maximum(map(p->length(p), convert_to_vertex_lists(node.solution))))
     return true
 end
 
@@ -373,8 +363,7 @@ end
 """
 function CRCBS.low_level_search!(solver::ISPS, pc_mapf::M,
         node::N=initialize_root_node(solver,pc_mapf),
-        idxs::Vector{Int}=Vector{Int}();
-        kwargs...
+        idxs::Vector{Int}=Vector{Int}()
     ) where {M<:PC_MAPF,N<:ConstraintTreeNode}
 
     # enter_low_level!(solver)
@@ -413,8 +402,8 @@ function CRCBS.low_level_search!(solver::ISPS, pc_mapf::M,
     # return search_env, valid_flag
     return valid_flag
 end
-function CRCBS.low_level_search!(solver::CBS_Solver, pc_mapf::PC_MAPF,node::ConstraintTreeNode,args...;kwargs...)
-    low_level_search!(low_level(solver),pc_mapf,node,args...;kwargs...)
+function CRCBS.low_level_search!(solver::CBSSolver, pc_mapf::PC_MAPF,node::ConstraintTreeNode,args...;kwargs...)
+    low_level_search!(low_level(solver),pc_mapf,node,args...)
 end
 
 """
@@ -429,11 +418,11 @@ function CRCBS.solve!(solver::ISPS,pc_mapf::PC_MAPF)
     return node.solution, get_cost(node.solution)
 end
 
-TaskGraphs.construct_cost_model(solver::CBS_Solver,args...;kwargs...) = construct_cost_model(low_level(solver),args...;kwargs...)
-search_trait(solver::CBS_Solver) = search_trait(low_level(solver))
-primary_cost(solver::CBS_Solver,cost) = primary_cost(low_level(solver),cost)
-primary_cost_type(solver::CBS_Solver) = primary_cost_type(low_level(solver))
-CRCBS.solve!(solver::CBS_Solver,pc_mapf::PC_MAPF) = CRCBS.cbs!(solver,pc_mapf)
+construct_cost_model(solver::CBSSolver,args...;kwargs...) = construct_cost_model(low_level(solver),args...;kwargs...)
+search_trait(solver::CBSSolver) = search_trait(low_level(solver))
+primary_cost(solver::CBSSolver,cost) = primary_cost(low_level(solver),cost)
+primary_cost_type(solver::CBSSolver) = primary_cost_type(low_level(solver))
+CRCBS.solve!(solver::CBSSolver,pc_mapf::PC_MAPF) = CRCBS.cbs!(solver,pc_mapf)
 
 export
     TaskGraphsMILPSolver
@@ -448,9 +437,9 @@ Wrapper for MILP solver for assignment problem.
     logger::SolverLogger{C} = SolverLogger{Int}()
 end
 TaskGraphsMILPSolver(milp) = TaskGraphsMILPSolver(milp,SolverLogger{Int}())
-TaskGraphs.get_assignment_matrix(solver::TaskGraphsMILPSolver) = get_assignment_matrix(solver.milp)
+get_assignment_matrix(solver::TaskGraphsMILPSolver) = get_assignment_matrix(solver.milp)
 
-function TaskGraphs.formulate_milp(solver::TaskGraphsMILPSolver,args...;kwargs...)
+function formulate_milp(solver::TaskGraphsMILPSolver,args...;kwargs...)
     formulate_milp(solver.milp,args...;kwargs...)
 end
 
@@ -475,13 +464,13 @@ The input to the route planner is the PC-TAPF problem spec along with the
 """
 @with_kw struct NBSSolver{A,P,C} <: AbstractPCTAPFSolver
     assignment_model::A     = TaskGraphsMILPSolver()
-    path_planner    ::P     = CBS_Solver(ISPS())
+    path_planner    ::P     = CBSSolver(ISPS())
     logger          ::SolverLogger{C} = SolverLogger{primary_cost_type(path_planner)}()
 end
 NBSSolver(a,b) = NBSSolver(assignment_model=a,path_planner=b)
 assignment_solver(solver::NBSSolver) = solver.assignment_model
 route_planner(solver::NBSSolver) = solver.path_planner
-TaskGraphs.construct_cost_model(solver::NBSSolver,args...;kwargs...) = construct_cost_model(route_planner(solver),args...;kwargs...)
+construct_cost_model(solver::NBSSolver,args...;kwargs...) = construct_cost_model(route_planner(solver),args...;kwargs...)
 search_trait(solver::NBSSolver) = search_trait(route_planner(solver))
 primary_cost(solver::NBSSolver,cost) = primary_cost(route_planner(solver),cost)
 primary_cost_type(solver::NBSSolver) = primary_cost_type(route_planner(solver))
@@ -667,4 +656,4 @@ function plan_route!(
     solution, primary_cost(solver,get_cost(solution))
 end
 
-end
+# end

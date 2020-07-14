@@ -1,6 +1,6 @@
 # Freeze assignments
 let
-    project_spec, problem_spec, robot_ICs, _, env_graph = initialize_toy_problem_6(;
+    project_spec, problem_spec, robot_ICs, _, env_graph = pctapf_problem_6(;
         verbose=false);
     cost_model = SumOfMakeSpans()
     solver = NBSSolver()
@@ -20,7 +20,7 @@ let
 
     replan_model = MergeAndBalance()
 
-    new_proj_spec, _, _, _, _ = initialize_toy_problem_1(;verbose=false)
+    new_proj_spec, _, _, _, _ = pctapf_problem_1(;verbose=false)
 
 
     request = Replanning.ProjectRequest(
@@ -55,7 +55,7 @@ let
 end
 # Test partial project schedule
 let
-    project_spec, problem_spec, robot_ICs, assignments, env_graph = initialize_toy_problem_6(;
+    project_spec, problem_spec, robot_ICs, assignments, env_graph = pctapf_problem_6(;
         verbose=false);
     # construct a partial project schedule
     construct_partial_project_schedule(project_spec, problem_spec, robot_ICs)

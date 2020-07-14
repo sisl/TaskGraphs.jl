@@ -1,25 +1,25 @@
-module Helpers
-
-using LightGraphs
-using MetaGraphs
-using GraphUtils
-using CRCBS
-
-# using ..PlanningPredicates
-# using ..TaskGraphsCore
-# using ..TaskGraphsUtils
-using ..TaskGraphs
+# module Helpers
+#
+# using LightGraphs
+# using MetaGraphs
+# using GraphUtils
+# using CRCBS
+#
+# # using ..PlanningPredicates
+# # using ..TaskGraphsCore
+# # using ..TaskGraphsUtils
+# using ..TaskGraphs
 
 export
-    initialize_toy_problem,
-    initialize_toy_problem_1,
-    initialize_toy_problem_2,
-    initialize_toy_problem_3,
-    initialize_toy_problem_4,
-    initialize_toy_problem_5,
-    initialize_toy_problem_6,
-    initialize_toy_problem_7,
-    initialize_toy_problem_8
+    pctapf_problem,
+    pctapf_problem_1,
+    pctapf_problem_2,
+    pctapf_problem_3,
+    pctapf_problem_4,
+    pctapf_problem_5,
+    pctapf_problem_6,
+    pctapf_problem_7,
+    pctapf_problem_8
 
 function get_zero_initial_conditions(G,N)
     # set initial conditions
@@ -49,7 +49,7 @@ function print_toy_problem_specs(prob_name,vtx_grid,r0,s0,sF,project_spec,delive
     print("\n\n")
 end
 
-function initialize_toy_problem(r0,s0,sF)
+function pctapf_problem(r0,s0,sF)
     N = length(r0)
     M = length(s0)
     object_ICs = Vector{OBJECT_AT}([OBJECT_AT(o,s0[o]) for o in 1:M]) # initial_conditions
@@ -69,12 +69,12 @@ end
 
 # This is a place to put reusable problem initializers for testing
 """
-    initialize_toy_problem_1
+    pctapf_problem_1
 
 Optimal MakeSpan = 5
 Optimal SumOfMakeSpans = 5
 """
-function initialize_toy_problem_1(;cost_function=SumOfMakeSpans(),verbose=false)
+function pctapf_problem_1(;cost_function=SumOfMakeSpans(),verbose=false)
     N = 2                  # num robots
     M = 3                  # num delivery tasks
     vtx_grid = initialize_dense_vtx_grid(4,4)
@@ -88,7 +88,7 @@ function initialize_toy_problem_1(;cost_function=SumOfMakeSpans(),verbose=false)
     env_graph = construct_factory_env_from_vtx_grid(
         vtx_grid;
     )
-    project_spec, robot_ICs = initialize_toy_problem(r0,s0,sF)
+    project_spec, robot_ICs = pctapf_problem(r0,s0,sF)
 
     add_operation!(project_spec,construct_operation(project_spec,-1,[1,2],[3],0))
     add_operation!(project_spec,construct_operation(project_spec,-1,[3],  [], 0))
@@ -119,7 +119,7 @@ end
     Optimal MakeSpan = 8
     Optimal SumOfMakeSpans = 8
 """
-function initialize_toy_problem_2(;cost_function=SumOfMakeSpans(),verbose=false)
+function pctapf_problem_2(;cost_function=SumOfMakeSpans(),verbose=false)
     N = 2                  # num robots
     M = 3                  # num delivery tasks
     vtx_grid = initialize_dense_vtx_grid(8,4)
@@ -137,7 +137,7 @@ function initialize_toy_problem_2(;cost_function=SumOfMakeSpans(),verbose=false)
     env_graph = construct_factory_env_from_vtx_grid(
         vtx_grid;
     )
-    project_spec, robot_ICs = initialize_toy_problem(r0,s0,sF)
+    project_spec, robot_ICs = pctapf_problem(r0,s0,sF)
 
     add_operation!(project_spec,construct_operation(project_spec,-1,[1,2],[3],0))
     add_operation!(project_spec,construct_operation(project_spec,-1,[3],  [], 0))
@@ -175,7 +175,7 @@ end
     Third operation:
         robot 2 does [8-12-16]
 """
-function initialize_toy_problem_3(;cost_function=SumOfMakeSpans(),verbose=false,Δt_op=0,Δt_collect=[0,0,0,0],Δt_deliver=[0,0,0,0])
+function pctapf_problem_3(;cost_function=SumOfMakeSpans(),verbose=false,Δt_op=0,Δt_collect=[0,0,0,0],Δt_deliver=[0,0,0,0])
     N = 2                  # num robots
     M = 4                  # num delivery tasks
     vtx_grid = initialize_dense_vtx_grid(8,4)
@@ -193,7 +193,7 @@ function initialize_toy_problem_3(;cost_function=SumOfMakeSpans(),verbose=false,
     env_graph = construct_factory_env_from_vtx_grid(
         vtx_grid;
     )
-    project_spec, robot_ICs = initialize_toy_problem(r0,s0,sF)
+    project_spec, robot_ICs = pctapf_problem(r0,s0,sF)
 
     add_operation!(project_spec,construct_operation(project_spec,-1,[1],[2],0.0))
     add_operation!(project_spec,construct_operation(project_spec,-1,[2,3],[4],0.0))
@@ -234,7 +234,7 @@ end
         robot 1 does [2-2-8]
         robot 2 does [4-4-6]
 """
-function initialize_toy_problem_4(;cost_function=SumOfMakeSpans(),verbose=false)
+function pctapf_problem_4(;cost_function=SumOfMakeSpans(),verbose=false)
     N = 2                  # num robots
     M = 2                  # num delivery tasks
     vtx_grid = initialize_dense_vtx_grid(3,3)
@@ -248,7 +248,7 @@ function initialize_toy_problem_4(;cost_function=SumOfMakeSpans(),verbose=false)
         vtx_grid;
     )
 
-    project_spec, robot_ICs = initialize_toy_problem(r0,s0,sF)
+    project_spec, robot_ICs = pctapf_problem(r0,s0,sF)
     add_operation!(project_spec,construct_operation(project_spec,-1,[1,2],[],0))
     assignment_dict = Dict(1=>[1],2=>[2])
 
@@ -289,7 +289,7 @@ end
         robot 1 does [3-11]
         robot 2 does [15-7]
 """
-function initialize_toy_problem_5(;cost_function=SumOfMakeSpans(),verbose=false)
+function pctapf_problem_5(;cost_function=SumOfMakeSpans(),verbose=false)
     N = 2                  # num robots
     M = 2                  # num delivery tasks
     vtx_grid = initialize_dense_vtx_grid(4,4)
@@ -304,7 +304,7 @@ function initialize_toy_problem_5(;cost_function=SumOfMakeSpans(),verbose=false)
         vtx_grid;
     )
 
-    project_spec, robot_ICs = initialize_toy_problem(r0,s0,sF)
+    project_spec, robot_ICs = pctapf_problem(r0,s0,sF)
     add_operation!(project_spec,construct_operation(project_spec,-1,[1,2],[],0))
     assignment_dict = Dict(1=>[1],2=>[2])
 
@@ -337,7 +337,7 @@ end
     robot 2 will do [4-8-32]. The key thing is that robot 1 will need to wait
     until robot 2 is finished before robot 1 can do its second task
 """
-function initialize_toy_problem_6(;cost_function=SumOfMakeSpans(),verbose=false,Δt_op=1,Δt_collect=[0,0,0],Δt_deliver=[0,0,0])
+function pctapf_problem_6(;cost_function=SumOfMakeSpans(),verbose=false,Δt_op=1,Δt_collect=[0,0,0],Δt_deliver=[0,0,0])
     N = 2                  # num robots
     M = 3                  # num delivery tasks
     vtx_grid = initialize_dense_vtx_grid(8,4)
@@ -356,7 +356,7 @@ function initialize_toy_problem_6(;cost_function=SumOfMakeSpans(),verbose=false,
         vtx_grid;
     )
 
-    project_spec, robot_ICs = initialize_toy_problem(r0,s0,sF)
+    project_spec, robot_ICs = pctapf_problem(r0,s0,sF)
     add_operation!(project_spec,construct_operation(project_spec,-1,[1,2],[3],Δt_op))
     add_operation!(project_spec,construct_operation(project_spec,-1,[3],  [], Δt_op))
     assignment_dict = Dict(1=>[1,3],2=>[2])
@@ -376,7 +376,7 @@ end
     Robot 2 will have to sit and wait at the pickup station, meaning that robot 1 will have to go around
     if robot 2 is on the critical path
 """
-function initialize_toy_problem_7(;cost_function=SumOfMakeSpans(),verbose=false,Δt_op=0,Δt_collect=[0,4,0],Δt_deliver=[0,0,0])
+function pctapf_problem_7(;cost_function=SumOfMakeSpans(),verbose=false,Δt_op=0,Δt_collect=[0,4,0],Δt_deliver=[0,0,0])
     N = 2                  # num robots
     M = 3                  # num delivery tasks
     vtx_grid = initialize_dense_vtx_grid(4,4)
@@ -391,7 +391,7 @@ function initialize_toy_problem_7(;cost_function=SumOfMakeSpans(),verbose=false,
         vtx_grid;
     )
 
-    project_spec, robot_ICs = initialize_toy_problem(r0,s0,sF)
+    project_spec, robot_ICs = pctapf_problem(r0,s0,sF)
     add_operation!(project_spec,construct_operation(project_spec,-1,[1,2],[3],Δt_op))
     add_operation!(project_spec,construct_operation(project_spec,-1,[3],  [], Δt_op))
     assignment_dict = Dict(1=>[1,3],2=>[2])
@@ -412,7 +412,7 @@ end
     Optimal MakeSpan = 8
     Optimal SumOfMakeSpans = 16
 """
-function initialize_toy_problem_8(;cost_function=SumOfMakeSpans(),verbose=false,Δt_op=0,Δt_collect=[0,0,0,0],Δt_deliver=[0,0,0,0])
+function pctapf_problem_8(;cost_function=SumOfMakeSpans(),verbose=false,Δt_op=0,Δt_collect=[0,0,0,0],Δt_deliver=[0,0,0,0])
     N = 2                  # num robots
     M = 4                  # num delivery tasks
     vtx_grid = initialize_dense_vtx_grid(8,4)
@@ -431,7 +431,7 @@ function initialize_toy_problem_8(;cost_function=SumOfMakeSpans(),verbose=false,
         vtx_grid;
     )
 
-    project_spec, robot_ICs = initialize_toy_problem(r0,s0,sF)
+    project_spec, robot_ICs = pctapf_problem(r0,s0,sF)
     add_operation!(project_spec,construct_operation(project_spec,-1,[1],[4],Δt_op))
     add_operation!(project_spec,construct_operation(project_spec,-1,[2],[3],Δt_op))
     add_operation!(project_spec,construct_operation(project_spec,-1,[4],[],Δt_op))
@@ -450,11 +450,11 @@ function initialize_toy_problem_8(;cost_function=SumOfMakeSpans(),verbose=false,
 end
 
 export
-    initialize_toy_problem_9
+    pctapf_problem_9
 """
     Project with station-sharing. Station 5 needs to accessed by both robots for picking up their objects.
 """
-function initialize_toy_problem_9(;cost_function=SumOfMakeSpans(),verbose=false,Δt_op=0,Δt_collect=[0,0],Δt_deliver=[0,0])
+function pctapf_problem_9(;cost_function=SumOfMakeSpans(),verbose=false,Δt_op=0,Δt_collect=[0,0],Δt_deliver=[0,0])
     N = 2                  # num robots
     M = 2                  # num delivery tasks
     vtx_grid = initialize_dense_vtx_grid(4,4)
@@ -469,7 +469,7 @@ function initialize_toy_problem_9(;cost_function=SumOfMakeSpans(),verbose=false,
         vtx_grid;
     )
 
-    project_spec, robot_ICs = initialize_toy_problem(r0,s0,sF)
+    project_spec, robot_ICs = pctapf_problem(r0,s0,sF)
     add_operation!(project_spec,construct_operation(project_spec,-1,[1],[],Δt_op))
     add_operation!(project_spec,construct_operation(project_spec,-1,[2],[],Δt_op))
     assignment_dict = Dict(1=>[1],2=>[2])
@@ -490,7 +490,7 @@ end
 
 
 export
-    initialize_toy_problem_10
+    pctapf_problem_10
 
 """
     Motivation for backtracking in ISPS
@@ -500,7 +500,7 @@ export
     This leads to a double delay that will not be caught without backtracking
     in ISPS. Hence, the solver will return a solution with T = 9.
 """
-function initialize_toy_problem_10(;cost_function=MakeSpan(),verbose=false,Δt_op=0,Δt_collect=[0,0,0,0,0,0],Δt_deliver=[0,0,0,0,0,0])
+function pctapf_problem_10(;cost_function=MakeSpan(),verbose=false,Δt_op=0,Δt_collect=[0,0,0,0,0,0],Δt_deliver=[0,0,0,0,0,0])
     N = 4                  # num robots
     M = 4                  # num delivery tasks
     vtx_grid = initialize_dense_vtx_grid(13,11)
@@ -538,7 +538,7 @@ function initialize_toy_problem_10(;cost_function=MakeSpan(),verbose=false,Δt_o
         vtx_grid;
     )
 
-    project_spec, robot_ICs = initialize_toy_problem(r0,s0,sF)
+    project_spec, robot_ICs = pctapf_problem(r0,s0,sF)
     add_operation!(project_spec,construct_operation(project_spec,-1,[1,2,3,6],[],Δt_op))
     # add_operation!(project_spec,construct_operation(project_spec,-1,[2],[],Δt_op))
     add_operation!(project_spec,construct_operation(project_spec,-1,[4],[5],Δt_op))
@@ -564,7 +564,7 @@ function initialize_toy_problem_10(;cost_function=MakeSpan(),verbose=false,Δt_o
 end
 
 export
-    initialize_toy_problem_11
+    pctapf_problem_11
 
 """
     #### TOY PROBLEM 11 ####
@@ -574,7 +574,7 @@ export
     robots pass.
 
 """
-function initialize_toy_problem_11(;
+function pctapf_problem_11(;
         cost_function = SumOfMakeSpans(),
         verbose = false,
     )
@@ -593,7 +593,7 @@ function initialize_toy_problem_11(;
     )
     shapes = [(1, 2), (1, 1), (1, 1)]
 
-    project_spec, robot_ICs = initialize_toy_problem(r0, s0, sF)
+    project_spec, robot_ICs = pctapf_problem(r0, s0, sF)
     add_operation!(
         project_spec,
         construct_operation(project_spec, -1, [1, 2], [3], 0),
@@ -644,4 +644,4 @@ init_env_3() = construct_regular_factory_world(;
     env_scale = 1
 )
 
-end
+# end
