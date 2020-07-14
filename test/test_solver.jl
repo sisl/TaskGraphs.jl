@@ -69,18 +69,15 @@ let
         search_env = construct_search_env(solver,deepcopy(sched),base_search_env)
         node = initialize_root_node(search_env)
         path_planner = ISPS()
-        @test plan_next_path!(path_planner,node.solution,node)
+        # @test plan_next_path!(path_planner,node.solution,node)
         # @test plan_next_path!(path_planner,node.solution,node)
         # @test plan_next_path!(path_planner,node.solution,node)
         # @test plan_next_path!(path_planner,node.solution,node)
         # @test plan_next_path!(path_planner,node.solution,node)
         # NOTE Weird stream of output here
-        # for i in 1:nv(search_env.schedule)
-        # for i in 1:1
-        while true
+        for i in 1:nv(search_env.schedule)
             # @code_warntype plan_next_path!(path_planner,node.solution,node)
             @test plan_next_path!(path_planner,node.solution,node)
-            break
         end
     end
     # Test ISPS
@@ -124,11 +121,11 @@ let
     let
         solver = NBSSolver(assignment_model = TaskGraphsMILPSolver(GreedyAssignment()))
         # solver = NBSSolver(assignment_model = TaskGraphsMILPSolver())
-        TaskGraphs.Solvers.set_iteration_limit!(solver,3)
+        set_iteration_limit!(solver,3)
         env, cost = solve!(solver,base_search_env;optimizer=Gurobi.Optimizer)
         # @show convert_to_vertex_lists(env.route_plan)
-        # @show TaskGraphs.Solvers.get_logger(solver)
-        # @show TaskGraphs.Solvers.optimality_gap(solver) > 0
+        # @show get_logger(solver)
+        # @show optimality_gap(solver) > 0
         @test validate(env.schedule)
         @test validate(env.schedule,convert_to_vertex_lists(env.route_plan), env.cache.t0, env.cache.tF)
     end
@@ -207,7 +204,7 @@ let
                         NBSSolver(assignment_model = TaskGraphsMILPSolver(GreedyAssignment())),
                         ]
                     # @show i, f, solver
-                    TaskGraphs.Solvers.set_iteration_limit!(solver,1)
+                    set_iteration_limit!(solver,1)
                     project_schedule = construct_partial_project_schedule(
                         project_spec,
                         problem_spec,
