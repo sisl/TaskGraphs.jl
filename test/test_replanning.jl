@@ -13,8 +13,9 @@ let
         solver,
         project_schedule,
         problem_spec,
-        env_graph;
-        primary_objective=cost_model,
+        env_graph,
+        initialize_planning_cache(project_schedule),
+        cost_model,
         )
     env, cost = solve!(solver,base_search_env;optimizer=Gurobi.Optimizer)
 
@@ -23,7 +24,7 @@ let
     new_proj_spec, _, _, _, _ = pctapf_problem_1(;verbose=false)
 
 
-    request = Replanning.ProjectRequest(
+    request = ProjectRequest(
         construct_partial_project_schedule(new_proj_spec,problem_spec),
         2,
         2

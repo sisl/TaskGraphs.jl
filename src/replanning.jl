@@ -125,7 +125,7 @@ function split_active_vtxs!(project_schedule::OperatingSchedule,problem_spec::Pr
         end
     end
     set_leaf_operation_nodes!(project_schedule)
-    new_cache = initialize_planning_cache(project_schedule;t0=t0,tF=tF)
+    new_cache = initialize_planning_cache(project_schedule,t0,tF)
     project_schedule, new_cache
 end
 
@@ -257,7 +257,7 @@ function prune_schedule(project_schedule::OperatingSchedule,problem_spec::Proble
     end
     set_leaf_operation_nodes!(new_schedule)
     # init planning cache with the existing solution
-    new_cache = initialize_planning_cache(new_schedule;t0=t0,tF=tF)
+    new_cache = initialize_planning_cache(new_schedule,t0,tF)
 
     @assert sanity_check(new_schedule,string(" in prune_schedule() at t = ",t,":\n",[string(string(get_node_from_vtx(project_schedule,v))," - t0 = ",cache.t0[v]," - tF = ",cache.tF[v]," - local_slack = ",cache.local_slack[v],"\n") for v in active_vtxs]...))
 
@@ -283,7 +283,7 @@ function prune_project_schedule(project_schedule::OperatingSchedule,problem_spec
     # Remove all "assignments" from schedule
     break_assignments!(new_schedule,problem_spec)
 
-    new_cache = initialize_planning_cache(new_schedule;t0=new_cache.t0,tF=min.(new_cache.tF,t))
+    new_cache = initialize_planning_cache(new_schedule,new_cache.t0,min.(new_cache.tF,t))
     new_schedule, new_cache
 end
 
@@ -491,7 +491,7 @@ function replan!(solver, replan_model, search_env, request; commit_threshold=5,k
     # Remove all "assignments" from schedule
     break_assignments!(replan_model,new_schedule,problem_spec)
     @assert sanity_check(new_schedule," after break_assignments!()")
-    new_cache = initialize_planning_cache(new_schedule;t0=new_cache.t0,tF=min.(new_cache.tF,t_commit))
+    new_cache = initialize_planning_cache(new_schedule,new_cache.t0,min.(new_cache.tF,t_commit))
     # splice projects together!
     splice_schedules!(new_schedule,next_schedule)
     @assert sanity_check(new_schedule," after splice_schedules!()")
@@ -500,7 +500,12 @@ function replan!(solver, replan_model, search_env, request; commit_threshold=5,k
     # NOTE: better performance is obtained when t_commit is the default t0 (tighter constraint on milp)
     t0 = map(v->get(new_cache.t0, v, t_commit), vertices(get_graph(new_schedule)))
     tF = map(v->get(new_cache.tF, v, t_commit), vertices(get_graph(new_schedule)))
-    base_search_env = construct_search_env(solver, new_schedule, search_env.problem_spec, env_graph;t0=t0,tF=tF)
+    base_search_env = construct_search_env(
+        solver,
+        new_schedule,
+        search_env,
+        initialize_planning_cache(new_schedule,t0,tF)
+        )
     trimmed_route_plan = trim_route_plan(base_search_env, route_plan, t_commit)
     base_search_env = SearchEnv(base_search_env, route_plan=trimmed_route_plan)
     base_search_env, solver

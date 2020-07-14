@@ -55,13 +55,11 @@ let
         # plan for Robot Start
         node_id = RobotID(1)
         schedule_node = get_node_from_id(search_env.schedule, node_id)
-        println(string(schedule_node))
         v = get_vtx(search_env.schedule, node_id)
         @test plan_path!(path_planner, search_env, node, schedule_node, v)
         # plan for GO
         v2 = outneighbors(search_env.schedule,v)[1]
         schedule_node = get_node_from_vtx(search_env.schedule, v2)
-        println(string(schedule_node))
         @test plan_path!(path_planner, search_env, node, schedule_node, v2)
         # @show convert_to_vertex_lists(node.solution)
     end
@@ -69,14 +67,7 @@ let
         search_env = construct_search_env(solver,deepcopy(sched),base_search_env)
         node = initialize_root_node(search_env)
         path_planner = ISPS()
-        # @test plan_next_path!(path_planner,node.solution,node)
-        # @test plan_next_path!(path_planner,node.solution,node)
-        # @test plan_next_path!(path_planner,node.solution,node)
-        # @test plan_next_path!(path_planner,node.solution,node)
-        # @test plan_next_path!(path_planner,node.solution,node)
-        # NOTE Weird stream of output here
         for i in 1:nv(search_env.schedule)
-            # @code_warntype plan_next_path!(path_planner,node.solution,node)
             @test plan_next_path!(path_planner,node.solution,node)
         end
     end
@@ -364,8 +355,9 @@ let
                 solver,
                 project_schedule,
                 problem_spec,
-                env_graph;
-                primary_objective=cost_model,
+                env_graph,
+                initialize_planning_cache(project_schedule),
+                cost_model,
                 )
             env, cost = solve!(solver,base_search_env;optimizer=Gurobi.Optimizer)
             paths = convert_to_vertex_lists(env.route_plan)
@@ -403,8 +395,9 @@ let
             solver,
             project_schedule,
             problem_spec,
-            env_graph;
-            primary_objective=cost_model,
+            env_graph,
+            initialize_planning_cache(project_schedule),
+            cost_model,
             )
         env, cost = solve!(solver,base_search_env;optimizer=Gurobi.Optimizer)
         paths = convert_to_vertex_lists(env.route_plan)

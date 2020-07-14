@@ -102,21 +102,21 @@ primary_cost(::PrioritizedAStarSC,cost::NTuple{5,Float64}) = cost[2]
 
 Construct the heuristic model to be used by solver.
 """
-function construct_heuristic_model(trait::NonPrioritized,solver,env_graph;
-        ph = PerfectHeuristic(get_dist_matrix(env_graph)),
-        kwargs...)
+function construct_heuristic_model(trait::NonPrioritized,solver,env_graph,
+        ph = PerfectHeuristic(get_dist_matrix(env_graph))
+        )
     construct_composite_heuristic(ph,NullHeuristic(),ph,ph,NullHeuristic())
 end
-function construct_heuristic_model(trait::Prioritized,args...;kwargs...)
-    h = construct_heuristic_model(NonPrioritized(),args...;kwargs...)
+function construct_heuristic_model(trait::Prioritized,args...)
+    h = construct_heuristic_model(NonPrioritized(),args...)
     construct_composite_heuristic(
         h.cost_models[2],
         h.cost_models[1],
         h.cost_models[3:end]...
     )
 end
-function construct_heuristic_model(solver, args...;kwargs...)
-    construct_heuristic_model(search_trait(solver),solver,args...;kwargs...)
+function construct_heuristic_model(solver, args...)
+    construct_heuristic_model(search_trait(solver),solver,args...)
 end
 
 # export

@@ -336,15 +336,17 @@ function initialize_route_plan(schedule::OperatingSchedule,env::E) where {E<:PCC
     LowLevelSolution(paths=paths, cost_model=cost_model,costs=costs, cost=cost)
 end
 initialize_route_plan(env::SearchEnv) = initialize_route_plan(env.schedule,env.env)
-function construct_search_env(solver, schedule, problem_spec, env_graph,
+function construct_search_env(
+        solver,
+        schedule::OperatingSchedule,
+        problem_spec::ProblemSpec,
+        env_graph,
+        cache::PlanningCache=initialize_planning_cache(schedule),
         primary_objective=problem_spec.cost_function,
-        t0 = zeros(Int,nv(schedule)),
-        tF = zeros(Int,nv(schedule)),
         ;
         extra_T=400,
         kwargs...
     )
-    cache = initialize_planning_cache(schedule,t0,tF)
     N = problem_spec.N                                          # number of robots
     cost_model, heuristic_model = construct_cost_model(
         solver, schedule, cache, problem_spec, env_graph, primary_objective;
@@ -358,14 +360,28 @@ function construct_search_env(solver, schedule, problem_spec, env_graph,
         problem_spec=problem_spec, num_agents=N, route_plan=route_plan)
     return search_env
 end
-function construct_search_env(solver,schedule::OperatingSchedule,
-        env::SearchEnv,primary_objective=env.problem_spec.cost_function,
-        t0 = env.cache.t0,
-        tF = env.cache.tF,
+# function construct_search_env(solver,
+#         schedule::OperatingSchedule,
+#         problem_spec::ProblemSpec,
+#         env_graph,
+#         cache::PlanningCache=initialize_planning_cache(schedule),
+#         primary_objective=problem_spec.cost_function,
+#         ;
+#         kwargs...
+#     )
+#     cache = initialize_planning_cache(schedule,t0,tF)
+#     construct_search_env(solver, schedule, problem_spec, env_graph, cache,
+#         primary_objective;kwargs...)
+# end
+function construct_search_env(
+        solver,
+        schedule::OperatingSchedule,
+        env::SearchEnv,
+        args...
         ;
         kwargs...)
     construct_search_env(solver,schedule,env.problem_spec,env.env.graph,
-        primary_objective,t0,tF;kwargs...)
+        args...;kwargs...)
 end
 
 update_cost_model!(model::C,env::S) where {C,S<:SearchEnv} = nothing
@@ -490,28 +506,26 @@ For COLLABORATIVE transport problems
 function CRCBS.build_env(solver, env::E, node::N, schedule_node::TEAM_ACTION, v::Int;kwargs...) where {E<:SearchEnv,N<:ConstraintTreeNode}
     envs = []
     agent_idxs = Int[]
-    starts = Vector{PCCBS.State}()
+    starts = Vector{state_type(env.env)}()
     meta_cost = MetaCost(Vector{cost_type(env)}(),get_initial_cost(env.env))
-    # path_specs = Vector{PathSpec}()
     for (i, sub_node) in enumerate(schedule_node.instructions)
-        # if i == 1 # leader
         ph = PerfectHeuristic(env.dist_function.dist_mtxs[schedule_node.shape][i])
-        heuristic = construct_heuristic_model(solver,env.env.graph;ph=ph)
-        # heuristic = construct_composite_heuristic(ph,NullHeuristic(),ph,ph,NullHeuristic())
-        # else
-        #     heuristic = get_heuristic_model(env.env)
-        # end
+        heuristic = construct_heuristic_model(solver,env.env.graph,ph)
         cbs_env, base_path = build_env(solver,env,node,sub_node,v,generate_path_spec(env.schedule,env.problem_spec,sub_node);
             heuristic=heuristic,
             kwargs...
-        ) # TODO need problem_spec here
+        )
         push!(envs, cbs_env)
         push!(agent_idxs, get_id(get_robot_id(sub_node)))
         push!(starts, get_final_state(base_path))
         push!(meta_cost.independent_costs, get_cost(base_path))
     end
-    meta_env = MetaAgentCBS.construct_meta_env([envs...], get_cost_model(env))
-    meta_path = Path{MetaAgentCBS.State{PCCBS.State},MetaAgentCBS.Action{PCCBS.Action},MetaCost{cost_type(env)}}(
+    meta_env = MetaAgentCBS.construct_meta_env(
+        [envs...],
+        agent_idxs,
+        get_cost_model(env)
+        )
+    meta_path = Path{MetaAgentCBS.State{state_type(env.env)},MetaAgentCBS.Action{action_type(env.env)},MetaCost{cost_type(env)}}(
         s0 = MetaAgentCBS.State(starts),
         cost = MetaCost(meta_cost.independent_costs, aggregate_costs(get_cost_model(meta_env), meta_cost.independent_costs))
     )

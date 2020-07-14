@@ -68,9 +68,9 @@ global_logger(SimpleLogger(stderr, Logging.Debug))
     @time @testset "TaskGraphs.Solvers" begin
         include(joinpath(testdir, "test_solver.jl"))
     end
-    # @time @testset "TaskGraphs.Replanning" begin
-    #     include(joinpath(testdir, "test_replanning.jl"))
-    # end
+    @time @testset "TaskGraphs.Replanning" begin
+        include(joinpath(testdir, "test_replanning.jl"))
+    end
     # @time @testset "TaskGraphs.Profiling" begin
     #     include(joinpath(testdir, "test_profiling.jl"))
     # end
