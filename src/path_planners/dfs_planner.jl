@@ -67,13 +67,19 @@ function sorted_actions(env,s)
         by=a->f(s,a,get_next_state(env,s,a))
     )
 end
+
+"""
+    get_conflict_idx(envs,states,actions,i,ordering,idxs)
+
+Check if the planned action for agent with priority `i` conflicts with the
+    planned action of any agent with higher priority.
+"""
 function get_conflict_idx(envs,states,actions,i,ordering,idxs)
     idx = ordering[i]
     env = envs[idx]
     s = states[idx]
     a = actions[idx]
-    sp = get_next_state(env,s,a)
-    pi = PathNode(s,a,sp)
+    pi = PathNode(s,a,get_next_state(env,s,a))
     for (j,idx) in enumerate(ordering[1:max(1,i-1)])
         if j == i
             continue
@@ -81,8 +87,7 @@ function get_conflict_idx(envs,states,actions,i,ordering,idxs)
         env = envs[idx]
         s = states[idx]
         a = actions[idx]
-        sp = get_next_state(env,s,a)
-        pj = PathNode(s,a,sp)
+        pj = PathNode(s,a,get_next_state(env,s,a))
         if detect_state_conflict(pi,pj) || detect_action_conflict(pi,pj)
             return j
         end
@@ -220,14 +225,10 @@ function select_ordering(solver,search_env,envs)
             minimum(cache.slack[get_vtx(schedule,envs[i].node_id)])
             )
         )
-    log_info(4,solver,"ordering = $ordering")
     ordering
 end
 function select_action_dfs!(solver,envs,states,actions,i,ordering,idxs,search_state=SearchState())
-    # search_states = map(e->search_state,1:length(envs)+1)
-    # while true
     search_state = update_search_state(search_state,i)
-    # search_states[i] = update_search_state(search_states[i],i)
     if i <= 0
         return false
     elseif i > length(states)
@@ -235,13 +236,10 @@ function select_action_dfs!(solver,envs,states,actions,i,ordering,idxs,search_st
             if a != CRCBS.wait(env,s) || length(get_possible_actions(env,s)) == 1 || s.t < env.goal.t
                 return true
             end
-            # log_info(5,solver,"action ",string(a)," ineligible with env ",string(env.schedule_node)," |A| = $(length(get_possible_actions(env,s)))")
         end
         log_info(4,solver,"action vector $(map(a->string(a),actions)) not eligible")
         return false
     elseif !(ordering[i] in idxs)
-        # search_states[i+1] = search_states[i]
-        # i = i + 1
         return select_action_dfs!(solver,envs,states,actions,i+1,ordering,idxs,search_state)
     else
         # idx = env.ordering_map[i]zs
@@ -259,9 +257,6 @@ function select_action_dfs!(solver,envs,states,actions,i,ordering,idxs,search_st
                 k = get_conflict_idx(envs,states,actions,i,ordering,idxs)
                 # @assert k < i "should only check for conflicts with 1:$i, but found conflict with $k"
                 if k <= 0
-                    # search_states[i+1] = search_states[i]
-                    # i = i+1
-                    # break
                     if select_action_dfs!(solver,envs,states,actions,i+1,ordering,idxs,search_state)
                         return true
                     end
@@ -290,41 +285,32 @@ function select_action_dfs!(solver,envs,states,actions,i,ordering,idxs,search_st
 end
 function prioritized_dfs_search(solver,search_env,envs,paths;
         t0 = max(0, minimum(map(path->length(path),paths))),
-        max_iters = 4*(maximum(search_env.cache.tF)-minimum(map(p->length(p),paths))),
         search_state = DFS_SearchState()
         )
      tip_times = map(path->length(path),paths)
      t = t0
-     log_info(3,solver,"start time t0=$t0")
      states     = map(path->get_s(get_path_node(path,t+1)), paths)
      actions    = map(path->get_a(get_path_node(path,t+1)), paths)
-     iter = 0
-     while true && iter < max_iters
-         iter += 1
-         # Update cache to reflect any delay ?
+     while true
+         increment_iteration_count(solver)
+         enforce_iteration_limit(solver)
          update_envs!(solver,search_env,envs,paths)
-         # if all(map(i->is_goal(envs[i],states[i]),1:length(paths)))
          if length(search_env.cache.active_set) == 0
              return envs, paths, true
          end
-         log_info(4,solver,"envs: $(string(map(e->string(e.schedule_node),envs))...)")
-         log_info(4,solver,"path_lengths = $(map(path->length(path),paths))")
-         log_info(4,solver,"states: $(string(map(s->string(s),states))...)")
-         @assert all(map(path->length(path)>=t,paths))
+         @assert all(map(p->length(p) >= t,paths))
          ordering   = select_ordering(solver,search_env,envs)
          idxs       = Set(findall(tip_times .<= t))
-         log_info(4,solver,"idxs: $idxs")
          if select_action_dfs!(solver,envs,states,actions,1,ordering,idxs,search_state)
-             log_info(4,solver,"actions: $(string(map(a->string(a),actions))...)")
              # step forward in search
              for idx in idxs
                  env = envs[idx]
                  path = paths[idx]
                  s = states[idx]
                  a = actions[idx]
-                 sp = get_next_state(envs[idx],s,a)
-                 push!(path.path_nodes,PathNode(s,a,sp))
-                 path.cost = accumulate_cost(env,path.cost,get_transition_cost(env,s,a,sp))
+                 sp = get_next_state(env,s,a)
+                 push!(path,PathNode(s,a,sp))
+                 set_cost!(path, accumulate_cost(env,get_cost(path),get_transition_cost(env,s,a,sp)))
              end
              t += 1
              search_state = DFS_SearchState()
@@ -347,12 +333,9 @@ function prioritized_dfs_search(solver,search_env,envs,paths;
          states     = map(path->get_s(get_path_node(path,t+1)), paths)
          actions    = map(path->get_a(get_path_node(path,t+1)), paths)
      end
-     if iter > max_iters
-         # throw(SolverCBSMaxOutException("ERROR in DFS: max_iters exceeded before finding a valid route plan!"))
-         throw(AssertionError("ERROR in DFS: max_iters exceeded before finding a valid route plan!"))
-     end
      return envs, paths, false
 end
+
 """
     Iterate over agents in order of priority, allowing them to fill in a
     reservation table for the vtxs they would like to occupy at the next time
@@ -367,6 +350,7 @@ function CRCBS.solve!(
 
     route_plan = deepcopy(search_env.route_plan)
     paths = get_paths(route_plan)
+    # initialize envs
     envs = Vector{PCCBS.LowLevelEnv}([PCCBS.LowLevelEnv() for p in paths])
     cbs_node = initialize_root_node(search_env)
     for i in 1:search_env.num_agents

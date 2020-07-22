@@ -35,6 +35,7 @@ function get_grid_world_layer(vtxs,color,cw)
         return layer(x=[],y=[])
     end
 end
+
 """
     `visualize_env`
 

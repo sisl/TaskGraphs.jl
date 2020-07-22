@@ -135,6 +135,8 @@ for op in [
     ]
     @eval CRCBS.$op(env::SearchEnv,args...) = $op(env.route_plan,args...)
 end
+CRCBS.num_states(env::SearchEnv) = num_states(env.env)
+CRCBS.num_actions(env::SearchEnv) = num_actions(env.env)
 
 initialize_planning_cache(env::SearchEnv) = initialize_planning_cache(env.schedule,deepcopy(env.cache.t0),deepcopy(env.cache.tF))
 # function reverse_propagate_delay!(solver,cache,schedule,delay_vec)
@@ -437,7 +439,7 @@ function CRCBS.build_env(solver, env::E, node::N, schedule_node::T, v::Int, path
     for v_next in outneighbors(get_graph(env.schedule),v)
         if get_path_spec(env.schedule, v_next).static == true
             duration_next = get_path_spec(env.schedule,v_next).min_path_duration
-            for c in get_constraints(node, agent_id).sorted_state_constraints
+            for c in sorted_state_constraints(env.env,get_constraints(node, agent_id)) #.sorted_state_constraints
                 if get_sp(get_path_node(c)).vtx == goal_vtx
                     if 0 < get_time_of(c) - goal_time < duration_next
                         log_info(1,solver,string("extending goal_time for node ",v," from ",goal_time," to ",get_time_of(c)," to avoid constraints"))
@@ -574,7 +576,8 @@ function CRCBS.initialize_root_node(env::SearchEnv)
     ConstraintTreeNode(
         solution    = solution,
         constraints = Dict(
-            i=>ConstraintTable{node_type(solution)}(a=i) for i in 1:num_agents(env)
+            # i=>ConstraintTable{node_type(solution)}(agent_id=i) for i in 1:num_agents(env)
+            i=>discrete_constraint_table(env,i,num_states(env.env)*8) for i in 1:num_agents(env)
             ),
         id = 1)
 end
@@ -599,6 +602,9 @@ function CRCBS.cbs_update_conflict_table!(solver,mapf::PC_MAPF,node,constraint)
     detect_conflicts!(node.conflict_table,search_env.route_plan,idxs,t0)
 end
 CRCBS.detect_conflicts!(table,env::SearchEnv,args...) = detect_conflicts!(table,env.route_plan,args...)
+
+CRCBS.serialize(pc_mapf::PC_MAPF,args...) = serialize(pc_mapf.env.env,args...)
+CRCBS.deserialize(pc_mapf::PC_MAPF,args...) = serialize(pc_mapf.env.env,args...)
 
 
 # end # PathPlanning module
