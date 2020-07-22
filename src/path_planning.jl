@@ -522,7 +522,7 @@ function CRCBS.build_env(solver, env::E, node::N, schedule_node::TEAM_ACTION, v:
         push!(starts, get_final_state(base_path))
         push!(meta_cost.independent_costs, get_cost(base_path))
     end
-    meta_env = MetaAgentCBS.construct_meta_env(
+    meta_env = MetaAgentCBS.construct_team_env(
         [envs...],
         agent_idxs,
         get_cost_model(env)
@@ -602,7 +602,6 @@ function CRCBS.cbs_update_conflict_table!(solver,mapf::PC_MAPF,node,constraint)
     detect_conflicts!(node.conflict_table,search_env.route_plan,idxs,t0)
 end
 CRCBS.detect_conflicts!(table,env::SearchEnv,args...) = detect_conflicts!(table,env.route_plan,args...)
-
 CRCBS.serialize(pc_mapf::PC_MAPF,args...) = serialize(pc_mapf.env.env,args...)
 CRCBS.deserialize(pc_mapf::PC_MAPF,args...) = serialize(pc_mapf.env.env,args...)
 
