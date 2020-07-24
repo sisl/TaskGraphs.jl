@@ -76,16 +76,16 @@ let
     let
         project_spec = ProjectSpec(initial_conditions=object_ICs,final_conditions=object_FCs)
         add_operation!(project_spec,construct_operation(project_spec, 3, [1,2], [3], 1.0))
-        @test project_spec.root_nodes == Set{Int}([1])
+        @test project_spec.root_vtxs == Set{Int}([1])
         add_operation!(project_spec,construct_operation(project_spec, 6, [3], [], 0.0))
-        @test project_spec.root_nodes == Set{Int}([2])
+        @test project_spec.root_vtxs == Set{Int}([2])
     end
     let
         project_spec = ProjectSpec(initial_conditions=object_ICs,final_conditions=object_FCs)
         add_operation!(project_spec,construct_operation(project_spec, 3, [1,2], [], 1.0))
-        @test project_spec.root_nodes == Set{Int}([1])
+        @test project_spec.root_vtxs == Set{Int}([1])
         add_operation!(project_spec,construct_operation(project_spec, 6, [3], [], 0.0))
-        @test project_spec.root_nodes == Set{Int}([1,2])
+        @test project_spec.root_vtxs == Set{Int}([1,2])
     end
     let
         project_spec = ProjectSpec(initial_conditions=object_ICs,final_conditions=object_FCs)
@@ -130,13 +130,6 @@ let
     get_robot_ICs(sched)
     get_actions(sched)
     get_operations(sched)
-
-    get_num_actions(sched)
-    get_num_operations(sched)
-    get_num_object_ICs(sched)
-    get_num_robot_ICs(sched)
-    get_num_vtxs(sched)
-    get_num_paths(sched)
 
     zero(sched)
     LightGraphs.edges(sched)

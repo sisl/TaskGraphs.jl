@@ -5,7 +5,6 @@ module PCCBS
 using CRCBS
 using Parameters, LightGraphs, DataStructures
 using GraphUtils
-# using ..FactoryWorlds
 using ..PlanningPredicates
 
 ################################################################################

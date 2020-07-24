@@ -42,7 +42,7 @@ Elements:
 - Δt::Vector{Float64}  - durations of operations
 - tr0_::Dict{Int,Float64} - robot start times
 - to0_::Dict{Int,Float64} - object start times
-- root_nodes::Vector{Set{Int}} - identifies "project heads"
+- root_vtxs::Vector{Set{Int}} - identifies "project heads"
 - weights::Dict{Int,Float64} - stores weights associated with each project head
 - cost_function::F - the optimization objective (default is SumOfMakeSpans)
 - s0::Vector{Int} - pickup stations for each task
@@ -59,8 +59,8 @@ Elements:
     Δt_deliver::Vector{Float64} = zeros(M) # duration of DELIVER operations
     tr0_::Dict{Int,Float64} = Dict{Int,Float64}() # robot start times
     to0_::Dict{Int,Float64} = Dict{Int,Float64}() # object start times
-    root_nodes::Vector{Set{Int}} = [get_all_root_nodes(graph)]
-    weights::Dict{Int,Float64} = Dict{Int,Float64}(v=>1.0 for v in 1:length(root_nodes))
+    root_vtxs::Vector{Set{Int}} = [get_all_root_nodes(graph)]
+    weights::Dict{Int,Float64} = Dict{Int,Float64}(v=>1.0 for v in 1:length(root_vtxs))
     cost_function::F        = SumOfMakeSpans()
     r0::Vector{Int} = zeros(N)
     s0::Vector{Int} = zeros(M) # pickup stations for each task
@@ -93,7 +93,7 @@ Elements:
 - pre_deps::Dict{Int,Set{Int}} - maps object id to ids of operations that are required to produce that object
 - post_deps::Dict{Int,Set{Int}} - maps object id to ids of operations that depend on that object
 - graph::G
-- root_nodes::Set{Int}
+- root_vtxs::Set{Int}
 - weights::Dict{Int,Float64}
 - M::Int
 - weight::Float64
@@ -106,8 +106,8 @@ Elements:
     pre_deps::Dict{Int,Set{Int}}  = Dict{Int,Set{Int}}() # id => (pre_conditions)
     post_deps::Dict{Int,Set{Int}} = Dict{Int,Set{Int}}()
     graph::G                      = DiGraph()
-    root_nodes::Set{Int}          = Set{Int}()
-    weights::Dict{Int,Float64}    = Dict{Int,Float64}(v=>1.0 for v in root_nodes)
+    root_vtxs::Set{Int}          = Set{Int}()
+    weights::Dict{Int,Float64}    = Dict{Int,Float64}(v=>1.0 for v in root_vtxs)
     weight::Float64               = 1.0
     M::Int                        = length(initial_conditions)
     object_id_to_idx::Dict{Int,Int} = Dict{Int,Int}(get_id(get_object_id(id))=>k for (k,id) in enumerate(initial_conditions))
@@ -188,9 +188,9 @@ function add_operation!(spec::ProjectSpec, op::Operation)
             add_edge!(G, op0_id, op_id) # for each (1) operation that generates object[id]
         end
     end
-    # set spec.root_nodes = get_all_root_nodes(spec.graph)
-    union!(spec.root_nodes, get_all_root_nodes(spec.graph))
-    intersect!(spec.root_nodes, get_all_root_nodes(spec.graph))
+    # set spec.root_vtxs = get_all_root_nodes(spec.graph)
+    union!(spec.root_vtxs, get_all_root_nodes(spec.graph))
+    intersect!(spec.root_vtxs, get_all_root_nodes(spec.graph))
     spec
 end
 
@@ -423,12 +423,6 @@ export
     get_vtx_ids,
     get_node_from_id,
     get_node_from_vtx,
-    get_num_actions,
-    get_num_operations,
-    get_num_object_ICs,
-    get_num_robot_ICs,
-    get_num_vtxs,
-    get_num_paths,
     get_completion_time,
     get_duration,
     get_vtx,
@@ -453,7 +447,7 @@ constraint between them.
     # TODO add UID vector so that vertex deletion can be constant time
     vtx_ids             ::Vector{AbstractID}    = Vector{AbstractID}() # maps vertex uid to actual graph node
     path_specs          ::Vector{PathSpec}      = Vector{PathSpec}()
-    root_nodes          ::Vector{Int}           = Vector{Int}() # list of "project heads"
+    root_vtxs          ::Vector{Int}           = Vector{Int}() # list of "project heads"
     weights             ::Dict{Int,Float64}     = Dict{Int,Float64}() # weights corresponding to project heads
 end
 Base.zero(schedule::OperatingSchedule{G}) where {G} = OperatingSchedule(graph=G())
@@ -467,7 +461,7 @@ end
 
 CRCBS.get_graph(schedule::P) where {P<:OperatingSchedule}       = schedule.graph
 get_vtx_ids(schedule::P) where {P<:OperatingSchedule}     = schedule.vtx_ids
-get_root_nodes(schedule::P) where {P<:OperatingSchedule}  = schedule.root_nodes
+get_root_vtxs(schedule::P) where {P<:OperatingSchedule}  = schedule.root_vtxs
 get_root_node_weights(schedule::P) where {P<:OperatingSchedule}  = schedule.weights
 
 get_node_from_id(schedule::P,id::A) where {P<:OperatingSchedule,A<:AbstractID}= schedule.planning_nodes[id]
@@ -482,12 +476,20 @@ get_robot_ICs(schedule::P) where {P<:OperatingSchedule}   = get_nodes_of_type(sc
 get_actions(schedule::P) where {P<:OperatingSchedule}     = get_nodes_of_type(schedule,ActionID)
 get_operations(schedule::P) where {P<:OperatingSchedule}  = get_nodes_of_type(schedule,OperationID)
 
-get_num_actions(schedule::P) where {P<:OperatingSchedule}     = length(get_actions(schedule))
-get_num_operations(schedule::P) where {P<:OperatingSchedule}  = length(get_operations(schedule))
-get_num_object_ICs(schedule::P) where {P<:OperatingSchedule}  = length(get_object_ICs(schedule))
-get_num_robot_ICs(schedule::P) where {P<:OperatingSchedule}   = length(get_robot_ICs(schedule))
-get_num_vtxs(schedule::P) where {P<:OperatingSchedule}        = nv(get_graph(schedule))
-get_num_paths(schedule::P) where {P<:OperatingSchedule}       = get_num_actions(schedule) + get_num_robot_ICs(schedule)
+# export
+#     get_num_actions,
+#     get_num_operations,
+#     get_num_object_ICs,
+#     get_num_robot_ICs,
+#     get_num_vtxs,
+#     get_num_paths
+
+# get_num_actions(schedule::P) where {P<:OperatingSchedule}     = length(get_actions(schedule))
+# get_num_operations(schedule::P) where {P<:OperatingSchedule}  = length(get_operations(schedule))
+# get_num_object_ICs(schedule::P) where {P<:OperatingSchedule}  = length(get_object_ICs(schedule))
+# get_num_robot_ICs(schedule::P) where {P<:OperatingSchedule}   = length(get_robot_ICs(schedule))
+# get_num_vtxs(schedule::P) where {P<:OperatingSchedule}        = nv(get_graph(schedule))
+# get_num_paths(schedule::P) where {P<:OperatingSchedule}       = get_num_actions(schedule) + get_num_robot_ICs(schedule)
 
 export
     set_vtx_map!,
@@ -698,10 +700,10 @@ function get_leaf_operation_nodes(schedule::OperatingSchedule)
     return root_vtxs
 end
 function set_leaf_operation_nodes!(schedule::OperatingSchedule)
-    empty!(get_root_nodes(schedule))
+    empty!(get_root_vtxs(schedule))
     empty!(get_root_node_weights(schedule))
     for vtx in  get_leaf_operation_nodes(schedule)
-        push!(get_root_nodes(schedule),vtx)
+        push!(get_root_vtxs(schedule),vtx)
         get_root_node_weights(schedule)[vtx] = 1.0
     end
     schedule
@@ -1072,8 +1074,8 @@ end
 #         operation_id = OperationID(get_id(op))
 #         add_to_schedule!(schedule, problem_spec, op, operation_id)
 #         v = nv(get_graph(schedule))
-#         if op_vtx in project_spec.root_nodes
-#             push!(schedule.root_nodes, v)
+#         if op_vtx in project_spec.root_vtxs
+#             push!(schedule.root_vtxs, v)
 #             schedule.weights[v] = get(project_spec.weights, op_vtx, 1.0)
 #         end
 #         for object_id in get_input_ids(op)
@@ -1109,7 +1111,7 @@ end
 #         add_to_schedule!(schedule, problem_spec, GO(get_id(robot_id), -1, -1,), action_id)
 #         add_edge!(schedule, pred_id, action_id)
 #     end
-#     sort!(schedule.root_nodes)
+#     sort!(schedule.root_vtxs)
 #     propagate_valid_ids!(schedule,problem_spec)
 #     return schedule
 # end
@@ -1192,7 +1194,7 @@ function construct_partial_project_schedule(
     # add root nodes
     for operation_id in root_ops
         v = get_vtx(project_schedule, operation_id)
-        push!(project_schedule.root_nodes, v)
+        push!(project_schedule.root_vtxs, v)
         project_schedule.weights[v] = 1.0
     end
     # Fill in gaps in project schedule (except for GO assignments)
@@ -1238,7 +1240,7 @@ function construct_partial_project_schedule(spec::ProjectSpec,problem_spec::Prob
         spec.final_conditions,
         map(i->robot_ICs[i], 1:min(length(robot_ICs),problem_spec.N)),
         spec.operations,
-        map(op->op.id, spec.operations[collect(spec.root_nodes)]),
+        map(op->op.id, spec.operations[collect(spec.root_vtxs)]),
         problem_spec,
     )
 end
@@ -1256,12 +1258,12 @@ function process_schedule(schedule::P,t0=zeros(Int,nv(schedule)),
 
     G = get_graph(schedule)
     traversal = topological_sort_by_dfs(G)
-    n_roots = max(length(schedule.root_nodes),1)
+    n_roots = max(length(schedule.root_vtxs),1)
     slack = map(i->Inf*ones(n_roots), vertices(G))
     local_slack = map(i->Inf*ones(n_roots), vertices(G))
     # max_deadlines = map(i->typemax(Int), vertices(G))
     # True terminal nodes
-    for (i,v) in enumerate(schedule.root_nodes)
+    for (i,v) in enumerate(schedule.root_vtxs)
         slack[v] = Inf*ones(n_roots)
         slack[v][i] = 0 # only slack for corresponding head is set to 0
     end
@@ -1506,18 +1508,18 @@ end
 
 Helper for setting the objective function for a milp model
 """
-function get_objective_expr(milp::AssignmentMILP, f::SumOfMakeSpans,model,root_nodes,weights,tof,Δt)
-    @variable(model, T[1:length(root_nodes)])
-    for (i,project_head) in enumerate(root_nodes)
+function get_objective_expr(milp::AssignmentMILP, f::SumOfMakeSpans,model,root_vtxs,weights,tof,Δt)
+    @variable(model, T[1:length(root_vtxs)])
+    for (i,project_head) in enumerate(root_vtxs)
         for v in project_head
             @constraint(model, T[i] >= tof[v] + Δt[v])
         end
     end
-    cost1 = @expression(model, sum(map(i->T[i]*get(weights,i,0.0), 1:length(root_nodes))))
-    # @objective(model, Min, sum(map(v->tof[v]*get(weights,v,0.0), root_nodes)))
+    cost1 = @expression(model, sum(map(i->T[i]*get(weights,i,0.0), 1:length(root_vtxs))))
+    # @objective(model, Min, sum(map(v->tof[v]*get(weights,v,0.0), root_vtxs)))
     # model
 end
-function get_objective_expr(milp::AssignmentMILP, f::MakeSpan,model,root_nodes,weights,tof,Δt)
+function get_objective_expr(milp::AssignmentMILP, f::MakeSpan,model,root_vtxs,weights,tof,Δt)
     @variable(model, T)
     @constraint(model, T .>= tof .+ Δt)
     T
@@ -1544,7 +1546,7 @@ Inputs:
         (applies to leaf tasks only)
     `tr0_` - a `Dict`, where `tr0_[i]` gives the start time for robot i
         (applies to non-dummy robots only)
-    `root_nodes` - a vector of integers specfying the graph vertices that
+    `root_vtxs` - a vector of integers specfying the graph vertices that
         are roots of the project
     `weights` - a vector of weights that determines the contribution of each
         root_node to the objective
@@ -1563,7 +1565,7 @@ Keyword Args:
 Outputs:
     `model` - the optimization model
 """
-function formulate_optimization_problem(N,M,G,D,Δt,Δt_collect,Δt_deliver,to0_,tr0_,root_nodes,weights,r0,s0,sF,nR,optimizer;
+function formulate_optimization_problem(N,M,G,D,Δt,Δt_collect,Δt_deliver,to0_,tr0_,root_vtxs,weights,r0,s0,sF,nR,optimizer;
     TimeLimit=100,
     OutputFlag=0,
     Presolve = -1, # automatic setting (-1), off (0), conservative (1), or aggressive (2)
@@ -1673,21 +1675,21 @@ function formulate_optimization_problem(N,M,G,D,Δt,Δt_collect,Δt_deliver,to0_
     end
     # cost depends only on root node(s)
     # if cost_model <: SumOfMakeSpans
-    #     @variable(model, T[1:length(root_nodes)])
-    #     for (i,project_head) in enumerate(root_nodes)
+    #     @variable(model, T[1:length(root_vtxs)])
+    #     for (i,project_head) in enumerate(root_vtxs)
     #         for v in project_head
     #             @constraint(model, T[i] >= tof[v] + Δt[v])
     #         end
     #     end
-    #     @objective(model, Min, sum(map(i->T[i]*get(weights,i,0.0), 1:length(root_nodes))))
-    #     # @objective(model, Min, sum(map(v->tof[v]*get(weights,v,0.0), root_nodes)))
+    #     @objective(model, Min, sum(map(i->T[i]*get(weights,i,0.0), 1:length(root_vtxs))))
+    #     # @objective(model, Min, sum(map(v->tof[v]*get(weights,v,0.0), root_vtxs)))
     # elseif cost_model <: MakeSpan
     #     @variable(model, T)
     #     @constraint(model, T .>= tof .+ Δt)
     #     @objective(model, Min, T)
     # end
     milp = AssignmentMILP(model)
-    cost1 = get_objective_expr(milp, cost_model, milp.model,root_nodes,weights,tof,Δt)
+    cost1 = get_objective_expr(milp, cost_model, milp.model,root_vtxs,weights,tof,Δt)
     @objective(milp.model, Min, cost1)
     milp
 end
@@ -1704,7 +1706,7 @@ function formulate_optimization_problem(spec::T,optimizer;
         spec.Δt_deliver,
         spec.to0_,
         spec.tr0_,
-        spec.root_nodes,
+        spec.root_vtxs,
         spec.weights,# # # #
         spec.r0,
         spec.s0,
@@ -2012,14 +2014,14 @@ function formulate_schedule_milp(project_schedule::OperatingSchedule,problem_spe
 
     # Formulate Objective
     # if cost_model <: SumOfMakeSpans
-    #     root_nodes = project_schedule.root_nodes
-    #     @variable(model, T[1:length(root_nodes)])
-    #     for (i,project_head) in enumerate(root_nodes)
+    #     root_vtxs = project_schedule.root_vtxs
+    #     @variable(model, T[1:length(root_vtxs)])
+    #     for (i,project_head) in enumerate(root_vtxs)
     #         for v in project_head
     #             @constraint(model, T[i] >= tF[v])
     #         end
     #     end
-    #     cost1 = @expression(model, sum(map(v->tF[v]*get(project_schedule.weights,v,0.0), root_nodes)))
+    #     cost1 = @expression(model, sum(map(v->tF[v]*get(project_schedule.weights,v,0.0), root_vtxs)))
     # elseif cost_model <: MakeSpan
     #     @variable(model, T)
     #     @constraint(model, T .>= tF)
@@ -2175,14 +2177,14 @@ function formulate_milp(milp_model::SparseAdjacencyMILP,project_schedule::Operat
 
     # Formulate Objective
     # if cost_model <: SumOfMakeSpans
-    #     root_nodes = project_schedule.root_nodes
-    #     @variable(model, T[1:length(root_nodes)])
-    #     for (i,project_head) in enumerate(root_nodes)
+    #     root_vtxs = project_schedule.root_vtxs
+    #     @variable(model, T[1:length(root_vtxs)])
+    #     for (i,project_head) in enumerate(root_vtxs)
     #         for v in project_head
     #             @constraint(model, T[i] >= tF[v])
     #         end
     #     end
-    #     cost1 = @expression(model, sum(map(v->tF[v]*get(project_schedule.weights,v,0.0), root_nodes)))
+    #     cost1 = @expression(model, sum(map(v->tF[v]*get(project_schedule.weights,v,0.0), root_vtxs)))
     # elseif cost_model <: MakeSpan
     #     @variable(model, T)
     #     @constraint(model, T .>= tF)
@@ -2198,14 +2200,14 @@ function formulate_milp(milp_model::SparseAdjacencyMILP,project_schedule::Operat
     milp
 end
 function get_objective_expr(milp,f::SumOfMakeSpans,model,project_schedule,tF)
-    root_nodes = project_schedule.root_nodes
-    @variable(model, T[1:length(root_nodes)])
-    for (i,project_head) in enumerate(root_nodes)
+    root_vtxs = project_schedule.root_vtxs
+    @variable(model, T[1:length(root_vtxs)])
+    for (i,project_head) in enumerate(root_vtxs)
         for v in project_head
             @constraint(model, T[i] >= tF[v])
         end
     end
-    cost1 = @expression(model, sum(map(v->tF[v]*get(project_schedule.weights,v,0.0), root_nodes)))
+    cost1 = @expression(model, sum(map(v->tF[v]*get(project_schedule.weights,v,0.0), root_vtxs)))
 end
 function get_objective_expr(milp,f::MakeSpan,model,project_schedule,tF)
     @variable(model, T)
@@ -2235,11 +2237,11 @@ JuMP.primal_status(model::GreedyAssignment)         = MOI.FEASIBLE_POINT
 get_assignment_matrix(model::GreedyAssignment)      = adjacency_matrix(get_graph(model.schedule))
 function JuMP.objective_function(model::GreedyAssignment{SumOfMakeSpans})
     t0,tF,slack,local_slack = process_schedule(model.schedule,model.t0)
-    return sum(tF[model.schedule.root_nodes] .* map(v->model.schedule.weights[v], model.schedule.root_nodes))
+    return sum(tF[model.schedule.root_vtxs] .* map(v->model.schedule.weights[v], model.schedule.root_vtxs))
 end
 function JuMP.objective_function(model::GreedyAssignment{MakeSpan})
     t0,tF,slack,local_slack = process_schedule(model.schedule,model.t0)
-    return maximum(tF[model.schedule.root_nodes])
+    return maximum(tF[model.schedule.root_vtxs])
 end
 function JuMP.objective_function(model::GreedyAssignment)
     println("UNKNOWN COST FUNCTION!")

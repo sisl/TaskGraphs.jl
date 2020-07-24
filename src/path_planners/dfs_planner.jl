@@ -94,15 +94,15 @@ function get_conflict_idx(envs,states,actions,i,ordering,idxs)
     end
     return -1
 end
-function get_next_node_matching_agent_id(schedule,cache,agent_id)
-    node_id = RobotID(agent_id)
-    for v in cache.active_set
-        if agent_id == get_path_spec(schedule, v).agent_id
-            return get_vtx_id(schedule,v)
-        end
-    end
-    return node_id
-end
+# function get_next_node_matching_agent_id(schedule,cache,agent_id)
+#     node_id = RobotID(agent_id)
+#     for v in cache.active_set
+#         if agent_id == get_path_spec(schedule, v).agent_id
+#             return get_vtx_id(schedule,v)
+#         end
+#     end
+#     return node_id
+# end
 function update_planning_cache!(solver,env)
     cache = env.cache
     schedule = env.schedule

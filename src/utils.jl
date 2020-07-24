@@ -168,12 +168,12 @@ function construct_task_graphs_problem(
     for i in 1:N
         tr0_[i] = 0.0
     end
-    root_node_groups = map(v->Set(get_input_ids(new_project_spec.operations[v])),collect(new_project_spec.root_nodes))
+    root_node_groups = map(v->Set(get_input_ids(new_project_spec.operations[v])),collect(new_project_spec.root_vtxs))
     problem_spec = ProblemSpec(N=N,M=M,graph=G,D=dist_matrix,
-        Δt=Δt,tr0_=tr0_,to0_=to0_,root_nodes=root_node_groups,
+        Δt=Δt,tr0_=tr0_,to0_=to0_,root_vtxs=root_node_groups,
         cost_function=cost_function,
         Δt_collect=Δt_collect,Δt_deliver=Δt_deliver,r0=r0,s0=s0,sF=sF)
-    # @show problem_spec.root_nodes
+    # @show problem_spec.root_vtxs
     return new_project_spec, problem_spec, object_ICs, object_FCs, robot_ICs
 end
 function construct_task_graphs_problem(
@@ -249,12 +249,12 @@ end
 #     for i in 1:N
 #         tr0_[i] = 0.0
 #     end
-#     root_node_groups = map(v->get_input_ids(project_spec.operations[v]),collect(project_spec.root_nodes))
+#     root_node_groups = map(v->get_input_ids(project_spec.operations[v]),collect(project_spec.root_vtxs))
 #     problem_spec = ProblemSpec(N=N,M=M,graph=G,D=dist_matrix,
-#         Δt=Δt_process,tr0_=tr0_,to0_=to0_,root_nodes=root_node_groups,
+#         Δt=Δt_process,tr0_=tr0_,to0_=to0_,root_vtxs=root_node_groups,
 #         cost_function=cost_function,
 #         Δt_collect=Δt_collect,Δt_deliver=Δt_deliver,r0=r0,s0=s0,sF=sF)
-#     # @show problem_spec.root_nodes
+#     # @show problem_spec.root_vtxs
 #     return project_spec, problem_spec, object_ICs, object_FCs, robot_ICs
 # end
 
@@ -615,7 +615,7 @@ function Base.:(==)(spec1::ProjectSpec,spec2::ProjectSpec)
         @assert(spec1.operations == spec2.operations)
         @assert(spec1.pre_deps == spec2.pre_deps)
         @assert(spec1.graph == spec2.graph)
-        @assert(spec1.root_nodes == spec2.root_nodes)
+        @assert(spec1.root_vtxs == spec2.root_vtxs)
         @assert(spec1.weights == spec2.weights)
         @assert(spec1.weight == spec2.weight)
         @assert(spec1.object_id_to_idx == spec2.object_id_to_idx)

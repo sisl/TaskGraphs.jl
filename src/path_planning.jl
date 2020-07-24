@@ -118,10 +118,15 @@ export
         cost_model = cost_model,
         costs = map(i->get_initial_cost(cost_model), 1:num_agents),
         cost = get_infeasible_cost(cost_model),
-        # cost  = aggregate_costs(cost_model,
-        #     map(i->get_initial_cost(cost_model), 1:num_agents)),
         )
 end
+struct ScheduleNode{V}
+    node::V
+    v::Int
+    path_spec::PathSpec
+    env::SearchEnv
+end
+
 function CRCBS.get_start(env::SearchEnv,v::Int)
     start_vtx   = get_path_spec(env.schedule,v).start_vtx
     start_time  = env.cache.t0[v]
@@ -139,6 +144,21 @@ CRCBS.num_states(env::SearchEnv) = num_states(env.env)
 CRCBS.num_actions(env::SearchEnv) = num_actions(env.env)
 
 initialize_planning_cache(env::SearchEnv) = initialize_planning_cache(env.schedule,deepcopy(env.cache.t0),deepcopy(env.cache.tF))
+
+"""
+    get_next_node_matching_agent_id(schedule,cache,agent_id)
+
+Return the node_id of the active node assigned to an agent.
+"""
+function get_next_node_matching_agent_id(env::SearchEnv,agent_id)
+    node_id = RobotID(agent_id)
+    for v in env.cache.active_set
+        if agent_id == get_path_spec(env.schedule, v).agent_id
+            return get_vtx_id(env.schedule,v)
+        end
+    end
+    return node_id
+end
 # function reverse_propagate_delay!(solver,cache,schedule,delay_vec)
 #     buffer = zeros(nv(schedule))
 #     for v in reverse(topological_sort_by_dfs(get_graph(schedule)))
@@ -306,16 +326,16 @@ end
 function CRCBS.SumOfMakeSpans(schedule::S,cache::C) where {S<:OperatingSchedule,C<:PlanningCache}
     SumOfMakeSpans(
         cache.tF,
-        schedule.root_nodes,
-        map(k->schedule.weights[k], schedule.root_nodes),
-        cache.tF[schedule.root_nodes])
+        schedule.root_vtxs,
+        map(k->schedule.weights[k], schedule.root_vtxs),
+        cache.tF[schedule.root_vtxs])
 end
 function CRCBS.MakeSpan(schedule::S,cache::C) where {S<:OperatingSchedule,C<:PlanningCache}
     MakeSpan(
         cache.tF,
-        schedule.root_nodes,
-        map(k->schedule.weights[k], schedule.root_nodes),
-        cache.tF[schedule.root_nodes])
+        schedule.root_vtxs,
+        map(k->schedule.weights[k], schedule.root_vtxs),
+        cache.tF[schedule.root_vtxs])
 end
 
 export
@@ -468,40 +488,36 @@ function CRCBS.build_env(solver, env::E, node::N, schedule_node::T, v::Int, path
     # update deadline in DeadlineCost
     set_deadline!(get_cost_model(cbs_env),deadline)
     # retrieve base_path
-    if !is_root_node(get_graph(env.schedule),v) # && agent_id != -1
-        # log_info(0,solver,string("retrieving base path for node ",v," of type ",typeof(schedule_node)))
-        base_path = get_paths(node.solution)[agent_id]
-    else
-        base_path = get_paths(node.solution)[agent_id]
-        # log_info(0,solver,string("initializing base path for node ",v," of type ",typeof(schedule_node)))
-        # start_vtx = path_spec.start_vtx
-        # base_path = Path{PCCBS.State,PCCBS.Action,cost_type(cbs_env)}(
-        #     s0=PCCBS.State(start_vtx, 0), # TODO fix start time
-        #     cost=get_initial_cost(cbs_env)
-        #     )
-        # try
-        #     @assert(PCCBS.State(path_spec.start_vtx, 0) == get_final_state(base_path),"State(path_spec.start_vtx, 0) = $((path_spec.start_vtx,0)), not equal to get_final_state(base_path) = $(get_final_state(base_path))")
-        # catch e
-        #     println(e.msg)
-        #     @show path_spec
-        #     @show schedule_node
-        #     throw(e)
-        # end
-    end
+    base_path = get_paths(node.solution)[agent_id]
     # make sure base_path hits t0 constraint
     if get_end_index(base_path) < env.cache.t0[v]
         log_info(1, solver, string("LOW LEVEL SEARCH: in schedule node ",v," -- ",
             string(schedule_node),": cache.t0[v] - get_end_index(base_path) = ",env.cache.t0[v] - get_end_index(base_path),". Extending path to ",env.cache.t0[v]," ..."))
-        # base_path = extend_path(cbs_env,base_path,env.cache.t0[v])
         extend_path!(cbs_env,base_path,env.cache.t0[v])
     end
-    # log_info(2,solver.l3_verbosity,
-    # "LOW LEVEL SEARCH: v=$(v), node=$(string(schedule_node)), deadline=$(deadline), ",
-    # "local_slack=$(env.cache.slack[v]), slack=$(env.cache.slack[v]), goal=$(string(cbs_env.goal)),
-    # ")
     return cbs_env, base_path
 end
-CRCBS.build_env(solver, env::SearchEnv, node::ConstraintTreeNode, v::Int) = build_env(solver, env, node, get_node_from_vtx(env.schedule,v), v)
+function get_base_path(search_env::SearchEnv,env::PCCBS.LowLevelEnv)
+    base_path = get_paths(search_env)[get_agent_id(env)]
+    v = get_vtx(search_env.schedule, env.node_id)
+    t0 = search_env.cache.t0[v]
+    gap = t0 - get_end_index(base_path),
+    if gap > 0
+        log_info(1, solver, string("LOW LEVEL SEARCH: in node ",v," -- ",
+            string(search_env.schedule_node),
+            ": cache.t0[v] - get_end_index(base_path) = ", gap,
+            ". Extending path to ",t0," ..."))
+        extend_path!(env,base_path,t0)
+    end
+end
+function CRCBS.build_env(solver, env::SearchEnv, node::ConstraintTreeNode, agent_id::Int)
+    node_id = get_next_node_matching_agent_id(env,agent_id)
+    build_env(solver,env,node,
+        get_node_from_id(env.schedule,node_id),
+        get_vtx(env.schedule,node_id)
+    )
+end
+
 """
 For COLLABORATIVE transport problems
 """
@@ -566,7 +582,8 @@ export
 struct PC_MAPF{E<:SearchEnv} <: AbstractMAPF
     env::E
 end
-
+CRCBS.build_env(solver, pc_mapf::PC_MAPF, args...) = build_env(solver,pc_mapf.env,args...)
+CRCBS.get_initial_solution(pc_mapf::PC_MAPF) = pc_mapf.env
 function CRCBS.initialize_root_node(env::SearchEnv)
     solution = SearchEnv(
         env,
@@ -604,6 +621,18 @@ end
 CRCBS.detect_conflicts!(table,env::SearchEnv,args...) = detect_conflicts!(table,env.route_plan,args...)
 CRCBS.serialize(pc_mapf::PC_MAPF,args...) = serialize(pc_mapf.env.env,args...)
 CRCBS.deserialize(pc_mapf::PC_MAPF,args...) = serialize(pc_mapf.env.env,args...)
+
+CRCBS.get_env(pc_mapf::PC_MAPF)             = pc_mapf.env
+CRCBS.action_type(pc_mapf::PC_MAPF)         = action_type(pc_mapf.env)
+CRCBS.state_type(pc_mapf::PC_MAPF)          = state_type(pc_mapf.env)
+CRCBS.cost_type(pc_mapf::PC_MAPF)           = cost_type(pc_mapf.env)
+CRCBS.num_agents(pc_mapf::PC_MAPF)          = num_agents(pc_mapf.env)
+# CRCBS.num_goals(pc_mapf::PC_MAPF)           = length(pc_mapf.goals)
+# CRCBS.get_starts(pc_mapf::PC_MAPF)          = pc_mapf.starts
+# CRCBS.get_goals(pc_mapf::PC_MAPF)           = pc_mapf.goals
+# CRCBS.get_start(pc_mapf::PC_MAPF, i)        = get_starts(pc_mapf)[i]
+# CRCBS.get_goal(pc_mapf::PC_MAPF, i)         = get_goals(pc_mapf)[i]
+# CRCBS.get_start(pc_mapf::PC_MAPF, env, i)   = get_start(pc_mapf,i)
 
 
 # end # PathPlanning module
