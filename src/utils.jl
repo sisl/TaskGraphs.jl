@@ -59,7 +59,6 @@ end
 
 export
     # validate,
-    exclude_solutions!,
     cached_pickup_and_delivery_distances,
     construct_task_graphs_problem
 

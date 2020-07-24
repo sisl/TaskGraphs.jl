@@ -124,7 +124,7 @@ function split_active_vtxs!(project_schedule::OperatingSchedule,problem_spec::Pr
             set_path_spec!(project_schedule,v2,PathSpec(get_path_spec(project_schedule,v2),tight=true,min_path_duration=tF[v2]-t0[v2]))
         end
     end
-    set_leaf_operation_nodes!(project_schedule)
+    set_leaf_operation_vtxs!(project_schedule)
     new_cache = initialize_planning_cache(project_schedule,t0,tF)
     project_schedule, new_cache
 end
@@ -255,7 +255,7 @@ function prune_schedule(project_schedule::OperatingSchedule,problem_spec::Proble
             end
         end
     end
-    set_leaf_operation_nodes!(new_schedule)
+    set_leaf_operation_vtxs!(new_schedule)
     # init planning cache with the existing solution
     new_cache = initialize_planning_cache(new_schedule,t0,tF)
 
@@ -302,7 +302,7 @@ function splice_schedules!(project_schedule::P,next_schedule::P) where {P<:Opera
         node_id2 = get_vtx_id(next_schedule, e.dst)
         add_edge!(project_schedule, node_id1, node_id2)
     end
-    set_leaf_operation_nodes!(project_schedule)
+    set_leaf_operation_vtxs!(project_schedule)
     project_schedule
 end
 splice_schedules!(project_schedule,next_schedule) = project_schedule

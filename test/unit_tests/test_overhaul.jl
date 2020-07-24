@@ -41,7 +41,7 @@ let
     cost = Int(round(value(objective_function(model))))
     adj_matrix = get_assignment_matrix(model)
     update_project_schedule!(solver.nbs_model,project_schedule,problem_spec,adj_matrix)
-    set_leaf_operation_nodes!(project_schedule)
+    set_leaf_operation_vtxs!(project_schedule)
     @test validate(project_schedule)
     print_project_schedule(project_schedule,"backtracking_schedule";mode=:root_align)
 

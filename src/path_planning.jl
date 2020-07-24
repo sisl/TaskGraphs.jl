@@ -13,36 +13,14 @@
 #
 # using ..TaskGraphs
 
-
-export
-    PC_TAPF
-
-const State = PCCBS.State
-const Action = PCCBS.Action
-
-"""
-    PC_TAPF{L<:LowLevelSolution}
-
-Defines an instance of a Precedence-Constrained Multi-Agent Task
-    Assignment and Path-Finding problem.
-"""
-struct PC_TAPF{L}
-    env::GridFactoryEnvironment
-    schedule::OperatingSchedule       # partial project schedule
-    initial_route_plan::L             # initial condition
-end
-
 include("legacy/pc_tapf_solver.jl")
 
 export
     PlanningCache,
     isps_queue_cost,
     initialize_planning_cache,
-    reset_cache!,
-    update_planning_cache!,
-    repair_solution!,
-    plan_path!,
-    plan_next_path!
+    reset_cache!
+
 
 @with_kw struct PlanningCache
     closed_set::Set{Int}                    = Set{Int}()    # nodes that are completed
@@ -120,11 +98,11 @@ export
         cost = get_infeasible_cost(cost_model),
         )
 end
-struct ScheduleNode{V}
-    node::V
+struct ScheduleNode{I,V}
     v::Int
+    node_id::I
+    node::V
     path_spec::PathSpec
-    env::SearchEnv
 end
 
 function CRCBS.get_start(env::SearchEnv,v::Int)
@@ -159,6 +137,9 @@ function get_next_node_matching_agent_id(env::SearchEnv,agent_id)
     end
     return node_id
 end
+
+export
+    update_planning_cache!
 # function reverse_propagate_delay!(solver,cache,schedule,delay_vec)
 #     buffer = zeros(nv(schedule))
 #     for v in reverse(topological_sort_by_dfs(get_graph(schedule)))
@@ -565,10 +546,24 @@ function reset_route_plan!(node::N,base_route_plan) where {N<:ConstraintTreeNode
     node
 end
 
-
 ################################################################################
 ############################## CBS Wrapper Stuff ###############################
 ################################################################################
+export
+    PC_TAPF
+
+const State = PCCBS.State
+const Action = PCCBS.Action
+
+"""
+    PC_TAPF{L<:LowLevelSolution}
+
+Defines an instance of a Precedence-Constrained Multi-Agent Task
+    Assignment and Path-Finding problem.
+"""
+struct PC_TAPF{E<:SearchEnv}
+    env::SearchEnv
+end
 
 export
     PC_MAPF

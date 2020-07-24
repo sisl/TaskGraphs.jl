@@ -26,8 +26,9 @@ let
     num_agents(pc_mapf)
     node  = initialize_root_node(solver,pc_mapf)
     build_env(solver,pc_mapf,node,1)
+    get_initial_solution(pc_mapf)
 
-    cache = pibt_init_cache(solver,mapf)
+    cache = CRCBS.pibt_init_cache(solver,pc_mapf)
     pibt!(solver,mapf)
 
 end
