@@ -42,7 +42,7 @@ Elements:
 - Δt::Vector{Float64}  - durations of operations
 - tr0_::Dict{Int,Float64} - robot start times
 - to0_::Dict{Int,Float64} - object start times
-- root_vtxs::Vector{Set{Int}} - identifies "project heads"
+- terminal_vtxs::Vector{Set{Int}} - identifies "project heads"
 - weights::Dict{Int,Float64} - stores weights associated with each project head
 - cost_function::F - the optimization objective (default is SumOfMakeSpans)
 - s0::Vector{Int} - pickup stations for each task
@@ -59,8 +59,8 @@ Elements:
     Δt_deliver::Vector{Float64} = zeros(M) # duration of DELIVER operations
     tr0_::Dict{Int,Float64} = Dict{Int,Float64}() # robot start times
     to0_::Dict{Int,Float64} = Dict{Int,Float64}() # object start times
-    root_vtxs::Vector{Set{Int}} = [get_all_root_nodes(graph)]
-    weights::Dict{Int,Float64} = Dict{Int,Float64}(v=>1.0 for v in 1:length(root_vtxs))
+    terminal_vtxs::Vector{Set{Int}} = [get_all_terminal_nodes(graph)]
+    weights::Dict{Int,Float64} = Dict{Int,Float64}(v=>1.0 for v in 1:length(terminal_vtxs))
     cost_function::F        = SumOfMakeSpans()
     r0::Vector{Int} = zeros(N)
     s0::Vector{Int} = zeros(M) # pickup stations for each task
@@ -93,7 +93,7 @@ Elements:
 - pre_deps::Dict{Int,Set{Int}} - maps object id to ids of operations that are required to produce that object
 - post_deps::Dict{Int,Set{Int}} - maps object id to ids of operations that depend on that object
 - graph::G
-- root_vtxs::Set{Int}
+- terminal_vtxs::Set{Int}
 - weights::Dict{Int,Float64}
 - M::Int
 - weight::Float64
@@ -106,8 +106,8 @@ Elements:
     pre_deps::Dict{Int,Set{Int}}  = Dict{Int,Set{Int}}() # id => (pre_conditions)
     post_deps::Dict{Int,Set{Int}} = Dict{Int,Set{Int}}()
     graph::G                      = DiGraph()
-    root_vtxs::Set{Int}          = Set{Int}()
-    weights::Dict{Int,Float64}    = Dict{Int,Float64}(v=>1.0 for v in root_vtxs)
+    terminal_vtxs::Set{Int}          = Set{Int}()
+    weights::Dict{Int,Float64}    = Dict{Int,Float64}(v=>1.0 for v in terminal_vtxs)
     weight::Float64               = 1.0
     M::Int                        = length(initial_conditions)
     object_id_to_idx::Dict{Int,Int} = Dict{Int,Int}(get_id(get_object_id(id))=>k for (k,id) in enumerate(initial_conditions))
@@ -188,9 +188,9 @@ function add_operation!(spec::ProjectSpec, op::Operation)
             add_edge!(G, op0_id, op_id) # for each (1) operation that generates object[id]
         end
     end
-    # set spec.root_vtxs = get_all_root_nodes(spec.graph)
-    union!(spec.root_vtxs, get_all_root_nodes(spec.graph))
-    intersect!(spec.root_vtxs, get_all_root_nodes(spec.graph))
+    # set spec.terminal_vtxs = get_all_terminal_nodes(spec.graph)
+    union!(spec.terminal_vtxs, get_all_terminal_nodes(spec.graph))
+    intersect!(spec.terminal_vtxs, get_all_terminal_nodes(spec.graph))
     spec
 end
 
@@ -447,25 +447,26 @@ constraint between them.
     # TODO add UID vector so that vertex deletion can be constant time
     vtx_ids             ::Vector{AbstractID}    = Vector{AbstractID}() # maps vertex uid to actual graph node
     path_specs          ::Vector{PathSpec}      = Vector{PathSpec}()
-    root_vtxs          ::Vector{Int}           = Vector{Int}() # list of "project heads"
+    terminal_vtxs           ::Vector{Int}           = Vector{Int}() # list of "project heads"
     weights             ::Dict{Int,Float64}     = Dict{Int,Float64}() # weights corresponding to project heads
 end
 Base.zero(schedule::OperatingSchedule{G}) where {G} = OperatingSchedule(graph=G())
 LightGraphs.edges(schedule::OperatingSchedule) = edges(schedule.graph)
 LightGraphs.is_directed(schedule::OperatingSchedule) = true
 for op in [
-    :edgetype,:has_edge,:has_vertex,:inneighbors,:ne,:nv,:outneighbors,:vertices
+    :edgetype,:has_edge,:has_vertex,:inneighbors,:ne,:nv,:outneighbors,
+    :vertices,:indegree,:outdegree
     ]
     @eval LightGraphs.$op(sched::OperatingSchedule,args...) = $op(sched.graph,args...)
 end
 
 CRCBS.get_graph(schedule::P) where {P<:OperatingSchedule}       = schedule.graph
 get_vtx_ids(schedule::P) where {P<:OperatingSchedule}     = schedule.vtx_ids
-get_root_vtxs(schedule::P) where {P<:OperatingSchedule}  = schedule.root_vtxs
+get_terminal_vtxs(schedule::P) where {P<:OperatingSchedule}  = schedule.terminal_vtxs
 get_root_node_weights(schedule::P) where {P<:OperatingSchedule}  = schedule.weights
 
 get_node_from_id(schedule::P,id::A) where {P<:OperatingSchedule,A<:AbstractID}= schedule.planning_nodes[id]
-CRCBS.get_vtx(schedule::P,id::A) where {P<:OperatingSchedule,A<:AbstractID}         = get(schedule.vtx_map, id, -1)
+CRCBS.get_vtx(schedule::P,id::A) where {P<:OperatingSchedule,A<:AbstractID} = get(schedule.vtx_map, id, -1)
 get_vtx_id(schedule::P,v::Int) where {P<:OperatingSchedule}                   = schedule.vtx_ids[v]
 get_node_from_vtx(schedule::P,v::Int) where {P<:OperatingSchedule}= schedule.planning_nodes[schedule.vtx_ids[v]]
 
@@ -501,6 +502,24 @@ function add_path_spec!(schedule::P,spec::S) where {P<:OperatingSchedule,S<:Path
     push!(schedule.path_specs, spec)
     set_path_spec!(schedule, nv(schedule.graph), spec)
 end
+
+export
+    ScheduleNode,
+    get_schedule_node
+
+struct ScheduleNode{I,V}
+    v::Int
+    node_id::I
+    node::V
+    path_spec::PathSpec
+end
+function get_schedule_node(schedule,node_id::AbstractID)
+    v = get_vtx(schedule,node_id)
+    node = get_node_from_id(schedule,node_id)
+    path_spec = get_path_spec(schedule,v)
+    return ScheduleNode(v,node_id,node,path_spec)
+end
+get_schedule_node(schedule,v::Int) = get_schedule_node(schedule,get_vtx_id(schedule,v))
 
 """
     generate_path_spec(schedule,spec,node)
@@ -681,7 +700,7 @@ function get_leaf_operation_vtxs(schedule::OperatingSchedule)
             end
         end
     end
-    return root_vtxs
+    return terminal_vtxs
 end
 function set_leaf_operation_vtxs!(schedule::OperatingSchedule)
     empty!(get_root_vtxs(schedule))
@@ -1053,7 +1072,7 @@ function construct_partial_project_schedule(
     # add root nodes
     for operation_id in root_ops
         v = get_vtx(project_schedule, operation_id)
-        push!(project_schedule.root_vtxs, v)
+        push!(project_schedule.terminal_vtxs, v)
         project_schedule.weights[v] = 1.0
     end
     # Fill in gaps in project schedule (except for GO assignments)
@@ -1099,7 +1118,7 @@ function construct_partial_project_schedule(spec::ProjectSpec,problem_spec::Prob
         spec.final_conditions,
         map(i->robot_ICs[i], 1:min(length(robot_ICs),problem_spec.N)),
         spec.operations,
-        map(op->op.id, spec.operations[collect(spec.root_vtxs)]),
+        map(op->op.id, spec.operations[collect(spec.terminal_vtxs)]),
         problem_spec,
     )
 end
@@ -1117,12 +1136,12 @@ function process_schedule(schedule::P,t0=zeros(Int,nv(schedule)),
 
     G = get_graph(schedule)
     traversal = topological_sort_by_dfs(G)
-    n_roots = max(length(schedule.root_vtxs),1)
+    n_roots = max(length(schedule.terminal_vtxs),1)
     slack = map(i->Inf*ones(n_roots), vertices(G))
     local_slack = map(i->Inf*ones(n_roots), vertices(G))
     # max_deadlines = map(i->typemax(Int), vertices(G))
     # True terminal nodes
-    for (i,v) in enumerate(schedule.root_vtxs)
+    for (i,v) in enumerate(schedule.terminal_vtxs)
         slack[v] = Inf*ones(n_roots)
         slack[v][i] = 0 # only slack for corresponding head is set to 0
     end

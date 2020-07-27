@@ -39,7 +39,7 @@ function construct_cost_model(solver::DFSRoutePlanner,
 end
 
 export
-    sorted_actions,
+    # sorted_actions,
     get_conflict_idx,
     select_action_dfs!,
     get_next_node_matching_agent_id,
@@ -60,13 +60,13 @@ function update_search_state(s,i)
     end
     s
 end
-function sorted_actions(env,s)
-    f = (s,a,sp)->add_heuristic_cost(env,get_transition_cost(env,s,a,sp),get_heuristic_cost(env,sp))
-    sort(
-        collect(get_possible_actions(env,s)),
-        by=a->f(s,a,get_next_state(env,s,a))
-    )
-end
+# function sorted_actions(env,s)
+#     f = (s,a,sp)->add_heuristic_cost(env,get_transition_cost(env,s,a,sp),get_heuristic_cost(env,sp))
+#     sort(
+#         collect(get_possible_actions(env,s)),
+#         by=a->f(s,a,get_next_state(env,s,a))
+#     )
+# end
 
 """
     get_conflict_idx(envs,states,actions,i,ordering,idxs)
@@ -158,7 +158,7 @@ function update_envs!(solver,search_env,envs,paths)
             env = envs[i]
             path = paths[i]
             v = get_vtx(schedule,env.node_id)
-            envs[i],_ = build_env(solver,search_env,cbs_node,v)
+            envs[i] = build_env(solver,search_env,cbs_node,v)
         end
     end
     # mark finished envs as complete
@@ -202,7 +202,7 @@ function update_envs!(solver,search_env,envs,paths)
             node_id = get_next_node_matching_agent_id(schedule,cache,env.agent_idx)
             @assert node_id != env.node_id
             if get_vtx(schedule,node_id) in cache.active_set
-                envs[i],_ = build_env(solver,search_env,cbs_node,get_vtx(schedule,node_id))
+                envs[i] = build_env(solver,search_env,cbs_node,get_vtx(schedule,node_id))
                 # i = 0
                 i -= 1
             else
@@ -355,7 +355,7 @@ function CRCBS.solve!(
     cbs_node = initialize_root_node(search_env)
     for i in 1:search_env.num_agents
         node_id = get_next_node_matching_agent_id(search_env.schedule,search_env.cache,i)
-        envs[i], _ = build_env(solver,search_env,cbs_node,get_vtx(search_env.schedule,node_id))
+        envs[i] = build_env(solver,search_env,cbs_node,get_vtx(search_env.schedule,node_id))
     end
 
     envs, paths, status = prioritized_dfs_search(solver,search_env,envs,paths;

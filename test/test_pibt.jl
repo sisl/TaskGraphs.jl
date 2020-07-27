@@ -20,7 +20,9 @@ let
     sched, cost = solve_assignment_problem!(solver.assignment_model,prob,base_search_env)
     @test validate(sched)
 
-    search_env = construct_search_env(solver,deepcopy(sched),base_search_env)
+    solver = PIBTPlanner{NTuple{3,Float64}}()
+    search_env = construct_search_env(planner,deepcopy(sched),base_search_env)
+    @show get_cost_model(search_env)
     pc_mapf = PC_MAPF(search_env)
 
     num_agents(pc_mapf)
