@@ -76,16 +76,16 @@ let
     let
         project_spec = ProjectSpec(initial_conditions=object_ICs,final_conditions=object_FCs)
         add_operation!(project_spec,construct_operation(project_spec, 3, [1,2], [3], 1.0))
-        @test project_spec.root_vtxs == Set{Int}([1])
+        @test project_spec.terminal_vtxs == Set{Int}([1])
         add_operation!(project_spec,construct_operation(project_spec, 6, [3], [], 0.0))
-        @test project_spec.root_vtxs == Set{Int}([2])
+        @test project_spec.terminal_vtxs == Set{Int}([2])
     end
     let
         project_spec = ProjectSpec(initial_conditions=object_ICs,final_conditions=object_FCs)
         add_operation!(project_spec,construct_operation(project_spec, 3, [1,2], [], 1.0))
-        @test project_spec.root_vtxs == Set{Int}([1])
+        @test project_spec.terminal_vtxs == Set{Int}([1])
         add_operation!(project_spec,construct_operation(project_spec, 6, [3], [], 0.0))
-        @test project_spec.root_vtxs == Set{Int}([1,2])
+        @test project_spec.terminal_vtxs == Set{Int}([1,2])
     end
     let
         project_spec = ProjectSpec(initial_conditions=object_ICs,final_conditions=object_FCs)
