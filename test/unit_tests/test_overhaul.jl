@@ -17,189 +17,19 @@ include(joinpath(pathof(TaskGraphs),"../..","test/notebooks/render_tools.jl"))
 # for f in *.svg; do inkscape -z $f -e $f.png; done
 
 let
-
-    Random.seed!(0);
-    # Define Environment
-    vtx_grid = initialize_dense_vtx_grid(8,8);
-    env_graph = initialize_grid_graph_from_vtx_grid(vtx_grid);
-    dist_matrix = get_dist_matrix(env_graph);
-    # Define project
-    N = 1; M = 2;
-    object_ICs = [OBJECT_AT(j,j) for j in 1:M];
-    object_FCs = [OBJECT_AT(j,j+M) for j in 1:M];
-    robot_ICs = [ROBOT_AT(i,i) for i in 1:N];
-    spec = construct_random_project_spec(M,object_ICs,object_FCs;max_parents=3);
-    operations = spec.operations;
-    root_ops = map(op->op.id, spec.operations[collect(spec.root_nodes)])
-    problem_spec = ProblemSpec(N=N,M=M,D=dist_matrix);
-
-    # Construct Partial Project Schedule
-    project_schedule = construct_partial_project_schedule(spec,problem_spec,robot_ICs)
-
-    # edge_list = collect(edges(project_schedule.graph))
-    # nodes = map(id->get_node_from_id(project_schedule, id), project_schedule.vtx_ids)
-    # nodes, edge_list
-
-    # Formulate MILP problem
-    model = formulate_schedule_milp(project_schedule,problem_spec)
-
-    # Optimize!
-    optimize!(model)
-    @show status = termination_status(model)
-    obj_val = Int(round(value(objective_function(model))))
-
+    project_spec, problem_spec, robot_ICs, assignments, env_graph = pctapf_problem_1(;verbose=false);
+    project_schedule = construct_partial_project_schedule(
+        project_spec,
+        problem_spec,
+        robot_ICs,
+        )
     print_project_schedule(project_schedule,"project_schedule1";mode=:leaf_aligned)
-
-    # Update Project Graph by adding all edges encoded by the optimized adjacency graph
-    update_project_schedule!(project_schedule,problem_spec,adj_matrix)
-    print_project_schedule(project_schedule,"project_schedule2")
-
-    @test validate(project_schedule)
 end
 # let
 
-# Verify that old method (assignment milp) and new method (adjacency matrix
-    # milp) yield the same costs
-let
-
-    for (i, f) in enumerate([
-        initialize_toy_problem_1,
-        initialize_toy_problem_2,
-        initialize_toy_problem_3,
-        initialize_toy_problem_4,
-        initialize_toy_problem_5,
-        initialize_toy_problem_6,
-        initialize_toy_problem_7,
-        initialize_toy_problem_8,
-        ])
-        for cost_model in [MakeSpan, SumOfMakeSpans]
-            costs = Float64[]
-            schedules = OperatingSchedule[]
-            project_spec, problem_spec, robot_ICs, assignments, env_graph = f(;verbose=false);
-            for milp_model in [AssignmentMILP(),AdjacencyMILP(),SparseAdjacencyMILP()]
-                # MILP formulations alone
-                schedule = construct_partial_project_schedule(project_spec,problem_spec,map(i->robot_ICs[i], 1:problem_spec.N))
-                model = formulate_milp(milp_model,schedule,problem_spec;cost_model=cost_model)
-                optimize!(model)
-                @test termination_status(model) == MOI.OPTIMAL
-                cost = Int(round(value(objective_function(model))))
-                adj_matrix = get_assignment_matrix(model)
-                update_project_schedule!(milp_model,schedule,problem_spec,adj_matrix)
-                push!(costs, cost)
-                push!(schedules, schedule)
-                @test validate(schedule)
-                @test cost != Inf
-
-                # Check that it matches low_level_search
-                solver = PC_TAPF_Solver(verbosity=0)
-                env = construct_search_env(solver, schedule, problem_spec, env_graph;primary_objective=cost_model)
-                pc_mapf = PC_MAPF(env)
-                constraint_node = initialize_root_node(pc_mapf)
-                low_level_search!(solver,pc_mapf,constraint_node)
-                @show i, f, milp_model, cost_model, cost, constraint_node.cost
-                @test constraint_node.cost[1] == cost
-                @test validate(env.schedule)
-            end
-            if !(costs[1] == costs[2])
-                print_project_schedule(schedules[1],string("project_schedule1_",i))
-                print_project_schedule(schedules[2],string("project_schedule2_",i))
-            end
-            if !(costs[1] == costs[3])
-                print_project_schedule(schedules[1],string("project_schedule1_",i))
-                print_project_schedule(schedules[3],string("project_schedule3_",i))
-            end
-            @test all(costs .== costs[1])
-        end
-    end
-end
-# Test GreedyAssignment
-let
-
-    for (i, f) in enumerate([
-        initialize_toy_problem_1,
-        initialize_toy_problem_2,
-        initialize_toy_problem_3,
-        initialize_toy_problem_4,
-        initialize_toy_problem_5,
-        initialize_toy_problem_6,
-        initialize_toy_problem_7,
-        initialize_toy_problem_8,
-        ])
-        for cost_model in [MakeSpan, SumOfMakeSpans]
-            costs = Float64[]
-            project_spec, problem_spec, robot_ICs, assignments, env_graph = f(;verbose=false);
-            for milp_model in [SparseAdjacencyMILP(),GreedyAssignment()]
-                # MILP formulations alone
-                schedule = construct_partial_project_schedule(project_spec,problem_spec,map(i->robot_ICs[i], 1:problem_spec.N))
-                model = formulate_milp(milp_model,schedule,problem_spec;cost_model=cost_model)
-                optimize!(model)
-                @test termination_status(model) == MOI.OPTIMAL
-                cost = Int(round(value(objective_function(model))))
-                adj_matrix = get_assignment_matrix(model)
-                update_project_schedule!(milp_model,schedule,problem_spec,adj_matrix)
-                @test validate(schedule)
-                @test cost != Inf
-                push!(costs, cost)
-
-                # Check that it matches low_level_search
-                solver = PC_TAPF_Solver(verbosity=0)
-                env = construct_search_env(solver, schedule, problem_spec, env_graph;primary_objective=cost_model)
-                pc_mapf = PC_MAPF(env)
-                constraint_node = initialize_root_node(pc_mapf)
-                low_level_search!(solver,pc_mapf,constraint_node)
-                @show i, f, milp_model, cost_model, cost, constraint_node.cost
-                @test get_primary_cost(solver,constraint_node.cost) == cost
-                @test validate(env.schedule)
-            end
-            @show costs
-        end
-    end
-end
-# Test that the full planning stack works with the new model and returns the same final cost
-let
-
-    for (i, f) in enumerate([
-        initialize_toy_problem_1,
-        initialize_toy_problem_2,
-        initialize_toy_problem_3,
-        initialize_toy_problem_4,
-        initialize_toy_problem_5,
-        initialize_toy_problem_6,
-        initialize_toy_problem_7,
-        initialize_toy_problem_8,
-        # initialize_toy_problem_10,
-        ])
-        for cost_model in [SumOfMakeSpans, MakeSpan]
-            let
-                costs = Float64[]
-                project_spec, problem_spec, robot_ICs, assignments, env_graph = f(;verbose=false);
-                for milp_model in [AssignmentMILP(),AdjacencyMILP(),SparseAdjacencyMILP()]
-                    solver = PC_TAPF_Solver(nbs_model=milp_model,l3_verbosity=0)
-                    solution, assignment, cost, env = high_level_search!(
-                        solver,
-                        env_graph,
-                        project_spec,
-                        problem_spec,
-                        robot_ICs,
-                        Gurobi.Optimizer;
-                        primary_objective=cost_model,
-                        )
-                    push!(costs, cost[1])
-                    @show f
-                    @test validate(env.schedule)
-                    @show convert_to_vertex_lists(solution)
-                    @test validate(env.schedule, convert_to_vertex_lists(solution), env.cache.t0, env.cache.tF)
-                    @test cost[1] != Inf
-                end
-                @test all(costs .== costs[1])
-            end
-        end
-    end
-end
-
 # Backtracking motivating example
 let
-    f = initialize_toy_problem_10
+    f = pctapf_problem_10
     cost_model = MakeSpan
     project_spec, problem_spec, robot_ICs, assignments, env_graph = f(;cost_function=cost_model,verbose=true)
     solver = PC_TAPF_Solver(nbs_model=AssignmentMILP(),l1_verbosity=2,l2_verbosity=2,l3_verbosity=0)
@@ -211,7 +41,7 @@ let
     cost = Int(round(value(objective_function(model))))
     adj_matrix = get_assignment_matrix(model)
     update_project_schedule!(solver.nbs_model,project_schedule,problem_spec,adj_matrix)
-    set_leaf_operation_nodes!(project_schedule)
+    set_leaf_operation_vtxs!(project_schedule)
     @test validate(project_schedule)
     print_project_schedule(project_schedule,"backtracking_schedule";mode=:root_align)
 
@@ -814,17 +644,17 @@ end
 let
 
     i = 1
-    f = initialize_toy_problem_1
+    f = pctapf_problem_1
     cost_model = MakeSpan
     for (i, f) in enumerate([
-                initialize_toy_problem_1,
-                initialize_toy_problem_2,
-                initialize_toy_problem_3,
-                initialize_toy_problem_4,
-                initialize_toy_problem_5,
-                initialize_toy_problem_6,
-                initialize_toy_problem_7,
-                initialize_toy_problem_8,
+                pctapf_problem_1,
+                pctapf_problem_2,
+                pctapf_problem_3,
+                pctapf_problem_4,
+                pctapf_problem_5,
+                pctapf_problem_6,
+                pctapf_problem_7,
+                pctapf_problem_8,
             ])
         project_spec, problem_spec, robot_ICs, assignments, env_graph = f(;verbose=false);
         milp_model = GreedyAssignment()
@@ -935,7 +765,7 @@ end
 let
 
     # init env
-    project_spec, problem_spec, robot_ICs, assignments, env_graph = initialize_toy_problem_3(;verbose=false);
+    project_spec, problem_spec, robot_ICs, assignments, env_graph = pctapf_problem_3(;verbose=false);
     primary_objective=MakeSpan
     # define solver
     solver = PC_TAPF_Solver()

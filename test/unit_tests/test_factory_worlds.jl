@@ -99,6 +99,19 @@ let
 end
 # test custom envs for different-sized robot sizes
 let
+    vtx_grid = initialize_dense_vtx_grid(4,4)
+    #  1   2   3   4
+    #  5   6   7   8
+    #  9  10  11  12
+    # 13  14  15  16
+    env = construct_factory_env_from_vtx_grid(vtx_grid)
+    for i in 1:3
+        for j in 1:3
+            # @show env.expanded_zones[vtx_grid[i,j]]
+        end
+    end
+end
+let
     factory_env = construct_regular_factory_world(;n_obstacles_x=1,n_obstacles_y=1)
     # 1   2   3   4   5   6
     # 7   8   9  10  11  12

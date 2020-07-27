@@ -2,7 +2,6 @@ module PlanningPredicates
 
 using Parameters
 
-
 export
     reset_task_id_counter!,
     get_unique_task_id,
@@ -98,29 +97,6 @@ end
 ROBOT_AT(r::Int,args...) = ROBOT_AT(RobotID(r),args...)
 ROBOT_AT(r::RobotID,x::Int) = ROBOT_AT(r,LocationID(x))
 
-# @with_kw struct LocationID <: AbstractID
-# 	id::Int = -1
-# end
-# @with_kw struct TerminalRobotID <: AbstractID
-# 	id::Int = -1
-# end
-
-# struct TERMINAL_ROBOT_AT <: AbstractPlanningPredicate
-#     r::TerminalRobotID
-#     x::LocationID
-# end
-# TERMINAL_ROBOT_AT(r::Int,x::Int) = TERMINAL_ROBOT_AT(TerminalRobotID(r),LocationID(x))
-
-# struct CAN_CARRY <: AbstractPlanningPredicate
-#     r::RobotID
-#     o::ObjectID
-# end
-
-# get_object_id(pred::CAN_CARRY) = pred.o
-# get_location_id(pred::TERMINAL_ROBOT_AT) = pred.x
-# get_robot_id(pred::TERMINAL_ROBOT_AT) = pred.r
-# get_robot_id(pred::CAN_CARRY) = pred.r
-
 export
     get_object_id,
     get_location_id,
@@ -161,9 +137,6 @@ postconditions(op::Operation) = op.post
 add_conditions(op::Operation) = op.post
 delete_conditions(op::Operation) = op.pre
 get_id(op::Operation) = get_id(op.id)
-# function Base.:(==)(op1::Operation,op2::Operation)
-# 	if op
-# end
 
 export
     AbstractRobotAction,
@@ -526,27 +499,6 @@ validate_edge(n1::CARRY,		n2::DEPOSIT		) = (n1.x2 	== n2.x) && (n1.o == n2.o)
 validate_edge(n1::DEPOSIT,		n2::CARRY		) = false
 validate_edge(n1::DEPOSIT,		n2::GO			) = (n1.x 	== n2.x1)
 validate_edge(n1::N,n2::N) where {N<:Union{COLLECT,DEPOSIT}} = (n1.x == n2.x) # job shop edges are valid
-
-
-# """
-#     COLLABORATE
-#
-#     Collaborative action (CARRY, COLLECT, or DEPOSIT).
-#
-#     `robots` specifies the ordered list of robots in the team
-#     `configuration` specifies their configuration relative to the object center
-#     `a` provides the underlying action (CARRY, COLLECT, DEPOSIT)
-# """
-# struct COLLABORATE{A} <: AbstractRobotAction
-#     robots::Vector{RobotID}
-#     configuration::Vector{Tuple{Int}}
-#     a::A
-# end
-#
-# get_robot_id(a::A) where {A<:COLLABORATE}                           = a.robots
-# get_initial_location_id(a::A) where {A<:COLLABORATE}                = get_initial_location_id(a.a)
-# get_destination_location_id(a::A) where {A<:COLLABORATE}            = get_destination_location_id(a.a)
-# get_object_id(a::A) where {A<:COLLABORATE}                          = get_object_id(a.a)
 
 # """ Planning Resources (at the assignment level) """
 # abstract type AbstractResource end

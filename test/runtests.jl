@@ -46,10 +46,7 @@ end
 global_logger(SimpleLogger(stderr, Logging.Debug))
 # Define package tests
 @time @testset "TaskGraphs Package Tests" begin
-    testdir = joinpath(dirname(@__DIR__), "test")
-    @time @testset "TaskGraphs.FactoryWorlds" begin
-        include(joinpath(testdir, "test_factory_worlds.jl"))
-    end
+    testdir = joinpath(dirname(@__DIR__), "test/unit_tests")
     @time @testset "TaskGraphs.PlanningPredicates" begin
         include(joinpath(testdir, "test_predicates.jl"))
     end
@@ -60,20 +57,17 @@ global_logger(SimpleLogger(stderr, Logging.Debug))
         include(joinpath(testdir, "test_core.jl"))
     end
     @time @testset "TaskGraphs.ExampleTests" begin
-        include(joinpath(testdir, "test_examples_milp.jl"))
+        include(joinpath(testdir, "test_milp_solvers.jl"))
     end
     @time @testset "TaskGraphs.PathPlanning" begin
         include(joinpath(testdir, "test_path_planning.jl"))
     end
-    # @time @testset "TaskGraphs.ProcessTime" begin
-    #     include(joinpath(testdir, "test_process_time.jl"))
-    # end
-    # @time @testset "TaskGraphs.MultiHeadProjects" begin
-    #     include(joinpath(testdir, "test_multihead_projects.jl"))
-    # end
-    # @time @testset "TaskGraphs.Replanning" begin
-    #     include(joinpath(testdir, "test_replanning.jl"))
-    # end
+    @time @testset "TaskGraphs.Solvers" begin
+        include(joinpath(testdir, "test_solver.jl"))
+    end
+    @time @testset "TaskGraphs.Replanning" begin
+        include(joinpath(testdir, "test_replanning.jl"))
+    end
     # @time @testset "TaskGraphs.Profiling" begin
     #     include(joinpath(testdir, "test_profiling.jl"))
     # end

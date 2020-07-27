@@ -43,6 +43,16 @@ let
     add_operation!(spec,op3)
     @test has_edge(spec.graph, spec.op_id_to_vtx[get_id(op1)], spec.op_id_to_vtx[get_id(op2)])
     @test has_edge(spec.graph, spec.op_id_to_vtx[get_id(op2)], spec.op_id_to_vtx[get_id(op3)])
+
+end
+let
+    def = SimpleProblemDef(
+        project_spec = ProjectSpec(),
+        r0 = [1,2,3],
+        s0 = [1,2,3],
+        sF = [1,2,3],
+    )
+    @test length(def.shapes) == length(def.s0)
 end
 # ProjectSpec
 let
@@ -66,16 +76,16 @@ let
     let
         project_spec = ProjectSpec(initial_conditions=object_ICs,final_conditions=object_FCs)
         add_operation!(project_spec,construct_operation(project_spec, 3, [1,2], [3], 1.0))
-        @test project_spec.root_nodes == Set{Int}([1])
+        @test project_spec.terminal_vtxs == Set{Int}([1])
         add_operation!(project_spec,construct_operation(project_spec, 6, [3], [], 0.0))
-        @test project_spec.root_nodes == Set{Int}([2])
+        @test project_spec.terminal_vtxs == Set{Int}([2])
     end
     let
         project_spec = ProjectSpec(initial_conditions=object_ICs,final_conditions=object_FCs)
         add_operation!(project_spec,construct_operation(project_spec, 3, [1,2], [], 1.0))
-        @test project_spec.root_nodes == Set{Int}([1])
+        @test project_spec.terminal_vtxs == Set{Int}([1])
         add_operation!(project_spec,construct_operation(project_spec, 6, [3], [], 0.0))
-        @test project_spec.root_nodes == Set{Int}([1,2])
+        @test project_spec.terminal_vtxs == Set{Int}([1,2])
     end
     let
         project_spec = ProjectSpec(initial_conditions=object_ICs,final_conditions=object_FCs)
@@ -121,13 +131,6 @@ let
     get_actions(sched)
     get_operations(sched)
 
-    get_num_actions(sched)
-    get_num_operations(sched)
-    get_num_object_ICs(sched)
-    get_num_robot_ICs(sched)
-    get_num_vtxs(sched)
-    get_num_paths(sched)
-
     zero(sched)
     LightGraphs.edges(sched)
     LightGraphs.edgetype(sched)
@@ -152,7 +155,7 @@ let
 end
 # Test process_schedule
 let
-    project_spec, problem_spec, robot_ICs, optimal_assignments, env_graph = initialize_toy_problem_1()
+    project_spec, problem_spec, robot_ICs, _, env_graph = pctapf_problem_1()
 
     project_schedule = construct_partial_project_schedule(project_spec,problem_spec,robot_ICs)
     model = formulate_milp(AssignmentMILP(),project_schedule,problem_spec;cost_model=MakeSpan())
@@ -166,7 +169,7 @@ let
     @test t0[get_vtx(project_schedule,RobotID(2))] == 0
     # try with perturbed start times
     t0[get_vtx(project_schedule,RobotID(2))] = 1
-    t0,tF,slack,local_slack = process_schedule(project_schedule;t0=t0)
+    t0,tF,slack,local_slack = process_schedule(project_schedule,t0)
     @test t0[get_vtx(project_schedule,RobotID(1))] == 0
     @test t0[get_vtx(project_schedule,RobotID(2))] == 1
 
@@ -176,8 +179,7 @@ let
     end
 end
 let
-    project_spec, problem_spec, robot_ICs, optimal_assignments, env_graph = initialize_toy_problem_1()
-    assignment_dict = Dict(k=>v for (k,v) in enumerate(optimal_assignments))
+    project_spec, problem_spec, robot_ICs, _, env_graph = pctapf_problem_1()
 
     filename = "/tmp/project_spec.toml"
     open(filename, "w") do io

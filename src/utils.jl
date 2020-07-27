@@ -1,15 +1,15 @@
-module TaskGraphsUtils
-
-using Parameters
-using LightGraphs, MetaGraphs
-using GraphUtils
-using LinearAlgebra
-using DataStructures
-using JuMP, MathOptInterface, Gurobi
-using Random
-
-using ..TaskGraphs
-using CRCBS
+# module TaskGraphsUtils
+#
+# using Parameters
+# using LightGraphs, MetaGraphs
+# using GraphUtils
+# using LinearAlgebra
+# using DataStructures
+# using JuMP, MathOptInterface, Gurobi
+# using Random
+#
+# using ..TaskGraphs
+# using CRCBS
 # using ..FactoryWorlds
 # using ..PlanningPredicates
 # using ..TaskGraphsCore
@@ -59,7 +59,6 @@ end
 
 export
     # validate,
-    exclude_solutions!,
     cached_pickup_and_delivery_distances,
     construct_task_graphs_problem
 
@@ -112,7 +111,7 @@ function construct_task_graphs_problem(
         dist_matrix;
         Δt_collect=zeros(length(s0)),
         Δt_deliver=zeros(length(sF)),
-        cost_function=SumOfMakeSpans,
+        cost_function=SumOfMakeSpans(),
         task_shapes=map(o->(1,1),s0),
         shape_dict=Dict{Int,Dict{Tuple{Int,Int},Vector{Int}}}(s=>Dict{Tuple{Int,Int},Vector{Int}}() for s in vcat(s0,sF))
         ) where {P<:ProjectSpec}
@@ -121,8 +120,13 @@ function construct_task_graphs_problem(
     # project_spec    = construct_random_project_spec(M,s0,sF;max_parents=3,depth_bias=1.0,Δt_min=0,Δt_max=0)
     N = length(r0)
     M = length(s0)
-    object_ICs = Vector{OBJECT_AT}([OBJECT_AT(o, get(shape_dict[s0[o]], task_shapes[o], s0[o]), task_shapes[o]) for o in 1:M]) # initial object conditions
-    object_FCs = Vector{OBJECT_AT}([OBJECT_AT(o, get(shape_dict[sF[o]], task_shapes[o], sF[o]), task_shapes[o]) for o in 1:M]) # final object conditions
+    for j in 1:M
+        @assert haskey(shape_dict, s0[j]) "shape_dict has no key for s0[$j] = $(s0[j])"
+        @assert haskey(shape_dict, sF[j]) "shape_dict has no key for sF[$j] = $(sF[j])"
+        @assert length(task_shapes) >= j "task_shapes has no key for j = $j"
+    end
+    object_ICs = Vector{OBJECT_AT}([OBJECT_AT(j, get(shape_dict[s0[j]], task_shapes[j], s0[j]), task_shapes[j]) for j in 1:M]) # initial object conditions
+    object_FCs = Vector{OBJECT_AT}([OBJECT_AT(j, get(shape_dict[sF[j]], task_shapes[j], sF[j]), task_shapes[j]) for j in 1:M]) # final object conditions
     new_project_spec = ProjectSpec(
         M=M,
         initial_conditions=object_ICs,
@@ -163,73 +167,95 @@ function construct_task_graphs_problem(
     for i in 1:N
         tr0_[i] = 0.0
     end
-    root_node_groups = map(v->Set(get_input_ids(new_project_spec.operations[v])),collect(new_project_spec.root_nodes))
+    root_node_groups = map(v->Set(get_input_ids(new_project_spec.operations[v])),collect(new_project_spec.terminal_vtxs))
     problem_spec = ProblemSpec(N=N,M=M,graph=G,D=dist_matrix,
-        Δt=Δt,tr0_=tr0_,to0_=to0_,root_nodes=root_node_groups,
+        Δt=Δt,tr0_=tr0_,to0_=to0_,terminal_vtxs=root_node_groups,
         cost_function=cost_function,
         Δt_collect=Δt_collect,Δt_deliver=Δt_deliver,r0=r0,s0=s0,sF=sF)
-    # @show problem_spec.root_nodes
+    # @show problem_spec.terminal_vtxs
     return new_project_spec, problem_spec, object_ICs, object_FCs, robot_ICs
 end
 function construct_task_graphs_problem(
-        def::SimpleProblemDef,
+    def::SimpleProblemDef,
+    dist_matrix;
+    task_shapes = def.shapes,
+    kwargs...,
+)
+    construct_task_graphs_problem(
+        def.project_spec,
+        def.r0,
+        def.s0,
+        def.sF,
         dist_matrix;
-        task_shapes=def.shapes,
-        kwargs...)
-    construct_task_graphs_problem(def.project_spec,def.r0,def.s0,def.sF,dist_matrix;task_shapes=task_shapes,kwargs...)
+        task_shapes = task_shapes,
+        kwargs...,
+    )
 end
 function construct_task_graphs_problem(
-        operations::Vector{Operation},
-        robot_ICs::Vector{ROBOT_AT},
-        object_ICs::Vector{OBJECT_AT},
-        object_FCs::Vector{OBJECT_AT},
-        dist_function,
-        Δt_collect=zeros(length(object_ICs)),
-        Δt_deliver=zeros(length(object_ICs)),
-        Δt_process=zeros(length(operations));
-        cost_function=SumOfMakeSpans
-        ) where {P<:ProjectSpec}
-    # select subset of pickup, dropoff and free locations to instantiate objects and robots
-    # r0,s0,sF        = get_random_problem_instantiation(N,M,pickup_vtxs,dropoff_vtxs,free_vtxs)
-    # project_spec    = construct_random_project_spec(M,s0,sF;max_parents=3,depth_bias=1.0,Δt_min=0,Δt_max=0)
-    N = length(robot_ICs)
-    M = length(object_ICs)
-    r0 = map(pred->get_id(get_location_id(pred)),robot_ICs)
-    s0 = map(pred->get_id(get_location_id(pred)),object_ICs)
-    sF = map(pred->get_id(get_location_id(pred)),object_FCs)
-    # object_ICs = Vector{OBJECT_AT}([OBJECT_AT(o,s0[o]) for o in 1:M]) # initial object conditions
-    # object_FCs = Vector{OBJECT_AT}([OBJECT_AT(o,sF[o]) for o in 1:M]) # final object conditions
-    # M = length(object_ICs)
-    # object_ICs = project_spec.initial_conditions
-    # object_FCs = project_spec.final_conditions
-    # robot_ICs = Dict{Int,ROBOT_AT}(r => ROBOT_AT(r,r0[r]) for r in 1:N) # initial robot conditions
-    for r in 1:M # dummy robots
-        robot_ICs[r+N] = ROBOT_AT(r+N,sF[r])
-    end
-
-    delivery_graph = construct_delivery_graph(project_spec,M)
-    # display(delivery_graph.tasks)
-    G = delivery_graph.graph
-    # Δt = get_duration_vector(project_spec) # initialize vector of operation times
-    # set initial conditions
-    to0_ = Dict{Int,Float64}()
-    for v in vertices(G)
-        if is_root_node(G,v)
-            to0_[v] = 0.0
-        end
-    end
-    tr0_ = Dict{Int,Float64}()
-    for i in 1:N
-        tr0_[i] = 0.0
-    end
-    root_node_groups = map(v->get_input_ids(project_spec.operations[v]),collect(project_spec.root_nodes))
-    problem_spec = ProblemSpec(N=N,M=M,graph=G,D=dist_matrix,
-        Δt=Δt_process,tr0_=tr0_,to0_=to0_,root_nodes=root_node_groups,
-        cost_function=cost_function,
-        Δt_collect=Δt_collect,Δt_deliver=Δt_deliver,r0=r0,s0=s0,sF=sF)
-    # @show problem_spec.root_nodes
-    return project_spec, problem_spec, object_ICs, object_FCs, robot_ICs
+    def::SimpleProblemDef,
+    env::GridFactoryEnvironment;
+    kwargs...,
+)
+    construct_task_graphs_problem(
+        def,
+        get_dist_matrix(env);
+        task_shapes = def.shapes,
+        shape_dict = env.expanded_zones,
+        kwargs...,
+    )
 end
+# function construct_task_graphs_problem(
+#         operations::Vector{Operation},
+#         robot_ICs::Vector{ROBOT_AT},
+#         object_ICs::Vector{OBJECT_AT},
+#         object_FCs::Vector{OBJECT_AT},
+#         dist_function,
+#         Δt_collect=zeros(length(object_ICs)),
+#         Δt_deliver=zeros(length(object_ICs)),
+#         Δt_process=zeros(length(operations));
+#         cost_function=SumOfMakeSpans()
+#         ) where {P<:ProjectSpec}
+#     # select subset of pickup, dropoff and free locations to instantiate objects and robots
+#     # r0,s0,sF        = get_random_problem_instantiation(N,M,pickup_vtxs,dropoff_vtxs,free_vtxs)
+#     # project_spec    = construct_random_project_spec(M,s0,sF;max_parents=3,depth_bias=1.0,Δt_min=0,Δt_max=0)
+#     N = length(robot_ICs)
+#     M = length(object_ICs)
+#     r0 = map(pred->get_id(get_location_id(pred)),robot_ICs)
+#     s0 = map(pred->get_id(get_location_id(pred)),object_ICs)
+#     sF = map(pred->get_id(get_location_id(pred)),object_FCs)
+#     # object_ICs = Vector{OBJECT_AT}([OBJECT_AT(o,s0[o]) for o in 1:M]) # initial object conditions
+#     # object_FCs = Vector{OBJECT_AT}([OBJECT_AT(o,sF[o]) for o in 1:M]) # final object conditions
+#     # M = length(object_ICs)
+#     # object_ICs = project_spec.initial_conditions
+#     # object_FCs = project_spec.final_conditions
+#     # robot_ICs = Dict{Int,ROBOT_AT}(r => ROBOT_AT(r,r0[r]) for r in 1:N) # initial robot conditions
+#     for r in 1:M # dummy robots
+#         robot_ICs[r+N] = ROBOT_AT(r+N,sF[r])
+#     end
+#
+#     delivery_graph = construct_delivery_graph(project_spec,M)
+#     # display(delivery_graph.tasks)
+#     G = delivery_graph.graph
+#     # Δt = get_duration_vector(project_spec) # initialize vector of operation times
+#     # set initial conditions
+#     to0_ = Dict{Int,Float64}()
+#     for v in vertices(G)
+#         if is_root_node(G,v)
+#             to0_[v] = 0.0
+#         end
+#     end
+#     tr0_ = Dict{Int,Float64}()
+#     for i in 1:N
+#         tr0_[i] = 0.0
+#     end
+#     root_node_groups = map(v->get_input_ids(project_spec.operations[v]),collect(project_spec.terminal_vtxs))
+#     problem_spec = ProblemSpec(N=N,M=M,graph=G,D=dist_matrix,
+#         Δt=Δt_process,tr0_=tr0_,to0_=to0_,terminal_vtxs=root_node_groups,
+#         cost_function=cost_function,
+#         Δt_collect=Δt_collect,Δt_deliver=Δt_deliver,r0=r0,s0=s0,sF=sF)
+#     # @show problem_spec.terminal_vtxs
+#     return project_spec, problem_spec, object_ICs, object_FCs, robot_ICs
+# end
 
 export
     construct_random_project_spec,
@@ -588,7 +614,7 @@ function Base.:(==)(spec1::ProjectSpec,spec2::ProjectSpec)
         @assert(spec1.operations == spec2.operations)
         @assert(spec1.pre_deps == spec2.pre_deps)
         @assert(spec1.graph == spec2.graph)
-        @assert(spec1.root_nodes == spec2.root_nodes)
+        @assert(spec1.terminal_vtxs == spec2.terminal_vtxs)
         @assert(spec1.weights == spec2.weights)
         @assert(spec1.weight == spec2.weight)
         @assert(spec1.object_id_to_idx == spec2.object_id_to_idx)
@@ -685,4 +711,4 @@ function convert_to_path_vectors(object_path_dict, object_interval_dict)
     object_paths, object_intervals
 end
 
-end # module TaskGraphsUtils
+# end # module TaskGraphsUtils

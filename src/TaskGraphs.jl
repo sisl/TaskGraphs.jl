@@ -6,8 +6,12 @@ using LightGraphs, MetaGraphs
 using GraphUtils
 using LinearAlgebra
 using DataStructures
-using JuMP
+using JuMP, MathOptInterface
+using Gurobi
 using TOML
+using CRCBS
+using SparseArrays
+using JLD2, FileIO
 
 export
     DEBUG_PATH,
@@ -24,19 +28,18 @@ global PROBLEM_DIR      = joinpath(EXPERIMENT_DIR,"problem_instances")
 global RESULTS_DIR      = joinpath(EXPERIMENT_DIR,"results")
 global VIDEO_DIR        = joinpath(EXPERIMENT_DIR,"videos")
 
-include("factory_worlds.jl")
-@reexport using TaskGraphs.FactoryWorlds
 include("planning_predicates.jl")
 @reexport using TaskGraphs.PlanningPredicates
 include("pccbs.jl")
 include("task_graphs_core.jl")
-@reexport using TaskGraphs.TaskGraphsCore
 include("utils.jl")
-@reexport using TaskGraphs.TaskGraphsUtils
+include("task_assignment_solvers.jl")
 include("path_planning.jl")
-@reexport using TaskGraphs.PathPlanning
+include("pc_tapf_solvers.jl")
+include("path_planners/dfs_planner.jl")
+include("path_planners/pibt_planner.jl")
+include("replanning.jl")
 include("helpers.jl")
-@reexport using TaskGraphs.Helpers
 include("profiling.jl")
 @reexport using TaskGraphs.SolverProfiling
 
