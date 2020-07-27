@@ -473,24 +473,8 @@ get_node_from_vtx(schedule::P,v::Int) where {P<:OperatingSchedule}= schedule.pla
 get_nodes_of_type(schedule::P,T) where {P<:OperatingSchedule} = Dict(get_id(id)=>get_node_from_id(schedule, id) for id in schedule.vtx_ids if typeof(id)<:T)
 get_object_ICs(schedule::P) where {P<:OperatingSchedule}  = get_nodes_of_type(schedule,ObjectID)
 get_robot_ICs(schedule::P) where {P<:OperatingSchedule}   = get_nodes_of_type(schedule,RobotID)
-# get_robot_FCs(schedule::P) where {P<:OperatingSchedule}   = get_nodes_of_type(schedule,TerminalRobotID)
 get_actions(schedule::P) where {P<:OperatingSchedule}     = get_nodes_of_type(schedule,ActionID)
 get_operations(schedule::P) where {P<:OperatingSchedule}  = get_nodes_of_type(schedule,OperationID)
-
-# export
-#     get_num_actions,
-#     get_num_operations,
-#     get_num_object_ICs,
-#     get_num_robot_ICs,
-#     get_num_vtxs,
-#     get_num_paths
-
-# get_num_actions(schedule::P) where {P<:OperatingSchedule}     = length(get_actions(schedule))
-# get_num_operations(schedule::P) where {P<:OperatingSchedule}  = length(get_operations(schedule))
-# get_num_object_ICs(schedule::P) where {P<:OperatingSchedule}  = length(get_object_ICs(schedule))
-# get_num_robot_ICs(schedule::P) where {P<:OperatingSchedule}   = length(get_robot_ICs(schedule))
-# get_num_vtxs(schedule::P) where {P<:OperatingSchedule}        = nv(get_graph(schedule))
-# get_num_paths(schedule::P) where {P<:OperatingSchedule}       = get_num_actions(schedule) + get_num_robot_ICs(schedule)
 
 export
     set_vtx_map!,

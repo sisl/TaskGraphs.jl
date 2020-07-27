@@ -1,5 +1,5 @@
 let
-    f = pctapf_problem_4
+    f = pctapf_problem_1
     cost_model = SumOfMakeSpans()
     project_spec, problem_spec, robot_ICs, _, env_graph = f(;cost_function=cost_model,verbose=false)
     solver = NBSSolver(assignment_model = TaskGraphsMILPSolver(GreedyAssignment()))

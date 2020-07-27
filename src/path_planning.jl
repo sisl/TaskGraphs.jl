@@ -20,11 +20,8 @@ export
     PlanningCache,
     isps_queue_cost,
     initialize_planning_cache,
-    reset_cache!,
-    update_planning_cache!,
-    repair_solution!,
-    plan_path!,
-    plan_next_path!
+    reset_cache!
+
 
 @with_kw struct PlanningCache
     closed_set::Set{Int}                    = Set{Int}()    # nodes that are completed
@@ -135,6 +132,9 @@ function get_next_node_matching_agent_id(env::SearchEnv,agent_id)
     end
     return node_id
 end
+
+export
+    update_planning_cache!
 # function reverse_propagate_delay!(solver,cache,schedule,delay_vec)
 #     buffer = zeros(nv(schedule))
 #     for v in reverse(topological_sort_by_dfs(get_graph(schedule)))
@@ -571,7 +571,6 @@ function reset_route_plan!(node::N,base_route_plan) where {N<:ConstraintTreeNode
     set_cost!(node, get_cost(base_route_plan))
     node
 end
-
 
 ################################################################################
 ############################## CBS Wrapper Stuff ###############################
