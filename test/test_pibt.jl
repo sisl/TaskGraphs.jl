@@ -36,6 +36,11 @@ let
     set_verbosity!(solver,4)
     reset_solver!(solver)
     solution, valid_flag = pibt!(solver,pc_mapf)
+
+    @show vtx_lists = convert_to_vertex_lists(solution)
+    grid_vtxs = map(v->[v[1],v[2]], pc_mapf.env.env.graph.vtxs)
+    paths = map(p->map(v->grid_vtxs[v],p),vtx_lists)
+
     # @show get_cost(solution)
     @show convert_to_vertex_lists(solution.route_plan)
     @test valid_flag
