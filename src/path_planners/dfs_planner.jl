@@ -103,27 +103,6 @@ end
 #     end
 #     return node_id
 # end
-function update_planning_cache!(solver,env)
-    cache = env.cache
-    schedule = env.schedule
-    while true
-        done = true
-        for v in collect(cache.active_set)
-            if get_path_spec(schedule,v).plan_path==false
-                path = Path{PCCBS.State,PCCBS.Action,cost_type(env.env)}(
-                    s0=PCCBS.State(-1, -1),
-                    cost=get_initial_cost(env.env)
-                    )
-                # update planning cache only
-                update_planning_cache!(solver,env,v,path) # NOTE I think this is all we need, since there is no actual path to update
-                done = false
-            end
-        end
-        if done
-            break
-        end
-    end
-end
 function update_envs!(solver,search_env,envs,paths)
     cache = search_env.cache
     schedule = search_env.schedule

@@ -1,13 +1,3 @@
-# export PIBTRoutePlanner
-#
-# """
-#     PIBTRoutePlanner
-#
-# Prioritized Depth-First Search route planner.
-# """
-# @with_kw struct PIBTRoutePlanner{C}
-#     logger::SolverLogger{C} = SolverLogger{C}()
-# end
 function construct_heuristic_model(solver::PIBTPlanner,env_graph;
         ph = PerfectHeuristic(get_dist_matrix(env_graph)),
         kwargs...)
@@ -21,8 +11,6 @@ function construct_cost_model(solver::PIBTPlanner,
         FullCostModel(maximum,TravelDistance())
         )
     heuristic_model = construct_heuristic_model(solver,env_graph;kwargs...)
-    # ph = PerfectHeuristic(get_dist_matrix(env_graph))
-    # heuristic_model = construct_composite_heuristic(ph,ph,NullHeuristic())
     cost_model, heuristic_model
 end
 
