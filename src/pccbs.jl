@@ -12,6 +12,7 @@ using ..PlanningPredicates
 ################################################################################
 const State = CRCBS.GraphState
 const Action = CRCBS.GraphAction
+# TODO simplify LowLevelEnv and include SearchEnv within it
 # LowLevelEnv
 @with_kw struct LowLevelEnv{C<:AbstractCostModel,H<:AbstractCostModel,N,I,T} <: GraphEnv{State,Action,C}
     graph::GridFactoryEnvironment   = GridFactoryEnvironment()
