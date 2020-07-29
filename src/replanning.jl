@@ -27,22 +27,25 @@ Construct a trimmed route_plan that stops at a certain time step
 """
 function trim_route_plan(search_env, route_plan, T)
     N = length(get_paths(route_plan))
-    env = search_env.env
-    trimmed_route_plan = get_initial_solution(MAPF(env, map(i->PCCBS.State(),1:N),map(i->PCCBS.State(),1:N)))
+    trimmed_route_plan = LowLevelSolution(
+        paths=map(i->path_type(search_env)(),1:num_agents(search_env)),
+        cost_model=get_cost_model(search_env)
+        )
     for agent_id in 1:N
-        cbs_env = typeof(env)(
-            graph = env.graph,
+        cbs_env = PCCBS.LowLevelEnv(
+            graph = search_env.env_graph,
             agent_idx = agent_id,
-            cost_model = get_cost_model(env),
-            heuristic = get_heuristic_model(env)
+            cost_model = get_cost_model(search_env),
+            heuristic = get_heuristic_model(search_env)
         )
         old_path = get_paths(route_plan)[agent_id]
         new_path = get_paths(trimmed_route_plan)[agent_id]
         for t in 1:max(1, min(T, length(old_path)))
             p = get_path_node(old_path,t)
             push!(new_path, p)
-            new_path.cost = accumulate_cost(cbs_env, get_cost(new_path), get_transition_cost(cbs_env, p.s, p.a, p.sp))
-            set_path_cost!(trimmed_route_plan, new_path.cost, agent_id)
+            set_cost!(new_path, accumulate_cost(cbs_env, get_cost(new_path),
+                get_transition_cost(cbs_env, p.s, p.a, p.sp)))
+            set_path_cost!(trimmed_route_plan, get_cost(new_path), agent_id)
         end
         if T > length(new_path)
             println("Extending path in trim_route_plan. Agent id = ",agent_id)
@@ -465,14 +468,14 @@ The exact behavior of this function depends on `replan_model <: ReplannerModel`
 """
 # function replan!(solver, replan_model, search_env, env_graph, problem_spec, route_plan, next_schedule, t_request, t_arrival; commit_threshold=5,kwargs...)
 function replan!(solver, replan_model, search_env, request; commit_threshold=5,kwargs...)
-    project_schedule = search_env.schedule
-    cache = search_env.cache
-    route_plan = search_env.route_plan
-    problem_spec = search_env.problem_spec
-    env_graph = search_env.env.graph
-    t_request = request.t_request
-    t_arrival = request.t_arrival
-    next_schedule = request.schedule
+    project_schedule    = search_env.schedule
+    cache               = search_env.cache
+    route_plan          = search_env.route_plan
+    problem_spec        = search_env.problem_spec
+    env_graph           = search_env.env_graph
+    t_request           = request.t_request
+    t_arrival           = request.t_arrival
+    next_schedule       = request.schedule
 
     @assert sanity_check(project_schedule," in replan!()")
     # Freeze route_plan and schedule at t_commit

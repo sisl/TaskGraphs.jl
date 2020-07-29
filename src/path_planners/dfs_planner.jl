@@ -116,7 +116,7 @@ function update_envs!(solver,search_env,envs,paths)
         path = paths[i]
         v = get_vtx(schedule,env.node_id)
         s = get_final_state(path)
-        t_arrival = max(cache.tF[v], s.t + get_distance(search_env.dist_function,s.vtx,env.goal.vtx))
+        t_arrival = max(cache.tF[v], s.t + get_distance(search_env.env_graph.dist_function,s.vtx,env.goal.vtx))
         if is_goal(envs[i],s)
             if t_arrival > cache.tF[v] && env.goal.vtx != -1
                 log_info(-1,solver,"DFS update_envs!(): extending tF[v] from $(cache.tF[v]) to $t_arrival in ",string(env.schedule_node),", s = ",string(s))
