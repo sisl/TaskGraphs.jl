@@ -115,6 +115,9 @@ for op in [
 end
 CRCBS.num_states(env::SearchEnv) = num_states(env.env)
 CRCBS.num_actions(env::SearchEnv) = num_actions(env.env)
+GraphUtils.get_distance(env::SearchEnv,args...) = get_distance(env.problem_spec,args...)
+GraphUtils.get_distance(env::SearchEnv,s::PCCBS.State,args...) = get_distance(env.problem_spec,get_vtx(s),args...)
+GraphUtils.get_distance(env::SearchEnv,s::PCCBS.State,g::PCCBS.State) = get_distance(env.problem_spec,s,get_vtx(g))
 
 initialize_planning_cache(env::SearchEnv) = initialize_planning_cache(env.schedule,deepcopy(env.cache.t0),deepcopy(env.cache.tF))
 
@@ -224,16 +227,15 @@ export
 """
     update_planning_cache!(solver,env,v,path)
 """
-function update_planning_cache!(solver,env::E,v::Int,path::P) where {E<:SearchEnv,P<:Path}
+function update_planning_cache!(solver,env::E,v::Int,path::P,t=get_t(get_final_state(path))) where {E<:SearchEnv,P<:Path}
     cache = env.cache
     schedule = env.schedule
     active_set = cache.active_set
     closed_set = cache.closed_set
     node_queue = cache.node_queue
     graph = get_graph(schedule)
-
     # update t0, tF, slack, local_slack
-    Δt = get_final_state(path).t - cache.tF[v]
+    Δt = t - cache.tF[v]
     if Δt > 0
         # delay = Δt - minimum(cache.slack[v])
         # if delay > 0
@@ -268,7 +270,7 @@ function update_planning_cache!(solver,env::E,v::Int,path::P) where {E<:SearchEn
         #         return cache
         #     end
         # end
-        cache.tF[v] = get_final_state(path).t
+        cache.tF[v] = t
         t0,tF,slack,local_slack = process_schedule(schedule,cache.t0,cache.tF)
         cache.t0            .= t0
         cache.tF            .= tF
@@ -304,21 +306,33 @@ end
 """
     update_planning_cache!(solver,env)
 
-Update cache continually
+Update cache continually. After a call to this function, the start and end times
+of all schedule nodes will be updated to reflect the progress of active schedule
+nodes (i.e., if a robot had not yet completed a GO task, the predicted final
+time for that task will be updated based on the robot's current state and
+distance to the goal).
+All active nodes that don't require planning will be automatically marked as
+complete.
 """
 function update_planning_cache!(solver,env)
     cache = env.cache
     schedule = env.schedule
     dummy_path = path_type(env)()
+    for v in collect(cache.active_set)
+        path_spec = get_path_spec(schedule,v)
+        agent_id = path_spec.agent_id
+        if 1 <= agent_id <= num_agents(env)
+            path = get_paths(env)[agent_id]
+            s = get_final_state(path)
+            t = get_t(s)
+            d = get_distance(env,s,path_spec.final_vtx)
+            cache.tF[v] = max(cache.tF[v],t+d)
+        end
+    end
     while true
         done = true
         for v in collect(cache.active_set)
-            if get_path_spec(schedule,v).plan_path==false
-                # path = Path{PCCBS.State,PCCBS.Action,cost_type(env.env)}(
-                #     s0=PCCBS.State(-1, -1),
-                #     cost=get_initial_cost(env.env)
-                #     )
-                # update planning cache only
+            if get_path_spec(schedule,v).plan_path == false
                 update_planning_cache!(solver,env,v,dummy_path) # NOTE I think this is all we need, since there is no actual path to update
                 done = false
             end
@@ -327,7 +341,13 @@ function update_planning_cache!(solver,env)
             break
         end
     end
-    env.cache
+    t0,tF,slack,local_slack = process_schedule(schedule,cache.t0,cache.tF)
+    cache.t0 .= t0
+    cache.tF .= tF
+    cache.slack .= slack
+    cache.local_slack .= local_slack
+
+    cache
 end
 
 function CRCBS.SumOfMakeSpans(schedule::S,cache::C) where {S<:OperatingSchedule,C<:PlanningCache}

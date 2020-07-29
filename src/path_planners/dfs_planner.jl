@@ -19,24 +19,24 @@ Prioritized Depth-First Search route planner.
 @with_kw struct DFSRoutePlanner{C}
     logger::SolverLogger{C} = SolverLogger{C}()
 end
-function construct_heuristic_model(solver::DFSRoutePlanner,env_graph;
-        ph = PerfectHeuristic(get_dist_matrix(env_graph)),
-        kwargs...)
-    construct_composite_heuristic(ph,ph,NullHeuristic())
-end
-function construct_cost_model(solver::DFSRoutePlanner,
-        schedule, cache, problem_spec, env_graph;
-        extra_T=400, primary_objective=SumOfMakeSpans(), kwargs...)
-    cost_model = construct_composite_cost_model(
-        typeof(primary_objective)(schedule,cache),
-        FullCostModel(maximum,TravelTime()),
-        FullCostModel(maximum,TravelDistance())
-        )
-    heuristic_model = construct_heuristic_model(solver,env_graph;kwargs...)
-    # ph = PerfectHeuristic(get_dist_matrix(env_graph))
-    # heuristic_model = construct_composite_heuristic(ph,ph,NullHeuristic())
-    cost_model, heuristic_model
-end
+# function construct_heuristic_model(solver::DFSRoutePlanner,env_graph;
+#         ph = PerfectHeuristic(get_dist_matrix(env_graph)),
+#         kwargs...)
+#     construct_composite_heuristic(ph,ph,NullHeuristic())
+# end
+# function construct_cost_model(solver::DFSRoutePlanner,
+#         schedule, cache, problem_spec, env_graph;
+#         extra_T=400, primary_objective=SumOfMakeSpans(), kwargs...)
+#     cost_model = construct_composite_cost_model(
+#         typeof(primary_objective)(schedule,cache),
+#         FullCostModel(maximum,TravelTime()),
+#         FullCostModel(maximum,TravelDistance())
+#         )
+#     heuristic_model = construct_heuristic_model(solver,env_graph;kwargs...)
+#     # ph = PerfectHeuristic(get_dist_matrix(env_graph))
+#     # heuristic_model = construct_composite_heuristic(ph,ph,NullHeuristic())
+#     cost_model, heuristic_model
+# end
 
 export
     # sorted_actions,

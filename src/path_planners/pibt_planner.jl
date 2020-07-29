@@ -31,25 +31,75 @@ function CRCBS.is_consistent(cache::PIBTCache,pc_mapf::PC_MAPF)
     return false
 end
 
+function CRCBS.pibt_set_priorities!(solver,pc_mapf::PC_MAPF,cache)
+    # get_priorities(cache) .= reverse(sortperm(
+    #     [(
+    #         ~isa(env.schedule_node,Union{COLLECT,DEPOSIT}),
+    #         ~isa(env.schedule_node,CARRY),
+    #         minimum(cache.slack[get_vtx(schedule,env.node_id)]),
+    #         i
+    #     ) for (i,env) in enumerate(get_envs(cache)) ] ))
+    CRCBS.get_priorities(cache) .= reverse(sortperm(
+        [(t,i) for (i,t) in enumerate(CRCBS.get_timers(cache))]
+        ))
+    log_info(3,solver,"priorities: ", CRCBS.get_priorities(cache))
+    return cache
+end
+
 """
     CRCBS.pibt_update_solution!(solver,pc_mapf::PC_MAPF,solution::SearchEnv,cache)
 
 Overridden to update the SearchEnv
 """
 function CRCBS.pibt_update_solution!(solver,solution::SearchEnv,cache)
+    # update route plan
     CRCBS.pibt_update_solution!(solver,solution.route_plan,cache)
-    for (p,env) in zip(get_paths(solution),CRCBS.get_envs(cache))
+    # NOTE Update planning cache so that all goal times can be updated
+    update_planning_cache!(solver,solution)
+    # update schedule and planning cache
+    # node = initialize_root_node(solver,mapf)
+    # for i in 1:num_agents(solution)
+    #     CRCBS.get_envs(cache)[i] = build_env(solver,CRCBS.get_solution(cache),node,agent_id)
+    # end
+    # for (p,env) in zip(get_paths(solution),CRCBS.get_envs(cache))
+    #     sp = get_final_state(p)
+    #     # update the env if the goal has been reached
+    #     if is_goal(env,sp) && CRCBS.is_valid(env,get_goal(env))
+    #         v = get_vtx(solution.schedule,env.node_id)
+    #         update_env!(solver,solution,v,p)
+    #         update_planning_cache!(solver,solution)
+    #     end
+    # end
+    solution
+end
+# function CRCBS.pibt_update_env!(solver,mapf::PC_MAPF,cache,agent_id)
+#     node = initialize_root_node(solver,mapf)
+#     CRCBS.get_envs(cache)[agent_id] = build_env(solver,CRCBS.get_solution(cache),node,agent_id)
+# end
+function CRCBS.pibt_update_envs!(solver,pc_mapf::PC_MAPF,cache)
+    solution = CRCBS.get_solution(cache)
+    node = initialize_root_node(solver,pc_mapf)
+    for (i,p) in enumerate(get_paths(solution))
+        # NOTE rebuild all envs to ensure that goal times are up to date
+        env = build_env(solver,solution,node,i)
+        CRCBS.get_envs(cache)[i] = env
+        # Now update the SearchEnv and rebuild any low level envs for which
+        # the goal has beem reached
         sp = get_final_state(p)
-        # update the env if the goal has been reached
         if is_goal(env,sp) && CRCBS.is_valid(env,get_goal(env))
             v = get_vtx(solution.schedule,env.node_id)
             update_env!(solver,solution,v,p)
             update_planning_cache!(solver,solution)
+            CRCBS.get_timers(cache)[i] = 0
+            CRCBS.get_envs(cache)[i] = build_env(solver,solution,node,i)
         end
     end
-    solution
-end
-function CRCBS.pibt_update_env!(solver,mapf::PC_MAPF,cache,agent_id)
-    node = initialize_root_node(solver,mapf)
-    CRCBS.get_envs(cache)[agent_id] = build_env(solver,CRCBS.get_solution(cache),node,agent_id)
+    # debugging
+    info_strings = String[]
+    for (i,(s,env)) in enumerate(zip(cache.states,cache.envs))
+        str = "\t$i : $(get_vtx(cache.solution.schedule,env.node_id)) $(string(env.schedule_node)), $(string(s)) -> $(string(env.goal))\n"
+        push!(info_strings,str)
+    end
+    log_info(0,solver,"PIBT iteration $(iterations(solver)) update_cache!\n",info_strings...)
+    cache
 end

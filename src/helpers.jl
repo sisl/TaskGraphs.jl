@@ -209,7 +209,7 @@ function pctapf_problem_3(;cost_function=SumOfMakeSpans(),verbose=false,Δt_op=0
 
         #### TOY PROBLEM 3 ####
 
-    jj    In this problem robot 2 will need to yield to let robot 1 through.
+        In this problem robot 2 will need to yield to let robot 1 through.
         First operation:
             robot 1 does [2-2-30]
         Second operation:
