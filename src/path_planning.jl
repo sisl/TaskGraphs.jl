@@ -13,8 +13,6 @@
 #
 # using ..TaskGraphs
 
-const State = PCCBS.State
-const Action = PCCBS.Action
 
 export
     PlanningCache,
@@ -79,6 +77,9 @@ end
 
 function initialize_route_plan end
 
+const State = CRCBS.GraphState
+const Action = CRCBS.GraphAction
+
 export
     SearchEnv,
     construct_search_env,
@@ -105,7 +106,7 @@ CRCBS.get_graph(env::SearchEnv) = env.env_graph
 function CRCBS.get_start(env::SearchEnv,v::Int)
     start_vtx   = get_path_spec(env.schedule,v).start_vtx
     start_time  = env.cache.t0[v]
-    PCCBS.State(start_vtx,start_time)
+    State(start_vtx,start_time)
 end
 CRCBS.get_cost_model(env::SearchEnv) = env.cost_model
 CRCBS.get_heuristic_model(env::SearchEnv) = env.heuristic_model
@@ -118,8 +119,8 @@ for op in [
     @eval CRCBS.$op(env::SearchEnv,args...) = $op(env.route_plan,args...)
 end
 GraphUtils.get_distance(env::SearchEnv,args...) = get_distance(env.problem_spec,args...)
-GraphUtils.get_distance(env::SearchEnv,s::PCCBS.State,args...) = get_distance(env.problem_spec,get_vtx(s),args...)
-GraphUtils.get_distance(env::SearchEnv,s::PCCBS.State,g::PCCBS.State) = get_distance(env.problem_spec,s,get_vtx(g))
+GraphUtils.get_distance(env::SearchEnv,s::State,args...) = get_distance(env.problem_spec,get_vtx(s),args...)
+GraphUtils.get_distance(env::SearchEnv,s::State,g::State) = get_distance(env.problem_spec,s,get_vtx(g))
 
 initialize_planning_cache(env::SearchEnv) = initialize_planning_cache(env.schedule,deepcopy(env.cache.t0),deepcopy(env.cache.tF))
 
@@ -473,7 +474,9 @@ end
 ############################### Low Level Search ###############################
 ################################################################################
 
-function get_base_path(search_env::SearchEnv,env::PCCBS.LowLevelEnv)
+include("pccbs.jl")
+
+function get_base_path(search_env::SearchEnv,env::PCCBSEnv)
     base_path = get_paths(search_env)[get_agent_id(env)]
     v = get_vtx(search_env.schedule, env.node_id)
     t0 = search_env.cache.t0[v]
@@ -527,14 +530,14 @@ function CRCBS.build_env(
         # deadline = Inf # already taken care of, perhaps?
         log_info(3,solver,string("BUILD ENV: setting goal_vtx = ",goal_vtx,", t = maximum(cache.tF) = ",goal_time))
     end
-    cbs_env = PCCBS.LowLevelEnv(
+    cbs_env = PCCBSEnv(
         # graph       = env.env_graph,
         search_env = env,
         schedule_node = schedule_node,
         node_id     = get_vtx_id(env.schedule,v),
         agent_idx   = agent_id, # this is only used for the HardConflictTable, which can be updated via the combined search node
         constraints = get_constraints(node, agent_id), # agent_id represents the whole path
-        goal        = PCCBS.State(goal_vtx,goal_time),
+        goal        = State(goal_vtx,goal_time),
         # heuristic   = heuristic,
         # cost_model  = cost_model
         )
@@ -700,7 +703,7 @@ CRCBS.num_agents(pc_mapf::PC_MAPF)          = num_agents(pc_mapf.env)
 # CRCBS.get_start(pc_mapf::PC_MAPF, i)        = get_starts(pc_mapf)[i]
 # CRCBS.get_goal(pc_mapf::PC_MAPF, i)         = get_goals(pc_mapf)[i]
 # CRCBS.get_start(pc_mapf::PC_MAPF, env, i)   = get_start(pc_mapf,i)
-CRCBS.base_env_type(pc_mapf::PC_MAPF)       = PCCBS.LowLevelEnv
+CRCBS.base_env_type(pc_mapf::PC_MAPF)       = PCCBSEnv
 
 include("legacy/pc_tapf_solver.jl")
 

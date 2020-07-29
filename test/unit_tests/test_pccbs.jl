@@ -1,4 +1,7 @@
 let
+    State = TaskGraphs.State
+    Action = TaskGraphs.Action
+
     f = pctapf_problem_1
     cost_model = SumOfMakeSpans()
     project_spec, problem_spec, robot_ICs, _, env_graph = f(;cost_function=cost_model,verbose=false)
@@ -24,38 +27,38 @@ let
     let
         env = build_env(solver,search_env,node,AgentID(1))
 
-        s = PCCBS.State()
-        a = PCCBS.Action()
+        s = State()
+        a = Action()
         get_next_state(s,a)
         get_next_state(env,s,a)
 
-        @test PCCBS.State(1,2) == PCCBS.State(1,2)
-        @test PCCBS.State() == PCCBS.State()
-        @test states_match(PCCBS.State(),PCCBS.State())
-        @test states_match(env,PCCBS.State(),PCCBS.State())
+        @test State(1,2) == State(1,2)
+        @test State() == State()
+        @test states_match(State(),State())
+        @test states_match(env,State(),State())
         CRCBS.wait(s)
         CRCBS.wait(env,s)
 
         get_cost_model(env)
         get_heuristic_model(env)
-        @test CRCBS.is_valid(env,PCCBS.State()) == false
-        @test CRCBS.is_valid(env,PCCBS.Action()) == false
-        @test CRCBS.is_valid(env,PCCBS.State(1,2))
-        @test CRCBS.is_valid(env,PCCBS.Action(Edge(1,2),1))
+        @test CRCBS.is_valid(env,State()) == false
+        @test CRCBS.is_valid(env,Action()) == false
+        @test CRCBS.is_valid(env,State(1,2))
+        @test CRCBS.is_valid(env,Action(Edge(1,2),1))
 
-        get_heuristic_cost(env,PCCBS.State(1,2))
-        # @test is_goal(env,PCCBS.State(1,0)) == false
-        # @test is_goal(env,PCCBS.State(2,3)) == false
-        # @test is_goal(env,PCCBS.State(1,3))
-        @test length(get_possible_actions(env,PCCBS.State(-1,-1))) == 0
+        get_heuristic_cost(env,State(1,2))
+        # @test is_goal(env,State(1,0)) == false
+        # @test is_goal(env,State(2,3)) == false
+        # @test is_goal(env,State(1,3))
+        @test length(get_possible_actions(env,State(-1,-1))) == 0
     end
     let
         for v in vertices(search_env.schedule)
             schedule_node = get_node_from_vtx(search_env.schedule,v)
             if isa(schedule_node,COLLECT)
                 env = build_env(solver,search_env,node,VtxID(v))
-                @test length(get_possible_actions(env,PCCBS.State(1,0))) == 1
-                @test length(get_possible_actions(env,PCCBS.State(-1,-1))) == 0
+                @test length(get_possible_actions(env,State(1,0))) == 1
+                @test length(get_possible_actions(env,State(-1,-1))) == 0
                 break
             end
         end

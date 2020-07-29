@@ -29,7 +29,7 @@ function trim_route_plan(search_env, route_plan, T)
     # N = length(get_paths(route_plan))
     trimmed_route_plan = initialize_route_plan(search_env)
     for agent_id in 1:num_agents(search_env)
-        cbs_env = PCCBS.LowLevelEnv(
+        cbs_env = PCCBSEnv(
             search_env = search_env,
             agent_idx = agent_id,
         )

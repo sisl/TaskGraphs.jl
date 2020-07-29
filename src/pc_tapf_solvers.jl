@@ -329,8 +329,8 @@ function plan_next_path!(solver::ISPS, env::SearchEnv, node::N
             end
         else
             # dummy path - update planning cache only
-            path = Path{PCCBS.State,PCCBS.Action,cost_type(env)}(
-                s0=PCCBS.State(-1, -1),
+            path = path_type(env)(
+                s0=State(-1, -1),
                 cost=get_initial_cost(env)
                 )
             update_planning_cache!(solver,env,v,path) # NOTE I think this is all we need, since there is no actual path to update
