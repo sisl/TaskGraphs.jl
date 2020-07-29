@@ -40,7 +40,7 @@ let
 
     num_agents(pc_mapf)
     node  = initialize_root_node(solver,pc_mapf)
-    build_env(solver,pc_mapf,node,1)
+    build_env(solver,pc_mapf,node,AgentID(1))
 
     cache = CRCBS.pibt_init_cache(solver,pc_mapf)
     is_consistent(cache,pc_mapf)

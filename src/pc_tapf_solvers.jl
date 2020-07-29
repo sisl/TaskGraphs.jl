@@ -68,7 +68,7 @@ function CRCBS.logger_step_a_star!(solver::AStarSC, env, base_path, s, q_cost)
         #     start   = (get_final_state(base_path).vtx,get_final_state(base_path).t)
         #     goal    = (env.goal.vtx,env.goal.t)
         #     idx = isa(solver.AStarSC) ? 2 : 1
-        #     paths   = env.cost_model.cost_models[idx].model.table.paths
+        #     paths   = get_cost_model(env).cost_models[idx].model.table.paths
         #     state_constraints = map(c->(c.a,(c.v.s.vtx,c.v.sp.vtx),c.t),collect(env.constraints.state_constraints))
         #     action_constraints = map(c->(c.a,(c.v.s.vtx,c.v.sp.vtx),c.t),collect(env.constraints.action_constraints))
         #     @save filename agent_id history start goal paths state_constraints action_constraints
@@ -233,7 +233,7 @@ function plan_path!(solver::AStarSC, env::SearchEnv, node::N,
     node_id = get_vtx_id(env.schedule,v)
 
     reset_solver!(solver)
-    cbs_env = build_env(solver, env, node, schedule_node, v)
+    cbs_env = build_env(solver, env, node, VtxID(v))#schedule_node, v)
     base_path = get_base_path(env,cbs_env)
     ### PATH PLANNING ###
     # solver.DEBUG ? validate(base_path,v) : nothing
@@ -245,7 +245,7 @@ function plan_path!(solver::AStarSC, env::SearchEnv, node::N,
             reset_solver!(solver)
             cost_model, _ = construct_cost_model(solver, env;
                 primary_objective=env.problem_spec.cost_function)
-            cbs_env = build_env(solver, env, node, schedule_node, v;cost_model=cost_model)
+            cbs_env = build_env(solver, env, node, VtxID(v);cost_model=cost_model)
             base_path = get_base_path(env,cbs_env)
             path, cost = path_finder(solver, cbs_env, base_path)
         end

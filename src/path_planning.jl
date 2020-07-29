@@ -77,12 +77,13 @@ function reset_cache!(cache::PlanningCache,schedule::OperatingSchedule,t0=cache.
     cache
 end
 
+function initialize_route_plan end
+
 export
     SearchEnv,
     construct_search_env,
     update_env!
 
-# @with_kw struct SearchEnv{G,C,H,E<:AbstractLowLevelEnv{State,Action,C},S} <: GraphEnv{State,Action,C}
 @with_kw struct SearchEnv{G,C,H,S} <: GraphEnv{State,Action,C}
     schedule::OperatingSchedule     = OperatingSchedule()
     cache::PlanningCache            = PlanningCache()
@@ -91,13 +92,14 @@ export
     cost_model::C                   = C() #get_cost_model(env)
     heuristic_model::H              = H()
     num_agents::Int                 = length(get_robot_ICs(schedule))
-    route_plan::S                   = LowLevelSolution(
-        paths = map(i->Path{State,Action,cost_type(cost_model)}(),
-            1:num_agents),
-        cost_model = cost_model,
-        costs = map(i->get_initial_cost(cost_model), 1:num_agents),
-        cost = get_infeasible_cost(cost_model),
-        )
+    route_plan::S                   = initialize_route_plan(schedule,cost_model)
+    # route_plan::S                   = LowLevelSolution(
+    #     paths = map(i->Path{State,Action,cost_type(cost_model)}(),
+    #         1:num_agents),
+    #     cost_model = cost_model,
+    #     costs = map(i->get_initial_cost(cost_model), 1:num_agents),
+    #     cost = get_infeasible_cost(cost_model),
+    #     )
 end
 CRCBS.get_graph(env::SearchEnv) = env.env_graph
 function CRCBS.get_start(env::SearchEnv,v::Int)
@@ -406,15 +408,13 @@ function construct_search_env(
         primary_objective;
         extra_T=extra_T,
         )
-    # low_level_env = PCCBS.LowLevelEnv(
-    #     graph=env_graph, cost_model=cost_model, heuristic=heuristic_model)
+
     route_plan = initialize_route_plan(schedule,cost_model)#low_level_env)
     @assert N == length(get_paths(route_plan))
 
     search_env = SearchEnv(
         schedule=schedule,
         cache=cache,
-        # env=low_level_env,
         env_graph=env_graph,
         problem_spec=problem_spec,
         cost_model=cost_model,
@@ -423,19 +423,6 @@ function construct_search_env(
         route_plan=route_plan)
     return search_env
 end
-# function construct_search_env(solver,
-#         schedule::OperatingSchedule,
-#         problem_spec::ProblemSpec,
-#         env_graph,
-#         cache::PlanningCache=initialize_planning_cache(schedule),
-#         primary_objective=problem_spec.cost_function,
-#         ;
-#         kwargs...
-#     )
-#     cache = initialize_planning_cache(schedule,t0,tF)
-#     construct_search_env(solver, schedule, problem_spec, env_graph, cache,
-#         primary_objective;kwargs...)
-# end
 function construct_search_env(
         solver,
         schedule::OperatingSchedule,
@@ -456,7 +443,7 @@ function update_cost_model!(model::C,env::S) where {C<:CompositeCostModel,S<:Sea
         update_cost_model!(m,env)
     end
 end
-update_cost_model!(env::S) where {S<:SearchEnv} = update_cost_model!(env.cost_model,env)
+update_cost_model!(env::S) where {S<:SearchEnv} = update_cost_model!(get_cost_model(env),env)
 
 """
     `update_env!`
@@ -482,6 +469,10 @@ function update_env!(solver,env::SearchEnv,v::Int,path::P,
     env
 end
 
+################################################################################
+############################### Low Level Search ###############################
+################################################################################
+
 function get_base_path(search_env::SearchEnv,env::PCCBS.LowLevelEnv)
     base_path = get_paths(search_env)[get_agent_id(env)]
     v = get_vtx(search_env.schedule, env.node_id)
@@ -496,14 +487,20 @@ function get_base_path(search_env::SearchEnv,env::PCCBS.LowLevelEnv)
     end
     return base_path
 end
-function CRCBS.build_env(solver, env::E, node::N, schedule_node::T, v::Int, path_spec=get_path_spec(env.schedule, v);
+function CRCBS.build_env(
+        solver,
+        env::SearchEnv,
+        node::ConstraintTreeNode,
+        schedule_node::T,
+        v::Int,
+        path_spec=get_path_spec(env.schedule, v),
+        ;
         heuristic = get_heuristic_model(env),
         cost_model = get_cost_model(env)
-    ) where {E<:SearchEnv,N<:ConstraintTreeNode,T}
+    ) where {T}
     agent_id = path_spec.agent_id
     goal_vtx = path_spec.final_vtx
-    goal_time = env.cache.tF[v]                             # time after which goal can be satisfied
-
+    goal_time = env.cache.tF[v] # time after which goal can be satisfied
     # deadline = env.cache.tF[v] .+ min.(env.cache.max_deadline[v],env.cache.slack[v]) # NOTE iterative deadline tightening was causing problems with slack running out before the goal time, so this line has been replaced by the original
     # deadline = env.cache.tF[v] .+ min.(max.(env.cache.local_slack[v], env.cache.max_deadline[v]),env.cache.slack[v]) # This is a potential fix that would allow iterative tightening to keep working
     deadline = env.cache.tF[v] .+ env.cache.slack[v]         # deadline for DeadlineCost
@@ -531,25 +528,36 @@ function CRCBS.build_env(solver, env::E, node::N, schedule_node::T, v::Int, path
         log_info(3,solver,string("BUILD ENV: setting goal_vtx = ",goal_vtx,", t = maximum(cache.tF) = ",goal_time))
     end
     cbs_env = PCCBS.LowLevelEnv(
-        graph       = env.env_graph,
+        # graph       = env.env_graph,
+        search_env = env,
         schedule_node = schedule_node,
         node_id     = get_vtx_id(env.schedule,v),
+        agent_idx   = agent_id, # this is only used for the HardConflictTable, which can be updated via the combined search node
         constraints = get_constraints(node, agent_id), # agent_id represents the whole path
         goal        = PCCBS.State(goal_vtx,goal_time),
-        agent_idx   = agent_id, # this is only used for the HardConflictTable, which can be updated via the combined search node
-        heuristic   = heuristic,
-        cost_model  = cost_model
+        # heuristic   = heuristic,
+        # cost_model  = cost_model
         )
     # update deadline in DeadlineCost
     set_deadline!(get_cost_model(cbs_env),deadline)
     return cbs_env
 end
-function CRCBS.build_env(solver, env::SearchEnv, node::ConstraintTreeNode, agent_id::Int)
-    node_id = get_next_node_matching_agent_id(env,agent_id)
-    build_env(solver,env,node,
-        get_node_from_id(env.schedule,node_id),
-        get_vtx(env.schedule,node_id)
+function CRCBS.build_env(
+    solver,
+    env::SearchEnv,
+    node::ConstraintTreeNode,
+    v::VtxID,
+    schedule_node=get_node_from_vtx(env.schedule,get_id(v)),
+    args...
+    ;
+    kwargs...
     )
+    build_env(solver,env,node,schedule_node,get_id(v),args...;kwargs...)
+end
+function CRCBS.build_env(solver, env::SearchEnv, node::ConstraintTreeNode, agent_id::AgentID)
+    node_id = get_next_node_matching_agent_id(env,get_id(agent_id))
+    build_env(solver,env,node,VtxID(get_vtx(env.schedule,node_id)))
+    # get_node_from_id(env.schedule,node_id),
 end
 function get_base_path(search_env::SearchEnv,meta_env::MetaAgentCBS.AbstractMetaEnv)
     starts = Vector{state_type(search_env)}()
@@ -569,13 +577,20 @@ end
 """
 For COLLABORATIVE transport problems
 """
-function CRCBS.build_env(solver, env::E, node::N, schedule_node::TEAM_ACTION, v::Int;kwargs...) where {E<:SearchEnv,N<:ConstraintTreeNode}
+function CRCBS.build_env(
+    solver,
+    env::E,
+    node::N,
+    schedule_node::TEAM_ACTION,
+    v::Int,
+    ;
+    kwargs...) where {E<:SearchEnv,N<:ConstraintTreeNode}
     envs = []
     agent_idxs = Int[]
     for (i, sub_node) in enumerate(schedule_node.instructions)
         ph = PerfectHeuristic(env.env_graph.dist_function.dist_mtxs[schedule_node.shape][i])
         heuristic = construct_heuristic_model(solver,env.env_graph,ph)
-        cbs_env = build_env(solver,env,node,sub_node,v,generate_path_spec(env.schedule,env.problem_spec,sub_node);
+        cbs_env = build_env(solver,env,node,VtxID(v),sub_node,generate_path_spec(env.schedule,env.problem_spec,sub_node);
             heuristic=heuristic,
             kwargs...
         )

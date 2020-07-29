@@ -32,7 +32,9 @@ export
     RobotID,
     LocationID,
     ActionID,
-    OperationID
+    OperationID,
+	AgentID,
+	VtxID
 
 abstract type AbstractID end
 @with_kw struct ObjectID <: AbstractID
@@ -48,6 +50,20 @@ end
 	id::Int = -1
 end
 @with_kw struct OperationID <: AbstractID
+	id::Int = -1
+end
+"""
+	AgentID
+Special helper for identifying agents.
+"""
+@with_kw struct AgentID <: AbstractID
+	id::Int = -1
+end
+"""
+	VtxID
+Special helper for identifying schedule vertices.
+"""
+@with_kw struct VtxID <: AbstractID
 	id::Int = -1
 end
 

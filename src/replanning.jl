@@ -26,17 +26,12 @@ end
 Construct a trimmed route_plan that stops at a certain time step
 """
 function trim_route_plan(search_env, route_plan, T)
-    N = length(get_paths(route_plan))
-    trimmed_route_plan = LowLevelSolution(
-        paths=map(i->path_type(search_env)(),1:num_agents(search_env)),
-        cost_model=get_cost_model(search_env)
-        )
-    for agent_id in 1:N
+    # N = length(get_paths(route_plan))
+    trimmed_route_plan = initialize_route_plan(search_env)
+    for agent_id in 1:num_agents(search_env)
         cbs_env = PCCBS.LowLevelEnv(
-            graph = search_env.env_graph,
+            search_env = search_env,
             agent_idx = agent_id,
-            cost_model = get_cost_model(search_env),
-            heuristic = get_heuristic_model(search_env)
         )
         old_path = get_paths(route_plan)[agent_id]
         new_path = get_paths(trimmed_route_plan)[agent_id]
