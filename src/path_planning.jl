@@ -714,6 +714,12 @@ CRCBS.action_type(pc_mapf::PC_MAPF)         = action_type(pc_mapf.env)
 CRCBS.state_type(pc_mapf::PC_MAPF)          = state_type(pc_mapf.env)
 CRCBS.cost_type(pc_mapf::PC_MAPF)           = cost_type(pc_mapf.env)
 CRCBS.num_agents(pc_mapf::PC_MAPF)          = num_agents(pc_mapf.env)
+for op in [
+    :cost_type,:state_type,:action_type,:path_type,:num_states,:num_actions
+    ]
+    @eval CRCBS.$op(prob::PC_MAPF,args...) = $op(prob.env,args...)
+    @eval CRCBS.$op(prob::PC_TAPF,args...) = $op(prob.env,args...)
+end
 # CRCBS.num_goals(pc_mapf::PC_MAPF)           = length(pc_mapf.goals)
 # CRCBS.get_starts(pc_mapf::PC_MAPF)          = pc_mapf.starts
 # CRCBS.get_goals(pc_mapf::PC_MAPF)           = pc_mapf.goals
