@@ -65,7 +65,7 @@ function CRCBS.pibt_update_envs!(solver,pc_mapf::PC_MAPF,cache)
             CRCBS.get_envs(cache)[i] = build_env(solver,solution,node,AgentID(i))
         end
         env = CRCBS.get_envs(cache)[i]
-        # Now update the SearchEnv and rebuild any low level envs for which
+        # Update the SearchEnv and rebuild any low level envs for which
         # the goal has beem reached
         sp = get_final_state(p)
         if is_goal(env,sp) && CRCBS.is_valid(env,get_goal(env))
