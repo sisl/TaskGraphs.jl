@@ -1,3 +1,4 @@
+CRCBS.build_env(solver,env::SearchEnv,node::ConstraintTreeNode,i::Int) = build_env(solver,env,node,AgentID(i))
 function construct_heuristic_model(solver::PIBTPlanner,env_graph;
         ph = PerfectHeuristic(get_dist_matrix(env_graph)),
         kwargs...)
@@ -32,16 +33,16 @@ function CRCBS.is_consistent(cache::PIBTCache,pc_mapf::PC_MAPF)
 end
 
 function CRCBS.pibt_set_priorities!(solver,pc_mapf::PC_MAPF,cache)
-    # get_priorities(cache) .= reverse(sortperm(
-    #     [(
-    #         ~isa(env.schedule_node,Union{COLLECT,DEPOSIT}),
-    #         ~isa(env.schedule_node,CARRY),
-    #         minimum(cache.slack[get_vtx(schedule,env.node_id)]),
-    #         i
-    #     ) for (i,env) in enumerate(get_envs(cache)) ] ))
-    CRCBS.get_priorities(cache) .= reverse(sortperm(
-        [(t,i) for (i,t) in enumerate(CRCBS.get_timers(cache))]
-        ))
+    CRCBS.get_priorities(cache) .= sortperm(
+        [(
+            ~isa(env.schedule_node,Union{COLLECT,DEPOSIT}),
+            ~isa(env.schedule_node,CARRY),
+            minimum(pc_mapf.env.cache.slack[get_vtx(pc_mapf.env.schedule,env.node_id)]),
+            i
+        ) for (i,env) in enumerate(CRCBS.get_envs(cache)) ] )
+    # CRCBS.get_priorities(cache) .= reverse(sortperm(
+    #     [(t,i) for (i,t) in enumerate(CRCBS.get_timers(cache))]
+    #     ))
     log_info(3,solver,"priorities: ", CRCBS.get_priorities(cache))
     return cache
 end
@@ -63,8 +64,10 @@ function CRCBS.pibt_update_envs!(solver,pc_mapf::PC_MAPF,cache)
     node = initialize_root_node(solver,pc_mapf)
     for (i,p) in enumerate(get_paths(solution))
         # NOTE rebuild all envs to ensure that goal times are up to date
-        env = build_env(solver,solution,node,AgentID(i))
-        CRCBS.get_envs(cache)[i] = env
+        if has_vertex(solution.schedule,get_next_vtx_matching_agent_id(solution,i))
+            CRCBS.get_envs(cache)[i] = build_env(solver,solution,node,AgentID(i))
+        end
+        env = CRCBS.get_envs(cache)[i]
         # Now update the SearchEnv and rebuild any low level envs for which
         # the goal has beem reached
         sp = get_final_state(p)
@@ -72,8 +75,12 @@ function CRCBS.pibt_update_envs!(solver,pc_mapf::PC_MAPF,cache)
             v = get_vtx(solution.schedule,env.node_id)
             update_env!(solver,solution,v,p)
             update_planning_cache!(solver,solution)
-            CRCBS.get_timers(cache)[i] = 0
-            CRCBS.get_envs(cache)[i] = build_env(solver,solution,node,AgentID(i))
+            # NOTE Even if the current goal is reached, we only want to build a
+            # new env if there is a valid available next vtx.
+            if has_vertex(solution.schedule,get_next_vtx_matching_agent_id(solution,i))
+                CRCBS.get_timers(cache)[i] = 0
+                CRCBS.get_envs(cache)[i] = build_env(solver,solution,node,AgentID(i))
+            end
         end
     end
     # debugging

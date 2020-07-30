@@ -76,18 +76,18 @@ function CRCBS.get_possible_actions(env::MetaAgentCBS.TeamMetaEnv,s::MetaAgentCB
     meta_actions
 end
 
-function CRCBS.is_goal(env:::PCCBSEnv,s)
-    if states_match(s, get_goal(env))
-        if get_t(s) >= get_t(get_goal(env))
-            # updated t_goal
-            # t_goal = maximum()
-            # check that all predecessor nodes have been completed.
-            return true
-        end
-    elseif !is_valid(get_goal(env))
-        return true
-    end
-    return false
-end
+# function CRCBS.is_goal(env::PCCBSEnv,s)
+#     if states_match(s, get_goal(env))
+#         if get_t(s) >= get_t(get_goal(env))
+#             # updated t_goal
+#             # t_goal = maximum()
+#             # check that all predecessor nodes have been completed.
+#             return true
+#         end
+#     elseif !CRCBS.is_valid(get_goal(env))
+#         return true
+#     end
+#     return false
+# end
 
 # end # end module PCCBS

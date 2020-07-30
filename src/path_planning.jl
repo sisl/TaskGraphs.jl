@@ -125,18 +125,30 @@ GraphUtils.get_distance(env::SearchEnv,s::State,g::State) = get_distance(env.pro
 initialize_planning_cache(env::SearchEnv) = initialize_planning_cache(env.schedule,deepcopy(env.cache.t0),deepcopy(env.cache.tF))
 
 """
+    get_next_vtx_matching_agent_id(schedule,cache,agent_id)
+
+Return the node_id of the active node assigned to an agent.
+"""
+function get_next_vtx_matching_agent_id(env::SearchEnv,agent_id)
+    for v in env.cache.active_set
+        if agent_id == get_path_spec(env.schedule, v).agent_id
+            return v
+        end
+    end
+    return -1
+end
+
+"""
     get_next_node_matching_agent_id(schedule,cache,agent_id)
 
 Return the node_id of the active node assigned to an agent.
 """
 function get_next_node_matching_agent_id(env::SearchEnv,agent_id)
-    node_id = RobotID(agent_id)
-    for v in env.cache.active_set
-        if agent_id == get_path_spec(env.schedule, v).agent_id
-            return get_vtx_id(env.schedule,v)
-        end
+    v = get_next_vtx_matching_agent_id(env::SearchEnv,agent_id)
+    if has_vertex(env.schedule,v)
+        return get_vtx_id(env.schedule,v)
     end
-    return node_id
+    return RobotID(agent_id)
 end
 
 export
@@ -557,7 +569,12 @@ function CRCBS.build_env(
     )
     build_env(solver,env,node,schedule_node,get_id(v),args...;kwargs...)
 end
-function CRCBS.build_env(solver, env::SearchEnv, node::ConstraintTreeNode, agent_id::AgentID)
+function CRCBS.build_env(
+        solver,
+        env::SearchEnv,
+        node::ConstraintTreeNode,
+        agent_id::AgentID
+        )
     node_id = get_next_node_matching_agent_id(env,get_id(agent_id))
     build_env(solver,env,node,VtxID(get_vtx(env.schedule,node_id)))
     # get_node_from_id(env.schedule,node_id),
