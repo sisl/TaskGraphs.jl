@@ -40,9 +40,6 @@ function CRCBS.pibt_set_priorities!(solver,pc_mapf::PC_MAPF,cache)
             minimum(pc_mapf.env.cache.slack[get_vtx(pc_mapf.env.schedule,env.node_id)]),
             i
         ) for (i,env) in enumerate(CRCBS.get_envs(cache)) ] )
-    # CRCBS.get_priorities(cache) .= reverse(sortperm(
-    #     [(t,i) for (i,t) in enumerate(CRCBS.get_timers(cache))]
-    #     ))
     log_info(3,solver,"priorities: ", CRCBS.get_priorities(cache))
     return cache
 end
