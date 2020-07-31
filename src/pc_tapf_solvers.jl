@@ -234,7 +234,7 @@ function plan_path!(solver::AStarSC, env::SearchEnv, node::N,
 
     reset_solver!(solver)
     cbs_env = build_env(solver, env, node, VtxID(v))#schedule_node, v)
-    base_path = get_base_path(env,cbs_env)
+    base_path = get_base_path(solver,env,cbs_env)
     ### PATH PLANNING ###
     # solver.DEBUG ? validate(base_path,v) : nothing
     path, cost = path_finder(solver, cbs_env, base_path)
@@ -246,7 +246,7 @@ function plan_path!(solver::AStarSC, env::SearchEnv, node::N,
             cost_model, _ = construct_cost_model(solver, env;
                 primary_objective=env.problem_spec.cost_function)
             cbs_env = build_env(solver, env, node, VtxID(v);cost_model=cost_model)
-            base_path = get_base_path(env,cbs_env)
+            base_path = get_base_path(solver,env,cbs_env)
             path, cost = path_finder(solver, cbs_env, base_path)
         end
         if cost == get_infeasible_cost(cbs_env)

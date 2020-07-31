@@ -1,60 +1,44 @@
 # Freeze assignments
 let
-    project_spec, problem_spec, robot_ICs, _, env_graph = pctapf_problem_6(;
-        verbose=false);
+    replan_model = MergeAndBalance()
     cost_model = SumOfMakeSpans()
-    solver = NBSSolver()
+    f =  pctapf_problem_6
+    project_spec, problem_spec, robot_ICs, _, env_graph = f(;cost_function=cost_model);
     project_schedule = construct_partial_project_schedule(
         project_spec,
         problem_spec,
         robot_ICs,
         )
-    base_search_env = construct_search_env(
-        solver,
-        project_schedule,
-        problem_spec,
-        env_graph,
-        initialize_planning_cache(project_schedule),
-        cost_model,
-        )
-    env, cost = solve!(solver,base_search_env;optimizer=Gurobi.Optimizer)
+    for solver in [
+        NBSSolver(),
+        NBSSolver(path_planner = PIBTPlanner{NTuple{3,Float64}}()),
+        ]
+        # solver = NBSSolver()
+        # solver = NBSSolver(path_planner = PIBTPlanner{NTuple{3,Float64}}())
+        base_search_env = construct_search_env(
+            solver,
+            project_schedule,
+            problem_spec,
+            env_graph,
+            )
 
-    replan_model = MergeAndBalance()
+        @show iteration_limit(solver)
+        @show runtime_limit(solver)
+        @show deadline(solver)
+        env, cost = solve!(solver,base_search_env;optimizer=Gurobi.Optimizer)
 
-    new_proj_spec, _, _, _, _ = pctapf_problem_1(;verbose=false)
+        new_proj_spec, _, _, _, _ = pctapf_problem_1(;verbose=false)
+        new_schedule = construct_partial_project_schedule(new_proj_spec,problem_spec)
+        request = ProjectRequest(new_schedule,2,2)
+        remap_object_ids!(request.schedule,env.schedule)
 
+        commit_threshold = 5
+        base_search_env = replan!(solver,replan_model,env,request;commit_threshold=commit_threshold)
 
-    request = ProjectRequest(
-        construct_partial_project_schedule(new_proj_spec,problem_spec),
-        2,
-        2
-    )
+        reset_solver!(solver)
+        env, cost = solve!(solver,base_search_env;optimizer=Gurobi.Optimizer)
+    end
 
-    remap_object_ids!(request.schedule,env.schedule)
-    base_search_env = replan!(solver,replan_model,env,request;commit_threshold=1)
-
-    pibt_planner = PIBTPlanner{NTuple{3,Float64}}()
-
-    # let
-    #     t = 0
-    #     assignment_dict = freeze_assignments!(search_env.schedule, search_env.cache, t)
-    #     @test length(assignment_dict) == 0
-    # end
-    # let
-    #     t = 1
-    #     assignment_dict = freeze_assignments!(search_env.schedule, search_env.cache, t)
-    #     @test length(assignment_dict) == 1
-    # end
-    # let
-    #     t = 2
-    #     assignment_dict = freeze_assignments!(search_env.schedule, search_env.cache, t)
-    #     @test length(assignment_dict) == 2
-    # end
-    # let
-    #     t = 8
-    #     assignment_dict = freeze_assignments!(search_env.schedule, search_env.cache, t)
-    #     @test length(assignment_dict) == 3
-    # end
 end
 # Test partial project schedule
 let

@@ -390,12 +390,14 @@ function set_time_limits!(solver,replan_model,t_request,t_commit)
     set_runtime_limit!(solver, (t_commit - t_request) - get_timeout_buffer(replan_model))
     # set_runtime_limit!(assignment_solver(solver), solver.time_limit - get_route_planning_buffer(replan_model))
     set_runtime_limit!(solver.assignment_model, runtime_limit(solver) - get_route_planning_buffer(replan_model))
+    @assert runtime_limit(solver) > 0.0
     solver
 end
 function set_time_limits!(solver,replan_model::DeferUntilCompletion,t_request,t_commit)
     set_runtime_limit!(solver, (t_commit - t_request) - get_timeout_buffer(replan_model))
     set_runtime_limit!(solver, min(runtime_limit(solver),replan_model.max_time_limit))
     set_runtime_limit!(assignment_solver(solver), runtime_limit(solver) - get_route_planning_buffer(replan_model))
+    @assert runtime_limit(solver) > 0.0
     solver
 end
 
@@ -454,6 +456,7 @@ struct ProjectRequest
     t_request::Int
     t_arrival::Int
 end
+
 """
     replan!(solver, replan_model, search_env, env_graph, problem_spec, route_plan,
         next_schedule, t_request, t_arrival; commit_threshold=5,kwargs...)
@@ -507,8 +510,7 @@ function replan!(solver, replan_model, search_env, request; commit_threshold=5,k
         initialize_planning_cache(new_schedule,t0,tF)
         )
     trimmed_route_plan = trim_route_plan(base_search_env, route_plan, t_commit)
-    base_search_env = SearchEnv(base_search_env, route_plan=trimmed_route_plan)
-    base_search_env
+    SearchEnv(base_search_env, route_plan=trimmed_route_plan)
 end
 replan!(solver, replan_model::NullReplanner, search_env, args...;kwargs...) = search_env
 

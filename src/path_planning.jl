@@ -487,14 +487,14 @@ end
 
 include("pccbs.jl")
 
-function get_base_path(search_env::SearchEnv,env::PCCBSEnv)
+function get_base_path(solver,search_env::SearchEnv,env::PCCBSEnv)
     base_path = get_paths(search_env)[get_agent_id(env)]
     v = get_vtx(search_env.schedule, env.node_id)
     t0 = search_env.cache.t0[v]
     gap = t0 - get_end_index(base_path)
     if gap > 0
         log_info(1, solver, string("LOW LEVEL SEARCH: in node ",v," -- ",
-            string(search_env.schedule_node),
+            string(env.schedule_node),
             ": cache.t0[v] - get_end_index(base_path) = ", gap,
             ". Extending path to ",t0," ..."))
         extend_path!(env,base_path,t0)
@@ -578,12 +578,12 @@ function CRCBS.build_env(
     build_env(solver,env,node,VtxID(get_vtx(env.schedule,node_id)))
     # get_node_from_id(env.schedule,node_id),
 end
-function get_base_path(search_env::SearchEnv,meta_env::MetaAgentCBS.AbstractMetaEnv)
+function get_base_path(solver,search_env::SearchEnv,meta_env::MetaAgentCBS.AbstractMetaEnv)
     starts = Vector{state_type(search_env)}()
     meta_cost = MetaCost(Vector{cost_type(search_env)}(),get_initial_cost(search_env))
     for cbs_env in MetaAgentCBS.get_envs(meta_env)
         sub_node = cbs_env.schedule_node
-        base_path = get_base_path(search_env,cbs_env)
+        base_path = get_base_path(solver,search_env,cbs_env)
         push!(starts, get_final_state(base_path))
         push!(meta_cost.independent_costs, get_cost(base_path))
     end
@@ -613,7 +613,7 @@ function CRCBS.build_env(
             heuristic=heuristic,
             kwargs...
         )
-        base_path = get_base_path(env,cbs_env)
+        base_path = get_base_path(solver,env,cbs_env)
         push!(envs, cbs_env)
         push!(agent_idxs, get_id(get_robot_id(sub_node)))
     end
