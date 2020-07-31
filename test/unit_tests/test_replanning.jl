@@ -31,7 +31,9 @@ let
     )
 
     remap_object_ids!(request.schedule,env.schedule)
-    replan!(solver,replan_model,env,request;commit_threshold=1)
+    base_search_env = replan!(solver,replan_model,env,request;commit_threshold=1)
+
+    pibt_planner = PIBTPlanner{NTuple{3,Float64}}()
 
     # let
     #     t = 0

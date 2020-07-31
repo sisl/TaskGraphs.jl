@@ -611,7 +611,9 @@ function pctapf_problem_11(;
     return project_spec, problem_spec, robot_ICs, assignment_dict, env_graph
 end
 
-export pctapf_test_problems
+export
+    pctapf_test_problems,
+    collaborative_pctapf_test_problems
 
 pctapf_test_problems() = [
     pctapf_problem_1,
@@ -624,8 +626,11 @@ pctapf_test_problems() = [
     pctapf_problem_8,
     pctapf_problem_9,
     pctapf_problem_10,
+]
+collaborative_pctapf_test_problems() = [
     pctapf_problem_11,
 ]
+
 
 export
     init_env_1,

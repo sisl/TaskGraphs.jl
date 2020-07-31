@@ -124,16 +124,7 @@ end
 # test task assignment
 let
     # init search env
-    for (i, f) in enumerate([
-        pctapf_problem_1,
-        pctapf_problem_2,
-        pctapf_problem_3,
-        pctapf_problem_4,
-        pctapf_problem_5,
-        pctapf_problem_6,
-        pctapf_problem_7,
-        pctapf_problem_8,
-        ])
+    for (i, f) in enumerate(pctapf_test_problems())
         for cost_model in [SumOfMakeSpans(), MakeSpan()]
             let
                 costs = Float64[]
@@ -193,9 +184,14 @@ let
                         NBSSolver(assignment_model = TaskGraphsMILPSolver(AssignmentMILP())),
                         NBSSolver(assignment_model = TaskGraphsMILPSolver(SparseAdjacencyMILP())),
                         NBSSolver(assignment_model = TaskGraphsMILPSolver(GreedyAssignment())),
+                        NBSSolver(
+                            assignment_model = TaskGraphsMILPSolver(GreedyAssignment()),
+                            path_planner = PIBTPlanner{NTuple{3,Float64}}()
+                            ),
                         ]
                     # @show i, f, solver
                     set_iteration_limit!(solver,1)
+                    set_iteration_limit!(route_planner(solver),100)
                     project_schedule = construct_partial_project_schedule(
                         project_spec,
                         problem_spec,
@@ -207,7 +203,7 @@ let
                         problem_spec,
                         env_graph
                         )
-                    env, cost = solve!(solver,base_search_env;optimizer=Gurobi.Optimizer)
+                    env, cost = solve!(solver,PC_TAPF(base_search_env);optimizer=Gurobi.Optimizer)
                     # @show convert_to_vertex_lists(env.route_plan)
                     # prob = formulate_assignment_problem(solver.assignment_model,search_env;
                     #     optimizer=Gurobi.Optimizer,

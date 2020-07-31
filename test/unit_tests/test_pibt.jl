@@ -68,18 +68,7 @@
 # end
 let
     cost_model = SumOfMakeSpans()
-    for (i, (f,expected_cost)) in enumerate([
-        (pctapf_problem_1,5),
-        (pctapf_problem_2,8),
-        (pctapf_problem_3,10),
-        (pctapf_problem_4,3),
-        (pctapf_problem_5,4),
-        (pctapf_problem_6,-1),
-        (pctapf_problem_7,-1),
-        (pctapf_problem_8,16),
-        (pctapf_problem_9,-1),
-        (pctapf_problem_10,-1),
-        ])
+    for (i, f) in enumerate(pctapf_test_problems())
         solver = NBSSolver(assignment_model = TaskGraphsMILPSolver(GreedyAssignment()))
         let
             project_spec, problem_spec, robot_ICs, _, env_graph = f(;cost_function=cost_model,verbose=false)
@@ -104,11 +93,14 @@ let
             pc_mapf = PC_MAPF(search_env)
             set_iteration_limit!(pibt_planner,50)
             set_verbosity!(pibt_planner,0)
-            solution, valid_flag = pibt!(pibt_planner,pc_mapf)
+            solution, valid_flag = pibt!(pibt_planner,deepcopy(pc_mapf))
             # @show i, f, get_cost(solution)
             # @show convert_to_vertex_lists(solution.route_plan)
             @test valid_flag
-            @test expected_cost <= get_cost(solution)
+
+            reset_solver!(solver)
+            solution, cost = solve!(pibt_planner,pc_mapf)
+            @test cost != typemax(cost_type(pc_mapf))
         end
     end
 end

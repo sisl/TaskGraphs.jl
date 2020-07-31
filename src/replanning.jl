@@ -19,6 +19,7 @@ export
 function get_env_snapshot(route_plan::S,t) where {S<:LowLevelSolution}
     Dict(RobotID(i)=>ROBOT_AT(i, get_sp(get_path_node(path,t)).vtx) for (i,path) in enumerate(get_paths(route_plan)))
 end
+get_env_snapshot(env::SearchEnv,args...) = get_env_snapshot(env.route_plan,args...)
 
 """
     trim_route_plan(search_env, route_plan, T)
@@ -261,6 +262,7 @@ function prune_schedule(project_schedule::OperatingSchedule,problem_spec::Proble
 
     new_schedule, new_cache
 end
+prune_schedule(env::SearchEnv,args...) = prune_schedule(env.schedule,env.problem_spec,env.cache,args...)
 
 """
     `prune_project_schedule`
@@ -478,10 +480,10 @@ function replan!(solver, replan_model, search_env, request; commit_threshold=5,k
     reset_solver!(solver)
     set_time_limits!(solver,replan_model,t_request,t_commit)
     # Update operating schedule
-    new_schedule, new_cache = prune_schedule(project_schedule,problem_spec,cache,t_commit)
+    new_schedule, new_cache = prune_schedule(search_env,t_commit)
     @assert sanity_check(new_schedule," after prune_schedule()")
     # split active nodes
-    robot_positions=get_env_snapshot(route_plan,t_commit)
+    robot_positions=get_env_snapshot(search_env,t_commit)
     new_schedule, new_cache = split_active_vtxs!(replan_model,new_schedule,problem_spec,new_cache,t_commit;robot_positions=robot_positions)
     @assert sanity_check(new_schedule," after split_active_vtxs!()")
     # freeze nodes that terminate before cutoff time
@@ -506,7 +508,7 @@ function replan!(solver, replan_model, search_env, request; commit_threshold=5,k
         )
     trimmed_route_plan = trim_route_plan(base_search_env, route_plan, t_commit)
     base_search_env = SearchEnv(base_search_env, route_plan=trimmed_route_plan)
-    base_search_env, solver
+    base_search_env
 end
 replan!(solver, replan_model::NullReplanner, search_env, args...;kwargs...) = search_env
 

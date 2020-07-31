@@ -47,30 +47,31 @@ global_logger(SimpleLogger(stderr, Logging.Debug))
 # Define package tests
 @time @testset "TaskGraphs Package Tests" begin
     testdir = joinpath(dirname(@__DIR__), "test/unit_tests")
-    @time @testset "TaskGraphs.PlanningPredicates" begin
-        include(joinpath(testdir, "test_predicates.jl"))
-    end
-    @time @testset "TaskGraphs.PCCBS" begin
-        include(joinpath(testdir, "test_pccbs.jl"))
-    end
-    @time @testset "TaskGraphs.CoreTests" begin
-        include(joinpath(testdir, "test_core.jl"))
-    end
-    @time @testset "TaskGraphs.ExampleTests" begin
-        include(joinpath(testdir, "test_milp_solvers.jl"))
-    end
-    @time @testset "TaskGraphs.PathPlanning" begin
-        include(joinpath(testdir, "test_path_planning.jl"))
-    end
+    # @time @testset "TaskGraphs.PlanningPredicates" begin
+    #     include(joinpath(testdir, "test_predicates.jl"))
+    # end
+    # @time @testset "TaskGraphs.PCCBS" begin
+    #     include(joinpath(testdir, "test_pccbs.jl"))
+    # end
+    # @time @testset "TaskGraphs.CoreTests" begin
+    #     include(joinpath(testdir, "test_core.jl"))
+    # end
+    # @time @testset "TaskGraphs.ExampleTests" begin
+    #     include(joinpath(testdir, "test_milp_solvers.jl"))
+    # end
+    # @time @testset "TaskGraphs.PathPlanning" begin
+    #     include(joinpath(testdir, "test_path_planning.jl"))
+    # end
     @time @testset "TaskGraphs.Solvers" begin
         include(joinpath(testdir, "test_solver.jl"))
     end
-    @time @testset "TaskGraphs.PIBT" begin
-        include(joinpath(testdir, "test_pibt.jl"))
-    end
-    @time @testset "TaskGraphs.Replanning" begin
-        include(joinpath(testdir, "test_replanning.jl"))
-    end
+    # @time @testset "TaskGraphs.PIBT" begin
+    #     include(joinpath(testdir, "test_pibt.jl"))
+    # end
+    # @time @testset "TaskGraphs.Replanning" begin
+    #     include(joinpath(testdir, "test_replanning.jl"))
+    # end
+    
     # @time @testset "TaskGraphs.Profiling" begin
     #     include(joinpath(testdir, "test_profiling.jl"))
     # end

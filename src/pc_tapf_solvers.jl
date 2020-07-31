@@ -548,6 +548,7 @@ function CRCBS.solve!(solver, env_graph, project_spec::ProjectSpec, problem_spec
         project_spec,problem_spec,map(i->robot_ICs[i], 1:problem_spec.N))
     solve!(solver, env_graph, schedule, problem_spec;kwargs...)
 end
+CRCBS.solve!(solver::NBSSolver, pc_tapf::PC_TAPF;kwargs...) = solve!(solver,pc_tapf.env;kwargs...)
 
 export
     formulate_assignment_problem
