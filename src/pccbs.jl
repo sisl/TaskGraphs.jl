@@ -76,18 +76,31 @@ function CRCBS.get_possible_actions(env::MetaAgentCBS.TeamMetaEnv,s::MetaAgentCB
     meta_actions
 end
 
-# function CRCBS.is_goal(env::PCCBSEnv,s)
-#     if states_match(s, get_goal(env))
-#         if get_t(s) >= get_t(get_goal(env))
-#             # updated t_goal
-#             # t_goal = maximum()
-#             # check that all predecessor nodes have been completed.
-#             return true
-#         end
-#     elseif !CRCBS.is_valid(get_goal(env))
-#         return true
-#     end
-#     return false
-# end
+function CRCBS.is_goal(env::PCCBSEnv,s)
+    if states_match(s, get_goal(env))
+        if get_t(s) >= get_t(get_goal(env))
+            #########################################
+            # updated goal time
+            v = get_vtx(env.search_env.schedule,env.node_id)
+            path_spec = get_path_spec(env.search_env.schedule, v)
+            goal_time = env.search_env.cache.tF[v] # time after which goal can be satisfied
+            if path_spec.tight == true
+                goal_time += minimum(env.search_env.cache.local_slack[v])
+            end
+            if (path_spec.free == true) && is_terminal_node(get_graph(env.search_env.schedule),v)
+                goal_time = maximum(env.search_env.cache.tF)
+            end
+            # check that all predecessor nodes have been completed.
+            if get_t(s) < goal_time
+                return false
+            end
+            #########################################
+            return true
+        end
+    elseif !CRCBS.is_valid(get_goal(env))
+        return true
+    end
+    return false
+end
 
 # end # end module PCCBS

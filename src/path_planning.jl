@@ -469,7 +469,6 @@ function update_env!(solver,env::SearchEnv,v::Int,path::P,
     route_plan = env.route_plan
     cache = env.cache
     schedule = env.schedule
-
     # UPDATE CACHE
     update_planning_cache!(solver,env,v,path)
     update_cost_model!(env)
@@ -520,7 +519,7 @@ function CRCBS.build_env(
     # deadline = env.cache.tF[v] .+ min.(max.(env.cache.local_slack[v], env.cache.max_deadline[v]),env.cache.slack[v]) # This is a potential fix that would allow iterative tightening to keep working
     deadline = env.cache.tF[v] .+ env.cache.slack[v]         # deadline for DeadlineCost
     # Adjust deadlines if necessary:
-    if get_path_spec(env.schedule, v).tight == true
+    if path_spec.tight == true
         goal_time += minimum(env.cache.local_slack[v])
     end
     for v_next in outneighbors(get_graph(env.schedule),v)

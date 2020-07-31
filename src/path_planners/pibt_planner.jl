@@ -32,16 +32,16 @@ function CRCBS.is_consistent(cache::PIBTCache,pc_mapf::PC_MAPF)
     return false
 end
 
-function CRCBS.pibt_set_priorities!(solver,pc_mapf::PC_MAPF,cache)
-    CRCBS.get_priorities(cache) .= sortperm(
-        [(
-            ~isa(env.schedule_node,Union{COLLECT,DEPOSIT}),
-            ~isa(env.schedule_node,CARRY),
-            minimum(pc_mapf.env.cache.slack[get_vtx(pc_mapf.env.schedule,env.node_id)]),
-            i
-        ) for (i,env) in enumerate(CRCBS.get_envs(cache)) ] )
-    log_info(3,solver,"priorities: ", CRCBS.get_priorities(cache))
-    return cache
+function CRCBS.pibt_priority_law(solver,pc_mapf::PC_MAPF,cache,i)
+    env = CRCBS.get_envs(cache)[i]
+    return (
+        ~isa(env.schedule_node,Union{COLLECT,DEPOSIT}),
+        ~isa(env.schedule_node,CARRY),
+        minimum(cache.solution.cache.slack[get_vtx(
+            cache.solution.schedule,env.node_id)]),
+        -CRCBS.get_timers(cache)[i],
+        i
+    )
 end
 
 """
