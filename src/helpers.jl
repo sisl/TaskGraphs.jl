@@ -612,6 +612,113 @@ function pctapf_problem_11(;
 end
 
 export
+    replanning_problem,
+    replanning_problem_1,
+    replanning_test_problems
+
+"""
+    replanning_problem
+
+Constructs a replanning problem, consisting of robot initial conditions, an
+environment, and a sequence of project requests scheduled to arrive in the
+factory at regular intervals.
+Args:
+- r0: list of integers specifying the start locations of the robots
+- defs: a list of tuples, where each tuple is of the form
+
+    `([start_1=>goal_1, ...], [([inputs],[outputs]),...])`
+
+    where the `start=>goal` pairs define the start and end points for each
+    object to be delivered, and the `([inputs],[outputs])` pairs define the
+    objects that go in and out of each operation.
+- env_graph: the environment (presumably a GridFactoryEnvironment)
+Outputs:
+- requests: a sequence of `ProjectRequest`s
+- problem_spec: a `ProblemSpec`
+- robot_ICs: Robot initial conditions `ROBOT_AT`
+- env_graph: the environment
+"""
+function replanning_problem(r0,defs,env_graph;
+        cost_function=SumOfMakeSpans(),
+        spacing=8,
+        t0=0,
+        Δt_op=0,
+        )
+    requests = Vector{ProjectRequest}()
+    problem_spec = nothing
+    robot_ICs = nothing
+    for (i,def) in enumerate(defs)
+        s0 = map(i->i.first,def.tasks)
+        sF = map(i->i.second,def.tasks)
+        spec, _ = pctapf_problem(r0,s0,sF)
+        for op in def.ops
+            inputs, outputs = op
+            add_operation!(spec,construct_operation(spec,-1,inputs,outputs,Δt_op))
+        end
+        if i == 1
+            problem_def = SimpleProblemDef(spec,r0,s0,sF)
+            _, problem_spec, _, _, robot_ICs = construct_task_graphs_problem(
+                problem_def,env_graph;
+                cost_function=cost_function)
+            project_schedule = construct_partial_project_schedule(
+                spec,
+                problem_spec,
+                robot_ICs,
+                )
+        else
+            project_schedule = construct_partial_project_schedule(
+                spec,
+                problem_spec,
+                )
+        end
+        t = t0+spacing*(i-1)
+        push!(requests,ProjectRequest(project_schedule,t,t))
+    end
+
+    return requests, problem_spec, robot_ICs, env_graph
+end
+
+function replanning_problem_1(;kwargs...)
+    N = 2                  # num robots
+    vtx_grid = initialize_dense_vtx_grid(4,4)
+    env_graph = construct_factory_env_from_vtx_grid(vtx_grid)
+    #  1   2   3   4
+    #  5   6   7   8
+    #  9  10  11  12
+    # 13  14  15  16
+    r0 = [1,13]
+    defs = [
+        ( tasks=[1=>4,8=>6],            ops=[ ([1],[]), ([2],[]) ] ),
+        ( tasks=[13=>1,16=>15],         ops=[ ([1],[2]), ([2],[]) ] ),
+        ( tasks=[9=>11,8=>11,7=>16],    ops=[ ([1,2],[3]), ([3],[]) ] ),
+        ( tasks=[2=>14,3=>15,11=>4],    ops=[ ([1,2],[3]), ([3],[]) ] ),
+        ]
+    return replanning_problem(r0,defs,env_graph;kwargs...)
+end
+
+function replanning_problem_2(;kwargs...)
+    N = 2                  # num robots
+    vtx_grid = initialize_dense_vtx_grid(4,4)
+    env_graph = construct_factory_env_from_vtx_grid(vtx_grid)
+    #  1   2   3   4
+    #  5   6   7   8
+    #  9  10  11  12
+    # 13  14  15  16
+    r0 = [1,13]
+    defs = [
+        ( tasks=[13=>1,16=>15],         ops=[ ([1],[2]), ([2],[]) ] ),
+        ( tasks=[1=>4,8=>6],            ops=[ ([1],[]), ([2],[]) ] ),
+        ( tasks=[2=>14,3=>15,11=>4],    ops=[ ([1,2],[3]), ([3],[]) ] ),
+        ( tasks=[9=>11,8=>11,7=>16],    ops=[ ([1,2],[3]), ([3],[]) ] ),
+        ]
+    return replanning_problem(r0,defs,env_graph;kwargs...)
+end
+replanning_test_problems() = [
+    replanning_problem_1,
+    replanning_problem_2,
+]
+
+export
     pctapf_test_problems,
     collaborative_pctapf_test_problems
 

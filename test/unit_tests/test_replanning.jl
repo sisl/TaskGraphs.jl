@@ -1,49 +1,40 @@
-# Freeze assignments
 let
     replan_model = MergeAndBalance()
     cost_model = SumOfMakeSpans()
-    f =  pctapf_problem_6
-    project_spec, problem_spec, robot_ICs, _, env_graph = f(;cost_function=cost_model);
-    project_schedule = construct_partial_project_schedule(
-        project_spec,
-        problem_spec,
-        robot_ICs,
-        )
-    for solver in [
+    solvers = [
         NBSSolver(),
         NBSSolver(path_planner = PIBTPlanner{NTuple{3,Float64}}()),
-        ]
-        # solver = NBSSolver()
-        # solver = NBSSolver(path_planner = PIBTPlanner{NTuple{3,Float64}}())
-        base_search_env = construct_search_env(
-            solver,
-            project_schedule,
-            problem_spec,
-            env_graph,
-            )
-
-        @show iteration_limit(solver)
-        @show runtime_limit(solver)
-        @show deadline(solver)
-        env, cost = solve!(solver,base_search_env;optimizer=Gurobi.Optimizer)
-
-        new_proj_spec, _, _, _, _ = pctapf_problem_1(;verbose=false)
-        new_schedule = construct_partial_project_schedule(new_proj_spec,problem_spec)
-        request = ProjectRequest(new_schedule,2,2)
-        remap_object_ids!(request.schedule,env.schedule)
-
-        commit_threshold = 5
-        base_search_env = replan!(solver,replan_model,env,request;commit_threshold=commit_threshold)
-
-        reset_solver!(solver)
-        env, cost = solve!(solver,base_search_env;optimizer=Gurobi.Optimizer)
+    ]
+    for solver in solvers
+        set_verbosity!(solver,0)
+        set_iteration_limit!(solver,1)
+        set_iteration_limit!(route_planner(solver),300)
     end
+    commit_threshold = 5
+    problem_generators = replanning_test_problems()
 
-end
-# Test partial project schedule
-let
-    project_spec, problem_spec, robot_ICs, assignments, env_graph = pctapf_problem_6(;
-        verbose=false);
-    # construct a partial project schedule
-    construct_partial_project_schedule(project_spec, problem_spec, robot_ICs)
+    for f in problem_generators
+        project_requests, problem_spec, robot_ICs, env_graph = f(;cost_function=cost_model)
+        for solver in solvers
+            base_env = nothing
+            env = nothing
+            for (stage,request) in enumerate(project_requests)
+                if stage == 1
+                    base_env = construct_search_env(solver,request.schedule,problem_spec,env_graph)
+                else
+                    remap_object_ids!(request.schedule,base_env.schedule)
+                    base_env = replan!(solver,replan_model,env,request;commit_threshold=commit_threshold)
+                end
+                reset_solver!(solver)
+                reset_solver!(route_planner(solver))
+                env, cost = solve!(solver,base_env;optimizer=Gurobi.Optimizer)
+                log_info(-1,solver,
+                    "Problem: ",f,"\n",
+                    "Solver: ",typeof(solver),"\n",
+                    "Stage: ",stage,"\n",
+                    "route planner iterations: ", iterations(route_planner(solver)),
+                )
+            end
+        end
+    end
 end
