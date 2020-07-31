@@ -74,7 +74,11 @@ let
         (pctapf_problem_3,10),
         (pctapf_problem_4,3),
         (pctapf_problem_5,4),
+        (pctapf_problem_6,-1),
+        (pctapf_problem_7,-1),
         (pctapf_problem_8,16),
+        (pctapf_problem_9,-1),
+        (pctapf_problem_10,-1),
         ])
         solver = NBSSolver(assignment_model = TaskGraphsMILPSolver(GreedyAssignment()))
         let

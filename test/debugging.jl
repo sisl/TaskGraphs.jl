@@ -1,5 +1,5 @@
 let
-    f = pctapf_problem_5
+    f = pctapf_problem_10
     cost_model = SumOfMakeSpans()
     project_spec, problem_spec, robot_ICs, _, env_graph = f(;cost_function=cost_model,verbose=false)
     solver = NBSSolver(assignment_model = TaskGraphsMILPSolver(GreedyAssignment()))
@@ -45,7 +45,7 @@ let
     cache = CRCBS.pibt_init_cache(solver,pc_mapf)
     is_consistent(cache,pc_mapf)
     # pibt_step!(solver,pc_mapf,cache,1)
-    set_iteration_limit!(solver,40)
+    set_iteration_limit!(solver,20)
     set_verbosity!(solver,4)
     reset_solver!(solver)
     solution, valid_flag = pibt!(solver,pc_mapf)
@@ -54,11 +54,16 @@ let
     grid_vtxs = map(v->[v[1],v[2]], get_graph(pc_mapf.env).vtxs)
     paths = map(p->map(v->grid_vtxs[v],p),vtx_lists)
 
-    # using FactoryRendering
-    # include("/home/kylebrown/.julia/dev/TaskGraphs/test/notebooks/render_tools.jl")
-    # FactoryRendering.record_video(string(f,".webm"),vtx_lists,grid_vtxs;goals=goals,res=(400,400))
-    # print_project_schedule(string(f),search_env;mode=:leaf_aligned)
-    # run(`inkscape -z $(string(f)).svg -e $(string(f)).png`)
+    using FactoryRendering
+    include("/home/kylebrown/.julia/dev/TaskGraphs/test/notebooks/render_tools.jl")
+    base_path = joinpath(dirname(pathof(TaskGraphs)),"..","test",string(f))
+    mkpath(base_path)
+    vid_file = joinpath(base_path,"animation.webm")
+    sched_file = joinpath(base_path,"schedule")
+    FactoryRendering.record_video(vid_file,vtx_lists,grid_vtxs;goals=goals,res=(400,400))
+    print_project_schedule(sched_file,search_env;mode=:leaf_aligned)
+    run(`inkscape -z $sched_file.svg -e $sched_file.png`)
+    run(`rm $sched_file.svg`)
 
     # @show get_cost(solution)
     @show convert_to_vertex_lists(solution.route_plan)
