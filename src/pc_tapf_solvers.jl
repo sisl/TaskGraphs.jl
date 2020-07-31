@@ -470,6 +470,10 @@ function CRCBS.hard_reset_solver!(solver::NBSSolver)
     hard_reset_solver!(get_logger(solver.logger))
     hard_reset_solver!(route_planner(solver))
 end
+function CRCBS.reset_solver!(solver::NBSSolver)
+    reset_solver!(get_logger(solver))
+    reset_solver!(route_planner(solver))
+end
 
 """
     solve!(solver, base_env::SearchEnv;kwargs...) where {A,P}

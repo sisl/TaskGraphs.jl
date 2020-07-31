@@ -26,7 +26,7 @@ let
                     base_env = replan!(solver,replan_model,env,request;commit_threshold=commit_threshold)
                 end
                 reset_solver!(solver)
-                reset_solver!(route_planner(solver))
+                # reset_solver!(route_planner(solver))
                 env, cost = solve!(solver,base_env;optimizer=Gurobi.Optimizer)
                 log_info(-1,solver,
                     "Problem: ",f,"\n",
