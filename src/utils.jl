@@ -53,7 +53,13 @@ function remap_object_ids!(project_schedule::OperatingSchedule,args...)
     project_schedule
 end
 function remap_object_ids!(new_schedule::OperatingSchedule,old_schedule::OperatingSchedule)
-    max_obj_id = maximum([get_id(id) for id in get_vtx_ids(old_schedule) if typeof(id) <: ObjectID])
+    max_obj_id = 0
+    for id in get_vtx_ids(old_schedule)
+        if typeof(id) <: ObjectID
+            # max_obj_id = maximum([get_id(id) for id in get_vtx_ids(old_schedule) if typeof(id) <: ObjectID])
+            max_obj_id = max(get_id(id),max_obj_id)
+        end
+    end
     remap_object_ids!(new_schedule,max_obj_id)
 end
 

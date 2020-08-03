@@ -309,13 +309,24 @@ splice_schedules!(project_schedule,next_schedule) = project_schedule
 
 export
     ReplannerModel,
+    ReplannerConfig,
     DeferUntilCompletion,
     ReassignFreeRobots,
     MergeAndBalance,
     Oracle,
     FallBackPlanner,
+    NullReplanner,
     get_commit_time,
     replan!
+
+function get_timeout_buffer end
+function get_route_planning_buffer end
+function get_commit_time end
+function break_assignments! end
+function set_time_limits! end
+function split_active_vtxs! end
+function fix_precutoff_nodes! end
+function replan! end
 
 """
     ReplannerModel
@@ -325,6 +336,18 @@ Abstract type. Concrete subtypes currently include `DeferUntilCompletion`,
 `NullReplanner`
 """
 abstract type ReplannerModel end
+@with_kw struct ReplannerConfig
+    timeout_buffer::Float64        = 1
+    route_planning_buffer::Float64  = 2
+    commit_threshold::Float64       = 5
+end
+get_replanner_config(config::ReplannerConfig) = config
+get_replanner_config(model) = model.config
+
+get_timeout_buffer(model) = get_replanner_config(model).timeout_buffer
+get_route_planning_buffer(model) = get_replanner_config(model).route_planning_buffer
+get_commit_threshold(model) = get_replanner_config(model).commit_threshold
+
 """
     DeferUntilCompletion <: ReplannerModel
 
@@ -332,8 +355,7 @@ Allow work to begin on the new project only after all other work is completed.
 """
 @with_kw struct DeferUntilCompletion <: ReplannerModel
     max_time_limit::Float64 = 100
-    time_out_buffer::Float64 = 1
-    route_planning_buffer::Float64 = 2
+    config::ReplannerConfig = ReplannerConfig()
 end
 """
     ReassignFreeRobots   <: ReplannerModel
@@ -342,8 +364,7 @@ Allow robots to begin working on the new project as soon as they have finished
 their current assignments.
 """
 @with_kw struct ReassignFreeRobots   <: ReplannerModel
-    time_out_buffer::Float64 = 1
-    route_planning_buffer::Float64 = 2
+    config::ReplannerConfig = ReplannerConfig()
 end
 """
     MergeAndBalance      <: ReplannerModel
@@ -352,33 +373,60 @@ Allow replanning from scratch for all assignments and routes except for those
 that will take place
 """
 @with_kw struct MergeAndBalance      <: ReplannerModel
-    time_out_buffer::Float64 = 1
-    route_planning_buffer::Float64 = 2
+    config::ReplannerConfig = ReplannerConfig()
 end
 @with_kw struct Oracle               <: ReplannerModel
-    time_out_buffer::Float64 = -110
-    route_planning_buffer::Float64 = 10
+    config::ReplannerConfig = ReplannerConfig(
+        timeout_buffer         = -110,
+        route_planning_buffer   = 10,
+        commit_threshold        = 0,
+    )
 end
 @with_kw struct FallBackPlanner      <: ReplannerModel
-    time_out_buffer::Float64 = 1
-    route_planning_buffer::Float64 = 2
+    config::ReplannerConfig = ReplannerConfig()
 end
 @with_kw struct NullReplanner        <: ReplannerModel
-    time_out_buffer::Float64 = 1
-    route_planning_buffer::Float64 = 2
+    config::ReplannerConfig = ReplannerConfig()
 end
 
-@with_kw struct FullReplanner{R,S,F}
-    replanner::R = MergeAndBalance()
-    solver::S = NBSSolver()
-    fallback::F = NBSSolver(
-        assignment_model=TaskGraphsMILPSolver(GreedyAssignment()))
+export
+    ReplanningProfilerCache,
+    FullReplanner
+
+"""
+    ReplanningProfilerCache
+
+Stores information during replanning
+* `schedule` - maintains a (non-pruned) version of the overall project schedule
+* `stage_ids` - maps the id of each node in the schedule to the stage index
+* `stage_results` - a vector of result dicts
+"""
+@with_kw struct ReplanningProfilerCache
+    schedule::OperatingSchedule             = OperatingSchedule()
+    project_ids::Dict{AbstractID,Int}       = Dict{AbstractID,Int}()
+    stage_results::Vector{Dict{String,Any}} = Vector{Dict{String,Any}}()
 end
 
-get_timeout_buffer(replan_model) = replan_model.time_out_buffer
-get_route_planning_buffer(replan_model) = replan_model.route_planning_buffer
+@with_kw struct FullReplanner{R,S}
+    solver::S                       = NBSSolver()
+    replanner::R                    = MergeAndBalance()
+    cache::ReplanningProfilerCache  = ReplanningProfilerCache()
+end
+for op in [:get_timeout_buffer,:get_route_planning_buffer,:get_commit_time,
+        :break_assignments!,:set_time_limits!,:split_active_vtxs!,
+        :fix_precutoff_nodes!]
+    @eval $op(planner::FullReplanner,args...) = $op(planner.replanner,args...)
+end
+for op in []
+    @eval $op(planner::FullReplanner,args...) = $op(planner.solver,args...)
+end
+for op in [:replan!,:set_time_limits!]
+    @eval $op(planner::FullReplanner,args...) = $op(planner.replanner,args...)
+end
 
-get_commit_time(replan_model, search_env, t_request, commit_threshold) = t_request + commit_threshold
+function get_commit_time(replan_model, search_env, t_request, commit_threshold=get_commit_threshold(replan_model))
+    t_request + commit_threshold
+end
 get_commit_time(replan_model::Oracle, search_env, t_request, args...) = t_request
 get_commit_time(replan_model::DeferUntilCompletion, search_env, t_request, commit_threshold) = max(t_request + commit_threshold,maximum(search_env.cache.tF))
 
@@ -404,39 +452,6 @@ end
 split_active_vtxs!(replan_model::ReplannerModel,new_schedule,problem_spec,new_cache,t_commit;kwargs...) = split_active_vtxs!(new_schedule,problem_spec,new_cache,t_commit;kwargs...)
 
 fix_precutoff_nodes!(replan_model,new_schedule,problem_spec,new_cache,t_commit) = fix_precutoff_nodes!(new_schedule,problem_spec,new_cache,t_commit)
-# function fix_precutoff_nodes!(replan_model::DeferUntilCompletion,project_schedule,problem_spec,new_cache,t_commit)
-#     fix_precutoff_nodes!(project_schedule,problem_spec,new_cache,t_commit)
-#     # prune all nodes but the tip GO nodes
-#     new_schedule = OperatingSchedule()
-#     for v in vertices(project_schedule)
-#         if ~get_path_spec(project_schedule,v).fixed
-#             node_id = get_vtx_id(project_schedule,v)
-#             node = get_node_from_id(project_schedule,node_id)
-#             @assert isa(node,GO)
-#             add_to_schedule!(new_schedule,problem_spec,node,node_id)
-#             robot_id = get_robot_id(node)
-#             robot_node = ROBOT_AT(get_robot_id(node),get_initial_location_id(node))
-#             robot_path_spec = PathSpec(generate_path_spec(new_schedule,problem_spec,robot_node),fixed=true,plan_path=false)
-#             add_to_schedule!(new_schedule,robot_path_spec,robot_node,robot_id)
-#             add_edge!(new_schedule,robot_id,node_id)
-#         end
-#     end
-#     new_cache = initialize_planning_cache(new_schedule;t0=map(v->t_commit,vertices(new_schedule)))
-#     new_schedule, new_cache
-#     # try
-#     #     @assert(all(map(v->get_path_spec(new_schedule,v).fixed,vertices(new_schedule))))
-#     # catch e
-#     #     for v in vertices(new_schedule)
-#     #         if ~get_path_spec(new_schedule,v).fixed
-#     #             @show string(get_node_from_vtx(new_schedule,v)), get_path_spec(new_schedule,v).fixed, new_cache.t0[v],new_cache.tF[v]
-#     #             for v2 in inneighbors(new_schedule,v)
-#     #                @show string(get_node_from_vtx(new_schedule,v2)), new_cache.t0[v2],new_cache.tF[v2]
-#     #             end
-#     #         end
-#     #     end
-#     #     throw(e)
-#     # end
-# end
 
 export
     ProjectRequest
@@ -451,10 +466,10 @@ Encodes a "request" that arrives in the factory command center.
 TODO more flexibility with t_arrival by allowing different materials to arrive
 at different times
 """
-struct ProjectRequest
-    schedule::OperatingSchedule
-    t_request::Int
-    t_arrival::Int
+@with_kw struct ProjectRequest
+    schedule::OperatingSchedule = OperatingSchedule()
+    t_request::Int              = -1
+    t_arrival::Int              = -1
 end
 
 """
@@ -467,7 +482,10 @@ is requested at time `t_request`, and whose raw materials become available at
 The exact behavior of this function depends on `replan_model <: ReplannerModel`
 """
 # function replan!(solver, replan_model, search_env, env_graph, problem_spec, route_plan, next_schedule, t_request, t_arrival; commit_threshold=5,kwargs...)
-function replan!(solver, replan_model, search_env, request; commit_threshold=5,kwargs...)
+function replan!(solver, replan_model, search_env, request;
+        commit_threshold=get_commit_threshold(replan_model),
+        kwargs...
+        )
     project_schedule    = search_env.schedule
     cache               = search_env.cache
     route_plan          = search_env.route_plan
@@ -513,5 +531,43 @@ function replan!(solver, replan_model, search_env, request; commit_threshold=5,k
     SearchEnv(base_search_env, route_plan=trimmed_route_plan)
 end
 replan!(solver, replan_model::NullReplanner, search_env, args...;kwargs...) = search_env
+
+export
+    RepeatedPC_TAPF,
+    compile_replanning_results!,
+    profile_replanner
+
+struct RepeatedPC_TAPF{S<:SearchEnv}
+    env::S
+    requests::Vector{ProjectRequest}
+end
+
+function compile_replanning_results!()
+end
+
+function profile_replanner(solver,prob::RepeatedPC_TAPF,optimizer=Gurobi.Optimizer)
+    # base_env = prob.env
+    env = prob.env
+    project_requests = prob.requests
+    # env = nothing
+    for (stage,request) in enumerate(project_requests)
+        # if stage == 1
+        #     base_env = construct_search_env(solver,request.schedule,problem_spec,env_graph)
+        # else
+            remap_object_ids!(request.schedule,env.schedule)
+            base_env = replan!(solver,replan_model,env,request;commit_threshold=commit_threshold)
+        # end
+        reset_solver!(solver)
+        env, cost = solve!(solver,base_env;optimizer=optimizer)
+        compile_replanning_results!(solver,env,cost,prob,stage)
+        # log_info(-1,solver,
+        #     "Problem: ",f,"\n",
+        #     "Solver: ",typeof(solver),"\n",
+        #     "Stage: ",stage,"\n",
+        #     "route planner iterations: ", iterations(route_planner(solver)),
+        # )
+    end
+end
+
 
 # end

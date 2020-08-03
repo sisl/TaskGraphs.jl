@@ -671,7 +671,7 @@ Outputs:
 - robot_ICs: Robot initial conditions `ROBOT_AT`
 - env_graph: the environment
 """
-function replanning_problem(r0,defs,env_graph;
+function replanning_problem(solver,r0,defs,env_graph;
         cost_function=SumOfMakeSpans(),
         spacing=8,
         t0=0,
@@ -707,10 +707,20 @@ function replanning_problem(r0,defs,env_graph;
         push!(requests,ProjectRequest(project_schedule,t,t))
     end
 
-    return requests, problem_spec, robot_ICs, env_graph
+    base_schedule = construct_partial_project_schedule(
+        ProjectSpec(),
+        problem_spec,
+        robot_ICs
+        )
+    base_env = construct_search_env(solver,base_schedule,problem_spec,env_graph)
+    return RepeatedPC_TAPF(base_env,requests)
+
+    # return requests, problem_spec, robot_ICs, env_graph
+    # env = construct_search_env(solver,OperatingSchedule(),problem_spec,env_graph)
+
 end
 
-function replanning_problem_1(;kwargs...)
+function replanning_problem_1(solver;kwargs...)
     N = 2                  # num robots
     vtx_grid = initialize_dense_vtx_grid(4,4)
     env_graph = construct_factory_env_from_vtx_grid(vtx_grid)
@@ -725,10 +735,10 @@ function replanning_problem_1(;kwargs...)
         ( tasks=[9=>11,8=>11,7=>16],    ops=[ (inputs=[1,2],outputs=[3]), (inputs=[3],outputs=[]) ] ),
         ( tasks=[2=>14,3=>15,11=>4],    ops=[ (inputs=[1,2],outputs=[3]), (inputs=[3],outputs=[]) ] ),
         ]
-    return replanning_problem(r0,defs,env_graph;kwargs...)
+    return replanning_problem(solver,r0,defs,env_graph;kwargs...)
 end
 
-function replanning_problem_2(;kwargs...)
+function replanning_problem_2(solver;kwargs...)
     N = 2                  # num robots
     vtx_grid = initialize_dense_vtx_grid(4,4)
     env_graph = construct_factory_env_from_vtx_grid(vtx_grid)
@@ -743,7 +753,7 @@ function replanning_problem_2(;kwargs...)
         ( tasks=[2=>14,3=>15,11=>4],    ops=[ (inputs=[1,2],outputs=[3]), (inputs=[3],outputs=[]) ] ),
         ( tasks=[9=>11,8=>11,7=>16],    ops=[ (inputs=[1,2],outputs=[3]), (inputs=[3],outputs=[]) ] ),
         ]
-    return replanning_problem(r0,defs,env_graph;kwargs...)
+    return replanning_problem(solver,r0,defs,env_graph;kwargs...)
 end
 replanning_test_problems() = [
     replanning_problem_1,

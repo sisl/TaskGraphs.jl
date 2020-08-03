@@ -1176,7 +1176,7 @@ function construct_partial_project_schedule(
     )
 
     # Construct Partial Project Schedule
-    project_schedule = OperatingSchedule();
+    project_schedule = OperatingSchedule()
     for op in operations
         add_to_schedule!(project_schedule, problem_spec, op, get_operation_id(op))
     end
