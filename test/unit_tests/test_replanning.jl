@@ -8,7 +8,7 @@ let
     for solver in solvers
         set_verbosity!(solver,0)
         set_iteration_limit!(solver,1)
-        set_iteration_limit!(route_planner(solver),300)
+        set_iteration_limit!(route_planner(solver),50)
     end
     commit_threshold = 5
     problem_generators = replanning_test_problems()
@@ -26,14 +26,13 @@ let
                     base_env = replan!(solver,replan_model,env,request;commit_threshold=commit_threshold)
                 end
                 reset_solver!(solver)
-                # reset_solver!(route_planner(solver))
                 env, cost = solve!(solver,base_env;optimizer=Gurobi.Optimizer)
-                log_info(-1,solver,
-                    "Problem: ",f,"\n",
-                    "Solver: ",typeof(solver),"\n",
-                    "Stage: ",stage,"\n",
-                    "route planner iterations: ", iterations(route_planner(solver)),
-                )
+                # log_info(-1,solver,
+                #     "Problem: ",f,"\n",
+                #     "Solver: ",typeof(solver),"\n",
+                #     "Stage: ",stage,"\n",
+                #     "route planner iterations: ", iterations(route_planner(solver)),
+                # )
             end
         end
     end

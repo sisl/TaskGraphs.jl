@@ -11,6 +11,39 @@
 # using ..TaskGraphs
 
 export
+    init_env_1,
+    init_env_2,
+    init_env_3
+
+init_env_1() = construct_regular_factory_world(;
+    n_obstacles_x=2,
+    n_obstacles_y=2,
+    obs_width = [4;4], # obs_w = 8/n
+    obs_offset = [4;4],
+    env_pad = [1;1],
+    env_offset = [1,1],
+    env_scale = 1
+)
+init_env_2() = construct_regular_factory_world(;
+    n_obstacles_x=4,
+    n_obstacles_y=4,
+    obs_width = [2;2],
+    obs_offset = [2;2],
+    env_pad = [1;1],
+    env_offset = [1,1],
+    env_scale = 1
+)
+init_env_3() = construct_regular_factory_world(;
+    n_obstacles_x=8,
+    n_obstacles_y=8,
+    obs_width = [1;1],
+    obs_offset = [1;1],
+    env_pad = [1;1],
+    env_offset = [1,1],
+    env_scale = 1
+)
+
+export
     pctapf_problem,
     pctapf_problem_1,
     pctapf_problem_2,
@@ -652,8 +685,7 @@ function replanning_problem(r0,defs,env_graph;
         sF = map(i->i.second,def.tasks)
         spec, _ = pctapf_problem(r0,s0,sF)
         for op in def.ops
-            inputs, outputs = op
-            add_operation!(spec,construct_operation(spec,-1,inputs,outputs,Δt_op))
+            add_operation!(spec,construct_operation(spec,-1,op.inputs,op.outputs,Δt_op))
         end
         if i == 1
             problem_def = SimpleProblemDef(spec,r0,s0,sF)
@@ -688,10 +720,10 @@ function replanning_problem_1(;kwargs...)
     # 13  14  15  16
     r0 = [1,13]
     defs = [
-        ( tasks=[1=>4,8=>6],            ops=[ ([1],[]), ([2],[]) ] ),
-        ( tasks=[13=>1,16=>15],         ops=[ ([1],[2]), ([2],[]) ] ),
-        ( tasks=[9=>11,8=>11,7=>16],    ops=[ ([1,2],[3]), ([3],[]) ] ),
-        ( tasks=[2=>14,3=>15,11=>4],    ops=[ ([1,2],[3]), ([3],[]) ] ),
+        ( tasks=[1=>4,8=>6],            ops=[ (inputs=[1],outputs=[]), (inputs=[2],outputs=[]) ] ),
+        ( tasks=[13=>1,16=>15],         ops=[ (inputs=[1],outputs=[2]), (inputs=[2],outputs=[]) ] ),
+        ( tasks=[9=>11,8=>11,7=>16],    ops=[ (inputs=[1,2],outputs=[3]), (inputs=[3],outputs=[]) ] ),
+        ( tasks=[2=>14,3=>15,11=>4],    ops=[ (inputs=[1,2],outputs=[3]), (inputs=[3],outputs=[]) ] ),
         ]
     return replanning_problem(r0,defs,env_graph;kwargs...)
 end
@@ -706,10 +738,10 @@ function replanning_problem_2(;kwargs...)
     # 13  14  15  16
     r0 = [1,13]
     defs = [
-        ( tasks=[13=>1,16=>15],         ops=[ ([1],[2]), ([2],[]) ] ),
-        ( tasks=[1=>4,8=>6],            ops=[ ([1],[]), ([2],[]) ] ),
-        ( tasks=[2=>14,3=>15,11=>4],    ops=[ ([1,2],[3]), ([3],[]) ] ),
-        ( tasks=[9=>11,8=>11,7=>16],    ops=[ ([1,2],[3]), ([3],[]) ] ),
+        ( tasks=[13=>1,16=>15],         ops=[ (inputs=[1],outputs=[2]), (inputs=[2],outputs=[]) ] ),
+        ( tasks=[1=>4,8=>6],            ops=[ (inputs=[1],outputs=[]), (inputs=[2],outputs=[]) ] ),
+        ( tasks=[2=>14,3=>15,11=>4],    ops=[ (inputs=[1,2],outputs=[3]), (inputs=[3],outputs=[]) ] ),
+        ( tasks=[9=>11,8=>11,7=>16],    ops=[ (inputs=[1,2],outputs=[3]), (inputs=[3],outputs=[]) ] ),
         ]
     return replanning_problem(r0,defs,env_graph;kwargs...)
 end
@@ -738,38 +770,5 @@ collaborative_pctapf_test_problems() = [
     pctapf_problem_11,
 ]
 
-
-export
-    init_env_1,
-    init_env_2,
-    init_env_3
-
-init_env_1() = construct_regular_factory_world(;
-    n_obstacles_x=2,
-    n_obstacles_y=2,
-    obs_width = [4;4], # obs_w = 8/n
-    obs_offset = [4;4],
-    env_pad = [1;1],
-    env_offset = [1,1],
-    env_scale = 1
-)
-init_env_2() = construct_regular_factory_world(;
-    n_obstacles_x=4,
-    n_obstacles_y=4,
-    obs_width = [2;2],
-    obs_offset = [2;2],
-    env_pad = [1;1],
-    env_offset = [1,1],
-    env_scale = 1
-)
-init_env_3() = construct_regular_factory_world(;
-    n_obstacles_x=8,
-    n_obstacles_y=8,
-    obs_width = [1;1],
-    obs_offset = [1;1],
-    env_pad = [1;1],
-    env_offset = [1,1],
-    env_scale = 1
-)
 
 # end

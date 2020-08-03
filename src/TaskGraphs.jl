@@ -39,7 +39,7 @@ include("pc_tapf_solvers.jl")
 include("path_planners/dfs_planner.jl")
 include("path_planners/pibt_planner.jl")
 include("replanning.jl")
-include("helpers.jl")
+include("helpers/problem_instances.jl")
 include("profiling.jl")
 @reexport using TaskGraphs.SolverProfiling
 
