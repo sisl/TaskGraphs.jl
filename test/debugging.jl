@@ -70,6 +70,7 @@ let
     @test valid_flag
 end
 let
+    # solver = NBSSolver()
     solver = NBSSolver(path_planner = PIBTPlanner{NTuple{3,Float64}}())
     set_verbosity!(solver,0)
     set_iteration_limit!(solver,1)
@@ -83,18 +84,23 @@ let
     # base_env = replan!(solver,MergeAndBalance(),env,prob.requests[1])
     base_env = prob.env
     env = prob.env
+    @show convert_to_vertex_lists(env.route_plan)
 
     request = prob.requests[1]
     remap_object_ids!(request.schedule,env.schedule)
     base_env = replan!(solver,replan_model,env,request)
     reset_solver!(solver)
     env, cost = solve!(solver,base_env;optimizer=Gurobi.Optimizer)
+    @show convert_to_vertex_lists(env.route_plan)
 
     request = prob.requests[2]
     remap_object_ids!(request.schedule,env.schedule)
     base_env = replan!(solver,replan_model,env,request)
+    @show convert_to_vertex_lists(base_env.route_plan)
+    # env = base_env
     reset_solver!(solver)
     env, cost = solve!(solver,base_env;optimizer=Gurobi.Optimizer)
+    @show convert_to_vertex_lists(env.route_plan)
 
     request = prob.requests[3]
     remap_object_ids!(request.schedule,env.schedule) # NOTE Why is this causing a "key ObjectID(3) not found error?"
@@ -107,6 +113,7 @@ let
     # env, cost = plan_route!(route_planner(solver),schedule,base_env)
 
     env, cost = solve!(solver,base_env;optimizer=Gurobi.Optimizer)
+    @show convert_to_vertex_lists(env.route_plan)
 
     request = prob.requests[4]
     remap_object_ids!(request.schedule,env.schedule) # NOTE Why is this causing a "key ObjectID(3) not found error?"

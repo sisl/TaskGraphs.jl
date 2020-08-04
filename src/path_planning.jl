@@ -399,7 +399,19 @@ function initialize_route_plan(schedule::OperatingSchedule,cost_model)
     cost = aggregate_costs(cost_model, costs)
     LowLevelSolution(paths=paths, cost_model=cost_model,costs=costs, cost=cost)
 end
-initialize_route_plan(env::SearchEnv) = initialize_route_plan(env.schedule,get_cost_model(env))
+function initialize_route_plan(env::SearchEnv)
+    paths = map(p->path_type(env)(
+        s0=get_initial_state(p),
+        cost=get_initial_cost(env)
+        ), get_paths(env.route_plan))
+    costs = map(p->get_cost(p), paths)
+    LowLevelSolution(
+        paths=paths,
+        cost_model=get_cost_model(env),
+        costs=costs,
+        cost=aggregate_costs(get_cost_model(env), costs)
+        )
+end
 function construct_search_env(
         solver,
         schedule::OperatingSchedule,
@@ -422,7 +434,7 @@ function construct_search_env(
         extra_T=extra_T,
         )
 
-    route_plan = initialize_route_plan(schedule,cost_model)#low_level_env)
+    route_plan = initialize_route_plan(schedule,cost_model)
     @assert N == length(get_paths(route_plan))
 
     search_env = SearchEnv(
@@ -443,8 +455,11 @@ function construct_search_env(
         args...
         ;
         kwargs...)
-    construct_search_env(solver,schedule,env.problem_spec,env.env_graph,
-        args...;kwargs...)
+    search_env = SearchEnv(
+        construct_search_env(solver,schedule,env.problem_spec,env.env_graph,
+        args...;kwargs...),
+        route_plan = env.route_plan
+        )
 end
 
 update_cost_model!(model::C,env::S) where {C,S<:SearchEnv} = nothing
@@ -693,7 +708,7 @@ function Base.copy(env::SearchEnv)
         )
 end
 function CRCBS.default_solution(env::SearchEnv)
-    solution = copy(env)
+    solution = deepcopy(env)
     set_cost!(solution.route_plan,get_infeasible_cost(solution.route_plan))
     solution
 end
