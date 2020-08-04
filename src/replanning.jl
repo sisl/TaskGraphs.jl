@@ -337,9 +337,9 @@ Abstract type. Concrete subtypes currently include `DeferUntilCompletion`,
 """
 abstract type ReplannerModel end
 @with_kw struct ReplannerConfig
-    timeout_buffer::Float64        = 1
+    timeout_buffer::Float64         = 1
     route_planning_buffer::Float64  = 2
-    commit_threshold::Float64       = 5
+    commit_threshold::Int           = 5
 end
 get_replanner_config(config::ReplannerConfig) = config
 get_replanner_config(model) = model.config

@@ -643,7 +643,7 @@ the accompanying `PathSpec` `path_spec`.
 """
 function replace_in_schedule!(schedule::P,path_spec::T,pred,id::ID) where {P<:OperatingSchedule,T<:PathSpec,ID<:AbstractID}
     v = get_vtx(schedule, id)
-    @assert v != -1
+    @assert v != -1 "node id $(string(id)) is not in schedule and therefore cannot be replaced"
     set_vtx_map!(schedule,pred,id,v)
     set_path_spec!(schedule,v,path_spec)
     schedule
@@ -778,9 +778,11 @@ function sanity_check(project_schedule::OperatingSchedule,append_string="")
         end
     catch e
         if typeof(e) <: AssertionError
+            bt = catch_backtrace()
+            showerror(stdout,e,bt)
             print(string(e.msg, append_string))
         else
-            throw(e)
+            rethrow(e)
         end
         return false
     end

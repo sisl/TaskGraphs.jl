@@ -692,17 +692,21 @@ function replanning_problem(solver,r0,defs,env_graph;
             _, problem_spec, _, _, robot_ICs = construct_task_graphs_problem(
                 problem_def,env_graph;
                 cost_function=cost_function)
-            project_schedule = construct_partial_project_schedule(
-                spec,
-                problem_spec,
-                robot_ICs,
-                )
-        else
-            project_schedule = construct_partial_project_schedule(
-                spec,
-                problem_spec,
-                )
+            # project_schedule = construct_partial_project_schedule(
+            #     spec,
+            #     problem_spec,
+            #     robot_ICs,
+            #     )
+        # else
+        #     project_schedule = construct_partial_project_schedule(
+        #         spec,
+        #         problem_spec,
+        #         )
         end
+        project_schedule = construct_partial_project_schedule(
+            spec,
+            problem_spec,
+            )
         t = t0+spacing*(i-1)
         push!(requests,ProjectRequest(project_schedule,t,t))
     end
@@ -712,6 +716,7 @@ function replanning_problem(solver,r0,defs,env_graph;
         problem_spec,
         robot_ICs
         )
+    # base_schedule = requests[1].schedule
     base_env = construct_search_env(solver,base_schedule,problem_spec,env_graph)
     return RepeatedPC_TAPF(base_env,requests)
 

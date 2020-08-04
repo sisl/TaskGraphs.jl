@@ -11,7 +11,42 @@ let
     ProjectRequest(OperatingSchedule(),10,10)
 
     solver = NBSSolver()
+    replan_model = MergeAndBalance()
+    commit_threshold = 5
     prob = replanning_problem_1(solver)
+    # env, cost = solve!(solver,PC_TAPF(prob.env);optimizer=Gurobi.Optimizer)
+    # base_env = replan!(solver,MergeAndBalance(),env,prob.requests[1])
+    base_env = prob.env
+    env = prob.env
+
+    request = prob.requests[1]
+    reset_solver!(solver)
+    env, cost = solve!(solver,base_env;optimizer=Gurobi.Optimizer)
+
+    request = prob.requests[2]
+    remap_object_ids!(request.schedule,env.schedule)
+    base_env = replan!(solver,replan_model,env,request)
+    reset_solver!(solver)
+    env, cost = solve!(solver,base_env;optimizer=Gurobi.Optimizer)
+
+    request = prob.requests[3]
+    remap_object_ids!(request.schedule,env.schedule) # NOTE Why is this causing a "key ObjectID(3) not found error?"
+    base_env = replan!(solver,replan_model,env,request)
+    reset_solver!(solver)
+    env, cost = solve!(solver,base_env;optimizer=Gurobi.Optimizer)
+
+
+    base_env = replan!(solver,replan_model,env,request)
+    reset_solver!(solver)
+    set_iteration_limit!(route_planner(solver),10)
+    env, cost = solve!(solver,PC_TAPF(base_env);optimizer=Gurobi.Optimizer)
+
+    prob.env.schedule
+    convert_to_vertex_lists(prob.env.route_plan)
+    solver = PIBTPlanner{NTuple{3,Float64}}()
+    prob = replanning_problem_1(solver)
+    env, cost = solve!(solver,PC_MAPF(prob.env))
+    convert_to_vertex_lists(env.route_plan)
 
 end
 let
@@ -36,10 +71,10 @@ let
             env = prob.env
             for (stage,request) in enumerate(prob.requests)
                 if stage == 1
-                    base_env = construct_search_env(solver,request.schedule,env.problem_spec,get_graph(env))
+                #     base_env = construct_search_env(solver,request.schedule,env.problem_spec,get_graph(env))
                     # base_env = deepcopy(env)
                 else
-                    remap_object_ids!(request.schedule,base_env.schedule)
+                    remap_object_ids!(request.schedule,env.schedule)
                     base_env = replan!(solver,replan_model,env,request;commit_threshold=commit_threshold)
                 end
                 reset_solver!(solver)
