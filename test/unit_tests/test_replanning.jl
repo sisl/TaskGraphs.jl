@@ -10,7 +10,12 @@ let
 
     ProjectRequest(OperatingSchedule(),10,10)
 
-    solver = NBSSolver()
+    # solver = NBSSolver()
+    solver = NBSSolver(path_planner = PIBTPlanner{NTuple{3,Float64}}())
+    set_verbosity!(solver,0)
+    set_iteration_limit!(solver,1)
+    set_iteration_limit!(route_planner(solver),50)
+
     replan_model = MergeAndBalance()
     commit_threshold = 5
     prob = replanning_problem_1(solver)
@@ -20,6 +25,8 @@ let
     env = prob.env
 
     request = prob.requests[1]
+    remap_object_ids!(request.schedule,env.schedule)
+    base_env = replan!(solver,replan_model,env,request)
     reset_solver!(solver)
     env, cost = solve!(solver,base_env;optimizer=Gurobi.Optimizer)
 
@@ -35,18 +42,24 @@ let
     reset_solver!(solver)
     env, cost = solve!(solver,base_env;optimizer=Gurobi.Optimizer)
 
-
+    request = prob.requests[4]
+    remap_object_ids!(request.schedule,env.schedule) # NOTE Why is this causing a "key ObjectID(3) not found error?"
     base_env = replan!(solver,replan_model,env,request)
     reset_solver!(solver)
-    set_iteration_limit!(route_planner(solver),10)
-    env, cost = solve!(solver,PC_TAPF(base_env);optimizer=Gurobi.Optimizer)
+    env, cost = solve!(solver,base_env;optimizer=Gurobi.Optimizer)
 
-    prob.env.schedule
-    convert_to_vertex_lists(prob.env.route_plan)
-    solver = PIBTPlanner{NTuple{3,Float64}}()
-    prob = replanning_problem_1(solver)
-    env, cost = solve!(solver,PC_MAPF(prob.env))
-    convert_to_vertex_lists(env.route_plan)
+
+    # base_env = replan!(solver,replan_model,env,request)
+    # reset_solver!(solver)
+    # set_iteration_limit!(route_planner(solver),10)
+    # env, cost = solve!(solver,PC_TAPF(base_env);optimizer=Gurobi.Optimizer)
+    #
+    # prob.env.schedule
+    # convert_to_vertex_lists(prob.env.route_plan)
+    # solver = PIBTPlanner{NTuple{3,Float64}}()
+    # prob = replanning_problem_1(solver)
+    # env, cost = solve!(solver,PC_MAPF(prob.env))
+    # convert_to_vertex_lists(env.route_plan)
 
 end
 let
@@ -68,7 +81,7 @@ let
         for solver in solvers
             prob = f(solver;cost_function=cost_model)
             base_env = prob.env
-            env = prob.env
+            env = nothing # prob.env
             for (stage,request) in enumerate(prob.requests)
                 if stage == 1
                 #     base_env = construct_search_env(solver,request.schedule,env.problem_spec,get_graph(env))
