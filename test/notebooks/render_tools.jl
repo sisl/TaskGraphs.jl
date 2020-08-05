@@ -799,21 +799,33 @@ end
 
 function plot_project_schedule(
         project_schedule::OperatingSchedule,
-        cache=initialize_planning_cache(project_schedule)
+        cache=initialize_planning_cache(project_schedule),
         ;
         mode=:root_aligned,
-        verbose=true
+        verbose=true,
+        shape_function = (G,v,x,y,r)->Compose.circle(x,y,r),
+        color_function = (G,v,x,y,r)->get_prop(G,v,:color),
+        text_function = (G,v,x,y,r)->string(
+            title_string(
+                get_node_from_id(project_schedule,
+                    get_vtx_id(project_schedule, v)),
+                verbose),
+            "\n",show_times(cache,v)
+            )
         )
     rg = get_display_metagraph(project_schedule;
         f=(v,p)->string(v,",",get_path_spec(project_schedule,v).agent_id))
     plot_graph_bfs(rg;
         mode=mode,
-        shape_function = (G,v,x,y,r)->Compose.circle(x,y,r),
-        color_function = (G,v,x,y,r)->get_prop(G,v,:color),
-        text_function = (G,v,x,y,r)->string(
-            title_string(get_node_from_id(project_schedule, get_vtx_id(project_schedule, v)),verbose),
-            "\n",show_times(cache,v)
-            )
+        shape_function=shape_function,
+        color_function=color_function,
+        text_function=text_function
+        # shape_function = (G,v,x,y,r)->Compose.circle(x,y,r),
+        # color_function = (G,v,x,y,r)->get_prop(G,v,:color),
+        # text_function = (G,v,x,y,r)->string(
+        #     title_string(get_node_from_id(project_schedule, get_vtx_id(project_schedule, v)),verbose),
+        #     "\n",show_times(cache,v)
+        #     )
     )
     # `inkscape -z project_schedule1.svg -e project_schedule1.png`
     # OR: `for f in *.svg; do inkscape -z $f -e $f.png; done`

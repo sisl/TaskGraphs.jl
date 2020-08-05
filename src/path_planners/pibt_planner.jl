@@ -44,6 +44,11 @@ function CRCBS.pibt_priority_law(solver,pc_mapf::PC_MAPF,cache,i)
     )
 end
 
+function CRCBS.pibt_preprocess!(solver,pc_mapf::PC_MAPF,cache)
+    update_planning_cache!(solver,CRCBS.get_solution(cache))
+    CRCBS.pibt_update_envs!(solver,pc_mapf,cache)
+end
+
 """
     CRCBS.pibt_update_solution!(solver,pc_mapf::PC_MAPF,solution::SearchEnv,cache)
 
@@ -73,6 +78,7 @@ function CRCBS.pibt_update_envs!(solver,pc_mapf::PC_MAPF,cache)
         sp = get_final_state(p)
         if is_goal(env,sp) && CRCBS.is_valid(env,get_goal(env))
             v = get_vtx(solution.schedule,env.node_id)
+            # NOTE Is update_env! the reason for the delays? I.e., does it unnecessarily push back solution.cache.tF?
             update_env!(solver,solution,v,p)
             update_planning_cache!(solver,solution)
             # NOTE Even if the current goal is reached, we only want to build a

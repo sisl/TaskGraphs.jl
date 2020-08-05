@@ -72,6 +72,16 @@ end
 let
     using FactoryRendering
     include("/home/kylebrown/.julia/dev/TaskGraphs/test/notebooks/render_tools.jl")
+
+    get_color_function(env) = (G,v,x,y,r) -> begin
+        path_spec = get_path_spec(env.schedule,v)
+        if path_spec.plan_path == false
+            return "gray"
+        else
+            return get_prop(G,v,:color)
+        end
+    end
+
     # solver = NBSSolver()
     solver = NBSSolver(path_planner = PIBTPlanner{NTuple{3,Float64}}())
     set_verbosity!(solver,0)
@@ -89,40 +99,46 @@ let
     base_env = prob.env
     env = prob.env
     @show convert_to_vertex_lists(env.route_plan)
-    display(plot_project_schedule(env;mode=:leaf_aligned))
+    display(plot_project_schedule(env;mode=:leaf_aligned,
+        color_function=get_color_function(env)
+    ))
 
     request = prob.requests[1]
     remap_object_ids!(request.schedule,env.schedule)
     base_env = replan!(solver,replan_model,env,request)
-    @show convert_to_vertex_lists(base_env.route_plan)
     set_runtime_limit!(solver,Inf)
     set_deadline!(solver,Inf)
     reset_solver!(solver)
     env, cost = solve!(solver,base_env;optimizer=Gurobi.Optimizer)
+    @show convert_to_vertex_lists(base_env.route_plan)
     @show convert_to_vertex_lists(env.route_plan)
-    display(plot_project_schedule(env;mode=:leaf_aligned))
+    display(plot_project_schedule(env;mode=:leaf_aligned,
+        color_function=get_color_function(env)
+    ))
 
     request = prob.requests[2]
     remap_object_ids!(request.schedule,env.schedule)
     base_env = replan!(solver,replan_model,env,request)
-    @show convert_to_vertex_lists(base_env.route_plan)
+    set_runtime_limit!(solver,Inf)
+    set_deadline!(solver,Inf)
     reset_solver!(solver)
     env, cost = solve!(solver,base_env;optimizer=Gurobi.Optimizer)
+    @show convert_to_vertex_lists(base_env.route_plan)
     @show convert_to_vertex_lists(env.route_plan)
-    display(plot_project_schedule(env;mode=:leaf_aligned))
+    display(plot_project_schedule(env;mode=:leaf_aligned,
+        color_function=get_color_function(env)
+    ))
 
     request = prob.requests[3]
     remap_object_ids!(request.schedule,env.schedule) # NOTE Why is this causing a "key ObjectID(3) not found error?"
     base_env = replan!(solver,replan_model,env,request)
-
     reset_solver!(solver)
-    # assignment_problem = formulate_assignment_problem(assignment_solver(solver), base_env;optimizer=Gurobi.Optimizer)
-    # update_assignment_problem!(assignment_solver(solver), assignment_problem, base_env)
-    # schedule, l_bound = solve_assignment_problem!(assignment_solver(solver),assignment_problem,base_env)
-    # env, cost = plan_route!(route_planner(solver),schedule,base_env)
-
     env, cost = solve!(solver,base_env;optimizer=Gurobi.Optimizer)
+    @show convert_to_vertex_lists(base_env.route_plan)
     @show convert_to_vertex_lists(env.route_plan)
+    display(plot_project_schedule(env;mode=:leaf_aligned,
+        color_function=get_color_function(env)
+    ))
 
     request = prob.requests[4]
     remap_object_ids!(request.schedule,env.schedule) # NOTE Why is this causing a "key ObjectID(3) not found error?"

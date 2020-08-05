@@ -801,6 +801,10 @@ function replanning_problem_2(solver;kwargs...)
     return replanning_problem(solver,r0,defs,env_graph;kwargs...)
 end
 
+"""
+    The robot should can do better if it handles the single task in the second
+    project prior to working on the third task of the first project.
+"""
 function replanning_problem_3(solver;kwargs...)
     N = 1                  # num robots
     vtx_grid = initialize_dense_vtx_grid(4,4)
@@ -811,13 +815,17 @@ function replanning_problem_3(solver;kwargs...)
     # 13  14  15  16
     r0 = [1]
     defs = [
-        ( tasks=[2=>4,8=>5,9=>12],
+        ( tasks=[2=>4,8=>5,12=>9],
             ops=[
                 (inputs=[1],outputs=[2]),
                 (inputs=[2],outputs=[3]),
                 (inputs=[3],outputs=[])
                 ] ),
         ( tasks=[13=>16],
+            ops=[
+                (inputs=[1],outputs=[]),
+                ] ),
+        ( tasks=[15=>1],
             ops=[
                 (inputs=[1],outputs=[]),
                 ] ),

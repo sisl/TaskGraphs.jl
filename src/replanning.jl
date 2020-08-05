@@ -68,7 +68,8 @@ export
     get_active_and_fixed_vtxs(project_schedule::OperatingSchedule,
         cache::PlanningCache,t)
 
-Get all vertices that "straddle" the query time t
+"active" vertices "straddle" the query time t
+"fixed" vertices finish before the query time t
 """
 function get_active_and_fixed_vtxs(project_schedule::OperatingSchedule,cache::PlanningCache,t)
     active_vtxs = Set{Int}()

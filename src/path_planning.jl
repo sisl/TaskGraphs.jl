@@ -332,6 +332,7 @@ complete.
 function update_planning_cache!(solver,env)
     cache = env.cache
     schedule = env.schedule
+    node = initialize_root_node(env)
     dummy_path = path_type(env)()
     for v in collect(cache.active_set)
         path_spec = get_path_spec(schedule,v)
@@ -353,6 +354,15 @@ function update_planning_cache!(solver,env)
                 done = false
             end
         end
+        # for (i,path) in enumerate(get_paths(env))
+        #     cbs_env = build_env(solver,env,node,AgentID(i))
+        #     sp = get_final_state(path)
+        #     if is_goal(cbs_env,sp) && CRCBS.is_valid(cbs_env,get_goal(cbs_env))
+        #         v = get_vtx(env.schedule,env.node_id)
+        #         update_env!(solver,env,v,path)
+        #         update_planning_cache!(solver,solution)
+        #     end
+        # end
         if done
             break
         end
