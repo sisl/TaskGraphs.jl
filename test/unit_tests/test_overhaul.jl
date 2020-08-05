@@ -17,7 +17,7 @@ include(joinpath(pathof(TaskGraphs),"../..","test/notebooks/render_tools.jl"))
 # for f in *.svg; do inkscape -z $f -e $f.png; done
 
 let
-    project_spec, problem_spec, robot_ICs, assignments, env_graph = pctapf_problem_1(;verbose=false);
+    project_spec, problem_spec, robot_ICs, env_graph, assignments = pctapf_problem_1(;verbose=false);
     project_schedule = construct_partial_project_schedule(
         project_spec,
         problem_spec,
@@ -31,7 +31,7 @@ end
 let
     f = pctapf_problem_10
     cost_model = MakeSpan
-    project_spec, problem_spec, robot_ICs, assignments, env_graph = f(;cost_function=cost_model,verbose=true)
+    project_spec, problem_spec, robot_ICs, env_graph, assignments = f(;cost_function=cost_model,verbose=true)
     solver = PC_TAPF_Solver(nbs_model=AssignmentMILP(),l1_verbosity=2,l2_verbosity=2,l3_verbosity=0)
 
     project_schedule = construct_partial_project_schedule(project_spec,problem_spec,map(i->robot_ICs[i], 1:problem_spec.N))
@@ -656,7 +656,7 @@ let
                 pctapf_problem_7,
                 pctapf_problem_8,
             ])
-        project_spec, problem_spec, robot_ICs, assignments, env_graph = f(;verbose=false);
+        project_spec, problem_spec, robot_ICs, env_graph, assignments = f(;verbose=false);
         milp_model = GreedyAssignment()
         project_schedule = construct_partial_project_schedule(project_spec,problem_spec,map(i->robot_ICs[i], 1:problem_spec.N))
         model = formulate_milp(milp_model,project_schedule,problem_spec;cost_model=cost_model)
@@ -765,7 +765,7 @@ end
 let
 
     # init env
-    project_spec, problem_spec, robot_ICs, assignments, env_graph = pctapf_problem_3(;verbose=false);
+    project_spec, problem_spec, robot_ICs, env_graph, assignments = pctapf_problem_3(;verbose=false);
     primary_objective=MakeSpan
     # define solver
     solver = PC_TAPF_Solver()

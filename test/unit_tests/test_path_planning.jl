@@ -1,23 +1,11 @@
 # test SearchEnv
 let
-    project_spec, problem_spec, robot_ICs, _, env_graph = pctapf_problem_4()
     solver = NBSSolver()
-    project_schedule = construct_partial_project_schedule(
-        project_spec,
-        problem_spec,
-        robot_ICs,
-        )
-    env = construct_search_env(
-        solver,
-        project_schedule,
-        problem_spec,
-        env_graph
-        )
-    pc_mapf = PC_MAPF(env)
+    pc_tapf = pctapf_problem_4(solver)
+    pc_mapf = PC_MAPF(pc_tapf.env)
 
     let
         env = deepcopy(pc_mapf.env)
-        @test num_agents(env) == problem_spec.N
         cost_type(env)
         state_type(env)
         action_type(env)

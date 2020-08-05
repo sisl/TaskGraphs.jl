@@ -28,29 +28,31 @@ Construct a trimmed route_plan that stops at a certain time step
 """
 function trim_route_plan(search_env, route_plan, T)
     # N = length(get_paths(route_plan))
-    trimmed_route_plan = initialize_route_plan(search_env)
-    for agent_id in 1:num_agents(search_env)
-        cbs_env = PCCBSEnv(
-            search_env = search_env,
-            agent_idx = agent_id,
-        )
-        old_path = get_paths(route_plan)[agent_id]
-        new_path = get_paths(trimmed_route_plan)[agent_id]
-        for t in 1:max(1, min(T, length(old_path)))
-            p = get_path_node(old_path,t)
-            push!(new_path, p)
-            set_cost!(new_path, accumulate_cost(cbs_env, get_cost(new_path),
-                get_transition_cost(cbs_env, p.s, p.a, p.sp)))
-            set_path_cost!(trimmed_route_plan, get_cost(new_path), agent_id)
-        end
-        if T > length(new_path)
-            println("Extending path in trim_route_plan. Agent id = ",agent_id)
-            extend_path!(cbs_env,new_path,T)
-        end
-    end
-    # trimmed_route_plan.cost = solution.cost
-    trimmed_route_plan
+    # trimmed_route_plan = initialize_route_plan(search_env)
+    # for agent_id in 1:num_agents(search_env)
+    #     cbs_env = PCCBSEnv(
+    #         search_env = search_env,
+    #         agent_idx = agent_id,
+    #     )
+    #     old_path = get_paths(route_plan)[agent_id]
+    #     new_path = get_paths(trimmed_route_plan)[agent_id]
+    #     for t in 1:max(1, min(T, length(old_path)))
+    #         p = get_path_node(old_path,t)
+    #         push!(new_path, p)
+    #         set_cost!(new_path, accumulate_cost(cbs_env, get_cost(new_path),
+    #             get_transition_cost(cbs_env, p.s, p.a, p.sp)))
+    #         set_path_cost!(trimmed_route_plan, get_cost(new_path), agent_id)
+    #     end
+    #     if T > length(new_path)
+    #         println("Extending path in trim_route_plan. Agent id = ",agent_id)
+    #         extend_path!(cbs_env,new_path,T)
+    #     end
+    # end
+    # # trimmed_route_plan.cost = solution.cost
+    # trimmed_route_plan
+    trim_solution!(build_env(search_env),route_plan,T)
 end
+
 
 
 export

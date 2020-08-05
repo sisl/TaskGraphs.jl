@@ -61,8 +61,11 @@ function CRCBS.pibt_update_envs!(solver,pc_mapf::PC_MAPF,cache)
     node = initialize_root_node(solver,pc_mapf)
     for (i,p) in enumerate(get_paths(solution))
         # NOTE rebuild all envs to ensure that goal times are up to date
-        if has_vertex(solution.schedule,get_next_vtx_matching_agent_id(solution,i))
-            CRCBS.get_envs(cache)[i] = build_env(solver,solution,node,AgentID(i))
+        v_next = get_next_vtx_matching_agent_id(solution,i)
+        if has_vertex(solution.schedule,v_next)
+            # if v_next != get_vtx(solution.schedule,env.node_id)
+                CRCBS.get_envs(cache)[i] = build_env(solver,solution,node,AgentID(i))
+            # end
         end
         env = CRCBS.get_envs(cache)[i]
         # Update the SearchEnv and rebuild any low level envs for which

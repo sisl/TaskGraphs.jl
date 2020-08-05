@@ -4,19 +4,9 @@ let
 
     f = pctapf_problem_1
     cost_model = SumOfMakeSpans()
-    project_spec, problem_spec, robot_ICs, _, env_graph = f(;cost_function=cost_model,verbose=false)
     solver = NBSSolver(assignment_model = TaskGraphsMILPSolver(GreedyAssignment()))
-    project_schedule = construct_partial_project_schedule(
-        project_spec,
-        problem_spec,
-        robot_ICs,
-        )
-    base_search_env = construct_search_env(
-        solver,
-        project_schedule,
-        problem_spec,
-        env_graph
-        )
+    pc_tapf = f(solver;cost_function=cost_model,verbose=false)
+    base_search_env = pc_tapf.env
     prob = formulate_assignment_problem(solver.assignment_model,base_search_env;
         optimizer=Gurobi.Optimizer,
     )

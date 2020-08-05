@@ -337,7 +337,7 @@ function update_planning_cache!(solver,env)
         path_spec = get_path_spec(schedule,v)
         agent_id = path_spec.agent_id
         if 1 <= agent_id <= num_agents(env)
-            @show string(get_node_from_vtx(env.schedule,v))
+            # @show string(get_node_from_vtx(env.schedule,v))
             path = get_paths(env)[agent_id]
             s = get_final_state(path)
             t = get_t(s)
@@ -400,17 +400,24 @@ function initialize_route_plan(schedule::OperatingSchedule,cost_model)
     cost = aggregate_costs(cost_model, costs)
     LowLevelSolution(paths=paths, cost_model=cost_model,costs=costs, cost=cost)
 end
-function initialize_route_plan(env::SearchEnv)
-    paths = map(p->path_type(env)(
-        s0=get_initial_state(p),
-        cost=get_initial_cost(env)
-        ), get_paths(env.route_plan))
+function initialize_route_plan(env::SearchEnv,cost_model=get_cost_model(env))
+    # paths = map(p->path_type(env)(
+    # paths = map(p->Path{state_type(env),action_type(env),cost_type(cost_model)}(
+    #     s0=get_initial_state(p),
+    #     cost=get_initial_cost(cost_model)
+    #     ), get_paths(env.route_plan))
+    # paths = map(p->Path{state_type(env),action_type(env),cost_type(cost_model)}(
+    #     s0=get_initial_state(p),
+    #     path_nodes=p.path_nodes,
+    #     cost=get_cost(p)
+    #     ), get_paths(env.route_plan))
+    paths=deepcopy(get_paths(env.route_plan))
     costs = map(p->get_cost(p), paths)
     LowLevelSolution(
         paths=paths,
-        cost_model=get_cost_model(env),
+        cost_model=cost_model,
         costs=costs,
-        cost=aggregate_costs(get_cost_model(env), costs)
+        cost=aggregate_costs(cost_model, costs)
         )
 end
 function construct_search_env(
@@ -449,18 +456,51 @@ function construct_search_env(
         route_plan=route_plan)
     return search_env
 end
+"""
+    construct_search_env(solver,schedule,env,...)
+
+Constructs a new search env by combining the new `schedule` with the pre-
+existing `env.route_plan`. This involves constructing a new cost function that
+reflects the new schedule structure.
+TODO: Carry over information about `search_env.cache`
+"""
 function construct_search_env(
         solver,
         schedule::OperatingSchedule,
         env::SearchEnv,
+        cache::PlanningCache=initialize_planning_cache(schedule),
+        # cache=env.cache,
+        env_graph=env.env_graph,
+        problem_spec = env.problem_spec,
+        primary_objective = problem_spec.cost_function,
         args...
         ;
+        extra_T=400,
         kwargs...)
-    search_env = SearchEnv(
-        construct_search_env(solver,schedule,env.problem_spec,env.env_graph,
-        args...;kwargs...),
-        route_plan = env.route_plan
+
+    N = problem_spec.N                                          # number of robots
+    cost_model, heuristic_model = construct_cost_model(
+        solver,
+        schedule,
+        cache,
+        problem_spec,
+        env_graph,
+        primary_objective;
+        extra_T=extra_T,
         )
+
+    route_plan = initialize_route_plan(env,cost_model)
+    @assert N == length(get_paths(route_plan))
+
+    search_env = SearchEnv(
+        schedule=schedule,
+        cache=cache,
+        env_graph=env_graph,
+        problem_spec=problem_spec,
+        cost_model=cost_model,
+        heuristic_model=heuristic_model,
+        num_agents=N,
+        route_plan=route_plan)
 end
 
 update_cost_model!(model::C,env::S) where {C,S<:SearchEnv} = nothing
@@ -557,6 +597,7 @@ function CRCBS.build_env(
         # deadline = Inf # already taken care of, perhaps?
         log_info(3,solver,string("BUILD ENV: setting goal_vtx = ",goal_vtx,", t = maximum(cache.tF) = ",goal_time))
     end
+    @assert goal_time != Inf "goal time set to $goal_time for node $(string(schedule_node))"
     cbs_env = PCCBSEnv(
         # graph       = env.env_graph,
         search_env = env,
@@ -595,6 +636,8 @@ function CRCBS.build_env(
     build_env(solver,env,node,VtxID(get_vtx(env.schedule,node_id)))
     # get_node_from_id(env.schedule,node_id),
 end
+CRCBS.build_env(env::SearchEnv) = PCCBSEnv(search_env=env)
+
 function get_base_path(solver,search_env::SearchEnv,meta_env::MetaAgentCBS.AbstractMetaEnv)
     starts = Vector{state_type(search_env)}()
     meta_cost = MetaCost(Vector{cost_type(search_env)}(),get_initial_cost(search_env))
@@ -686,6 +729,7 @@ struct PC_MAPF{E<:SearchEnv} <: AbstractMAPF
     env::E
 end
 CRCBS.build_env(solver, pc_mapf::PC_MAPF, args...) = build_env(solver,pc_mapf.env,args...)
+CRCBS.build_env(prob::Union{PC_TAPF,PC_MAPF}) = build_env(prob.env)
 CRCBS.get_initial_solution(pc_mapf::PC_MAPF) = pc_mapf.env
 function CRCBS.initialize_root_node(env::SearchEnv)
     solution = SearchEnv(

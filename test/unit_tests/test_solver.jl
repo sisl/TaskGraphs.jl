@@ -29,19 +29,9 @@ let
     # init search env
     f = pctapf_problem_4
     cost_model = SumOfMakeSpans()
-    project_spec, problem_spec, robot_ICs, _, env_graph = f(;cost_function=cost_model,verbose=false)
     solver = NBSSolver(assignment_model = TaskGraphsMILPSolver(GreedyAssignment()))
-    project_schedule = construct_partial_project_schedule(
-        project_spec,
-        problem_spec,
-        robot_ICs,
-        )
-    base_search_env = construct_search_env(
-        solver,
-        project_schedule,
-        problem_spec,
-        env_graph
-        )
+    pc_tapf = f(solver;cost_function=cost_model,verbose=false)
+    base_search_env = pc_tapf.env
     prob = formulate_assignment_problem(solver.assignment_model,base_search_env;
         optimizer=Gurobi.Optimizer,
     )
@@ -128,24 +118,14 @@ let
         for cost_model in [SumOfMakeSpans(), MakeSpan()]
             let
                 costs = Float64[]
-                project_spec, problem_spec, robot_ICs, _, env_graph = f(;cost_function=cost_model,verbose=false);
                 for solver in [
                         NBSSolver(assignment_model = TaskGraphsMILPSolver(AssignmentMILP())),
                         NBSSolver(assignment_model = TaskGraphsMILPSolver(SparseAdjacencyMILP())),
                         NBSSolver(assignment_model = TaskGraphsMILPSolver(GreedyAssignment())),
                         ]
                     # @show i, f, solver
-                    project_schedule = construct_partial_project_schedule(
-                        project_spec,
-                        problem_spec,
-                        robot_ICs,
-                        )
-                    search_env = construct_search_env(
-                        solver,
-                        project_schedule,
-                        problem_spec,
-                        env_graph
-                        )
+                    pc_tapf = f(solver;cost_function=cost_model,verbose=false);
+                    search_env = pc_tapf.env
                     prob = formulate_assignment_problem(solver.assignment_model,search_env;
                         optimizer=Gurobi.Optimizer,
                     )
@@ -179,7 +159,6 @@ let
         for cost_model in [SumOfMakeSpans(), MakeSpan()]
             let
                 costs = Float64[]
-                project_spec, problem_spec, robot_ICs, _, env_graph = f(;cost_function=cost_model,verbose=false);
                 for solver in [
                         NBSSolver(assignment_model = TaskGraphsMILPSolver(AssignmentMILP())),
                         NBSSolver(assignment_model = TaskGraphsMILPSolver(SparseAdjacencyMILP())),
@@ -192,18 +171,8 @@ let
                     # @show i, f, solver
                     set_iteration_limit!(solver,1)
                     set_iteration_limit!(route_planner(solver),100)
-                    project_schedule = construct_partial_project_schedule(
-                        project_spec,
-                        problem_spec,
-                        robot_ICs,
-                        )
-                    base_search_env = construct_search_env(
-                        solver,
-                        project_schedule,
-                        problem_spec,
-                        env_graph
-                        )
-                    env, cost = solve!(solver,PC_TAPF(base_search_env);optimizer=Gurobi.Optimizer)
+                    pc_tapf = f(solver;cost_function=cost_model,verbose=false);
+                    env, cost = solve!(solver,pc_tapf;optimizer=Gurobi.Optimizer)
                     # @show convert_to_vertex_lists(env.route_plan)
                     # prob = formulate_assignment_problem(solver.assignment_model,search_env;
                     #     optimizer=Gurobi.Optimizer,
@@ -247,19 +216,8 @@ let
                 NBSSolver(assignment_model = TaskGraphsMILPSolver(SparseAdjacencyMILP())),
                 ]
             let
-                project_spec, problem_spec, robot_ICs, _, env_graph = f(;cost_function=cost_model,verbose=false);
-                project_schedule = construct_partial_project_schedule(
-                    project_spec,
-                    problem_spec,
-                    robot_ICs,
-                    )
-                base_search_env = construct_search_env(
-                    solver,
-                    project_schedule,
-                    problem_spec,
-                    env_graph
-                    )
-                env, cost = solve!(solver,base_search_env;optimizer=Gurobi.Optimizer)
+                pc_tapf = f(solver;cost_function=cost_model,verbose=false);
+                env, cost = solve!(solver,pc_tapf;optimizer=Gurobi.Optimizer)
                 @test expected_cost == cost
             end
         end
@@ -278,19 +236,8 @@ let
                 NBSSolver(assignment_model = TaskGraphsMILPSolver(SparseAdjacencyMILP())),
                 ]
             let
-                project_spec, problem_spec, robot_ICs, _, env_graph = f(;cost_function=cost_model,verbose=false);
-                project_schedule = construct_partial_project_schedule(
-                    project_spec,
-                    problem_spec,
-                    robot_ICs,
-                    )
-                base_search_env = construct_search_env(
-                    solver,
-                    project_schedule,
-                    problem_spec,
-                    env_graph
-                    )
-                env, cost = solve!(solver,base_search_env;optimizer=Gurobi.Optimizer)
+                pc_tapf = f(solver;cost_function=cost_model,verbose=false);
+                env, cost = solve!(solver,pc_tapf;optimizer=Gurobi.Optimizer)
                 @test expected_cost == cost
             end
         end
@@ -300,14 +247,8 @@ end
 let
     solver = NBSSolver()
     cost_model = MakeSpan()
-    project_spec, problem_spec, robot_ICs, _, env_graph = pctapf_problem_3(;cost_function=cost_model,verbose=false);
-    project_schedule = construct_partial_project_schedule(project_spec,problem_spec,robot_ICs)
-    base_search_env = construct_search_env(
-        solver,
-        project_schedule,
-        problem_spec,
-        env_graph
-        )
+    pc_tapf = pctapf_problem_3(solver;cost_function=cost_model,verbose=false);
+    base_search_env = pc_tapf.env
 
     prob = formulate_assignment_problem(assignment_solver(solver),base_search_env)
     project_schedule, cost = solve_assignment_problem!(assignment_solver(solver),prob,base_search_env)
@@ -337,25 +278,12 @@ let
         let
             solver = NBSSolver()
             cost_model=MakeSpan()
-            project_spec, problem_spec, robot_ICs, _, env_graph = pctapf_problem_6(;
+            pc_tapf = pctapf_problem_6(solver;
                 cost_function=cost_model,
                 verbose=false,
                 Δt_op=Δt
                 );
-            project_schedule = construct_partial_project_schedule(
-                project_spec,
-                problem_spec,
-                robot_ICs,
-                )
-            base_search_env = construct_search_env(
-                solver,
-                project_schedule,
-                problem_spec,
-                env_graph,
-                initialize_planning_cache(project_schedule),
-                cost_model,
-                )
-            env, cost = solve!(solver,base_search_env;optimizer=Gurobi.Optimizer)
+            env, cost = solve!(solver,pc_tapf;optimizer=Gurobi.Optimizer)
             paths = convert_to_vertex_lists(env.route_plan)
             # @show paths[1]
             # @show paths[2]
@@ -375,27 +303,14 @@ let
     for (Δt_collect_2, true_cost) in zip([0,1,2,3,4],[6,7,8,8,8])
         solver = NBSSolver()
         cost_model = MakeSpan()
-        project_spec, problem_spec, robot_ICs, _, env_graph = pctapf_problem_7(;
+        pc_tapf = pctapf_problem_7(solver;
             cost_function=cost_model,
             verbose=false,
             Δt_op=0,
             Δt_collect=[0,Δt_collect_2,0],
             Δt_deliver=[Δt_deliver_1,0,0]
             );
-        project_schedule = construct_partial_project_schedule(
-            project_spec,
-            problem_spec,
-            robot_ICs,
-            )
-        base_search_env = construct_search_env(
-            solver,
-            project_schedule,
-            problem_spec,
-            env_graph,
-            initialize_planning_cache(project_schedule),
-            cost_model,
-            )
-        env, cost = solve!(solver,base_search_env;optimizer=Gurobi.Optimizer)
+        env, cost = solve!(solver,pc_tapf;optimizer=Gurobi.Optimizer)
         paths = convert_to_vertex_lists(env.route_plan)
         @test cost == true_cost
     end
@@ -414,19 +329,8 @@ let
                 NBSSolver(assignment_model = TaskGraphsMILPSolver(SparseAdjacencyMILP())),
                 ]
             let
-                project_spec, problem_spec, robot_ICs, _, env_graph = f(;cost_function=cost_model,verbose=false);
-                project_schedule = construct_partial_project_schedule(
-                    project_spec,
-                    problem_spec,
-                    robot_ICs,
-                    )
-                base_search_env = construct_search_env(
-                    solver,
-                    project_schedule,
-                    problem_spec,
-                    env_graph
-                    )
-                env, cost = solve!(solver,base_search_env;optimizer=Gurobi.Optimizer)
+                pc_tapf = f(solver;cost_function=cost_model,verbose=false);
+                env, cost = solve!(solver,pc_tapf;optimizer=Gurobi.Optimizer)
                 paths = convert_to_vertex_lists(env.route_plan)
                 @test cost == expected_cost
                 for (expected_path, path) in zip(expected_paths,paths)

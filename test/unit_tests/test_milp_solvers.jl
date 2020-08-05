@@ -20,7 +20,7 @@ let
                 GreedyAssignment(),
             ]
                     # MILP formulations alone
-                project_spec, problem_spec, robot_ICs, _, env_graph = f(
+                project_spec, problem_spec, robot_ICs, env_graph, _ = f(
                     ;
                     cost_function = cost_model,
                     verbose = false,
@@ -141,7 +141,7 @@ let
 end
 # Job shop constraints
 let
-    project_spec, problem_spec, robot_ICs, _, env_graph = pctapf_problem_9(;
+    project_spec, problem_spec, robot_ICs, env_graph, _ = pctapf_problem_9(;
         verbose=false,Δt_op=0,Δt_collect=[0,0],Δt_deliver=[0,0]
         );
     cost_model=SumOfMakeSpans()

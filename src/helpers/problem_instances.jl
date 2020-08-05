@@ -100,6 +100,28 @@ function pctapf_problem(r0,s0,sF)
     project_spec, robot_ICs
 end
 
+function pctapf_problem(
+        solver,
+        project_spec::ProjectSpec,
+        problem_spec::ProblemSpec,
+        robot_ICs,
+        env_graph,
+        args...
+    )
+    project_schedule = construct_partial_project_schedule(
+        project_spec,
+        problem_spec,
+        robot_ICs,
+        )
+    env = construct_search_env(
+        solver,
+        project_schedule,
+        problem_spec,
+        env_graph
+        )
+    PC_TAPF(env)
+end
+
 # This is a place to put reusable problem initializers for testing
 """
     pctapf_problem_1
@@ -140,7 +162,7 @@ function pctapf_problem_1(;cost_function=SumOfMakeSpans(),verbose=false)
     #     """
     #     print_toy_problem_specs(problem_description,vtx_grid,r0,s0,sF,project_spec)
     # end
-    return project_spec, problem_spec, robot_ICs, assignment_dict, env_graph
+    return project_spec, problem_spec, robot_ICs, env_graph, assignment_dict
 end
 
 """
@@ -193,7 +215,7 @@ function pctapf_problem_2(;cost_function=SumOfMakeSpans(),verbose=false)
         """
         print_toy_problem_specs(problem_description,vtx_grid,r0,s0,sF,project_spec)
     end
-    return project_spec, problem_spec, robot_ICs, assignment_dict, env_graph
+    return project_spec, problem_spec, robot_ICs, env_graph, assignment_dict
 end
 
 """
@@ -253,7 +275,7 @@ function pctapf_problem_3(;cost_function=SumOfMakeSpans(),verbose=false,Δt_op=0
         """
         print_toy_problem_specs(problem_description,vtx_grid,r0,s0,sF,project_spec)
     end
-    return project_spec, problem_spec, robot_ICs, assignment_dict, env_graph
+    return project_spec, problem_spec, robot_ICs, env_graph, assignment_dict
 end
 
 
@@ -308,7 +330,7 @@ function pctapf_problem_4(;cost_function=SumOfMakeSpans(),verbose=false)
         """
         print_toy_problem_specs(problem_description,vtx_grid,r0,s0,sF,project_spec)
     end
-    return project_spec, problem_spec, robot_ICs, assignment_dict, env_graph
+    return project_spec, problem_spec, robot_ICs, env_graph, assignment_dict
 end
 
 
@@ -361,7 +383,7 @@ function pctapf_problem_5(;cost_function=SumOfMakeSpans(),verbose=false)
         """
         print_toy_problem_specs(problem_description,vtx_grid,r0,s0,sF,project_spec)
     end
-    return project_spec, problem_spec, robot_ICs, assignment_dict, env_graph
+    return project_spec, problem_spec, robot_ICs, env_graph, assignment_dict
 end
 
 """
@@ -401,7 +423,7 @@ function pctapf_problem_6(;cost_function=SumOfMakeSpans(),verbose=false,Δt_op=1
     if verbose
         print_toy_problem_specs("TOY PROBLEM 6",vtx_grid,r0,s0,sF,project_spec)
     end
-    return project_spec, problem_spec, robot_ICs, assignment_dict, env_graph
+    return project_spec, problem_spec, robot_ICs, env_graph, assignment_dict
 end
 
 
@@ -436,7 +458,7 @@ function pctapf_problem_7(;cost_function=SumOfMakeSpans(),verbose=false,Δt_op=0
     if verbose
         print_toy_problem_specs("TOY PROBLEM 7",vtx_grid,r0,s0,sF,project_spec)
     end
-    return project_spec, problem_spec, robot_ICs, assignment_dict, env_graph
+    return project_spec, problem_spec, robot_ICs, env_graph, assignment_dict
 end
 
 """
@@ -479,7 +501,7 @@ function pctapf_problem_8(;cost_function=SumOfMakeSpans(),verbose=false,Δt_op=0
     if verbose
         print_toy_problem_specs("TOY PROBLEM 8",vtx_grid,r0,s0,sF,project_spec)
     end
-    return project_spec, problem_spec, robot_ICs, assignment_dict, env_graph
+    return project_spec, problem_spec, robot_ICs, env_graph, assignment_dict
 end
 
 export
@@ -518,7 +540,7 @@ function pctapf_problem_9(;cost_function=SumOfMakeSpans(),verbose=false,Δt_op=0
             Project with station-sharing. Station 5 needs to accessed by both robots for picking up their objects.
             """,vtx_grid,r0,s0,sF,project_spec,problem_spec.graph)
     end
-    return project_spec, problem_spec, robot_ICs, assignment_dict, env_graph
+    return project_spec, problem_spec, robot_ICs, env_graph, assignment_dict
 end
 
 
@@ -593,7 +615,7 @@ function pctapf_problem_10(;cost_function=MakeSpan(),verbose=false,Δt_op=0,Δt_
             in ISPS. Hence, the solver will return a solution with T = 9.
             """,vtx_grid,r0,s0,sF,project_spec,problem_spec.graph)
     end
-    return project_spec, problem_spec, robot_ICs, assignment_dict, env_graph
+    return project_spec, problem_spec, robot_ICs, env_graph, assignment_dict
 end
 
 export
@@ -641,7 +663,23 @@ function pctapf_problem_11(;
     project_spec, problem_spec, _, _, robot_ICs = construct_task_graphs_problem(
         def,env_graph;cost_function=cost_function)
 
-    return project_spec, problem_spec, robot_ICs, assignment_dict, env_graph
+    return project_spec, problem_spec, robot_ICs, env_graph, assignment_dict
+end
+
+for op in [
+        :pctapf_problem_1,
+        :pctapf_problem_2,
+        :pctapf_problem_3,
+        :pctapf_problem_4,
+        :pctapf_problem_5,
+        :pctapf_problem_6,
+        :pctapf_problem_7,
+        :pctapf_problem_8,
+        :pctapf_problem_9,
+        :pctapf_problem_10,
+        :pctapf_problem_11,
+    ]
+    @eval $op(solver,args...;kwargs...) = pctapf_problem(solver,$op(args...;kwargs...)...)
 end
 
 export

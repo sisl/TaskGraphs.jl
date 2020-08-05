@@ -796,7 +796,14 @@ function show_times(cache::PlanningCache,v)
     slack_string = slack == Inf ? string(slack) : string(Int(slack))
     return string(cache.t0[v],",",cache.tF[v],",",slack_string)
 end
-function print_project_schedule(filename::String,project_schedule::OperatingSchedule,cache=initialize_planning_cache(project_schedule);mode=:root_aligned,verbose=true)
+
+function plot_project_schedule(
+        project_schedule::OperatingSchedule,
+        cache=initialize_planning_cache(project_schedule)
+        ;
+        mode=:root_aligned,
+        verbose=true
+        )
     rg = get_display_metagraph(project_schedule;
         f=(v,p)->string(v,",",get_path_spec(project_schedule,v).agent_id))
     plot_graph_bfs(rg;
@@ -807,25 +814,11 @@ function print_project_schedule(filename::String,project_schedule::OperatingSche
             title_string(get_node_from_id(project_schedule, get_vtx_id(project_schedule, v)),verbose),
             "\n",show_times(cache,v)
             )
-    ) |> Compose.SVG(string(filename,".svg"))
+    )
     # `inkscape -z project_schedule1.svg -e project_schedule1.png`
     # OR: `for f in *.svg; do inkscape -z $f -e $f.png; done`
 end
-print_project_schedule(filename::String,search_env::SearchEnv;kwargs...) = print_project_schedule(filename,search_env.schedule,search_env.cache;kwargs...)
-print_project_schedule(project_schedule::OperatingSchedule,filename::String;kwargs...) = print_project_schedule(filename,project_schedule)
-function print_project_schedule(project_schedule::OperatingSchedule,model,filename;mode=:root_aligned,verbose=true)
-    rg = get_display_metagraph(project_schedule;
-        f=(v,p)->string(v,",",get_path_spec(project_schedule,v).agent_id))
-    plot_graph_bfs(rg;
-        mode=mode,
-        shape_function = (G,v,x,y,r)->Compose.circle(x,y,r),
-        color_function = (G,v,x,y,r)->get_prop(G,v,:color),
-        text_function = (G,v,x,y,r)->string(
-            title_string(get_node_from_id(project_schedule, get_vtx_id(project_schedule, v)),verbose),
-            "\n",show_times(project_schedule,v),
-            "-",Int(round(value(model[:t0][v]))),",",Int(round(value(model[:tF][v])))
-            )
-    ) |> Compose.SVG(string(filename,".svg"))
-    # `inkscape -z project_schedule1.svg -e project_schedule1.png`
-    # OR: `for f in *.svg; do inkscape -z $f -e $f.png; done`
+plot_project_schedule(search_env::SearchEnv;kwargs...) = plot_project_schedule(search_env.schedule,search_env.cache;kwargs...)
+function print_project_schedule(filename::String,args...;kwargs...)
+    plot_project_schedule(args...;kwargs...) |> Compose.SVG(string(filename,".svg"))
 end

@@ -155,7 +155,7 @@ let
 end
 # Test process_schedule
 let
-    project_spec, problem_spec, robot_ICs, _, env_graph = pctapf_problem_1()
+    project_spec, problem_spec, robot_ICs, env_graph, _ = pctapf_problem_1()
 
     project_schedule = construct_partial_project_schedule(project_spec,problem_spec,robot_ICs)
     model = formulate_milp(AssignmentMILP(),project_schedule,problem_spec;cost_model=MakeSpan())
@@ -179,7 +179,7 @@ let
     end
 end
 let
-    project_spec, problem_spec, robot_ICs, _, env_graph = pctapf_problem_1()
+    project_spec, problem_spec, robot_ICs, env_graph, _ = pctapf_problem_1()
 
     filename = "/tmp/project_spec.toml"
     open(filename, "w") do io
