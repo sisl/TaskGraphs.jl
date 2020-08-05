@@ -72,13 +72,15 @@ end
 let
     # solver = NBSSolver()
     solver = NBSSolver(path_planner = PIBTPlanner{NTuple{3,Float64}}())
-    set_verbosity!(solver,0)
+    set_verbosity!(solver,2)
     set_iteration_limit!(solver,1)
     set_iteration_limit!(route_planner(solver),50)
 
-    replan_model = MergeAndBalance()
-    commit_threshold = 5
-    f = replanning_problem_1
+    replan_model = MergeAndBalance(
+        ReplannerConfig(commit_threshold=5)
+    )
+    # commit_threshold = 0
+    f = replanning_problem_3
     prob = f(solver)
     # env, cost = solve!(solver,PC_TAPF(prob.env);optimizer=Gurobi.Optimizer)
     # base_env = replan!(solver,MergeAndBalance(),env,prob.requests[1])
@@ -89,6 +91,9 @@ let
     request = prob.requests[1]
     remap_object_ids!(request.schedule,env.schedule)
     base_env = replan!(solver,replan_model,env,request)
+    @show convert_to_vertex_lists(base_env.route_plan)
+    set_runtime_limit!(solver,Inf)
+    set_deadline!(solver,Inf)
     reset_solver!(solver)
     env, cost = solve!(solver,base_env;optimizer=Gurobi.Optimizer)
     @show convert_to_vertex_lists(env.route_plan)

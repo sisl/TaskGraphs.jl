@@ -337,6 +337,7 @@ function update_planning_cache!(solver,env)
         path_spec = get_path_spec(schedule,v)
         agent_id = path_spec.agent_id
         if 1 <= agent_id <= num_agents(env)
+            @show string(get_node_from_vtx(env.schedule,v))
             path = get_paths(env)[agent_id]
             s = get_final_state(path)
             t = get_t(s)
@@ -581,7 +582,8 @@ function CRCBS.build_env(
     ;
     kwargs...
     )
-    build_env(solver,env,node,schedule_node,get_id(v),args...;kwargs...)
+    id = get_id(v)
+    env = build_env(solver,env,node,schedule_node,id,args...;kwargs...)
 end
 function CRCBS.build_env(
         solver,
