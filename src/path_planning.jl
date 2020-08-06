@@ -334,18 +334,6 @@ function update_planning_cache!(solver,env)
     schedule = env.schedule
     node = initialize_root_node(env)
     dummy_path = path_type(env)()
-    for v in collect(cache.active_set)
-        path_spec = get_path_spec(schedule,v)
-        agent_id = path_spec.agent_id
-        if 1 <= agent_id <= num_agents(env)
-            # @show string(get_node_from_vtx(env.schedule,v))
-            path = get_paths(env)[agent_id]
-            s = get_final_state(path)
-            t = get_t(s)
-            d = get_distance(env,s,path_spec.final_vtx)
-            cache.tF[v] = max(cache.tF[v],t+d)
-        end
-    end
     while true
         done = true
         for v in collect(cache.active_set)
@@ -365,6 +353,18 @@ function update_planning_cache!(solver,env)
         # end
         if done
             break
+        end
+    end
+    for v in collect(cache.active_set)
+        path_spec = get_path_spec(schedule,v)
+        agent_id = path_spec.agent_id
+        if 1 <= agent_id <= num_agents(env)
+            # @show string(get_node_from_vtx(env.schedule,v))
+            path = get_paths(env)[agent_id]
+            s = get_final_state(path)
+            t = get_t(s)
+            d = get_distance(env,s,path_spec.final_vtx)
+            cache.tF[v] = max(cache.tF[v],t+d)
         end
     end
     t0,tF,slack,local_slack = process_schedule(schedule,cache.t0,cache.tF)

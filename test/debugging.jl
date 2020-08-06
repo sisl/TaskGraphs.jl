@@ -112,6 +112,11 @@ let
     env, cost = solve!(solver,base_env;optimizer=Gurobi.Optimizer)
     @show convert_to_vertex_lists(base_env.route_plan)
     @show convert_to_vertex_lists(env.route_plan)
+    set_default_plot_size(12cm, 8cm)
+    display(plot(
+        layer(x=collect(1:nv(base_env.schedule)), y=base_env.cache.t0),
+        layer(x=collect(1:nv(env.schedule)), y=env.cache.t0,Theme(default_color="red"))
+        ))
     display(plot_project_schedule(env;mode=:leaf_aligned,
         color_function=get_color_function(env)
     ))
