@@ -219,13 +219,14 @@ export
     plan_path!
 
 path_finder(solver::AStarSC,args...) = CRCBS.a_star(solver,args...)
+
 """
     plan_path!
 
     Computes nxxt path specified by the project schedule and updates the
     solution in the ConstraintTreeNode::node accordingly.
 """
-function plan_path!(solver::AStarSC, env::SearchEnv, node::N,
+function plan_path!(solver::AStarSC, pc_mapf::AbstractPC_MAPF, env::SearchEnv, node::N,
         schedule_node::T, v::Int;
         kwargs...) where {N<:ConstraintTreeNode,T}
 
@@ -233,7 +234,7 @@ function plan_path!(solver::AStarSC, env::SearchEnv, node::N,
     node_id = get_vtx_id(env.schedule,v)
 
     reset_solver!(solver)
-    cbs_env = build_env(solver, env, node, VtxID(v))#schedule_node, v)
+    cbs_env = build_env(solver, pc_mapf, env, node, VtxID(v))#schedule_node, v)
     base_path = get_base_path(solver,env,cbs_env)
     ### PATH PLANNING ###
     # solver.DEBUG ? validate(base_path,v) : nothing
@@ -245,7 +246,7 @@ function plan_path!(solver::AStarSC, env::SearchEnv, node::N,
             reset_solver!(solver)
             cost_model, _ = construct_cost_model(solver, env;
                 primary_objective=env.problem_spec.cost_function)
-            cbs_env = build_env(solver, env, node, VtxID(v);cost_model=cost_model)
+            cbs_env = build_env(solver, pc_mapf, env, node, VtxID(v);cost_model=cost_model)
             base_path = get_base_path(solver,env,cbs_env)
             path, cost = path_finder(solver, cbs_env, base_path)
         end
@@ -302,12 +303,13 @@ function CRCBS.hard_reset_solver!(solver::ISPS)
 end
 
 export
-    plan_next_path!
+    plan_next_path!,
+    compute_route_plan!
 
 """
     `plan_next_path`
 """
-function plan_next_path!(solver::ISPS, env::SearchEnv, node::N
+function plan_next_path!(solver::ISPS, pc_mapf::AbstractPC_MAPF, env::SearchEnv, node::N
         ) where {N<:ConstraintTreeNode}
 
     valid_flag = true
@@ -317,7 +319,7 @@ function plan_next_path!(solver::ISPS, env::SearchEnv, node::N
         schedule_node = get_node_from_id(env.schedule,node_id)
         if get_path_spec(env.schedule, v).plan_path == true
             try
-                valid_flag = plan_path!(low_level(solver),env,node,schedule_node,v)
+                valid_flag = plan_path!(low_level(solver),pc_mapf,env,node,schedule_node,v)
             catch e
                 if isa(e, SolverException)
                     showerror(stdout, e, catch_backtrace())
@@ -340,33 +342,29 @@ function plan_next_path!(solver::ISPS, env::SearchEnv, node::N
 end
 
 """
-    Computes all paths specified by the project schedule and updates the
-    solution in the ConstraintTreeNode::node accordingly.
+    compute_route_plan!
+
+Computes all paths specified by the project schedule and updates the solution
+in the ConstraintTreeNode::node accordingly.
 """
-function CRCBS.low_level_search!(solver::ISPS, node::N, env::SearchEnv=node.solution;
+function compute_route_plan!(solver::ISPS, pc_mapf::AbstractPC_MAPF, node::N, env::SearchEnv=node.solution;
         kwargs...
         ) where {N<:ConstraintTreeNode}
 
-    # reset_route_plan!(node,env.route_plan)
     while length(env.cache.node_queue) > 0
-        if !(plan_next_path!(solver,env,node))
+        if !(plan_next_path!(solver,pc_mapf,env,node))
             return false
         end
-        # @show convert_to_vertex_lists(env.route_plan)
         enforce_time_limit(solver)
     end
     return true
 end
 
-"""
-    low_level_search!
-"""
-function CRCBS.low_level_search!(solver::ISPS, pc_mapf::M,
+function CRCBS.low_level_search!(solver::ISPS, pc_mapf::AbstractPC_MAPF,
         node::N=initialize_root_node(solver,pc_mapf),
         idxs::Vector{Int}=Vector{Int}()
-    ) where {M<:PC_MAPF,N<:ConstraintTreeNode}
+    ) where {N<:ConstraintTreeNode}
 
-    # enter_low_level!(solver)
     reset_solver!(solver)
     valid_flag = true
     search_env = node.solution
@@ -380,17 +378,15 @@ function CRCBS.low_level_search!(solver::ISPS, pc_mapf::M,
             pc_mapf.env.cache.tF)
         reset_route_plan!(node,
             pc_mapf.env.route_plan)
-        valid_flag = low_level_search!(solver, node)
+        valid_flag = compute_route_plan!(solver, pc_mapf, node)
         if valid_flag == false
             log_info(0,solver,"ISPS: failed on ",i,"th repair iteration.")
             break
         end
     end
-    # exit_low_level!(solver)
-    # return search_env, valid_flag
     return valid_flag
 end
-function CRCBS.low_level_search!(solver::CBSSolver, pc_mapf::PC_MAPF,node::ConstraintTreeNode,args...;kwargs...)
+function CRCBS.low_level_search!(solver::CBSSolver, pc_mapf::AbstractPC_MAPF,node::ConstraintTreeNode,args...;kwargs...)
     low_level_search!(low_level(solver),pc_mapf,node,args...)
 end
 
@@ -402,7 +398,7 @@ Solve a PC-MAPF problem with the ISPS algorithm.
 
 function CRCBS.solve!(solver::ISPS,pc_mapf::PC_MAPF)
     node = initialize_root_node(solver,pc_mapf)
-    valid_flag = low_level_search!(solver,pc_mapf,node)#,node)
+    valid_flag = compute_route_plan!(solver,pc_mapf,node)#,node)
     return node.solution, get_cost(node.solution)
 end
 
@@ -496,25 +492,24 @@ Outputs:
 - best_env : a `SearchEnv` data structure that encodes a solution to the problem
 - cost : the cost of the solution encoded by `best_env`
 """
-function CRCBS.solve!(solver::NBSSolver{A,P,C}, base_env::E;kwargs...) where {A,P,C,E<:SearchEnv}
-    best_env = SearchEnv(base_env,route_plan=initialize_route_plan(base_env))
+function CRCBS.solve!(solver::NBSSolver, prob::E;kwargs...) where {E<:AbstractPC_TAPF}
+    best_env = SearchEnv(prob.env,route_plan=initialize_route_plan(prob.env))
     set_cost!(best_env,get_infeasible_cost(best_env))
     set_best_cost!(solver, primary_cost(solver, get_cost(best_env)))
-    assignment_problem = formulate_assignment_problem(assignment_solver(solver), base_env;
-        kwargs...)
+    assignment_problem = formulate_assignment_problem(assignment_solver(solver),
+        prob;kwargs...)
     while optimality_gap(solver) > 0
         try
-            update_assignment_problem!(assignment_solver(solver), assignment_problem, base_env)
+            update_assignment_problem!(assignment_solver(solver),
+                assignment_problem, prob)
             schedule, l_bound = solve_assignment_problem!(
                 assignment_solver(solver),
                 assignment_problem,
-                base_env;kwargs...)
+                prob;kwargs...)
             set_lower_bound!(solver,l_bound)
             if optimality_gap(solver) > 0
-                env, cost = plan_route!(
-                    route_planner(solver),
-                    schedule,
-                    base_env;kwargs...)
+                env, cost = plan_route!(route_planner(solver),
+                    schedule, prob;kwargs...)
                 if cost < best_cost(solver)
                     best_env = env
                     set_best_cost!(solver,cost)
@@ -543,7 +538,6 @@ end
 function CRCBS.solve!(solver, env_graph, schedule::OperatingSchedule, problem_spec::ProblemSpec;
     kwargs...)
     base_env = construct_search_env(solver,schedule,problem_spec,env_graph;kwargs...)
-    # @show base_env.cache.t0
     solve!(solver, base_env;kwargs...)
 end
 function CRCBS.solve!(solver, env_graph, project_spec::ProjectSpec, problem_spec::ProblemSpec,
@@ -552,28 +546,27 @@ function CRCBS.solve!(solver, env_graph, project_spec::ProjectSpec, problem_spec
         project_spec,problem_spec,map(i->robot_ICs[i], 1:problem_spec.N))
     solve!(solver, env_graph, schedule, problem_spec;kwargs...)
 end
-CRCBS.solve!(solver::NBSSolver, pc_tapf::PC_TAPF;kwargs...) = solve!(solver,pc_tapf.env;kwargs...)
+# CRCBS.solve!(solver::NBSSolver, pc_tapf::PC_TAPF;kwargs...) = solve!(solver,pc_tapf.env;kwargs...)
+CRCBS.solve!(solver::NBSSolver, env::SearchEnv;kwargs...) = solve!(solver,PC_TAPF(env);kwargs...)
 
 export
     formulate_assignment_problem
 
 """
-    formulate_assignment_problem(solver,base_env::SearchEnv;
+    formulate_assignment_problem(solver,prob;
 
 Returns an assignment problem instance that can be updated (as opposed to being
 reconstructed from scratch) on each call to `update_assignment_problem!` prior
 to being resolved.
 """
-function formulate_assignment_problem(solver,base_env::SearchEnv;
-        # cost_model=base_env.problem_spec.cost_function,
-        # optimizer=get_optimizer(solver), #TODO where to pass in the optimizer?
+function formulate_assignment_problem(solver,prob;
         kwargs...)
 
+    base_env = prob.env
     project_schedule    = base_env.schedule
     problem_spec        = base_env.problem_spec
     formulate_milp(solver,project_schedule,problem_spec;
         cost_model=base_env.problem_spec.cost_function,
-        # optimizer=optimizer,
         kwargs...)
 end
 
@@ -587,7 +580,7 @@ A helper method for updating an instance of an assignment problem. In the case
     of MILP-based models, this method simply excludes all previous solutions by
     adding new constraints on the assignment/adjacency matrix.
 """
-function update_assignment_problem!(solver, model::T, base_env) where {T<:TaskGraphsMILP}
+function update_assignment_problem!(solver, model::T, base_prob) where {T<:TaskGraphsMILP}
     exclude_solutions!(model) # exclude most recent solution in order to get next best solution
 end
 
@@ -600,14 +593,13 @@ export
 Solve the "assignment problem"--i.e., the relaxation of the full PC-TAPF problem
 wherein we ignore collisions--using the algorithm encoded by solver.
 """
-function solve_assignment_problem!(solver::S, model, base_env;
-        t0_ = Dict{AbstractID,Int}(get_vtx_id(base_env.schedule, v)=>t0 for (v,t0) in enumerate(base_env.cache.t0)),
-        tF_ = Dict{AbstractID,Int}(get_vtx_id(base_env.schedule, v)=>tF for (v,tF) in enumerate(base_env.cache.tF)),
+function solve_assignment_problem!(solver::S, model, prob;
+        t0_ = Dict{AbstractID,Int}(get_vtx_id(prob.env.schedule, v)=>t0 for (v,t0) in enumerate(prob.env.cache.t0)),
+        tF_ = Dict{AbstractID,Int}(get_vtx_id(prob.env.schedule, v)=>tF for (v,tF) in enumerate(prob.env.cache.tF)),
         TimeLimit=min(deadline(solver)-time(),runtime_limit(solver)),
         buffer=5.0, # to give some extra time to the path planner if the milp terminates late.
         kwargs...) where {S<:TaskGraphsMILPSolver}
 
-    # enter_assignment!(solver)
     l_bound = lower_bound(solver)
     optimize!(model)
     if primal_status(model) != MOI.FEASIBLE_POINT
@@ -618,8 +610,8 @@ function solve_assignment_problem!(solver::S, model, base_env;
     if termination_status(model) == MOI.OPTIMAL
         @assert lower_bound(solver) == best_cost(solver)
     end
-    schedule = deepcopy(base_env.schedule)
-    update_project_schedule!(model, schedule, base_env.problem_spec)
+    schedule = deepcopy(prob.env.schedule)
+    update_project_schedule!(model, schedule, prob.env.problem_spec)
     schedule, lower_bound(solver)
 end
 
@@ -642,11 +634,12 @@ Outputs:
 function plan_route!(
         solver,
         schedule,
-        base_env;
+        prob;
         kwargs...)
 
-    env = construct_search_env(solver, schedule, base_env;kwargs...)
-    solution, cost = solve!(solver, PC_MAPF(env))
+    env = construct_search_env(solver, schedule, prob.env;kwargs...)
+    pc_mapf = construct_routing_problem(prob,env)
+    solution, cost = solve!(solver, pc_mapf)
     solution, primary_cost(solver,get_cost(solution))
 end
 

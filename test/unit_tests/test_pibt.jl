@@ -8,10 +8,11 @@ let
         let
             pc_tapf = f(solver;cost_function=cost_model,verbose=false)
             base_search_env = pc_tapf.env
-            prob = formulate_assignment_problem(solver.assignment_model,base_search_env;
+            prob = formulate_assignment_problem(solver.assignment_model,
+                pc_tapf;
                 optimizer=Gurobi.Optimizer,
             )
-            sched, _ = solve_assignment_problem!(solver.assignment_model,prob,base_search_env)
+            sched, _ = solve_assignment_problem!(solver.assignment_model,prob,pc_tapf)
 
             pibt_planner = route_planner(solver)
             search_env = construct_search_env(solver,deepcopy(sched),base_search_env)

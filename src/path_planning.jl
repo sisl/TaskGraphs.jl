@@ -106,38 +106,22 @@ end
 
 export
     AbstractPC_MAPF,
+    PC_MAPF,
+    C_PC_MAPF,
+    AbstractPC_TAPF,
     PC_TAPF,
-    C_PC_TAPF,
-    PC_MAPF
+    C_PC_TAPF
+
+export
+    construct_routing_problem
 
 """
     AbstractPC_MAPF
 
 An abstract type of which all Precedence-Constrained Multi-Agent Path-Finding
-are concrete subtypes.
+problems are concrete subtypes.
 """
 abstract type AbstractPC_MAPF <: AbstractMAPF end
-
-"""
-    PC_TAPF{L<:LowLevelSolution}
-
-Defines an instance of a Precedence-Constrained Multi-Agent Task
-    Assignment and Path-Finding problem.
-"""
-struct PC_TAPF{E<:SearchEnv} <: AbstractPC_MAPF
-    env::E
-end
-
-"""
-    C_PC_TAPF{L<:LowLevelSolution}
-
-Defines an instance of a Collaborative Precedence-Constrained Multi-Agent Task
-    Assignment and Path-Finding problem, where agents must sometimes transport
-    objects in teams.
-"""
-struct C_PC_TAPF{E<:SearchEnv} <: AbstractPC_MAPF
-    env::E
-end
 
 """
     `PC_MAPF`
@@ -148,6 +132,51 @@ assigned tasks, but there are precedence constraints between tasks.
 struct PC_MAPF{E<:SearchEnv} <: AbstractPC_MAPF
     env::E
 end
+
+"""
+    `C_PC_MAPF`
+
+A collaborative precedence-constrained multi-agent path-finding problem. All
+agents have assigned tasks, there are precedence constraints between tasks, and
+some tasks must be done in teams.
+"""
+struct C_PC_MAPF{E<:SearchEnv} <: AbstractPC_MAPF
+    env::E
+end
+
+"""
+    AbstractPC_TAPF <: AbstractPC_MAPF
+
+An abstract type of which all Precedence-Constrained Multi-Agent Task Assignment
+and Path-Finding problems are concrete subtypes.
+"""
+abstract type AbstractPC_TAPF <: AbstractPC_MAPF end
+
+"""
+    PC_TAPF{L<:LowLevelSolution}
+
+Defines an instance of a Precedence-Constrained Multi-Agent Task
+    Assignment and Path-Finding problem.
+"""
+struct PC_TAPF{E<:SearchEnv} <: AbstractPC_TAPF
+    env::E
+end
+
+construct_routing_problem(prob::PC_TAPF,env) = PC_MAPF(env)
+
+"""
+    C_PC_TAPF{L<:LowLevelSolution}
+
+Defines an instance of a Collaborative Precedence-Constrained Multi-Agent Task
+    Assignment and Path-Finding problem, where agents must sometimes transport
+    objects in teams.
+"""
+struct C_PC_TAPF{E<:SearchEnv} <: AbstractPC_TAPF
+    env::E
+end
+
+construct_routing_problem(prob::C_PC_TAPF,env) = PC_MAPF(env)
+
 
 CRCBS.get_graph(env::SearchEnv) = env.env_graph
 function CRCBS.get_start(env::SearchEnv,v::Int)
@@ -618,6 +647,7 @@ function get_base_path(solver,search_env::SearchEnv,env::PCCBSEnv)
 end
 function CRCBS.build_env(
         solver,
+        pc_mapf::AbstractPC_MAPF,
         env::SearchEnv,
         node::ConstraintTreeNode,
         schedule_node::T,
@@ -674,6 +704,7 @@ function CRCBS.build_env(
 end
 function CRCBS.build_env(
     solver,
+    pc_mapf::AbstractPC_MAPF,
     env::SearchEnv,
     node::ConstraintTreeNode,
     v::VtxID,
@@ -683,16 +714,17 @@ function CRCBS.build_env(
     kwargs...
     )
     id = get_id(v)
-    env = build_env(solver,env,node,schedule_node,id,args...;kwargs...)
+    env = build_env(solver,pc_mapf,env,node,schedule_node,id,args...;kwargs...)
 end
 function CRCBS.build_env(
         solver,
+        pc_mapf::AbstractPC_MAPF,
         env::SearchEnv,
         node::ConstraintTreeNode,
         agent_id::AgentID
         )
     node_id = get_next_node_matching_agent_id(env,get_id(agent_id))
-    build_env(solver,env,node,VtxID(get_vtx(env.schedule,node_id)))
+    build_env(solver,pc_mapf,env,node,VtxID(get_vtx(env.schedule,node_id)))
     # get_node_from_id(env.schedule,node_id),
 end
 CRCBS.build_env(env::SearchEnv) = PCCBSEnv(search_env=env)
@@ -717,6 +749,7 @@ For COLLABORATIVE transport problems
 """
 function CRCBS.build_env(
     solver,
+    pc_mapf::AbstractPC_MAPF,
     env::E,
     node::N,
     schedule_node::TEAM_ACTION,
@@ -725,10 +758,10 @@ function CRCBS.build_env(
     kwargs...) where {E<:SearchEnv,N<:ConstraintTreeNode}
     envs = []
     agent_idxs = Int[]
-    for (i, sub_node) in enumerate(schedule_node.instructions)
-        ph = PerfectHeuristic(env.env_graph.dist_function.dist_mtxs[schedule_node.shape][i])
+    for (i, sub_node) in enumerate(sub_nodes(schedule_node))
+        ph = PerfectHeuristic(env.env_graph.dist_function.dist_mtxs[team_configuration(schedule_node)][i])
         heuristic = construct_heuristic_model(solver,env.env_graph,ph)
-        cbs_env = build_env(solver,env,node,VtxID(v),sub_node,generate_path_spec(env.schedule,env.problem_spec,sub_node);
+        cbs_env = build_env(solver,pc_mapf,env,node,VtxID(v),sub_node,generate_path_spec(env.schedule,env.problem_spec,sub_node);
             heuristic=heuristic,
             kwargs...
         )
@@ -763,7 +796,7 @@ end
 ############################## CBS Wrapper Stuff ###############################
 ################################################################################
 
-CRCBS.build_env(solver, pc_mapf::PC_MAPF, args...) = build_env(solver,pc_mapf.env,args...)
+CRCBS.build_env(solver, pc_mapf::AbstractPC_MAPF, args...) = build_env(solver,pc_mapf,pc_mapf.env,args...)
 CRCBS.build_env(prob::Union{PC_TAPF,PC_MAPF}) = build_env(prob.env)
 CRCBS.get_initial_solution(pc_mapf::PC_MAPF) = pc_mapf.env
 function CRCBS.initialize_root_node(env::SearchEnv)
@@ -780,7 +813,7 @@ function CRCBS.initialize_root_node(env::SearchEnv)
             ),
         id = 1)
 end
-CRCBS.initialize_root_node(solver,pc_mapf::PC_MAPF) = initialize_root_node(pc_mapf.env)
+CRCBS.initialize_root_node(solver,pc_mapf::AbstractPC_MAPF) = initialize_root_node(pc_mapf.env)
 function Base.copy(env::SearchEnv)
     SearchEnv(
         env,
@@ -793,35 +826,27 @@ function CRCBS.default_solution(env::SearchEnv)
     set_cost!(solution.route_plan,get_infeasible_cost(solution.route_plan))
     solution
 end
-CRCBS.default_solution(pc_mapf::M) where {M<:PC_MAPF} = default_solution(pc_mapf.env)
-function CRCBS.cbs_update_conflict_table!(solver,mapf::PC_MAPF,node,constraint)
+CRCBS.default_solution(pc_mapf::M) where {M<:AbstractPC_MAPF} = default_solution(pc_mapf.env)
+function CRCBS.cbs_update_conflict_table!(solver,mapf::AbstractPC_MAPF,node,constraint)
     search_env = node.solution
     idxs = collect(1:num_agents(search_env))
     t0 = max(minimum(search_env.cache.t0), 1) # This is particularly relevant for replanning, where we don't care to look for conflicts way back in the past.
     detect_conflicts!(node.conflict_table,search_env.route_plan,idxs,t0)
 end
 CRCBS.detect_conflicts!(table,env::SearchEnv,args...) = detect_conflicts!(table,env.route_plan,args...)
-CRCBS.serialize(pc_mapf::PC_MAPF,args...) = serialize(pc_mapf.env,args...)
-CRCBS.deserialize(pc_mapf::PC_MAPF,args...) = serialize(pc_mapf.env,args...)
 
-CRCBS.get_env(pc_mapf::PC_MAPF)             = pc_mapf.env
-CRCBS.action_type(pc_mapf::PC_MAPF)         = action_type(pc_mapf.env)
-CRCBS.state_type(pc_mapf::PC_MAPF)          = state_type(pc_mapf.env)
-CRCBS.cost_type(pc_mapf::PC_MAPF)           = cost_type(pc_mapf.env)
-CRCBS.num_agents(pc_mapf::PC_MAPF)          = num_agents(pc_mapf.env)
+# CRCBS.serialize(pc_mapf::PC_MAPF,args...) = serialize(pc_mapf.env,args...)
+# CRCBS.deserialize(pc_mapf::PC_MAPF,args...) = serialize(pc_mapf.env,args...)
+CRCBS.get_env(pc_mapf::AbstractPC_MAPF)             = pc_mapf.env
 for op in [
-    :cost_type,:state_type,:action_type,:path_type,:num_states,:num_actions
+    :cost_type,:state_type,:action_type,:path_type,:num_states,:num_actions,
+    :num_agents,:serialize,:deserialize,
     ]
-    @eval CRCBS.$op(prob::PC_MAPF,args...) = $op(prob.env,args...)
-    @eval CRCBS.$op(prob::PC_TAPF,args...) = $op(prob.env,args...)
+    @eval CRCBS.$op(prob::AbstractPC_MAPF,args...) = $op(prob.env,args...)
+    # @eval CRCBS.$op(prob::AbstractPC_MAPF,args...) = $op(prob.env,args...)
 end
-# CRCBS.num_goals(pc_mapf::PC_MAPF)           = length(pc_mapf.goals)
-# CRCBS.get_starts(pc_mapf::PC_MAPF)          = pc_mapf.starts
-# CRCBS.get_goals(pc_mapf::PC_MAPF)           = pc_mapf.goals
-# CRCBS.get_start(pc_mapf::PC_MAPF, i)        = get_starts(pc_mapf)[i]
-# CRCBS.get_goal(pc_mapf::PC_MAPF, i)         = get_goals(pc_mapf)[i]
-# CRCBS.get_start(pc_mapf::PC_MAPF, env, i)   = get_start(pc_mapf,i)
-CRCBS.base_env_type(pc_mapf::PC_MAPF)       = PCCBSEnv
+CRCBS.base_env_type(pc_mapf::AbstractPC_MAPF)               = PCCBSEnv
+CRCBS.base_env_type(pc_mapf::Union{C_PC_MAPF,C_PC_TAPF})    = MetaAgentCBS.TeamMetaEnv
 
 include("legacy/pc_tapf_solver.jl")
 

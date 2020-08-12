@@ -626,7 +626,7 @@ function generate_path_spec(schedule::P,spec::T,pred::TEAM_ACTION{A}) where {P<:
     path_spec = PathSpec(
         node_type=Symbol(typeof(pred)),
         # min_path_duration = maximum(map(a->generate_path_spec(schedule,spec,a).min_path_duration, pred.instructions)),
-        min_path_duration = get_distance(spec.D,s0,s,pred.shape),
+        min_path_duration = get_distance(spec.D,s0,s,team_configuration(pred)),
         plan_path = true,
         static = (A <: Union{COLLECT,DEPOSIT})
         )

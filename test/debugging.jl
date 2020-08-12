@@ -1,23 +1,14 @@
 let
     f = pctapf_problem_10
     cost_model = SumOfMakeSpans()
-    project_spec, problem_spec, robot_ICs, env_graph, _ = f(;cost_function=cost_model,verbose=false)
+    pc_tapf = f(;cost_function=cost_model,verbose=false)
     solver = NBSSolver(assignment_model = TaskGraphsMILPSolver(GreedyAssignment()))
-    project_schedule = construct_partial_project_schedule(
-        project_spec,
-        problem_spec,
-        robot_ICs,
-        )
-    base_search_env = construct_search_env(
-        solver,
-        project_schedule,
-        problem_spec,
-        env_graph
-        )
-    prob = formulate_assignment_problem(solver.assignment_model,base_search_env;
+    base_search_env = pc_tapf.env
+    prob = formulate_assignment_problem(solver.assignment_model,
+        pc_tapf;
         optimizer=Gurobi.Optimizer,
     )
-    sched, cost = solve_assignment_problem!(solver.assignment_model,prob,base_search_env)
+    sched, cost = solve_assignment_problem!(solver.assignment_model,prob,pc_tapf)
     @test validate(sched)
 
     goals = map(i->Vector{Int}(), 1:num_agents(base_search_env))

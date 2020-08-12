@@ -1,4 +1,4 @@
-CRCBS.build_env(solver,env::SearchEnv,node::ConstraintTreeNode,i::Int) = build_env(solver,env,node,AgentID(i))
+CRCBS.build_env(solver,pc_mapf::AbstractPC_MAPF,env::SearchEnv,node::ConstraintTreeNode,i::Int) = build_env(solver,pc_mapf,env,node,AgentID(i))
 function construct_heuristic_model(solver::PIBTPlanner,env_graph;
         ph = PerfectHeuristic(get_dist_matrix(env_graph)),
         kwargs...)
@@ -69,7 +69,7 @@ function CRCBS.pibt_update_envs!(solver,pc_mapf::PC_MAPF,cache)
         v_next = get_next_vtx_matching_agent_id(solution,i)
         if has_vertex(solution.schedule,v_next)
             # if v_next != get_vtx(solution.schedule,env.node_id)
-                CRCBS.get_envs(cache)[i] = build_env(solver,solution,node,AgentID(i))
+                CRCBS.get_envs(cache)[i] = build_env(solver,pc_mapf,solution,node,AgentID(i))
             # end
         end
         env = CRCBS.get_envs(cache)[i]
@@ -85,7 +85,7 @@ function CRCBS.pibt_update_envs!(solver,pc_mapf::PC_MAPF,cache)
             # new env if there is a valid available next vtx.
             if has_vertex(solution.schedule,get_next_vtx_matching_agent_id(solution,i))
                 CRCBS.get_timers(cache)[i] = 0
-                CRCBS.get_envs(cache)[i] = build_env(solver,solution,node,AgentID(i))
+                CRCBS.get_envs(cache)[i] = build_env(solver,pc_mapf,solution,node,AgentID(i))
             end
         end
     end

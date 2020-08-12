@@ -7,15 +7,17 @@ let
     solver = NBSSolver(assignment_model = TaskGraphsMILPSolver(GreedyAssignment()))
     pc_tapf = f(solver;cost_function=cost_model,verbose=false)
     base_search_env = pc_tapf.env
-    prob = formulate_assignment_problem(solver.assignment_model,base_search_env;
+    prob = formulate_assignment_problem(solver.assignment_model,
+        pc_tapf;
         optimizer=Gurobi.Optimizer,
     )
-    sched, cost = solve_assignment_problem!(solver.assignment_model,prob,base_search_env)
+    sched, cost = solve_assignment_problem!(solver.assignment_model,prob,pc_tapf)
     @test validate(sched)
     search_env = construct_search_env(solver,deepcopy(sched),base_search_env)
+    pc_mapf = PC_MAPF(search_env)
     node = initialize_root_node(search_env)
     let
-        env = build_env(solver,search_env,node,AgentID(1))
+        env = build_env(solver,pc_mapf,search_env,node,AgentID(1))
 
         s = State()
         a = Action()
@@ -46,7 +48,7 @@ let
         for v in vertices(search_env.schedule)
             schedule_node = get_node_from_vtx(search_env.schedule,v)
             if isa(schedule_node,COLLECT)
-                env = build_env(solver,search_env,node,VtxID(v))
+                env = build_env(solver,pc_mapf,search_env,node,VtxID(v))
                 @test length(get_possible_actions(env,State(1,0))) == 1
                 @test length(get_possible_actions(env,State(-1,-1))) == 0
                 break

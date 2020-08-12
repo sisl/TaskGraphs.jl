@@ -244,7 +244,9 @@ function split_node(node::N,x::LocationID) where {N<:Union{DEPOSIT,COLLECT}}
 end
 
 export
-	TEAM_ACTION
+	TEAM_ACTION,
+	sub_nodes,
+	team_configuration
 
 """
 	TEAM_ACTION{A}
@@ -263,6 +265,10 @@ For collaborative tasks.
     n::Int 					= length(instructions) # number of robots
     # config::Matrix{Int} = ones(n) # defines configuration of agents relative to each other during collaborative task
 end
+sub_nodes(n) = n
+sub_nodes(n::TEAM_ACTION) = n.instructions
+team_configuration(n) = (1,1)
+team_configuration(n::TEAM_ACTION) = n.shape
 
 export
 	required_predecessors,
