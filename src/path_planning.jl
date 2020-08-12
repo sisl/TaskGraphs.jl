@@ -103,6 +103,52 @@ export
     #     cost = get_infeasible_cost(cost_model),
     #     )
 end
+
+export
+    AbstractPC_MAPF,
+    PC_TAPF,
+    C_PC_TAPF,
+    PC_MAPF
+
+"""
+    AbstractPC_MAPF
+
+An abstract type of which all Precedence-Constrained Multi-Agent Path-Finding
+are concrete subtypes.
+"""
+abstract type AbstractPC_MAPF <: AbstractMAPF end
+
+"""
+    PC_TAPF{L<:LowLevelSolution}
+
+Defines an instance of a Precedence-Constrained Multi-Agent Task
+    Assignment and Path-Finding problem.
+"""
+struct PC_TAPF{E<:SearchEnv} <: AbstractPC_MAPF
+    env::E
+end
+
+"""
+    C_PC_TAPF{L<:LowLevelSolution}
+
+Defines an instance of a Collaborative Precedence-Constrained Multi-Agent Task
+    Assignment and Path-Finding problem, where agents must sometimes transport
+    objects in teams.
+"""
+struct C_PC_TAPF{E<:SearchEnv} <: AbstractPC_MAPF
+    env::E
+end
+
+"""
+    `PC_MAPF`
+
+A precedence-constrained multi-agent path-finding problem. All agents have
+assigned tasks, but there are precedence constraints between tasks.
+"""
+struct PC_MAPF{E<:SearchEnv} <: AbstractPC_MAPF
+    env::E
+end
+
 CRCBS.get_graph(env::SearchEnv) = env.env_graph
 function CRCBS.get_start(env::SearchEnv,v::Int)
     start_vtx   = get_path_spec(env.schedule,v).start_vtx
@@ -716,31 +762,7 @@ end
 ################################################################################
 ############################## CBS Wrapper Stuff ###############################
 ################################################################################
-export
-    PC_TAPF
 
-"""
-    PC_TAPF{L<:LowLevelSolution}
-
-Defines an instance of a Precedence-Constrained Multi-Agent Task
-    Assignment and Path-Finding problem.
-"""
-struct PC_TAPF{E<:SearchEnv} <: AbstractMAPF
-    env::E
-end
-
-export
-    PC_MAPF
-
-"""
-    `PC_MAPF`
-
-    A precedence-constrained multi-agent path-finding problem. All agents have
-    assigned tasks, but there are precedence constraints between tasks.
-"""
-struct PC_MAPF{E<:SearchEnv} <: AbstractMAPF
-    env::E
-end
 CRCBS.build_env(solver, pc_mapf::PC_MAPF, args...) = build_env(solver,pc_mapf.env,args...)
 CRCBS.build_env(prob::Union{PC_TAPF,PC_MAPF}) = build_env(prob.env)
 CRCBS.get_initial_solution(pc_mapf::PC_MAPF) = pc_mapf.env
