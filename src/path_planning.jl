@@ -46,6 +46,7 @@ function initialize_planning_cache(schedule::OperatingSchedule,t0_=zeros(nv(sche
         push!(cache.active_set,v)
         enqueue!(cache.node_queue,v=>isps_queue_cost(schedule,cache,v)) # need to store slack
     end
+    # TODO skip over all nodes for which path_spec.plan_path == false
     cache
 end
 
@@ -334,6 +335,8 @@ function update_planning_cache!(solver,env)
     schedule = env.schedule
     node = initialize_root_node(env)
     dummy_path = path_type(env)()
+    # Skip over nodes that don't need planning (either they have already been
+    # planned, or they don't need planning period.)
     while true
         done = true
         for v in collect(cache.active_set)
