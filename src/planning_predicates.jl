@@ -265,7 +265,7 @@ For collaborative tasks.
     n::Int 					= length(instructions) # number of robots
     # config::Matrix{Int} = ones(n) # defines configuration of agents relative to each other during collaborative task
 end
-sub_nodes(n) = n
+sub_nodes(n) = [n]
 sub_nodes(n::TEAM_ACTION) = n.instructions
 team_configuration(n) = (1,1)
 team_configuration(n::TEAM_ACTION) = n.shape

@@ -640,9 +640,9 @@ function pctapf_problem_11(;
     # 5   6   7   8
     # 9  10  11  12
     # 13  14  15  16
-    r0 = [2, 4, 11]
-    s0 = [2, 7, 13]
-    sF = [14, 3, 9]
+    r0 = [1, 4, 15]
+    s0 = [2, 11, 13]
+    sF = [14, 1, 9]
     env_graph = construct_factory_env_from_vtx_grid(
         vtx_grid;
     )
@@ -657,7 +657,7 @@ function pctapf_problem_11(;
         project_spec,
         construct_operation(project_spec, -1, [3], [], 0),
     )
-    assignment_dict = Dict(1 => [1, 3], 2 => [1], 3 => [2])
+    assignment_dict = Dict(1 => [1,3], 2 => [1], 3 => [2])
 
     def = SimpleProblemDef(project_spec,r0,s0,sF,shapes)
     project_spec, problem_spec, _, _, robot_ICs = construct_task_graphs_problem(
@@ -759,10 +759,6 @@ function replanning_problem(solver,r0,defs,env_graph;
     # base_schedule = requests[1].schedule
     base_env = construct_search_env(solver,base_schedule,problem_spec,env_graph)
     return RepeatedPC_TAPF(base_env,requests)
-
-    # return requests, problem_spec, robot_ICs, env_graph
-    # env = construct_search_env(solver,OperatingSchedule(),problem_spec,env_graph)
-
 end
 
 function replanning_problem_1(solver;kwargs...)

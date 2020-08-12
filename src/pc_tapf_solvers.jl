@@ -179,7 +179,7 @@ export
 """
     update_route_plan!()
 """
-function update_route_plan!(solver,env,v,path,cost,schedule_node,agent_id = get_path_spec(env.schedule, v).agent_id)
+function update_route_plan!(solver,pc_mapf::AbstractPC_MAPF,env,v,path,cost,schedule_node,agent_id = get_path_spec(env.schedule, v).agent_id)
     # add to solution
     # log_info(3,solver,string("agent_path = ", convert_to_vertex_lists(path)))
     # log_info(3,solver,string("cost = ", get_cost(path)))
@@ -189,14 +189,14 @@ function update_route_plan!(solver,env,v,path,cost,schedule_node,agent_id = get_
     set_cost!(env,aggregate_costs(get_cost_model(env),get_path_costs(env)))
     return env
 end
-function update_route_plan!(solver,env,v,meta_path,meta_cost,schedule_node::TEAM_ACTION)
+function update_route_plan!(solver,pc_mapf::C_PC_MAPF,env,v,meta_path,meta_cost,schedule_node)
     # add to solution
     paths = MetaAgentCBS.split_path(meta_path)
     # @show length(paths)
     # @show length(meta_env.envs)
     # @show length(meta_cost.independent_costs)
     # @show length(schedule_node.instructions)
-    for (new_path, sub_node) in zip(paths, schedule_node.instructions)
+    for (new_path, sub_node) in zip(paths, sub_nodes(schedule_node))
         agent_id = get_id(get_robot_id(sub_node))
         path = get_paths(env)[agent_id]
         for p in new_path.path_nodes
@@ -204,7 +204,7 @@ function update_route_plan!(solver,env,v,meta_path,meta_cost,schedule_node::TEAM
             # path.cost = accumulate_cost(cbs_env, get_cost(path), get_transition_cost(cbs_env, p.s, p.a, p.sp))
         end
         set_cost!(path,get_cost(new_path))
-        update_route_plan!(solver,env,v,path,path.cost,sub_node,agent_id)
+        update_route_plan!(solver,PC_MAPF(pc_mapf.env),env,v,path,get_cost(path),sub_node,agent_id)
         # update_env!(solver,env,route_plan,v,path,agent_id)
         # Print for debugging
         # @show agent_id
@@ -265,7 +265,7 @@ function plan_path!(solver::AStarSC, pc_mapf::AbstractPC_MAPF, env::SearchEnv, n
         # solver.DEBUG ? validate(path,v) : nothing
     end
     # add to solution
-    update_route_plan!(solver,env,v,path,cost,schedule_node)
+    update_route_plan!(solver,pc_mapf,env,v,path,cost,schedule_node)
     if get_cost(node) >= best_cost(solver)
         log_info(0,solver,"ISPS: get_cost(node) >= best_cost(solver) ... Exiting early")
         return false
@@ -546,7 +546,6 @@ function CRCBS.solve!(solver, env_graph, project_spec::ProjectSpec, problem_spec
         project_spec,problem_spec,map(i->robot_ICs[i], 1:problem_spec.N))
     solve!(solver, env_graph, schedule, problem_spec;kwargs...)
 end
-# CRCBS.solve!(solver::NBSSolver, pc_tapf::PC_TAPF;kwargs...) = solve!(solver,pc_tapf.env;kwargs...)
 CRCBS.solve!(solver::NBSSolver, env::SearchEnv;kwargs...) = solve!(solver,PC_TAPF(env);kwargs...)
 
 export

@@ -175,7 +175,7 @@ struct C_PC_TAPF{E<:SearchEnv} <: AbstractPC_TAPF
     env::E
 end
 
-construct_routing_problem(prob::C_PC_TAPF,env) = PC_MAPF(env)
+construct_routing_problem(prob::C_PC_TAPF,env) = C_PC_MAPF(env)
 
 
 CRCBS.get_graph(env::SearchEnv) = env.env_graph
@@ -749,19 +749,20 @@ For COLLABORATIVE transport problems
 """
 function CRCBS.build_env(
     solver,
-    pc_mapf::AbstractPC_MAPF,
+    # pc_mapf::AbstractPC_MAPF,
+    pc_mapf::C_PC_MAPF,
     env::E,
     node::N,
-    schedule_node::TEAM_ACTION,
+    schedule_node::T,
     v::Int,
     ;
-    kwargs...) where {E<:SearchEnv,N<:ConstraintTreeNode}
+    kwargs...) where {E<:SearchEnv,N<:ConstraintTreeNode,T}
     envs = []
     agent_idxs = Int[]
     for (i, sub_node) in enumerate(sub_nodes(schedule_node))
         ph = PerfectHeuristic(env.env_graph.dist_function.dist_mtxs[team_configuration(schedule_node)][i])
         heuristic = construct_heuristic_model(solver,env.env_graph,ph)
-        cbs_env = build_env(solver,pc_mapf,env,node,VtxID(v),sub_node,generate_path_spec(env.schedule,env.problem_spec,sub_node);
+        cbs_env = build_env(solver,PC_MAPF(pc_mapf.env),env,node,VtxID(v),sub_node,generate_path_spec(env.schedule,env.problem_spec,sub_node);
             heuristic=heuristic,
             kwargs...
         )
