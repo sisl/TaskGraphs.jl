@@ -260,12 +260,17 @@ function plan_path!(solver::AStarSC, pc_mapf::AbstractPC_MAPF, env::SearchEnv, n
     log_info(2,solver,string("A* iterations = ",iterations(solver)))
     # Make sure every robot sticks around for the entire time horizon
     if is_terminal_node(get_graph(env.schedule),v)
-        log_info(2,solver,"ISPS: Extending terminal node")
+        log_info(2,solver,"ISPS: length(path) = $(length(path)).",
+        " Extending terminal node $(string(schedule_node))",
+        " to $(maximum(cache.tF))")
         extend_path!(cbs_env,path,maximum(cache.tF))
+        log_info(2,solver,"ISPS: length(path) = $(length(path)).",
+        " maximum(cache.tF) = $(maximum(cache.tF))")
         # solver.DEBUG ? validate(path,v) : nothing
     end
     # add to solution
     update_route_plan!(solver,pc_mapf,env,v,path,cost,schedule_node)
+    log_info(2,solver,"ISPS: after update_route_plan! maximum(cache.tF) $(maximum(cache.tF))")
     if get_cost(node) >= best_cost(solver)
         log_info(0,solver,"ISPS: get_cost(node) >= best_cost(solver) ... Exiting early")
         return false
@@ -301,6 +306,14 @@ function CRCBS.hard_reset_solver!(solver::ISPS)
     hard_reset_solver!(get_logger(solver))
     hard_reset_solver!(low_level(solver))
 end
+for op in [:set_deadline!,:set_runtime_limit!,:set_verbosity!]
+    eval(quote
+        CRCBS.$op(solver::ISPS,args...) = begin
+            $op(get_logger(solver),args...)
+            $op(low_level(solver),args...)
+        end
+    end)
+end
 
 export
     plan_next_path!,
@@ -319,7 +332,18 @@ function plan_next_path!(solver::ISPS, pc_mapf::AbstractPC_MAPF, env::SearchEnv,
         schedule_node = get_node_from_id(env.schedule,node_id)
         if get_path_spec(env.schedule, v).plan_path == true
             try
+                log_info(-1,solver,"""
+                schedule_node: $(string(schedule_node))
+                cache.tF: $(env.cache.tF)
+                cache.tF[v]: $(env.cache.tF[v])
+                maximum(env.cache.tF): $(maximum(env.cache.tF))
+                """)
                 valid_flag = plan_path!(low_level(solver),pc_mapf,env,node,schedule_node,v)
+                log_info(-1,solver,"""
+                routes: $(convert_to_vertex_lists(env.route_plan))
+                cache.tF: $(env.cache.tF)
+                cache.tF[v]: $(env.cache.tF[v])
+                """)
             catch e
                 if isa(e, SolverException)
                     showerror(stdout, e, catch_backtrace())
@@ -469,6 +493,15 @@ end
 function CRCBS.reset_solver!(solver::NBSSolver)
     reset_solver!(get_logger(solver))
     reset_solver!(route_planner(solver))
+end
+for op in [:set_deadline!,:set_runtime_limit!,:set_verbosity!]
+    eval(quote
+        CRCBS.$op(solver::NBSSolver,args...) = begin
+            $op(get_logger(solver),args...)
+            $op(assignment_solver(solver),args...)
+            $op(route_planner(solver),args...)
+        end
+    end)
 end
 
 """

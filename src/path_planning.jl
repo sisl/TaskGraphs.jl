@@ -760,7 +760,8 @@ function CRCBS.build_env(
     envs = []
     agent_idxs = Int[]
     for (i, sub_node) in enumerate(sub_nodes(schedule_node))
-        ph = PerfectHeuristic(env.env_graph.dist_function.dist_mtxs[team_configuration(schedule_node)][i])
+        # ph = PerfectHeuristic(env.env_graph.dist_function.dist_mtxs[team_configuration(schedule_node)][i])
+        ph = PerfectHeuristic(get_team_config_dist_function(env.env_graph,team_configuration(schedule_node),i))
         heuristic = construct_heuristic_model(solver,env.env_graph,ph)
         cbs_env = build_env(solver,PC_MAPF(pc_mapf.env),env,node,VtxID(v),sub_node,generate_path_spec(env.schedule,env.problem_spec,sub_node);
             heuristic=heuristic,
