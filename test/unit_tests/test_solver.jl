@@ -364,7 +364,8 @@ let
     i = 1
     env = build_env(mapf,node,i)
     meta_env = MetaAgentCBS.construct_meta_env([env],[1])
-    s = get_start(mapf,meta_env,i)
+    # s = get_start(mapf,meta_env,i)
+    s = MetaAgentCBS.State([CBSEnv.State(1,0)])
     a = CRCBS.wait(meta_env,s)
     sp = get_next_state(meta_env,s,a)
     n = PathNode(s,a,sp)
@@ -373,6 +374,8 @@ let
         s0=s,
         cost=MetaCost{Float64}([0.0],0.0)
         )
+
+    get_start_index(path), get_end_index(path), get_index_from_time(path,get_end_index(path))
 
     length(path)
     extend_path!(path,4)
