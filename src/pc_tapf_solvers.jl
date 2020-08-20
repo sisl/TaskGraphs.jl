@@ -198,12 +198,13 @@ function update_route_plan!(solver,pc_mapf::C_PC_MAPF,env,v,meta_path,meta_cost,
     # @show length(schedule_node.instructions)
     for (new_path, sub_node) in zip(paths, sub_nodes(schedule_node))
         agent_id = get_id(get_robot_id(sub_node))
-        path = get_paths(env)[agent_id]
-        for p in new_path.path_nodes
-            push!(path, p)
-            # path.cost = accumulate_cost(cbs_env, get_cost(path), get_transition_cost(cbs_env, p.s, p.a, p.sp))
-        end
-        set_cost!(path,get_cost(new_path))
+        path = new_path
+        # path = get_paths(env)[agent_id]
+        # for p in new_path.path_nodes
+        #     push!(path, p)
+        #     # path.cost = accumulate_cost(cbs_env, get_cost(path), get_transition_cost(cbs_env, p.s, p.a, p.sp))
+        # end
+        # set_cost!(path,get_cost(new_path))
         update_route_plan!(solver,PC_MAPF(pc_mapf.env),env,v,path,get_cost(path),sub_node,agent_id)
         # update_env!(solver,env,route_plan,v,path,agent_id)
         # Print for debugging

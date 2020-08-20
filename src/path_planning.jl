@@ -95,13 +95,6 @@ export
     heuristic_model::H              = H()
     num_agents::Int                 = length(get_robot_ICs(schedule))
     route_plan::S                   = initialize_route_plan(schedule,cost_model)
-    # route_plan::S                   = LowLevelSolution(
-    #     paths = map(i->Path{State,Action,cost_type(cost_model)}(),
-    #         1:num_agents),
-    #     cost_model = cost_model,
-    #     costs = map(i->get_initial_cost(cost_model), 1:num_agents),
-    #     cost = get_infeasible_cost(cost_model),
-    #     )
 end
 
 export
@@ -489,16 +482,6 @@ function initialize_route_plan(schedule::OperatingSchedule,cost_model)
     LowLevelSolution(paths=paths, cost_model=cost_model,costs=costs, cost=cost)
 end
 function initialize_route_plan(env::SearchEnv,cost_model=get_cost_model(env))
-    # paths = map(p->path_type(env)(
-    # paths = map(p->Path{state_type(env),action_type(env),cost_type(cost_model)}(
-    #     s0=get_initial_state(p),
-    #     cost=get_initial_cost(cost_model)
-    #     ), get_paths(env.route_plan))
-    # paths = map(p->Path{state_type(env),action_type(env),cost_type(cost_model)}(
-    #     s0=get_initial_state(p),
-    #     path_nodes=p.path_nodes,
-    #     cost=get_cost(p)
-    #     ), get_paths(env.route_plan))
     paths=deepcopy(get_paths(env.route_plan))
     costs = map(p->get_cost(p), paths)
     LowLevelSolution(
@@ -619,6 +602,10 @@ function update_env!(solver,env::SearchEnv,v::Int,path::P,
     # ADD UPDATED PATH TO HEURISTIC MODELS
     if agent_id != -1
         partially_set_path!(get_heuristic_model(env),agent_id,convert_to_vertex_lists(get_paths(route_plan)[agent_id]))
+        # log_info(3,solver,
+        #     "Adding vertex list path to conflict cost model for agent ",
+        #     agent_id,": ",
+        #     convert_to_vertex_lists(get_paths(route_plan)[agent_id]))
         partially_set_path!(get_cost_model(env),agent_id,convert_to_vertex_lists(get_paths(route_plan)[agent_id]))
     end
 
@@ -730,18 +717,21 @@ end
 CRCBS.build_env(env::SearchEnv) = PCCBSEnv(search_env=env)
 
 function get_base_path(solver,search_env::SearchEnv,meta_env::MetaAgentCBS.AbstractMetaEnv)
-    starts = Vector{state_type(search_env)}()
-    meta_cost = MetaCost(Vector{cost_type(search_env)}(),get_initial_cost(search_env))
-    for cbs_env in MetaAgentCBS.get_envs(meta_env)
-        sub_node = cbs_env.schedule_node
-        base_path = get_base_path(solver,search_env,cbs_env)
-        push!(starts, get_final_state(base_path))
-        push!(meta_cost.independent_costs, get_cost(base_path))
-    end
-    meta_path = Path{state_type(meta_env),action_type(meta_env),MetaCost{cost_type(search_env)}}(
-        s0 = MetaAgentCBS.State(starts),
-        cost = MetaCost(meta_cost.independent_costs, aggregate_costs(get_cost_model(meta_env), meta_cost.independent_costs))
-    )
+    base_paths = map(env->get_base_path(solver,search_env,env),MetaAgentCBS.get_envs(meta_env))
+    cost = aggregate_costs(get_cost_model(meta_env), map(get_cost,base_paths))
+    MetaAgentCBS.construct_meta_path(base_paths,cost)
+    # starts = Vector{state_type(search_env)}()
+    # meta_cost = MetaCost(Vector{cost_type(search_env)}(),get_initial_cost(search_env))
+    # for cbs_env in MetaAgentCBS.get_envs(meta_env)
+    #     sub_node = cbs_env.schedule_node
+    #     base_path = get_base_path(solver,search_env,cbs_env)
+    #     push!(starts, get_final_state(base_path))
+    #     push!(meta_cost.independent_costs, get_cost(base_path))
+    # end
+    # meta_path = Path{state_type(meta_env),action_type(meta_env),MetaCost{cost_type(search_env)}}(
+    #     s0 = MetaAgentCBS.State(starts),
+    #     cost = MetaCost(meta_cost.independent_costs, aggregate_costs(get_cost_model(meta_env), meta_cost.independent_costs))
+    # )
 end
 
 """
@@ -767,7 +757,7 @@ function CRCBS.build_env(
             heuristic=heuristic,
             kwargs...
         )
-        base_path = get_base_path(solver,env,cbs_env)
+        # base_path = get_base_path(solver,env,cbs_env)
         push!(envs, cbs_env)
         push!(agent_idxs, get_id(get_robot_id(sub_node)))
     end
