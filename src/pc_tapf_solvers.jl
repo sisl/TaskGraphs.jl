@@ -94,9 +94,6 @@ end
 search_trait(solver::PrioritizedAStarSC) = Prioritized()
 primary_cost(::PrioritizedAStarSC,cost::NTuple{5,Float64}) = cost[2]
 
-# export
-#     construct_heuristic_model
-
 """
     construct_heuristic_model(solver,env_graph;kwargs...)
 
@@ -118,9 +115,6 @@ end
 function construct_heuristic_model(solver, args...)
     construct_heuristic_model(search_trait(solver),solver,args...)
 end
-
-# export
-#     construct_cost_model
 
 """
     construct_cost_model(solver::AStarSC, args...;kwargs...)
