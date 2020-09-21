@@ -816,7 +816,7 @@ end
 function CRCBS.default_solution(env::SearchEnv)
     solution = deepcopy(env)
     set_cost!(solution.route_plan,get_infeasible_cost(solution.route_plan))
-    solution
+    solution, get_cost(solution)
 end
 CRCBS.default_solution(pc_mapf::M) where {M<:AbstractPC_MAPF} = default_solution(pc_mapf.env)
 function CRCBS.cbs_update_conflict_table!(solver,mapf::AbstractPC_MAPF,node,constraint)

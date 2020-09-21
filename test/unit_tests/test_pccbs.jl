@@ -6,6 +6,8 @@ let
     cost_model = SumOfMakeSpans()
     solver = NBSSolver(assignment_model = TaskGraphsMILPSolver(GreedyAssignment()))
     pc_tapf = f(solver;cost_function=cost_model,verbose=false)
+    # proj_spec, prob_spec, robot_ics, env_graph, _ = f(;cost_function=cost_model,verbose=false)
+
     base_search_env = pc_tapf.env
     prob = formulate_assignment_problem(solver.assignment_model,
         pc_tapf;
