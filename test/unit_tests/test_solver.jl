@@ -1,6 +1,6 @@
 # test solver initialization
 let
-    AStarSC()
+    DefaultAStarSC()
     AStarSC{Int}()
     ISPS()
     CBSSolver()
@@ -42,7 +42,7 @@ let
     let
         search_env = construct_search_env(solver,deepcopy(sched),base_env)
         pc_mapf = PC_MAPF(search_env)
-        path_planner = AStarSC()
+        path_planner = DefaultAStarSC()
         node = initialize_root_node(search_env)
         # plan for Robot Start
         node_id = RobotID(1)

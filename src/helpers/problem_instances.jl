@@ -687,6 +687,7 @@ export
     replanning_problem_1,
     replanning_problem_2,
     replanning_problem_3,
+    replanning_problem_4,
     replanning_test_problems
 
 """
@@ -798,7 +799,7 @@ function replanning_problem_2(solver;kwargs...)
 end
 
 """
-    The robot should can do better if it handles the single task in the second
+    The robot should do better if it handles the single task in the second
     project prior to working on the third task of the first project.
 """
 function replanning_problem_3(solver;kwargs...)
@@ -828,10 +829,39 @@ function replanning_problem_3(solver;kwargs...)
         ]
     return replanning_problem(solver,r0,defs,env_graph;kwargs...)
 end
+
+"""
+    Just intended to take longer so that the tests pass even if Julia hasn't
+    finished warming up yet.
+"""
+function replanning_problem_4(solver;kwargs...)
+    N = 1                  # num robots
+    vtx_grid = initialize_dense_vtx_grid(4,4)
+    env_graph = construct_factory_env_from_vtx_grid(vtx_grid)
+    #  1   2   3   4   5   6   7   8   9  10  11  12  13  14  15  16
+    # 17  18  19  20  21  22  23  24  25  26  27  28  29  30  31  32
+    # 33  34  35  36  37  38  39  40  41  42  43  44  45  46  47  48
+    # 49  50  51  52  53  54  55  56  57  58  59  60  61  62  63  64
+    r0 = [1]
+    defs = [
+        ( tasks=[1=>16,32=>17,33=>48],
+            ops=[
+                (inputs=[1],outputs=[2]),
+                (inputs=[2],outputs=[3]),
+                (inputs=[3],outputs=[])
+                ] ),
+        ( tasks=[64=>49],
+            ops=[
+                (inputs=[1],outputs=[]),
+                ] ),
+        ]
+    return replanning_problem(solver,r0,defs,env_graph;kwargs...)
+end
 replanning_test_problems() = [
     replanning_problem_1,
     replanning_problem_2,
     replanning_problem_3,
+    replanning_problem_4,
 ]
 
 export

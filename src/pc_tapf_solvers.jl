@@ -50,7 +50,6 @@ Fields:
     logger::SolverLogger{C} = SolverLogger{C}()
     replan::Bool            = false
 end
-AStarSC() = AStarSC{NTuple{5,Float64}}()
 search_trait(solver::AStarSC) = NonPrioritized()
 function CRCBS.logger_step_a_star!(solver::AStarSC, env, base_path, s, q_cost)
     increment_iteration_count!(solver)
@@ -62,7 +61,7 @@ function CRCBS.logger_step_a_star!(solver::AStarSC, env, base_path, s, q_cost)
         #     # Dump env to JLD2 environment
         #     filename = joinpath(DEBUG_PATH,string("A_star_dump_",get_debug_file_id(),".jld2"))
         #     mkpath(DEBUG_PATH)
-        #     log_info(-1,solver,"Dumping A* env to $filename")
+        #     @log_info(-1,solver,"Dumping A* env to $filename")
         #     agent_id = env.agent_idx
         #     history = map(s->(s.vtx,s.t),solver.search_history)
         #     start   = (get_final_state(base_path).vtx,get_final_state(base_path).t)
@@ -76,8 +75,11 @@ function CRCBS.logger_step_a_star!(solver::AStarSC, env, base_path, s, q_cost)
         # end
         # throw(SolverAstarMaxOutException(string("# MAX OUT: A* limit of ",solver.LIMIT_A_star_iterations," exceeded.")))
     end
-    log_info(2,solver,"A* iter $(iterations(solver)): s = $(string(s)), q_cost = $q_cost")
+    @log_info(2,solver,"A* iter $(iterations(solver)): s = $(string(s)), q_cost = $q_cost")
 end
+
+export DefaultAStarSC
+DefaultAStarSC() = AStarSC{NTuple{5,Float64}}()
 
 export
     PrioritizedAStarSC
@@ -175,8 +177,8 @@ export
 """
 function update_route_plan!(solver,pc_mapf::AbstractPC_MAPF,env,v,path,cost,schedule_node,agent_id = get_path_spec(env.schedule, v).agent_id)
     # add to solution
-    # log_info(3,solver,string("agent_path = ", convert_to_vertex_lists(path)))
-    # log_info(3,solver,string("cost = ", get_cost(path)))
+    # @log_info(3,solver,string("agent_path = ", convert_to_vertex_lists(path)))
+    # @log_info(3,solver,string("cost = ", get_cost(path)))
     set_solution_path!(env, path, agent_id)
     set_path_cost!(env, cost, agent_id)
     update_env!(solver,env,v,path)
@@ -203,9 +205,9 @@ function update_route_plan!(solver,pc_mapf::C_PC_MAPF,env,v,meta_path,meta_cost,
         # update_env!(solver,env,route_plan,v,path,agent_id)
         # Print for debugging
         # @show agent_id
-        log_info(3,solver,"agent_id = ", agent_id)
-        log_info(3,solver,string("agent_path = ", convert_to_vertex_lists(path)))
-        log_info(3,solver,string("cost = ", get_cost(new_path)))
+        @log_info(3,solver,"agent_id = ", agent_id)
+        @log_info(3,solver,string("agent_path = ", convert_to_vertex_lists(path)))
+        @log_info(3,solver,string("cost = ", get_cost(new_path)))
     end
     return env
 end
@@ -213,12 +215,12 @@ end
 export
     plan_path!
 
-path_finder(solver::AStarSC,args...) = CRCBS.a_star(solver,args...)
+path_finder(solver::AStarSC,args...) = CRCBS.a_star!(solver,args...)
 
 """
     plan_path!
 
-    Computes nxxt path specified by the project schedule and updates the
+    Computes next path specified by the project schedule and updates the
     solution in the ConstraintTreeNode::node accordingly.
 """
 function plan_path!(solver::AStarSC, pc_mapf::AbstractPC_MAPF, env::SearchEnv, node::N,
@@ -237,7 +239,7 @@ function plan_path!(solver::AStarSC, pc_mapf::AbstractPC_MAPF, env::SearchEnv, n
     @assert get_cost(path) == cost
     if cost == get_infeasible_cost(cbs_env)
         if solver.replan == true
-            log_info(-1,solver,"A*: replanning without conflict cost", string(schedule_node))
+            @log_info(-1,solver,"A*: replanning without conflict cost", string(schedule_node))
             reset_solver!(solver)
             cost_model, _ = construct_cost_model(solver, env;
                 primary_objective=env.problem_spec.cost_function)
@@ -246,28 +248,28 @@ function plan_path!(solver::AStarSC, pc_mapf::AbstractPC_MAPF, env::SearchEnv, n
             path, cost = path_finder(solver, cbs_env, base_path)
         end
         if cost == get_infeasible_cost(cbs_env)
-            log_info(-1,solver,"A*: returned infeasible path for node ", string(schedule_node))
+            @log_info(-1,solver,"A*: returned infeasible path for node ", string(schedule_node))
             return false
         end
     end
     # solver.DEBUG ? validate(path,v,cbs_env) : nothing
     #####################
-    log_info(2,solver,string("A* iterations = ",iterations(solver)))
+    @log_info(2,solver,string("A* iterations = ",iterations(solver)))
     # Make sure every robot sticks around for the entire time horizon
     if is_terminal_node(get_graph(env.schedule),v)
-        log_info(2,solver,"ISPS: length(path) = $(length(path)).",
+        @log_info(2,solver,"ISPS: length(path) = $(length(path)).",
         " Extending terminal node $(string(schedule_node))",
         " to $(maximum(cache.tF))")
         extend_path!(cbs_env,path,maximum(cache.tF))
-        log_info(2,solver,"ISPS: length(path) = $(length(path)).",
+        @log_info(2,solver,"ISPS: length(path) = $(length(path)).",
         " maximum(cache.tF) = $(maximum(cache.tF))")
         # solver.DEBUG ? validate(path,v) : nothing
     end
     # add to solution
     update_route_plan!(solver,pc_mapf,env,v,path,cost,schedule_node)
-    log_info(2,solver,"ISPS: after update_route_plan! maximum(cache.tF) $(maximum(cache.tF))")
+    @log_info(2,solver,"ISPS: after update_route_plan! maximum(cache.tF) $(maximum(cache.tF))")
     if get_cost(node) >= best_cost(solver)
-        log_info(0,solver,"ISPS: get_cost(node) >= best_cost(solver) ... Exiting early")
+        @log_info(0,solver,"ISPS: get_cost(node) >= best_cost(solver) ... Exiting early")
         return false
     end
 
@@ -283,7 +285,7 @@ export
 Path planner that employs Incremental Slack-Prioritized Search.
 """
 @with_kw struct ISPS{L,C} <: BiLevelPlanner
-    low_level_planner::L = AStarSC()
+    low_level_planner::L = DefaultAStarSC()
     logger::SolverLogger{C} = SolverLogger{cost_type(low_level_planner)}(
         iteration_limit = 2
     )
@@ -327,21 +329,26 @@ function plan_next_path!(solver::ISPS, pc_mapf::AbstractPC_MAPF, env::SearchEnv,
         schedule_node = get_node_from_id(env.schedule,node_id)
         if get_path_spec(env.schedule, v).plan_path == true
             try
-                log_info(-1,solver,"""
+                @log_info(2,solver,"""
                 schedule_node: $(string(schedule_node))
                 cache.tF: $(env.cache.tF)
                 cache.tF[v]: $(env.cache.tF[v])
                 maximum(env.cache.tF): $(maximum(env.cache.tF))
                 """)
                 valid_flag = plan_path!(low_level(solver),pc_mapf,env,node,schedule_node,v)
-                log_info(-1,solver,"""
+                @log_info(2,solver,"""
                 routes: $(convert_to_vertex_lists(env.route_plan))
                 cache.tF: $(env.cache.tF)
                 cache.tF[v]: $(env.cache.tF[v])
                 """)
             catch e
                 if isa(e, SolverException)
-                    showerror(stdout, e, catch_backtrace())
+                    # if debug(solver)
+                    #     debug(solver) ? showerror(stdout, e, catch_backtrace()) :
+                    # else
+                    #     printstyled(e;color=:red)
+                    # end
+                    handle_solver_exception(solver,e)
                     valid_flag = false
                     return valid_flag
                 else
@@ -399,7 +406,7 @@ function CRCBS.low_level_search!(solver::ISPS, pc_mapf::AbstractPC_MAPF,
             pc_mapf.env.route_plan)
         valid_flag = compute_route_plan!(solver, pc_mapf, node)
         if valid_flag == false
-            log_info(0,solver,"ISPS: failed on ",i,"th repair iteration.")
+            @log_info(0,solver,"ISPS: failed on ",i,"th repair iteration.")
             break
         end
     end
@@ -546,15 +553,13 @@ function CRCBS.solve!(solver::NBSSolver, prob::E;kwargs...) where {E<:AbstractPC
             increment_iteration_count!(solver)
             enforce_time_limit(solver)
             if check_iterations(solver)
-                log_info(1,solver,
+                @log_info(1,solver,
                     "NBS: Reached $(iteration_limit(solver))-iteration limit.")
                 break
             end
         catch e
             if isa(e, SolverException)
-                bt = catch_backtrace()
-                showerror(stdout, e, bt)
-                # log_info(-1, solver, sprint(showerror, e, bt))
+                handle_solver_exception(solver,e)
                 break
             else
                 rethrow(e)

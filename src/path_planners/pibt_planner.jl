@@ -95,6 +95,6 @@ function CRCBS.pibt_update_envs!(solver,pc_mapf::PC_MAPF,cache)
         str = "\t$i : $(get_vtx(cache.solution.schedule,env.node_id)) $(string(env.schedule_node)), $(string(s)) -> $(string(env.goal))\n"
         push!(info_strings,str)
     end
-    log_info(0,solver,"PIBT iteration $(iterations(solver)) update_cache!\n",info_strings...)
+    @log_info(0,solver,"PIBT iteration $(iterations(solver)) update_cache!\n",info_strings...)
     cache
 end

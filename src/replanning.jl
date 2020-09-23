@@ -295,10 +295,17 @@ end
 
 Merge next_schedule into project_schedule
 """
-function splice_schedules!(project_schedule::P,next_schedule::P) where {P<:OperatingSchedule}
+function splice_schedules!(project_schedule::P,next_schedule::P,enforce_unique=true) where {P<:OperatingSchedule}
     for v in vertices(get_graph(next_schedule))
         node_id = get_vtx_id(next_schedule, v)
-        add_to_schedule!(project_schedule, get_path_spec(next_schedule,v), get_node_from_id(next_schedule, node_id), node_id)
+        if !has_vertex(project_schedule,get_vtx(project_schedule,node_id))
+            add_to_schedule!(project_schedule, get_path_spec(next_schedule,v), get_node_from_id(next_schedule, node_id), node_id)
+        elseif enforce_unique
+            throw(ErrorException(string("Vertex ",v," = ",
+                string(get_node_from_id(next_schedule,node_id)),
+                " already in project_schedule."
+                )))
+        end
     end
     for e in edges(get_graph(next_schedule))
         node_id1 = get_vtx_id(next_schedule, e.src)
@@ -339,17 +346,48 @@ Abstract type. Concrete subtypes currently include `DeferUntilCompletion`,
 `NullReplanner`
 """
 abstract type ReplannerModel end
-@with_kw struct ReplannerConfig
+
+"""
+    ReplannerConfig
+
+Stores parameters for configuring an instance of `ReplannerModel`.
+Fields:
+* real_time::Bool - if `true`, adjust solver runtime limits to meet real time
+    operation constraints.
+* timeout_buffer::Float64 - defines the minimum amount of time that must be for
+    replanning the route
+* route_planning_buffer::Float64 - defines the minimum amount of time that must
+    be allocated for replanning the route
+* commit_threshold::Float64 - defines where the ``freeze time'', or the time
+    step from which the solver may change the existing plan.
+"""
+@with_kw mutable struct ReplannerConfig
+    real_time::Bool                 = true
     timeout_buffer::Float64         = 1
     route_planning_buffer::Float64  = 2
-    commit_threshold::Int           = 5
+    commit_threshold::Int           = 10
 end
 get_replanner_config(config::ReplannerConfig) = config
 get_replanner_config(model) = model.config
 
-get_timeout_buffer(model) = get_replanner_config(model).timeout_buffer
-get_route_planning_buffer(model) = get_replanner_config(model).route_planning_buffer
-get_commit_threshold(model) = get_replanner_config(model).commit_threshold
+export
+    get_real_time_flag,
+    get_timeout_buffer,
+    get_route_planning_buffer,
+    get_commit_threshold,
+    set_real_time_flag!,
+    set_timeout_buffer!,
+    set_route_planning_buffer!,
+    set_commit_threshold!
+
+get_real_time_flag(model)           = get_replanner_config(model).real_time
+get_timeout_buffer(model)           = get_replanner_config(model).timeout_buffer
+get_route_planning_buffer(model)    = get_replanner_config(model).route_planning_buffer
+get_commit_threshold(model)         = get_replanner_config(model).commit_threshold
+function set_real_time_flag!(model,val) get_replanner_config(model).real_time = val end
+function set_timeout_buffer!(model,val) get_replanner_config(model).timeout_buffer = val end
+function set_route_planning_buffer!(model,val) get_replanner_config(model).route_planning_buffer = val end
+function set_commit_threshold!(model,val) get_replanner_config(model).commit_threshold = val end
 
 """
     DeferUntilCompletion <: ReplannerModel
@@ -400,14 +438,19 @@ export
     ReplanningProfilerCache
 
 Stores information during replanning
-* `schedule` - maintains a (non-pruned) version of the overall project schedule
-* `stage_ids` - maps the id of each node in the schedule to the stage index
-* `stage_results` - a vector of result dicts
+* `schedule` - maintains (non-pruned) overall project schedule
+* `stage_ids` - maps id of each node in schedule to stage index
+* `stage_results` - vector of result dicts
+* `features` - vector of `::FeatureExtractors` to extract after each stage
+* `final_features` - vector of `::FeatureExtractors` to extract after final stage
 """
 @with_kw struct ReplanningProfilerCache
     schedule::OperatingSchedule             = OperatingSchedule()
     project_ids::Dict{AbstractID,Int}       = Dict{AbstractID,Int}()
     stage_results::Vector{Dict{String,Any}} = Vector{Dict{String,Any}}()
+    final_results::Dict{String,Any}         = Dict{String,Any}()
+    features::Vector{FeatureExtractor}      = Vector{FeatureExtractor}()
+    final_features::Vector{FeatureExtractor}= Vector{FeatureExtractor}()
 end
 
 @with_kw struct FullReplanner{R,S}
@@ -415,16 +458,13 @@ end
     replanner::R                    = MergeAndBalance()
     cache::ReplanningProfilerCache  = ReplanningProfilerCache()
 end
-for op in [:get_timeout_buffer,:get_route_planning_buffer,:get_commit_time,
+for op in [:replan!,:get_timeout_buffer,:get_route_planning_buffer,:get_commit_time,
         :break_assignments!,:set_time_limits!,:split_active_vtxs!,
         :fix_precutoff_nodes!]
     @eval $op(planner::FullReplanner,args...) = $op(planner.replanner,args...)
 end
 for op in []
     @eval $op(planner::FullReplanner,args...) = $op(planner.solver,args...)
-end
-for op in [:replan!,:set_time_limits!]
-    @eval $op(planner::FullReplanner,args...) = $op(planner.replanner,args...)
 end
 
 function get_commit_time(replan_model, search_env, t_request, commit_threshold=get_commit_threshold(replan_model))
@@ -437,14 +477,21 @@ break_assignments!(replan_model::ReplannerModel,args...) = break_assignments!(ar
 break_assignments!(replan_model::ReassignFreeRobots,args...) = nothing
 break_assignments!(replan_model::DeferUntilCompletion,args...) = nothing
 
-function set_time_limits!(solver,replan_model,t_request,t_commit)
+function set_time_limits!(replan_model,solver,t_request,t_commit)
+    real_time = get_real_time_flag(replan_model)
+    if real_time
+        set_time_limits!(real_time,replan_model,solver,t_request,t_commit)
+    end
+end
+
+function set_time_limits!(flag::Bool,replan_model,solver,t_request,t_commit)
     set_runtime_limit!(solver, (t_commit - t_request) - get_timeout_buffer(replan_model))
     # set_runtime_limit!(assignment_solver(solver), solver.time_limit - get_route_planning_buffer(replan_model))
     set_runtime_limit!(solver.assignment_model, runtime_limit(solver) - get_route_planning_buffer(replan_model))
     @assert runtime_limit(solver) > 0.0
     solver
 end
-function set_time_limits!(solver,replan_model::DeferUntilCompletion,t_request,t_commit)
+function set_time_limits!(flag::Bool,replan_model::DeferUntilCompletion,solver,t_request,t_commit)
     set_runtime_limit!(solver, (t_commit - t_request) - get_timeout_buffer(replan_model))
     set_runtime_limit!(solver, min(runtime_limit(solver),replan_model.max_time_limit))
     set_runtime_limit!(assignment_solver(solver), runtime_limit(solver) - get_route_planning_buffer(replan_model))
@@ -502,7 +549,7 @@ function replan!(solver, replan_model, search_env, request;
     # Freeze route_plan and schedule at t_commit
     t_commit = get_commit_time(replan_model, search_env, t_request, commit_threshold)
     reset_solver!(solver)
-    set_time_limits!(solver,replan_model,t_request,t_commit)
+    set_time_limits!(replan_model,solver,t_request,t_commit)
     # Update operating schedule
     new_schedule, new_cache = prune_schedule(search_env,t_commit)
     @assert sanity_check(new_schedule," after prune_schedule()")
@@ -538,38 +585,51 @@ replan!(solver, replan_model::NullReplanner, search_env, args...;kwargs...) = se
 export
     RepeatedPC_TAPF,
     compile_replanning_results!,
-    profile_replanner
+    profile_replanner!
 
 struct RepeatedPC_TAPF{S<:SearchEnv}
     env::S
     requests::Vector{ProjectRequest}
 end
 
-function compile_replanning_results!()
+function compile_replanning_results!(
+        cache::ReplanningProfilerCache,solver,env,
+        timer_results,prob,stage,request)
+    # merge schedule
+    splice_schedules!(cache.schedule,request.schedule,false)
+    # TODO update a planning cache to store the start/end times of all nodes
+    # store project ids
+    for v in vertices(request.schedule)
+        id = get_vtx_id(request.schedule,v)
+        cache.project_ids[id] = stage
+    end
+    # store results
+    push!(cache.stage_results, compile_results(solver,cache.features,prob,env,timer_results))
+    # store final results
+    if stage == length(prob.requests)
+        merge!(cache.final_results, compile_results(solver,cache.final_features,prob,env,timer_results))
+    end
+    return cache
 end
 
-function profile_replanner(solver,prob::RepeatedPC_TAPF,optimizer=Gurobi.Optimizer)
-    # base_env = prob.env
+function profile_replanner!(solver,replan_model,prob::RepeatedPC_TAPF,
+        cache = ReplanningProfilerCache()
+    )
     env = prob.env
-    project_requests = prob.requests
-    # env = nothing
-    for (stage,request) in enumerate(project_requests)
-        # if stage == 1
-        #     base_env = construct_search_env(solver,request.schedule,problem_spec,env_graph)
-        # else
-            remap_object_ids!(request.schedule,env.schedule)
-            base_env = replan!(solver,replan_model,env,request;commit_threshold=commit_threshold)
-        # end
+    for (stage,request) in enumerate(prob.requests)
+        remap_object_ids!(request.schedule,env.schedule)
+        base_env = replan!(solver,replan_model,env,request)
         reset_solver!(solver)
-        env, cost = solve!(solver,base_env;optimizer=optimizer)
-        compile_replanning_results!(solver,env,cost,prob,stage)
-        # log_info(-1,solver,
-        #     "Problem: ",f,"\n",
-        #     "Solver: ",typeof(solver),"\n",
-        #     "Stage: ",stage,"\n",
-        #     "route planner iterations: ", iterations(route_planner(solver)),
-        # )
+        # env, cost = solve!(solver,base_env)
+        env, timer_results = profile_solver!(solver,base_env)
+        compile_replanning_results!(cache,solver,env,timer_results,prob,stage,request)
+        @log_info(2,solver,
+            # "Solver: ",typeof(solver),"\n",
+            "Stage: ",stage,"\n",
+            "route planner iterations: ", iterations(route_planner(solver)),
+        )
     end
+    return cache
 end
 
 

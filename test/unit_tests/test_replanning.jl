@@ -1,69 +1,66 @@
+# Replanner Interface
 let
-    ReplannerConfig()
-    DeferUntilCompletion()
-    ReassignFreeRobots()
-    MergeAndBalance()
-    Oracle()
-    NullReplanner()
-    ReplanningProfilerCache()
+    for model in [
+            ReplannerConfig(),
+            DeferUntilCompletion(),
+            ReassignFreeRobots(),
+            MergeAndBalance(),
+            Oracle(),
+            NullReplanner(),
+        ]
+        set_commit_threshold!(model,10)
+        @test get_commit_threshold(model) == 10
+        set_timeout_buffer!(model,10)
+        @test get_timeout_buffer(model) == 10
+        set_route_planning_buffer!(model,10)
+        @test get_route_planning_buffer(model) == 10
+    end
     FullReplanner()
-
     ProjectRequest(OperatingSchedule(),10,10)
-
-    # solver = NBSSolver()
-    solver = NBSSolver(path_planner = PIBTPlanner{NTuple{3,Float64}}())
-    set_verbosity!(solver,0)
+end
+let
+    cache = features=[
+        RunTime(),SolutionCost(),OptimalFlag(),FeasibleFlag(),OptimalityGap(),
+        IterationCount(),TimeOutStatus(),IterationMaxOutStatus(),
+        RobotPaths()
+        ]
+    cache = ReplanningProfilerCache(features=features)
+    # solver = NBSSolver(path_planner = PIBTPlanner{NTuple{3,Float64}}())
+    solver = NBSSolver()
+    set_verbosity!(solver,5)
+    set_verbosity!(low_level(route_planner(solver)),0)
+    set_verbosity!(low_level(low_level(route_planner(solver))),2)
     set_iteration_limit!(solver,1)
-    set_iteration_limit!(route_planner(solver),50)
+    set_iteration_limit!(route_planner(solver),10)
 
     replan_model = MergeAndBalance()
-    commit_threshold = 5
+    set_real_time_flag!(replan_model,false) # turn off real-time op constraints
+    # set_commit_threshold!(replan_model,40) # setting high commit threshold to allow for warmup
     prob = replanning_problem_1(solver)
-    # env, cost = solve!(solver,PC_TAPF(prob.env);optimizer=Gurobi.Optimizer)
-    # base_env = replan!(solver,MergeAndBalance(),env,prob.requests[1])
-    base_env = prob.env
-    env = prob.env
-
-    request = prob.requests[1]
-    remap_object_ids!(request.schedule,env.schedule)
-    base_env = replan!(solver,replan_model,env,request)
-    reset_solver!(solver)
-    env, cost = solve!(solver,base_env;optimizer=Gurobi.Optimizer)
-
-    request = prob.requests[2]
-    remap_object_ids!(request.schedule,env.schedule)
-    base_env = replan!(solver,replan_model,env,request)
-    reset_solver!(solver)
-    env, cost = solve!(solver,base_env;optimizer=Gurobi.Optimizer)
-
-    request = prob.requests[3]
-    remap_object_ids!(request.schedule,env.schedule) # NOTE Why is this causing a "key ObjectID(3) not found error?"
-    base_env = replan!(solver,replan_model,env,request)
-    reset_solver!(solver)
-    env, cost = solve!(solver,base_env;optimizer=Gurobi.Optimizer)
-
-    request = prob.requests[4]
-    remap_object_ids!(request.schedule,env.schedule) # NOTE Why is this causing a "key ObjectID(3) not found error?"
-    base_env = replan!(solver,replan_model,env,request)
-    reset_solver!(solver)
-    env, cost = solve!(solver,base_env;optimizer=Gurobi.Optimizer)
-
-
-    # base_env = replan!(solver,replan_model,env,request)
-    # reset_solver!(solver)
-    # set_iteration_limit!(route_planner(solver),10)
-    # env, cost = solve!(solver,PC_TAPF(base_env);optimizer=Gurobi.Optimizer)
+    cache = profile_replanner!(solver,replan_model,prob,cache)
+    # env = prob.env
+    # stage = 0
     #
-    # prob.env.schedule
-    # convert_to_vertex_lists(prob.env.route_plan)
-    # solver = PIBTPlanner{NTuple{3,Float64}}()
-    # prob = replanning_problem_1(solver)
-    # env, cost = solve!(solver,PC_MAPF(prob.env))
-    # convert_to_vertex_lists(env.route_plan)
+    # @show stage += 1
+    # if stage <= length(prob.requests)
+    #     request = prob.requests[stage]
+    #     remap_object_ids!(request.schedule,env.schedule)
+    #     base_env = replan!(solver,replan_model,env,request)
+    #     reset_solver!(solver)
+    #     env, timer_results = profile_solver!(solver,base_env)
+    # else
+    #     println("DONE")
+    # end
 
 end
 let
+    cache = features=[
+        RunTime(),SolutionCost(),OptimalFlag(),FeasibleFlag(),OptimalityGap(),
+        IterationCount(),TimeOutStatus(),IterationMaxOutStatus(),
+        RobotPaths()
+        ]
     replan_model = MergeAndBalance()
+    set_real_time_flag!(replan_model,false) # turn off real time constraints
     cost_model = SumOfMakeSpans()
     solvers = [
         NBSSolver(),
@@ -72,33 +69,17 @@ let
     for solver in solvers
         set_verbosity!(solver,0)
         set_iteration_limit!(solver,1)
-        set_iteration_limit!(route_planner(solver),50)
+        set_iteration_limit!(route_planner(solver),500)
     end
-    commit_threshold = 5
     problem_generators = replanning_test_problems()
 
     for f in problem_generators
         for solver in solvers
+            @show f
+            cache = ReplanningProfilerCache(features=features)
             prob = f(solver;cost_function=cost_model)
-            base_env = prob.env
-            env = nothing # prob.env
-            for (stage,request) in enumerate(prob.requests)
-                if stage == 1
-                #     base_env = construct_search_env(solver,request.schedule,env.problem_spec,get_graph(env))
-                    # base_env = deepcopy(env)
-                else
-                    remap_object_ids!(request.schedule,env.schedule)
-                    base_env = replan!(solver,replan_model,env,request;commit_threshold=commit_threshold)
-                end
-                reset_solver!(solver)
-                env, cost = solve!(solver,base_env;optimizer=Gurobi.Optimizer)
-                log_info(-1,solver,
-                    "Problem: ",f,"\n",
-                    "Solver: ",typeof(solver),"\n",
-                    "Stage: ",stage,"\n",
-                    "route planner iterations: ", iterations(route_planner(solver)),
-                )
-            end
+            cache = profile_replanner!(solver,replan_model,prob)
+            reset_solver!(solver)
         end
     end
 end

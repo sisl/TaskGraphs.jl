@@ -262,7 +262,7 @@ export
 #             push!(delay_cut,v)
 #         elseif indegree(schedule,v) == 0
 #             # if v is a root_node, the deadlines cannot be tightened anymore
-#             log_info(-1,solver.l3_verbosity,"ISPS: deadlines cannot be tightened any more.")
+#             @log_info(-1,solver.l3_verbosity,"ISPS: deadlines cannot be tightened any more.")
 #             return Set{Int}()
 #         else
 #             for v2 in inneighbors(schedule,v)
@@ -323,7 +323,7 @@ function update_planning_cache!(solver,env::E,v::Int,path::P,t=get_t(get_final_s
     if Δt > 0
         # delay = Δt - minimum(cache.slack[v])
         # if delay > 0
-        #     log_info(-1,solver.l3_verbosity,"LOW LEVEL SEARCH: schedule delay of ",delay," time steps incurred by path for vertex v = ",v," - ",string(get_node_from_vtx(schedule,v)), " - tF = ",get_final_state(path).t)
+        #     @log_info(-1,solver.l3_verbosity,"LOW LEVEL SEARCH: schedule delay of ",delay," time steps incurred by path for vertex v = ",v," - ",string(get_node_from_vtx(schedule,v)), " - tF = ",get_final_state(path).t)
         #     # Backtracking
         #     tightenable_set = backtrack_deadlines(solver,cache,schedule,v)
         #     delay_vec = get_delay_vec(solver,cache,schedule,v)
@@ -331,14 +331,14 @@ function update_planning_cache!(solver,env::E,v::Int,path::P,t=get_t(get_final_s
         #     if any(delay_vec .> 0)
         #         for v_ in topological_sort(graph)
         #             if delay_vec[v_] > 0
-        #                 log_info(-1,solver,"ISPS: tightening at v = ",v_," - ",string(get_node_from_vtx(schedule,v_)))
+        #                 @log_info(-1,solver,"ISPS: tightening at v = ",v_," - ",string(get_node_from_vtx(schedule,v_)))
         #                 tighten_deadline!(solver,env,solution,v_)
         #                 break
         #             end
         #         end
         #     # if length(tightenable_set) > 0
         #     #     for v_ in tightenable_set
-        #     #         log_info(-1,solver,"ISPS: backtracking at v = ",v_," - ",string(get_node_from_vtx(schedule,v_)))
+        #     #         @log_info(-1,solver,"ISPS: backtracking at v = ",v_," - ",string(get_node_from_vtx(schedule,v_)))
         #     #         # tighten_deadline!(solver,env,solution,v_)
         #     #     end
         #         t0,tF,slack,local_slack = process_schedule(schedule;
@@ -383,8 +383,8 @@ function update_planning_cache!(solver,env::E,v::Int,path::P,t=get_t(get_final_s
     for v2 in active_set
         node_queue[v2] = isps_queue_cost(schedule,cache,v2)
     end
-    log_info(2,solver,"moved ",v," to closed set, moved ",activated_vtxs," to active set")
-    log_info(3,solver,string("cache.tF[v] = ",cache.tF))
+    @log_info(2,solver,"moved ",v," to closed set, moved ",activated_vtxs," to active set")
+    @log_info(3,solver,string("cache.tF[v] = ",cache.tF))
     return cache
 end
 """
@@ -602,7 +602,7 @@ function update_env!(solver,env::SearchEnv,v::Int,path::P,
     # ADD UPDATED PATH TO HEURISTIC MODELS
     if agent_id != -1
         partially_set_path!(get_heuristic_model(env),agent_id,convert_to_vertex_lists(get_paths(route_plan)[agent_id]))
-        # log_info(3,solver,
+        # @log_info(3,solver,
         #     "Adding vertex list path to conflict cost model for agent ",
         #     agent_id,": ",
         #     convert_to_vertex_lists(get_paths(route_plan)[agent_id]))
@@ -624,7 +624,7 @@ function get_base_path(solver,search_env::SearchEnv,env::PCCBSEnv)
     t0 = search_env.cache.t0[v]
     gap = t0 - get_end_index(base_path)
     if gap > 0
-        log_info(1, solver, string("LOW LEVEL SEARCH: in node ",v," -- ",
+        @log_info(1, solver, string("LOW LEVEL SEARCH: in node ",v," -- ",
             string(env.schedule_node),
             ": cache.t0[v] - get_end_index(base_path) = ", gap,
             ". Extending path to ",t0," ..."))
@@ -660,7 +660,7 @@ function CRCBS.build_env(
             for c in sorted_state_constraints(env,get_constraints(node, agent_id)) #.sorted_state_constraints
                 if get_sp(get_path_node(c)).vtx == goal_vtx
                     if 0 < get_time_of(c) - goal_time < duration_next
-                        log_info(1,solver,string("extending goal_time for node ",v," from ",goal_time," to ",get_time_of(c)," to avoid constraints"))
+                        @log_info(1,solver,string("extending goal_time for node ",v," from ",goal_time," to ",get_time_of(c)," to avoid constraints"))
                         goal_time = max(goal_time, get_time_of(c))
                     end
                 end
@@ -671,7 +671,7 @@ function CRCBS.build_env(
         goal_time = maximum(env.cache.tF)
         goal_vtx = -1
         # deadline = Inf # already taken care of, perhaps?
-        log_info(3,solver,string("BUILD ENV: setting goal_vtx = ",goal_vtx,", t = maximum(cache.tF) = ",goal_time))
+        @log_info(3,solver,string("BUILD ENV: setting goal_vtx = ",goal_vtx,", t = maximum(cache.tF) = ",goal_time))
     end
     @assert goal_time != Inf "goal time set to $goal_time for node $(string(schedule_node))"
     cbs_env = PCCBSEnv(
