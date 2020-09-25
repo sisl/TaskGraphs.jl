@@ -155,14 +155,15 @@ let
 end
 # Test process_schedule
 let
+    solver = TaskGraphsMILPSolver(AssignmentMILP())
     project_spec, problem_spec, robot_ICs, env_graph, _ = pctapf_problem_1()
 
     project_schedule = construct_partial_project_schedule(project_spec,problem_spec,robot_ICs)
-    model = formulate_milp(AssignmentMILP(),project_schedule,problem_spec;cost_model=MakeSpan())
+    model = formulate_milp(solver,project_schedule,problem_spec;cost_model=MakeSpan())
     optimize!(model)
     @test termination_status(model) == MOI.OPTIMAL
     cost = Int(round(value(objective_function(model))))
-    update_project_schedule!(model,project_schedule,problem_spec,get_assignment_matrix(model))
+    update_project_schedule!(solver,model,project_schedule,problem_spec,get_assignment_matrix(model))
 
     t0,tF,slack,local_slack = process_schedule(project_schedule)
     @test t0[get_vtx(project_schedule,RobotID(1))] == 0
@@ -211,12 +212,13 @@ let
     project_spec, problem_spec, object_ICs, object_FCs, robot_ICs = construct_random_task_graphs_problem(
         N,M,pickup_zones,dropoff_zones,free_zones,dist_matrix)
 
+    solver = TaskGraphsMILPSolver(AssignmentMILP())
     project_schedule = construct_partial_project_schedule(project_spec,problem_spec,robot_ICs)
-    model = formulate_milp(AssignmentMILP(),project_schedule,problem_spec;cost_model=MakeSpan())
+    model = formulate_milp(solver,project_schedule,problem_spec;cost_model=MakeSpan())
     optimize!(model)
     @test termination_status(model) == MOI.OPTIMAL
     cost = Int(round(value(objective_function(model))))
-    update_project_schedule!(model,project_schedule,problem_spec,get_assignment_matrix(model))
+    update_project_schedule!(solver,model,project_schedule,problem_spec,get_assignment_matrix(model))
 
     o_keys = Set(collect(keys(get_object_ICs(project_schedule))))
     input_ids = union([get_input_ids(op) for (k,op) in get_operations(project_schedule)]...)

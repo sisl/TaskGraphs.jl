@@ -25,6 +25,37 @@ be posed as a one-off assignment problem with inter-task constraints.
 @with_kw struct AssignmentMILP <: TaskGraphsMILP
     model::JuMP.Model = Model()
 end
+
+"""
+    adj_mat_from_assignment_mat(sched,assignment_matrix)
+
+Compute an adjacency matrix from an assignment matrix
+"""
+function adj_mat_from_assignment_mat(sched::OperatingSchedule,assignment_matrix)
+    N = length(get_robot_ICs(sched))
+    M = length(get_object_ICs(sched))
+    assignment_dict = get_assignment_dict(assignment_matrix,N,M)
+    G = get_graph(sched)
+    adj_matrix = adjacency_matrix(G)
+    for (robot_id, task_list) in assignment_dict
+        robot_node = get_node_from_id(sched, RobotID(robot_id))
+        v_go = outneighbors(G, get_vtx(sched, RobotID(robot_id)))[1] # GO_NODE
+        for object_id in task_list
+            v_collect = outneighbors(G,get_vtx(sched, ObjectID(object_id)))[1]
+            adj_matrix[v_go,v_collect] = 1
+            v_carry = outneighbors(G,v_collect)[1]
+            v_deposit = outneighbors(G,v_carry)[1]
+            for v in outneighbors(G,v_deposit)
+                if isa(get_vtx_id(sched, v), ActionID)
+                    v_go = v
+                    break
+                end
+            end
+        end
+    end
+    adj_matrix
+end
+
 """
     TeamAssignmentMILP
 
@@ -997,7 +1028,7 @@ function select_next_edge(model,D,Ao,Ai)
     end
     a,b
     if a < 0 || b < 0
-        println("DEBUGGING edge selection for model ",typeof(model))
+        println("debugging edge selection for model ",typeof(model))
         for v in Ai
             node = get_node_from_vtx(model.schedule,v)
             println(string("node ",string(node), " needs assignment"))
@@ -1033,7 +1064,7 @@ function JuMP.optimize!(model::GreedyAssignment)
         end
     end
     set_leaf_operation_vtxs!(project_schedule)
-    update_project_schedule!(project_schedule,problem_spec,adjacency_matrix(G))
+    propagate_valid_ids!(project_schedule,problem_spec)
     model
 end
 
@@ -1070,6 +1101,7 @@ end
     update_project_schedule!
 
 Args:
+- solver
 - project_schedule
 - adj_matrix - adjacency_matrix encoding the edges that need to be added to
     the project schedule
@@ -1079,9 +1111,19 @@ reflect the appropriate valid IDs (e.g., `Action` nodes are populated with
 the correct `RobotID`s)
 Returns `false` if the new edges cause cycles in the project graph.
 """
-function update_project_schedule!(schedule::P,problem_spec::T,adj_matrix,DEBUG::Bool=false) where {P<:OperatingSchedule,T<:ProblemSpec}
-    # Add all new edges to project schedule
-    G = get_graph(schedule)
+function update_project_schedule!(solver,sched::OperatingSchedule,problem_spec,adj_matrix)
+    @log_info(1,solver,"Assignment: Adding edges ",
+        map(idx->string("\t",
+                string(get_node_from_vtx(sched,idx.I[1]))," → ",
+                string(get_node_from_vtx(sched,idx.I[2])),"\n"
+                ),
+            findall(adj_matrix .- adjacency_matrix(sched) .!= 0))...
+    )
+    update_project_schedule!(sched,problem_spec,adj_matrix)
+end
+function update_project_schedule!(sched::OperatingSchedule,problem_spec,adj_matrix)
+    # Add all new edges to project sched
+    G = get_graph(sched)
     # remove existing edges first, so that there is no carryover between consecutive MILP iterations
     for e in collect(edges(G))
         rem_edge!(G, e)
@@ -1094,16 +1136,14 @@ function update_project_schedule!(schedule::P,problem_spec::T,adj_matrix,DEBUG::
             end
         end
     end
-    # DEBUG ? @assert(is_cyclic(G) == false) : nothing
-    # @assert !is_cyclic(G) "update_schedule!() -------> is_cyclic(G)"
     try
-        propagate_valid_ids!(schedule,problem_spec)
-        @assert validate(schedule)
+        propagate_valid_ids!(sched,problem_spec)
+        @assert validate(sched)
     catch e
         if isa(e, AssertionError)
-            println(e.msg)
+            showerror(stdout,e,catch_backtrace())
         else
-            throw(e)
+            rethrow(e)
         end
         return false
     end
@@ -1111,8 +1151,8 @@ function update_project_schedule!(schedule::P,problem_spec::T,adj_matrix,DEBUG::
 end
 
 """
-    update_project_schedule!(milp_model::M,project_schedule,problem_spec,
-        adj_matrix,DEBUG=false) where {M<:TaskGraphsMILP}
+    update_project_schedule!(solver,milp_model::M,project_schedule,problem_spec,
+        adj_matrix) where {M<:TaskGraphsMILP}
 
 Args:
 - milp_model <: TaskGraphsMILP
@@ -1126,48 +1166,14 @@ reflect the appropriate valid IDs (e.g., `Action` nodes are populated with
 the correct `RobotID`s)
 Returns `false` if the new edges cause cycles in the project graph.
 """
-function update_project_schedule!(model::TaskGraphsMILP,
-        project_schedule::OperatingSchedule,
-        problem_spec::ProblemSpec,
-        adj_matrix::A,
-        DEBUG::Bool=false
-    ) where {A<:AbstractMatrix}
-    update_project_schedule!(project_schedule,problem_spec,adj_matrix,DEBUG)
-end
-function update_project_schedule!(model::TaskGraphsMILP,
-        project_schedule::OperatingSchedule,
-        problem_spec::ProblemSpec,
-        DEBUG::Bool=false
+function update_project_schedule!(solver,model::TaskGraphsMILP,sched,prob_spec,
+        adj_matrix=get_assignment_matrix(model),
     )
-    update_project_schedule!(model,project_schedule,problem_spec,
-        get_assignment_matrix(model),DEBUG)
+    update_project_schedule!(solver,sched,prob_spec,adj_matrix)
 end
-function update_project_schedule!(model::AssignmentMILP,
-        project_schedule::OperatingSchedule,
-        problem_spec::ProblemSpec,
-        assignment_matrix::A,
-        DEBUG::Bool=false
-    ) where {A<:AbstractMatrix}
-    N = length(get_robot_ICs(project_schedule))
-    M = length(get_object_ICs(project_schedule))
-    assignment_dict = get_assignment_dict(assignment_matrix,N,M)
-    G = get_graph(project_schedule)
-    adj_matrix = adjacency_matrix(G)
-    for (robot_id, task_list) in assignment_dict
-        robot_node = get_node_from_id(project_schedule, RobotID(robot_id))
-        v_go = outneighbors(G, get_vtx(project_schedule, RobotID(robot_id)))[1] # GO_NODE
-        for object_id in task_list
-            v_collect = outneighbors(G,get_vtx(project_schedule, ObjectID(object_id)))[1]
-            adj_matrix[v_go,v_collect] = 1
-            v_carry = outneighbors(G,v_collect)[1]
-            v_deposit = outneighbors(G,v_carry)[1]
-            for v in outneighbors(G,v_deposit)
-                if isa(get_vtx_id(project_schedule, v), ActionID)
-                    v_go = v
-                    break
-                end
-            end
-        end
-    end
-    update_project_schedule!(project_schedule,problem_spec,adj_matrix,DEBUG)
+function update_project_schedule!(solver,model::AssignmentMILP,sched,prob_spec,
+        assignment_matrix=get_assignment_matrix(model),
+    )
+    adj_matrix = adj_mat_from_assignment_mat(sched,assignment_matrix)
+    update_project_schedule!(solver,sched,prob_spec,adj_matrix)
 end

@@ -453,6 +453,7 @@ function formulate_milp(solver::TaskGraphsMILPSolver,args...;kwargs...)
     formulate_milp(solver.milp,args...;kwargs...)
 end
 
+
 export
     NBSSolver,
     assignment_solver,
@@ -642,9 +643,9 @@ function solve_assignment_problem!(solver::S, model, prob;
     if termination_status(model) == MOI.OPTIMAL
         @assert lower_bound(solver) == best_cost(solver)
     end
-    schedule = deepcopy(prob.env.schedule)
-    update_project_schedule!(model, schedule, prob.env.problem_spec)
-    schedule, lower_bound(solver)
+    sched = deepcopy(prob.env.schedule)
+    update_project_schedule!(solver, model, sched, prob.env.problem_spec)
+    sched, lower_bound(solver)
 end
 
 
