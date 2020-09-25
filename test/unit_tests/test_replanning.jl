@@ -38,6 +38,7 @@ let
     # set_commit_threshold!(replan_model,40) # setting high commit threshold to allow for warmup
     prob = replanning_problem_1(solver)
     cache = profile_replanner!(solver,replan_model,prob,cache)
+    
     # env = prob.env
     # stage = 0
     #
