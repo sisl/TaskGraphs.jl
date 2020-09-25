@@ -19,39 +19,28 @@ let
     ProjectRequest(OperatingSchedule(),10,10)
 end
 let
-    cache = features=[
-        RunTime(),SolutionCost(),OptimalFlag(),FeasibleFlag(),OptimalityGap(),
-        IterationCount(),TimeOutStatus(),IterationMaxOutStatus(),
-        RobotPaths()
-        ]
-    cache = ReplanningProfilerCache(features=features)
-    # solver = NBSSolver(path_planner = PIBTPlanner{NTuple{3,Float64}}())
-    solver = NBSSolver()
-    set_verbosity!(solver,5)
-    set_verbosity!(low_level(route_planner(solver)),0)
-    set_verbosity!(low_level(low_level(route_planner(solver))),2)
-    set_iteration_limit!(solver,1)
-    set_iteration_limit!(route_planner(solver),10)
+    redirect_to_files("out.log","err.log") do
+        features=[
+            RunTime(),SolutionCost(),OptimalFlag(),FeasibleFlag(),OptimalityGap(),
+            IterationCount(),TimeOutStatus(),IterationMaxOutStatus(),
+            RobotPaths()
+            ]
+        cache = ReplanningProfilerCache(features=features)
+        # solver = NBSSolver(path_planner = PIBTPlanner{NTuple{3,Float64}}())
+        solver = NBSSolver()
+        set_verbosity!(solver,5)
+        set_verbosity!(low_level(route_planner(solver)),3)
+        set_verbosity!(low_level(low_level(route_planner(solver))),3)
+        set_iteration_limit!(solver,1)
+        set_iteration_limit!(route_planner(solver),10)
 
-    replan_model = MergeAndBalance()
-    set_real_time_flag!(replan_model,false) # turn off real-time op constraints
-    # set_commit_threshold!(replan_model,40) # setting high commit threshold to allow for warmup
-    prob = replanning_problem_1(solver)
-    cache = profile_replanner!(solver,replan_model,prob,cache)
-    
-    # env = prob.env
-    # stage = 0
-    #
-    # @show stage += 1
-    # if stage <= length(prob.requests)
-    #     request = prob.requests[stage]
-    #     remap_object_ids!(request.schedule,env.schedule)
-    #     base_env = replan!(solver,replan_model,env,request)
-    #     reset_solver!(solver)
-    #     env, timer_results = profile_solver!(solver,base_env)
-    # else
-    #     println("DONE")
-    # end
+        replan_model = MergeAndBalance()
+        set_real_time_flag!(replan_model,false) # turn off real-time op constraints
+        # set_commit_threshold!(replan_model,40) # setting high commit threshold to allow for warmup
+        prob = replanning_problem_1(solver)
+
+        cache = profile_replanner!(solver,replan_model,prob,cache)
+    end
 
 end
 let

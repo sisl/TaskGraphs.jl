@@ -31,6 +31,33 @@ export
     local_slack::Vector{Vector{Float64}}    = Vector{Vector{Float64}}()
     # max_deadline::Vector{Int}               = Vector{Int}() # Marks the time at which this node will begin accumulating a delay cost
 end
+function sprint_cache(io::IO, cache::PlanningCache;label_pad=14,pad=5)
+    lpad(str) = sprint_padded(str;pad=label_pad,leftaligned=true)
+    rpad(str) = sprint_padded(str;pad=label_pad,leftaligned=false)
+    spad(str;kwargs...) = sprint_padded_list(str;pad=pad,leftaligned=false,kwargs...)
+    print(io,"PlanningCache:","\n")
+    print(io,"\t",lpad("closed_set:  "),cache.closed_set,"\n")
+    print(io,"\t",lpad("active_set:  "),cache.active_set,"\n")
+    print(io,"\t",lpad("node_queue:  "),cache.node_queue,"\n")
+    print(io,"\t",rpad("          v: "),spad(1:length(cache.t0);lchar=" ",rchar=" "),"\n")
+    print(io,"\t",lpad("t0:          "),spad(cache.t0),"\n")
+    print(io,"\t",lpad("tF:          "),spad(cache.tF),"\n")
+    if !isempty(cache.slack)
+        slack_dim = length(cache.slack[1])
+        for i in 1:slack_dim
+            pre = (i == 1) ? "slack:" : ""
+            print(io,"\t",lpad(pre),spad(map(slc->slc[i],cache.slack)),"\n")
+        end
+        for i in 1:slack_dim
+            pre = (i == 1) ? "local_slack:" : ""
+            print(io,"\t",lpad(pre),spad(map(slc->slc[i],cache.local_slack)),"\n")
+        end
+    end
+end
+
+function Base.show(io::IO, cache::PlanningCache)
+    sprint_cache(io, cache)
+end
 
 function isps_queue_cost(schedule::OperatingSchedule,cache::PlanningCache,v::Int)
     path_spec = get_path_spec(schedule,v)
@@ -95,6 +122,25 @@ export
     heuristic_model::H              = H()
     num_agents::Int                 = length(get_robot_ICs(schedule))
     route_plan::S                   = initialize_route_plan(schedule,cost_model)
+end
+function sprint_search_env(io::IO,env::SearchEnv)
+    # print(io,"schedule: ",env.schedule,"\n")
+    print(io,"cache: ",sprint(show,env.cache))
+    print(io,"active task nodes:","\n")
+    for v in env.cache.active_set
+        print(io,"\t","v = ",
+            sprint_padded(v)," => ",
+            string(get_node_from_vtx(env.schedule,v)),"\n")
+    end
+    # print(io,"env_graph: ",env.env_graph,"\n")
+    # print(io,"problem_spec: ",env.problem_spec,"\n")
+    # print(io,"cost_model: ",env.cost_model,"\n")
+    # print(io,"heuristic_model: ",env.heuristic_model,"\n")
+    # print(io,"num_agents: ",env.num_agents,"\n")
+    print(io,"route_plan: ",env.route_plan,"\n")
+end
+function Base.show(io::IO,env::SearchEnv)
+    sprint_search_env(io,env)
 end
 
 export
@@ -671,7 +717,7 @@ function CRCBS.build_env(
         goal_time = maximum(env.cache.tF)
         goal_vtx = -1
         # deadline = Inf # already taken care of, perhaps?
-        @log_info(3,solver,string("BUILD ENV: setting goal_vtx = ",goal_vtx,", t = maximum(cache.tF) = ",goal_time))
+        @log_info(1,solver,string("BUILD ENV: setting goal_vtx = ",goal_vtx,", t = maximum(cache.tF) = ",goal_time))
     end
     @assert goal_time != Inf "goal time set to $goal_time for node $(string(schedule_node))"
     cbs_env = PCCBSEnv(

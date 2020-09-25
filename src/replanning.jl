@@ -617,17 +617,15 @@ function profile_replanner!(solver,replan_model,prob::RepeatedPC_TAPF,
     )
     env = prob.env
     for (stage,request) in enumerate(prob.requests)
+        @log_info(2,solver,"REPLANNING: Stage ",stage)
         remap_object_ids!(request.schedule,env.schedule)
         base_env = replan!(solver,replan_model,env,request)
         reset_solver!(solver)
         # env, cost = solve!(solver,base_env)
         env, timer_results = profile_solver!(solver,base_env)
         compile_replanning_results!(cache,solver,env,timer_results,prob,stage,request)
-        @log_info(2,solver,
-            # "Solver: ",typeof(solver),"\n",
-            "Stage: ",stage,"\n",
-            "route planner iterations: ", iterations(route_planner(solver)),
-        )
+        @log_info(2,solver,"Stage ",stage," - ","route planner iterations: ",
+            iterations(route_planner(solver)))
     end
     return cache
 end

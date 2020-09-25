@@ -329,25 +329,27 @@ function plan_next_path!(solver::ISPS, pc_mapf::AbstractPC_MAPF, env::SearchEnv,
         schedule_node = get_node_from_id(env.schedule,node_id)
         if get_path_spec(env.schedule, v).plan_path == true
             try
-                @log_info(2,solver,"""
-                schedule_node: $(string(schedule_node))
-                cache.tF: $(env.cache.tF)
-                cache.tF[v]: $(env.cache.tF[v])
-                maximum(env.cache.tF): $(maximum(env.cache.tF))
+                @log_info(2,solver,sprint(show,env))
+                @log_info(2,solver,
+                """
+                ISPS:
+                    schedule_node: $(string(schedule_node))
+                    cache.tF[v]: $(env.cache.tF[v])
+                    maximum(env.cache.tF): $(maximum(env.cache.tF))
                 """)
                 valid_flag = plan_path!(low_level(solver),pc_mapf,env,node,schedule_node,v)
                 @log_info(2,solver,"""
-                routes: $(convert_to_vertex_lists(env.route_plan))
-                cache.tF: $(env.cache.tF)
-                cache.tF[v]: $(env.cache.tF[v])
+                ISPS:
+                    routes:
+                """,
+                sprint_padded_list_array(
+                    convert_to_vertex_lists(env.route_plan);leftaligned=true),
+                """
+                    cache.tF: $(env.cache.tF)
+                    cache.tF[v]: $(env.cache.tF[v])
                 """)
             catch e
                 if isa(e, SolverException)
-                    # if debug(solver)
-                    #     debug(solver) ? showerror(stdout, e, catch_backtrace()) :
-                    # else
-                    #     printstyled(e;color=:red)
-                    # end
                     handle_solver_exception(solver,e)
                     valid_flag = false
                     return valid_flag

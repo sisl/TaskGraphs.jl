@@ -1112,14 +1112,16 @@ the correct `RobotID`s)
 Returns `false` if the new edges cause cycles in the project graph.
 """
 function update_project_schedule!(solver,sched::OperatingSchedule,problem_spec,adj_matrix)
-    @log_info(1,solver,"Assignment: Adding edges ",
+    mtx = adjacency_matrix(sched)
+    val = update_project_schedule!(sched,problem_spec,adj_matrix)
+    @log_info(1,solver,"Assignment: Adding edges \n",
         map(idx->string("\t",
                 string(get_node_from_vtx(sched,idx.I[1]))," → ",
                 string(get_node_from_vtx(sched,idx.I[2])),"\n"
                 ),
-            findall(adj_matrix .- adjacency_matrix(sched) .!= 0))...
+            findall(adj_matrix .- mtx .!= 0))...
     )
-    update_project_schedule!(sched,problem_spec,adj_matrix)
+    val
 end
 function update_project_schedule!(sched::OperatingSchedule,problem_spec,adj_matrix)
     # Add all new edges to project sched

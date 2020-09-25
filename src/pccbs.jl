@@ -98,7 +98,9 @@ function CRCBS.is_goal(env::PCCBSEnv,s)
             return true
         end
     elseif !CRCBS.is_valid(get_goal(env))
-        return true
+        @assert get_t(s) >= get_t(get_goal(env))
+        return true # NOTE HERE IS THE PROBLEM! This is why Astar keeps
+        # quitting early.
     end
     return false
 end
