@@ -125,6 +125,7 @@ export
 end
 function sprint_search_env(io::IO,env::SearchEnv)
     # print(io,"schedule: ",env.schedule,"\n")
+    print(io,"SearchEnv: \n")
     print(io,"cache: ",sprint(show,env.cache))
     print(io,"active task nodes:","\n")
     for v in env.cache.active_set
@@ -357,7 +358,8 @@ export
 """
     update_planning_cache!(solver,env,v,path)
 """
-function update_planning_cache!(solver,env::E,v::Int,path::P,t=get_t(get_final_state(path))) where {E<:SearchEnv,P<:Path}
+update_planning_cache!(solver,env::SearchEnv,v::Int,path::Path) = update_planning_cache!(solver,env,v,get_t(get_final_state(path)))
+function update_planning_cache!(solver,env::SearchEnv,v::Int,t::Int=-1)
     cache = env.cache
     schedule = env.schedule
     active_set = cache.active_set
@@ -448,14 +450,14 @@ function update_planning_cache!(solver,env)
     cache = env.cache
     schedule = env.schedule
     node = initialize_root_node(env)
-    dummy_path = path_type(env)()
+    # dummy_path = path_type(env)()
     # Skip over nodes that don't need planning (either they have already been
     # planned, or they don't need planning period.)
     while true
         done = true
         for v in collect(cache.active_set)
             if get_path_spec(schedule,v).plan_path == false
-                update_planning_cache!(solver,env,v,dummy_path) # NOTE I think this is all we need, since there is no actual path to update
+                update_planning_cache!(solver,env,v) # NOTE I think this is all we need, since there is no actual path to update
                 done = false
             end
         end
@@ -643,7 +645,7 @@ function update_env!(solver,env::SearchEnv,v::Int,path::P,
     cache = env.cache
     schedule = env.schedule
     # UPDATE CACHE
-    update_planning_cache!(solver,env,v,path)
+    update_planning_cache!(solver,env,v,get_t(get_final_state(path)))
     update_cost_model!(env)
     # ADD UPDATED PATH TO HEURISTIC MODELS
     if agent_id != -1
@@ -853,7 +855,6 @@ function CRCBS.initialize_root_node(env::SearchEnv)
         id = 1)
 end
 function CRCBS.discrete_constraint_table(env::SearchEnv,agent_id=-1,tf=2*maximum(env.cache.tF)+50*num_agents(env))
-    @show tf
     discrete_constraint_table(num_states(env),num_actions(env),agent_id,tf)
 end
 CRCBS.initialize_root_node(solver,pc_mapf::AbstractPC_MAPF) = initialize_root_node(pc_mapf.env)

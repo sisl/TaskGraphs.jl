@@ -23,7 +23,7 @@ let
         set_cost!(env,typemax(cost_type(env)))
         @test get_cost(env2) != get_cost(env)
 
-        path = path_type(env)()
+        path = deepcopy(get_paths(env)[1])
         extend_path!(path,4)
         set_solution_path!(env,path,1)
         @test length(get_paths(env)[1]) != length(get_paths(env2)[1])
@@ -49,11 +49,6 @@ let
         set_path_cost!(node,typemin(cost_type(node)),1)
         set_path_cost!(node2,typemax(cost_type(node)),1)
         @test get_path_costs(node)[1] != get_path_costs(node2)[1]
-
-        path = path_type(node)()
-        extend_path!(path,4)
-        set_solution_path!(node,path,1)
-        @test length(get_paths(node)[1]) != length(get_paths(node2)[1])
 
         # now reset the route plan and check that everything matches up again
         reset_route_plan!(node,node2.solution.route_plan)

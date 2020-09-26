@@ -344,7 +344,7 @@ function plan_next_path!(solver::ISPS, pc_mapf::AbstractPC_MAPF, env::SearchEnv,
                 ISPS:
                     routes:
                 """,
-                sprint_padded_list_array(
+                sprint_indexed_list_array(
                     convert_to_vertex_lists(env.route_plan);leftaligned=true),
                 """
                     cache.tF: $(env.cache.tF)
@@ -360,12 +360,7 @@ function plan_next_path!(solver::ISPS, pc_mapf::AbstractPC_MAPF, env::SearchEnv,
                 end
             end
         else
-            # dummy path - update planning cache only
-            path = path_type(env)(
-                s0=State(-1, -1),
-                cost=get_initial_cost(env)
-                )
-            update_planning_cache!(solver,env,v,path) # NOTE I think this is all we need, since there is no actual path to update
+            update_planning_cache!(solver,env,v,-1)
         end
     end
     return valid_flag

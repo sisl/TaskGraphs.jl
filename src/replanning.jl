@@ -604,7 +604,7 @@ function profile_replanner!(solver,replan_model,prob::RepeatedPC_TAPF,
         @log_info(2,solver,"Stage ",stage," - ","route planner iterations: ",
             iterations(route_planner(solver)))
     end
-    return cache
+    return env, cache
 end
 
 
