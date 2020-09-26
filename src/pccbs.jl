@@ -77,8 +77,8 @@ function CRCBS.get_possible_actions(env::MetaAgentCBS.TeamMetaEnv,s::MetaAgentCB
 end
 
 function CRCBS.is_goal(env::PCCBSEnv,s)
-    if states_match(s, get_goal(env))
-        if get_t(s) >= get_t(get_goal(env))
+    if get_t(s) >= get_t(get_goal(env))
+        if states_match(s, get_goal(env))
             #########################################
             # updated goal time
             v = get_vtx(env.search_env.schedule,env.node_id)
@@ -96,11 +96,9 @@ function CRCBS.is_goal(env::PCCBSEnv,s)
             end
             #########################################
             return true
+        elseif !CRCBS.is_valid(get_goal(env))
+            return true 
         end
-    elseif !CRCBS.is_valid(get_goal(env))
-        @assert get_t(s) >= get_t(get_goal(env))
-        return true # NOTE HERE IS THE PROBLEM! This is why Astar keeps
-        # quitting early.
     end
     return false
 end

@@ -28,9 +28,9 @@ let
         cache = ReplanningProfilerCache(features=features)
         # solver = NBSSolver(path_planner = PIBTPlanner{NTuple{3,Float64}}())
         solver = NBSSolver()
-        set_verbosity!(solver,5)
-        set_verbosity!(low_level(route_planner(solver)),3)
-        set_verbosity!(low_level(low_level(route_planner(solver))),3)
+        # set_verbosity!(solver,5)
+        # set_verbosity!(low_level(route_planner(solver)),3)
+        # set_verbosity!(low_level(low_level(route_planner(solver))),3)
         set_iteration_limit!(solver,1)
         set_iteration_limit!(route_planner(solver),10)
 
