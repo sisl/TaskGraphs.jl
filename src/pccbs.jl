@@ -22,10 +22,7 @@ export PCCBSEnv
     node_id::I                      = nothing
     agent_idx::Int                  = -1
     # graph::G                        = get_graph(search_env)
-    constraints::T                  = discrete_constraint_table(
-                                        nv(get_graph(search_env)),
-                                        nv(get_graph(search_env))^2,
-                                        agent_idx)
+    constraints::T                  = discrete_constraint_table(search_env,agent_idx)
     goal::State                     = State()
     cost_model::C                   = get_cost_model(search_env)
     heuristic::H                    = get_heuristic_model(search_env)
@@ -38,6 +35,14 @@ CRCBS.get_goal(env::PCCBSEnv)             = env.goal
 CRCBS.get_heuristic_model(env::PCCBSEnv)  = get_heuristic_model(env.search_env)
 
 get_schedule_node(env::PCCBSEnv)          = env.schedule_node
+
+function Base.show(io::IO, env::PCCBSEnv)
+    print(io,"PCCBSEnv: \n",
+        "\t","schedule_node: ",string(get_schedule_node(env)),"\n",
+        "\t","agent_idx:     ",get_agent_id(env),"\n",
+        "\t","goal:          ",string(get_goal(env)),"\n")
+end
+
 CRCBS.get_next_state(s::State,a::Action)    = State(get_e(a).dst,get_t(s)+get_dt(a))
 CRCBS.get_next_state(env::PCCBSEnv,s,a)  = get_next_state(s,a)
 CRCBS.wait(env::PCCBSEnv,s)              = Action(e=Edge(get_vtx(s),get_vtx(s)))
@@ -97,7 +102,7 @@ function CRCBS.is_goal(env::PCCBSEnv,s)
             #########################################
             return true
         elseif !CRCBS.is_valid(get_goal(env))
-            return true 
+            return true
         end
     end
     return false

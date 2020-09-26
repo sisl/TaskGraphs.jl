@@ -19,7 +19,7 @@ let
     ProjectRequest(OperatingSchedule(),10,10)
 end
 let
-    redirect_to_files("out.log","err.log") do
+    # redirect_to_files("out.log","err.log") do
         features=[
             RunTime(),SolutionCost(),OptimalFlag(),FeasibleFlag(),OptimalityGap(),
             IterationCount(),TimeOutStatus(),IterationMaxOutStatus(),
@@ -28,9 +28,9 @@ let
         cache = ReplanningProfilerCache(features=features)
         # solver = NBSSolver(path_planner = PIBTPlanner{NTuple{3,Float64}}())
         solver = NBSSolver()
-        # set_verbosity!(solver,5)
-        # set_verbosity!(low_level(route_planner(solver)),3)
-        # set_verbosity!(low_level(low_level(route_planner(solver))),3)
+        set_verbosity!(solver,5)
+        set_verbosity!(low_level(route_planner(solver)),1)
+        set_verbosity!(low_level(low_level(route_planner(solver))),4)
         set_iteration_limit!(solver,1)
         set_iteration_limit!(route_planner(solver),10)
 
@@ -40,7 +40,7 @@ let
         prob = replanning_problem_1(solver)
 
         cache = profile_replanner!(solver,replan_model,prob,cache)
-    end
+    # end
 
 end
 let
@@ -54,12 +54,12 @@ let
     cost_model = SumOfMakeSpans()
     solvers = [
         NBSSolver(),
-        NBSSolver(path_planner = PIBTPlanner{NTuple{3,Float64}}()),
+        # NBSSolver(path_planner = PIBTPlanner{NTuple{3,Float64}}()),
     ]
     for solver in solvers
         set_verbosity!(solver,0)
         set_iteration_limit!(solver,1)
-        set_iteration_limit!(route_planner(solver),500)
+        set_iteration_limit!(route_planner(solver),5000)
     end
     problem_generators = replanning_test_problems()
 

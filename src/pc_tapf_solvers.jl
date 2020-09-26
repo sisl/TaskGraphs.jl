@@ -267,9 +267,11 @@ function plan_path!(solver::AStarSC, pc_mapf::AbstractPC_MAPF, env::SearchEnv, n
     end
     # add to solution
     update_route_plan!(solver,pc_mapf,env,v,path,cost,schedule_node)
-    @log_info(2,solver,"ISPS: after update_route_plan! maximum(cache.tF) $(maximum(cache.tF))")
+    @log_info(2,solver,"ISPS: after update_route_plan! maximum(cache.tF) = ",
+        maximum(cache.tF))
     if get_cost(node) >= best_cost(solver)
-        @log_info(0,solver,"ISPS: get_cost(node) >= best_cost(solver) ... Exiting early")
+        @log_info(0,solver,"ISPS: get_cost(node) (",get_cost(node),
+            ") >= best_cost(solver)",best_cost(solver)," ... Exiting early")
         return false
     end
 

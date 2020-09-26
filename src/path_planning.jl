@@ -672,7 +672,8 @@ function get_base_path(solver,search_env::SearchEnv,env::PCCBSEnv)
     if gap > 0
         @log_info(1, solver, string("LOW LEVEL SEARCH: in node ",v," -- ",
             string(env.schedule_node),
-            ": cache.t0[v] - get_end_index(base_path) = ", gap,
+            ": cache.t0[v] (",t0,") - get_end_index(base_path) (",
+            get_end_index(base_path),") = ", gap,
             ". Extending path to ",t0," ..."))
         extend_path!(env,base_path,t0)
     end
@@ -847,9 +848,13 @@ function CRCBS.initialize_root_node(env::SearchEnv)
         solution    = solution,
         constraints = Dict(
             # i=>ConstraintTable{node_type(solution)}(agent_id=i) for i in 1:num_agents(env)
-            i=>discrete_constraint_table(env,i,num_states(env)*8) for i in 1:num_agents(env)
+            i=>discrete_constraint_table(env,i) for i in 1:num_agents(env)
             ),
         id = 1)
+end
+function CRCBS.discrete_constraint_table(env::SearchEnv,agent_id=-1,tf=2*maximum(env.cache.tF)+50*num_agents(env))
+    @show tf
+    discrete_constraint_table(num_states(env),num_actions(env),agent_id,tf)
 end
 CRCBS.initialize_root_node(solver,pc_mapf::AbstractPC_MAPF) = initialize_root_node(pc_mapf.env)
 function Base.copy(env::SearchEnv)
@@ -879,6 +884,7 @@ CRCBS.get_env(pc_mapf::AbstractPC_MAPF)             = pc_mapf.env
 for op in [
     :cost_type,:state_type,:action_type,:path_type,:num_states,:num_actions,
     :num_agents,:serialize,:deserialize,
+    :discrete_constraint_table,
     ]
     @eval CRCBS.$op(prob::AbstractPC_MAPF,args...) = $op(prob.env,args...)
     # @eval CRCBS.$op(prob::AbstractPC_MAPF,args...) = $op(prob.env,args...)
