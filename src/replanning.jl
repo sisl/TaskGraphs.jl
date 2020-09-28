@@ -6,9 +6,40 @@
 # using CRCBS
 # using ..TaskGraphs
 
-################################################################################
-################################# Replanning ###################################
-################################################################################
+export
+    ProjectRequest
+
+"""
+    ProjectRequest
+
+Encodes a "request" that arrives in the factory command center.
+    `t_request` encodes the time at which the request reaches the command center
+    `t_arrival` is the time at which the project materials will be available
+
+TODO more flexibility with t_arrival by allowing different materials to arrive
+at different times
+"""
+@with_kw struct ProjectRequest
+    schedule::OperatingSchedule = OperatingSchedule()
+    t_request::Int              = -1
+    t_arrival::Int              = -1
+end
+
+export
+    RepeatedPC_TAPF
+
+"""
+    RepeatedPC_TAPF{S<:SearchEnv}
+
+Encodes a Repeated PC_TAPF problem.
+Usage:
+    `prob = RepeatedPC_TAPF(env::SearchEnv,requests::Vector{ProjectRequest})`
+"""
+struct RepeatedPC_TAPF{S<:SearchEnv}
+    env::S
+    requests::Vector{ProjectRequest}
+end
+
 export
     get_env_snapshot,
     trim_route_plan
@@ -480,24 +511,6 @@ split_active_vtxs!(replan_model::ReplannerModel,new_schedule,problem_spec,new_ca
 
 fix_precutoff_nodes!(replan_model,new_schedule,problem_spec,new_cache,t_commit) = fix_precutoff_nodes!(new_schedule,problem_spec,new_cache,t_commit)
 
-export
-    ProjectRequest
-
-"""
-    ProjectRequest
-
-Encodes a "request" that arrives in the factory command center.
-    `t_request` encodes the time at which the request reaches the command center
-    `t_arrival` is the time at which the project materials will be available
-
-TODO more flexibility with t_arrival by allowing different materials to arrive
-at different times
-"""
-@with_kw struct ProjectRequest
-    schedule::OperatingSchedule = OperatingSchedule()
-    t_request::Int              = -1
-    t_arrival::Int              = -1
-end
 
 """
     replan!(solver, replan_model, search_env, env_graph, problem_spec, route_plan,
@@ -562,14 +575,8 @@ end
 replan!(solver, replan_model::NullReplanner, search_env, args...;kwargs...) = search_env
 
 export
-    RepeatedPC_TAPF,
     compile_replanning_results!,
     profile_replanner!
-
-struct RepeatedPC_TAPF{S<:SearchEnv}
-    env::S
-    requests::Vector{ProjectRequest}
-end
 
 function compile_replanning_results!(
         cache::ReplanningProfilerCache,solver,env,

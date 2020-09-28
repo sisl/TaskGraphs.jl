@@ -122,6 +122,46 @@ function pctapf_problem(
     PC_TAPF(env)
 end
 
+
+"""
+    instantiate_random_pctapf_problem(env,config)
+
+Instantiate a random `PC_TAPF` problem based on the parameters of config.
+"""
+function instantiate_random_pctapf_problem(env::GridFactoryEnvironment,config)
+    N                   = get(config,:N,30)
+    M                   = get(config,:M,10)
+    max_parents         = get(config,:max_parents,3)
+    depth_bias          = get(config,:depth_bias,0.4)
+    dt_min              = get(config,:dt_min,0)
+    dt_max              = get(config,:dt_max,0)
+    # dt_collect          = get(config,:dt_collect,0)
+    # dt_deliver          = get(config,:dt_deliver,0)
+    task_sizes          = get(config,:task_sizes,(1=>1.0,2=>0.0,4=>0.0))
+    # num_projects        = get(config,:num_projects,10)
+    # arrival_interval    = get(config,:arrival_interval,40)
+
+    r0,s0,sF = get_random_problem_instantiation(N,M,get_pickup_zones(env),
+        get_dropoff_zones(env),get_free_zones(env))
+    project_spec = construct_random_project_spec(M,s0,sF;
+        max_parents=max_parents,
+        depth_bias=depth_bias,
+        Δt_min=dt_min,
+        Δt_max=dt_max)
+    shapes = choose_random_object_sizes(M,Dict(task_sizes...))
+    problem_def = SimpleProblemDef(project_spec,r0,s0,sF,shapes)
+end
+
+"""
+    instantiate_random_repeated_pctapf_problem(env,config)
+
+Instantiate a random `RepeatedPC_TAPF` problem based on the parameters of config.
+"""
+function instantiate_random_pctapf_sequence(env::GridFactoryEnvironment,config)
+    num_projects        = get(config,:num_projects,10)
+    projects = map(i->instantiate_random_pctapf_problem(env,config), 1:num_projects)
+end
+
 # This is a place to put reusable problem initializers for testing
 """
     pctapf_problem_1
@@ -523,6 +563,9 @@ function pctapf_problem_9(;cost_function=SumOfMakeSpans(),verbose=false,Δt_op=0
     env_graph = construct_factory_env_from_vtx_grid(
         vtx_grid;
     )
+
+    # tasks=[5=>8,5=>6]
+    # ops=[ (inputs=[1],outputs=[],dt=Δt_op), (inputs=[2],outputs=[],dt=Δt_op) ]
 
     project_spec, robot_ICs = pctapf_problem(r0,s0,sF)
     add_operation!(project_spec,construct_operation(project_spec,-1,[1],[],Δt_op))

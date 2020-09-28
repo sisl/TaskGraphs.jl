@@ -1,3 +1,3 @@
 # TaskGraphs
 
-- consider using JLD.jl for saving and loading custom types (instead of TOML)
+A Julia package for modeling and solving precedence constrained multi-agent task assignment and path finding (PC-TAPF) problems.
