@@ -157,12 +157,6 @@ git-tree-sha1 = "eb0c34204c8410888844ada5359ac8b96292cfd1"
 uuid = "b552c78f-8df3-52c6-915a-8e097449b14b"
 version = "1.0.1"
 
-[[Distances]]
-deps = ["LinearAlgebra", "Statistics"]
-git-tree-sha1 = "23717536c81b63e250f682b0e0933769eecd1411"
-uuid = "b4f34e82-e78d-54a5-968a-f98e89d6e8f7"
-version = "0.8.2"
-
 [[Distributed]]
 deps = ["Random", "Serialization", "Sockets"]
 uuid = "8ba89e20-285c-5b6f-9357-94700520ee1b"
@@ -226,7 +220,9 @@ uuid = "9fa8497b-333b-5362-9e8d-4d0656e87820"
 
 [[GraphPlottingBFS]]
 deps = ["Colors", "Compose", "LightGraphs", "Logging", "MetaGraphs", "Parameters", "Test"]
-path = "../GraphPlottingBFS"
+git-tree-sha1 = "363bd38c15059d0af1315b6b978bc2dfd6d6e87b"
+repo-rev = "master"
+repo-url = "git@github.com:kylejbrown17/GraphPlottingBFS.jl.git"
 uuid = "277fd268-772f-11e9-01e2-fbbcabd1ad4a"
 version = "0.1.0"
 
@@ -382,12 +378,6 @@ uuid = "a63ad114-7e13-5084-954f-fe012c677804"
 git-tree-sha1 = "928b8ca9b2791081dc71a51c55347c27c618760f"
 uuid = "77ba4419-2d1f-58cd-9bb1-8ffee604a2e3"
 version = "0.3.3"
-
-[[NearestNeighbors]]
-deps = ["Distances", "StaticArrays"]
-git-tree-sha1 = "8bc6180f328f3c0ea2663935db880d34c57d6eae"
-uuid = "b8a86587-4115-5ab1-83bc-aa920d37bbce"
-version = "0.4.4"
 
 [[OffsetArrays]]
 git-tree-sha1 = "87d0a91efe29352d5caaa271ae3927083c096e33"
