@@ -59,7 +59,7 @@ let
     cost_model = SumOfMakeSpans()
     solvers = [
         NBSSolver(),
-        # NBSSolver(path_planner = PIBTPlanner{NTuple{3,Float64}}()),
+        NBSSolver(path_planner = PIBTPlanner{NTuple{3,Float64}}()),
     ]
     for solver in solvers
         set_verbosity!(solver,0)
@@ -70,7 +70,7 @@ let
 
     for f in problem_generators
         for solver in solvers
-            @show f
+            # @show f
             cache = ReplanningProfilerCache(features=features)
             prob = f(solver;cost_function=cost_model)
             cache = profile_replanner!(solver,replan_model,prob)

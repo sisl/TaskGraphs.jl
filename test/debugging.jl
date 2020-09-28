@@ -37,7 +37,7 @@ let
     is_consistent(cache,pc_mapf)
     # pibt_step!(solver,pc_mapf,cache,1)
     set_iteration_limit!(solver,20)
-    set_verbosity!(solver,4)
+    # set_verbosity!(solver,4)
     reset_solver!(solver)
     solution, valid_flag = pibt!(solver,pc_mapf)
 
