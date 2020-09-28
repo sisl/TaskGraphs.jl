@@ -554,9 +554,9 @@ function replan!(solver, replan_model, search_env, request;
         search_env,
         initialize_planning_cache(new_schedule,t0,tF)
         )
-    @log_info(-1,solver,"Previous route plan: ",sprint_route_plan(route_plan))
+    @log_info(3,solver,"Previous route plan: ",sprint_route_plan(route_plan))
     trimmed_route_plan = trim_route_plan(base_search_env, route_plan, t_commit)
-    @log_info(-1,solver,"Trimmed route plan: ",sprint_route_plan(trimmed_route_plan))
+    @log_info(3,solver,"Trimmed route plan: ",sprint_route_plan(trimmed_route_plan))
     SearchEnv(base_search_env, route_plan=trimmed_route_plan)
 end
 replan!(solver, replan_model::NullReplanner, search_env, args...;kwargs...) = search_env

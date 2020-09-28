@@ -733,16 +733,6 @@ function replanning_problem(solver,r0,defs,env_graph;
             _, problem_spec, _, _, robot_ICs = construct_task_graphs_problem(
                 problem_def,env_graph;
                 cost_function=cost_function)
-            # project_schedule = construct_partial_project_schedule(
-            #     spec,
-            #     problem_spec,
-            #     robot_ICs,
-            #     )
-        # else
-        #     project_schedule = construct_partial_project_schedule(
-        #         spec,
-        #         problem_spec,
-        #         )
         end
         project_schedule = construct_partial_project_schedule(
             spec,
@@ -763,7 +753,6 @@ function replanning_problem(solver,r0,defs,env_graph;
 end
 
 function replanning_problem_1(solver;kwargs...)
-    N = 2                  # num robots
     vtx_grid = initialize_dense_vtx_grid(4,4)
     env_graph = construct_factory_env_from_vtx_grid(vtx_grid)
     #  1   2   3   4
@@ -781,7 +770,6 @@ function replanning_problem_1(solver;kwargs...)
 end
 
 function replanning_problem_2(solver;kwargs...)
-    N = 2                  # num robots
     vtx_grid = initialize_dense_vtx_grid(4,4)
     env_graph = construct_factory_env_from_vtx_grid(vtx_grid)
     #  1   2   3   4
@@ -803,7 +791,6 @@ end
     project prior to working on the third task of the first project.
 """
 function replanning_problem_3(solver;kwargs...)
-    N = 1                  # num robots
     vtx_grid = initialize_dense_vtx_grid(4,4)
     env_graph = construct_factory_env_from_vtx_grid(vtx_grid)
     #  1   2   3   4
@@ -835,8 +822,7 @@ end
     finished warming up yet.
 """
 function replanning_problem_4(solver;kwargs...)
-    N = 1                  # num robots
-    vtx_grid = initialize_dense_vtx_grid(4,4)
+    vtx_grid = initialize_dense_vtx_grid(4,16)
     env_graph = construct_factory_env_from_vtx_grid(vtx_grid)
     #  1   2   3   4   5   6   7   8   9  10  11  12  13  14  15  16
     # 17  18  19  20  21  22  23  24  25  26  27  28  29  30  31  32
