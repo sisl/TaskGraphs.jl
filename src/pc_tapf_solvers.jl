@@ -257,12 +257,12 @@ function plan_path!(solver::AStarSC, pc_mapf::AbstractPC_MAPF, env::SearchEnv, n
     @log_info(2,solver,string("A* iterations = ",iterations(solver)))
     # Make sure every robot sticks around for the entire time horizon
     if is_terminal_node(get_graph(env.schedule),v)
-        @log_info(2,solver,"ISPS: length(path) = $(length(path)).",
-        " Extending terminal node $(string(schedule_node))",
-        " to $(maximum(cache.tF))")
+        @log_info(2,solver,"ISPS: length(path) = ",length(path),
+        ". Extending terminal node ", string(schedule_node),
+        " to ",maximum(cache.tF))
         extend_path!(cbs_env,path,maximum(cache.tF))
-        @log_info(2,solver,"ISPS: length(path) = $(length(path)).",
-        " maximum(cache.tF) = $(maximum(cache.tF))")
+        @log_info(2,solver,"ISPS: length(path) = ",length(path),
+        ". maximum(cache.tF) = ",maximum(cache.tF))
         # solver.DEBUG ? validate(path,v) : nothing
     end
     # add to solution

@@ -709,7 +709,9 @@ function CRCBS.build_env(
             for c in sorted_state_constraints(env,get_constraints(node, agent_id)) #.sorted_state_constraints
                 if get_sp(get_path_node(c)).vtx == goal_vtx
                     if 0 < get_time_of(c) - goal_time < duration_next
-                        @log_info(1,solver,string("extending goal_time for node ",v," from ",goal_time," to ",get_time_of(c)," to avoid constraints"))
+                        @log_info(1,solver,"extending goal_time for node ",v,
+                            " from ",goal_time," to ",get_time_of(c),
+                            " to avoid constraints")
                         goal_time = max(goal_time, get_time_of(c))
                     end
                 end

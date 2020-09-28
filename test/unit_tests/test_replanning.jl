@@ -31,8 +31,10 @@ let
         # set_verbosity!(solver,5)
         # set_verbosity!(low_level(route_planner(solver)),4)
         # set_verbosity!(low_level(low_level(route_planner(solver))),5)
-        # set_iteration_limit!(solver,1)
+        set_iteration_limit!(solver,1)
         set_iteration_limit!(route_planner(solver),10)
+        set_runtime_limit!(route_planner(solver),500)
+        # set_debug!(solver,true)
 
         replan_model = MergeAndBalance()
         set_real_time_flag!(replan_model,false) # turn off real-time op constraints
