@@ -1247,6 +1247,20 @@ function construct_partial_project_schedule(spec::ProjectSpec,problem_spec::Prob
     )
 end
 
+
+function construct_partial_project_schedule(robot_ICs::Vector{ROBOT_AT},prob_spec=
+        ProblemSpec()
+        )
+    construct_partial_project_schedule(
+        Vector{OBJECT_AT}(),
+        Vector{OBJECT_AT}(),
+        robot_ICs,
+        Vector{Operation}(),
+        Vector{OperationID}(),
+        prob_spec
+    )
+end
+
 """
     process_schedule(schedule::P) where {P<:OperatingSchedule}
 

@@ -39,6 +39,145 @@ struct RepeatedPC_TAPF{S<:SearchEnv}
     env::S
     requests::Vector{ProjectRequest}
 end
+RepeatedPC_TAPF(env::SearchEnv) = RepeatedPC_TAPF(env,Vector{ProjectRequest}())
+
+struct SimpleReplanningRequest
+    def::SimpleProblemDef
+    t_request::Int
+    t_arrival::Int
+end
+function TOML.parse(def::SimpleReplanningRequest)
+    toml_dict = TOML.parse(def.def)
+    toml_dict["t_request"] = def.t_request
+    toml_dict["t_arrival"] = def.t_arrival
+    toml_dict
+end
+function read_simple_request(toml_dict)
+    SimpleReplanningRequest(
+        read_problem_def(toml_dict),
+        prob_dict["t_request"],
+        prob_dict["t_arrival"]
+    )
+end
+read_simple_request(path::String)
+
+function ProjectRequest(def::SimpleReplanningRequest,prob_spec)
+    ProjectRequest(
+        schedule = construct_partial_project_schedule(
+            def.def.project_spec,prob_spec),
+        t_request = def.t_request,
+        t_arrival = def.t_arrival
+        )
+end
+
+struct SimpleRepeatedProblemDef
+    requests::Vector{SimpleReplanningRequest}
+    r0::Vector{Int}
+    env_id::String
+end
+
+function write_simple_repeated_problem_def(path,def::SimpleRepeatedProblemDef)
+    toml_dict = Dict(
+        "r0" => def.r0,
+        "env_id" => def.env_id
+    )
+    TOML.print(joinpath(path,"config.toml"),toml_dict)
+    for (i,stage_def) in enumerate(def.requests)
+        p = joinpath(path,@sprintf("stage%3.3i",i))
+        mkpath(p)
+        toml_dict = TOML.parse(stage_def)
+        TOML.print(joinpath(p,"problem.toml"),toml_dict)
+    end
+    return true
+end
+
+function read_simple_repeated_problem_def(path)
+    toml_dict = TOML.parsefile(joinpath(path,"config.toml"))
+    prob_def = SimpleRepeatedProblemDef(
+        SimpleReplanningRequest[],
+        toml_dict["r0"],
+        toml_dict["env_id"],
+    )
+    for p in readdir(path;join=true,sort=true)
+        isdir(p) ? nothing : continue
+        prob_dict = TOML.parsefile(joinpath(p,"problem.toml"))
+        push!(prob_def.requests,read_simple_request(prob_dict))
+    end
+    prob_def
+end
+
+function RepeatedPC_TAPF(simple_def::SimpleRepeatedProblemDef,solver,envs,prob_spec)
+    env = envs[simple_def.env_id]
+    sched = construct_partial_project_schedule(
+        [ROBOT_AT(r,x) for (r,x) in enumerate(simple_def.r0)],prob_spec)
+    search_env = construct_search_env(solver,sched,prob_spec,env)
+    r_pc_tapf = RepeatedPC_TAPF(
+        search_env,
+        map(req->ProjectRequest(req,prob_spec), simple_def.requests)
+    )
+end
+
+#
+# problem_path/
+#   config.toml - # robot initial positions, env_id
+#   stages/
+#       stage1/
+#           config.toml
+#           problem.toml
+#       ...
+#       stageN/
+#           ...
+#
+# function load_repeated_pctapf_problem(solver,path,envs,prob_spec)
+#     config_dict = TOML.parsefile(joinpath(path,"config.toml"))
+#     r0 = config_dict["r0"] # robot initial conditions
+#     env_id = config_dict["env_id"] # robot initial conditions
+#     env = envs[env_id]
+#     sched = construct_partial_project_schedule(
+#         map(i->ROBOT_AT(i,r0[i]),1:length(r0)),prob_spec)
+#     search_env = construct_search_env(solver,sched,prob_spec,env)
+#     r_pc_tapf = RepeatedPC_TAPF(search_env)
+#     for p in readdir(path;join=true,sort=true)
+#         isdir(p) ? nothing : continue
+#         prob_dict = TOML.parsefile(joinpath(p,"problem.toml"))
+#         simple_request = read_simple_request(prob_dict)
+#         t_request = prob_dict["t_request"]
+#         t_arrival = prob_dict["t_arrival"]
+#         prob_def = read_problem_def(prob_dict)
+#         request = ProjectRequest(
+#             schedule = construct_partial_project_schedule(
+#                 prob_def.project_spec,prob_spec),
+#             t_request = t_request,
+#             t_arrival = t_arrival
+#             )
+#         push!(r_pc_tapf.requests, request)
+#     end
+#     r_pc_tapf
+# end
+
+
+#
+# function TOML.parse(def::SimpleRepeatedProblemDef)
+#     toml_dict = TOML.parse(def.project_spec)
+#     toml_dict["r0"] = def.r0
+#     toml_dict["s0"] = def.s0
+#     toml_dict["sF"] = def.sF
+#     toml_dict["shapes"] = map(s->[s...], def.shapes)
+#     toml_dict
+# end
+# function read_repeated_problem_def(toml_dict::Dict)
+#     SimpleRepeatedProblemDef(
+#         read_project_spec(toml_dict),
+#         toml_dict["r0"],
+#         toml_dict["s0"],
+#         toml_dict["sF"],
+#         # map(s->tuple(s...), toml_dict["shapes"])
+#         map(s->tuple(s...), get(toml_dict,"shapes",[[1,1] for o in toml_dict["s0"]]) )
+#     )
+# end
+# function repeated_problem_def(io)
+#     repeated_problem_def(TOML.parsefile(io))
+# end
 
 export
     get_env_snapshot,

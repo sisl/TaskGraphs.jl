@@ -128,7 +128,7 @@ end
 
 Instantiate a random `PC_TAPF` problem based on the parameters of config.
 """
-function instantiate_random_pctapf_problem(env::GridFactoryEnvironment,config)
+function instantiate_random_pctapf_def(env::GridFactoryEnvironment,config)
     N                   = get(config,:N,30)
     M                   = get(config,:M,10)
     max_parents         = get(config,:max_parents,3)
@@ -563,9 +563,6 @@ function pctapf_problem_9(;cost_function=SumOfMakeSpans(),verbose=false,Δt_op=0
     env_graph = construct_factory_env_from_vtx_grid(
         vtx_grid;
     )
-
-    # tasks=[5=>8,5=>6]
-    # ops=[ (inputs=[1],outputs=[],dt=Δt_op), (inputs=[2],outputs=[],dt=Δt_op) ]
 
     project_spec, robot_ICs = pctapf_problem(r0,s0,sF)
     add_operation!(project_spec,construct_operation(project_spec,-1,[1],[],Δt_op))
