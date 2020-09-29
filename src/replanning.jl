@@ -57,6 +57,14 @@ struct ReplanningProblemLoader
         Dict{String,ProblemSpec}()
     )
 end
+function add_env!(loader::ReplanningProblemLoader,env_id::String,
+    env=read_env(env_id))
+    if haskey(loader.envs,env_id)
+    else
+        loader.envs[env_id] = env
+        loader.prob_specs[env_id] = ProblemSpec(graph=env)
+    end
+end
 
 """
     SimpleReplanningRequest
