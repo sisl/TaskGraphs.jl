@@ -228,9 +228,9 @@ version = "0.1.0"
 
 [[GraphUtils]]
 deps = ["Documenter", "ImageFiltering", "LightGraphs", "LinearAlgebra", "Logging", "MetaGraphs", "Parameters", "Printf", "Random", "Reexport", "SortingAlgorithms", "SparseArrays", "TOML", "Test"]
-git-tree-sha1 = "a2b12149f0051fd42ede981577c6276a155a0c59"
+git-tree-sha1 = "bbb7b4a4ad8fb3896433a5fc23d191d0b407e1cf"
 repo-rev = "master"
-repo-url = "git@github.com:kylejbrown17/GraphUtils.jl.git"
+repo-url = "https://github.com/kylejbrown17/GraphUtils.jl.git"
 uuid = "5d4bc1c0-0fb7-11e9-3252-b1aa07358cab"
 version = "0.1.0"
 

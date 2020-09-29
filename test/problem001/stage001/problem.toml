@@ -8,7 +8,7 @@ shapes = [[1, 1], [1, 1], [1, 1]]
 initial_conditions = [[1, 4], [2, 5], [3, 6]]
 
 [[operations]]
-pre = [[2, 11], [1, 10]]
+pre = [[1, 10], [2, 11]]
 post = [[3, 6]]
 station_id = -1
 id = 1661
