@@ -106,6 +106,9 @@ let
 
     search_env = replan!(solver,replan_model,prob.env,prob.requests[1])
     is_cyclic(search_env.schedule.graph)
+    node_strings = [string(v," → ",string(get_node_from_vtx(search_env.schedule,v))) for v in vertices(search_env.schedule)]
+    edgelist = collect(edges(search_env.schedule))
+    node_strings[1:25],edgelist
 
     #
     # is_cyclic(prob.env.schedule.graph)

@@ -11,23 +11,23 @@ using Test
 using GraphPlottingBFS
 using Compose
 # load rendering tools
-include(joinpath(pathof(TaskGraphs),"../..","test/notebooks/render_tools.jl"))
+include(joinpath(pathof(TaskGraphs),"..","helpers/render_tools.jl"))
 # for f in *.svg; do inkscape -z $f -e $f.png; done
 
 let
-    project_spec, problem_spec, robot_ICs, env_graph, assignments = pctapf_problem_1(;verbose=false);
-    project_schedule = construct_partial_project_schedule(
-        project_spec,
-        problem_spec,
-        robot_ICs,
-        )
-    print_project_schedule(project_schedule,"project_schedule1";mode=:leaf_aligned)
+    solver = NBSSolver()
+    prob = pctapf_problem_1(solver)
+    sched = prob.env.schedule
+    plot_project_schedule(sched;mode=:leaf_aligned)
 end
 # let
 
 # Replanning problem generation and profiling
 let
     solver = NBSSolver()
+    replan_model = MergeAndBalance()
+    set_verbosity!(solver,5)
+    set_real_time_flag!(replan_model,false)
     loader = ReplanningProblemLoader()
     add_env!(loader,"env_1",init_env_1())
 
@@ -50,21 +50,37 @@ let
     write_simple_repeated_problem_def("problem001",simple_prob_def)
     simple_prob_def = read_simple_repeated_problem_def("problem001")
     prob = RepeatedPC_TAPF(simple_prob_def,solver,loader)
+    plot_project_schedule(prob.env.schedule;mode=:leaf_aligned)
+
+    env = prob.env
+    stage = 1
+    request = prob.requests[stage]
+    remap_object_ids!(request.schedule,env.schedule)
+    base_env = replan!(solver,replan_model,env,request)
+    reset_solver!(solver)
+    assignment_problem = formulate_assignment_problem(assignment_solver(solver),PC_TAPF(base_env))
+    sched, l_bound = solve_assignment_problem!(
+                assignment_solver(solver),
+                assignment_problem,
+                PC_TAPF(base_env))
+
+    node_strings = [string(v," → ",string(get_node_from_vtx(sched,v))) for v in vertices(sched)]
+    edge_list = collect(edges(sched))
+    node_strings,edge_list
+    plot_project_schedule(sched;mode=:leaf_aligned)
+
+    # env, cost = solve!(solver,base_env)
+    env, timer_results = profile_solver!(solver,base_env)
+    compile_replanning_results!(cache,solver,env,timer_results,prob,stage,request)
+
 
     search_env = replan!(solver,replan_model,prob.env,prob.requests[1])
-    is_cyclic(search_env.schedule.graph)
-    node_strings = [string(v," → ",string(get_node_from_vtx(search_env.schedule,v))) for v in vertices(search_env.schedule)]
-    edgelist = collect(edges(search_env.schedule))
-    node_strings[1:25],edgelist
+    plot_project_schedule(search_env.schedule;mode=:leaf_aligned)
 
-    #
     # is_cyclic(prob.env.schedule.graph)
     # is_cyclic(prob.requests[1].schedule.graph)
     # is_cyclic(prob.requests[2].schedule.graph)
 
-    set_verbosity!(solver,5)
-    replan_model = MergeAndBalance()
-    set_real_time_flag!(replan_model,false)
     profile_replanner!(solver,replan_model,prob)
 
 end
