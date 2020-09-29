@@ -28,7 +28,8 @@ let
                 sched = construct_partial_project_schedule(
                     project_spec,
                     problem_spec,
-                    map(i -> robot_ICs[i], 1:problem_spec.N),
+                    robot_ICs
+                    # map(i -> robot_ICs[i], 1:problem_spec.N),
                 )
                 model = formulate_milp(
                     solver,

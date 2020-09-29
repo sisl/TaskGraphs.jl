@@ -67,28 +67,28 @@ let
         OBJECT_AT(2,5),
         OBJECT_AT(3,6)
         ])
-    robot_ICs = Dict{Int,ROBOT_AT}(
-        1=>ROBOT_AT(1,7),
-        2=>ROBOT_AT(2,8),
-        3=>ROBOT_AT(3,9)
-        )
+    robot_ICs = [
+        ROBOT_AT(1,7),
+        ROBOT_AT(2,8),
+        ROBOT_AT(3,9)
+        ]
     # Testing root nodes
     let
-        project_spec = ProjectSpec(initial_conditions=object_ICs,final_conditions=object_FCs)
+        project_spec = ProjectSpec(object_ICs,object_FCs)
         add_operation!(project_spec,construct_operation(project_spec, 3, [1,2], [3], 1.0))
         @test project_spec.terminal_vtxs == Set{Int}([1])
         add_operation!(project_spec,construct_operation(project_spec, 6, [3], [], 0.0))
         @test project_spec.terminal_vtxs == Set{Int}([2])
     end
     let
-        project_spec = ProjectSpec(initial_conditions=object_ICs,final_conditions=object_FCs)
+        project_spec = ProjectSpec(object_ICs,object_FCs)
         add_operation!(project_spec,construct_operation(project_spec, 3, [1,2], [], 1.0))
         @test project_spec.terminal_vtxs == Set{Int}([1])
         add_operation!(project_spec,construct_operation(project_spec, 6, [3], [], 0.0))
         @test project_spec.terminal_vtxs == Set{Int}([1,2])
     end
     let
-        project_spec = ProjectSpec(initial_conditions=object_ICs,final_conditions=object_FCs)
+        project_spec = ProjectSpec(object_ICs,object_FCs)
         add_operation!(project_spec,construct_operation(project_spec, 3, [1,2], [3], 1.0))
         add_operation!(project_spec,construct_operation(project_spec, 6, [3], [], 0.0))
         delivery_graph = construct_delivery_graph(project_spec,M)

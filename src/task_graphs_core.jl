@@ -45,6 +45,7 @@ Elements:
 - terminal_vtxs::Vector{Set{Int}} - identifies "project heads"
 - weights::Dict{Int,Float64} - stores weights associated with each project head
 - cost_function::F - the optimization objective (default is SumOfMakeSpans)
+- r0::Vector{Int} - initial locations for all robots
 - s0::Vector{Int} - pickup stations for each task
 - sF::Vector{Int} - delivery station for each task
 - nR::Vector{Int} - num robots required for each task (>1 => collaborative task)
@@ -62,10 +63,12 @@ Elements:
     terminal_vtxs::Vector{Set{Int}} = [get_all_terminal_nodes(graph)]
     weights::Dict{Int,Float64} = Dict{Int,Float64}(v=>1.0 for v in 1:length(terminal_vtxs))
     cost_function::F        = SumOfMakeSpans()
-    r0::Vector{Int} = zeros(N)
-    s0::Vector{Int} = zeros(M) # pickup stations for each task
-    sF::Vector{Int} = zeros(M) # delivery station for each task
-    nR::Vector{Int} = ones(M) # num robots required for each task (>1 => collaborative task)
+    r0::Vector{Int}         = zeros(N)
+    s0::Vector{Int}         = zeros(M) # pickup stations for each task
+    sF::Vector{Int}         = zeros(M) # delivery station for each task
+    nR::Vector{Int}         = ones(M) # num robots required for each task (>1 => collaborative task)
+    @assert length(r0) == N
+    @assert length(s0) == length(sF) == M
 end
 TaskGraphs.get_distance(spec::ProblemSpec,args...) = get_distance(spec.D,args...)
 
@@ -112,6 +115,9 @@ Elements:
     M::Int                        = length(initial_conditions)
     object_id_to_idx::Dict{Int,Int} = Dict{Int,Int}(get_id(get_object_id(id))=>k for (k,id) in enumerate(initial_conditions))
     op_id_to_vtx::Dict{Int,Int}    = Dict{Int,Int}()
+end
+function ProjectSpec(ics::V,fcs::V) where {V<:Vector{OBJECT_AT}}
+    ProjectSpec(initial_conditions=ics,final_conditions=fcs)
 end
 get_initial_nodes(spec::ProjectSpec) = setdiff(
     Set(collect(vertices(spec.graph))),collect(keys(spec.pre_deps)))
@@ -1035,131 +1041,6 @@ function add_headless_delivery_task!(
         )
 end
 
-# """
-#     construct_project_schedule
-#
-# Args:
-# - `project_spec` - a ProjectSpec
-# - `problem_spec` - a ProblemSpec
-# - `object_ICs` - a list of initial object locations
-# - `object_fCs` - a list of final object locations
-# - `robot_ICs` - a list of initial robot locations
-# - `assignments` - a list of robot assignments. `assignments[i] == j` means
-# that robot `i` is assigned to transport object `j`
-# """
-# function construct_project_schedule(
-#         project_spec::P,
-#         problem_spec::T,
-#         object_ICs::Vector{OBJECT_AT},
-#         object_FCs::Vector{OBJECT_AT},
-#         robot_ICs::Dict{Int,ROBOT_AT},
-#         assignments::V=Dict{Int,Int}()
-#         ) where {P<:ProjectSpec,T<:ProblemSpec,V<:Union{Dict{Int,Int},Vector{Int}}}
-#     schedule = OperatingSchedule()
-#     robot_pred_tips = Dict{AbstractID,AbstractID}()
-#     object_ops = Dict{ObjectID,OperationID}()
-#     graph = get_graph(schedule)
-#     for pred in object_ICs
-#         add_to_schedule!(schedule, problem_spec, pred, get_object_id(pred))
-#     end
-#     # for (id,pred) in robot_ICs
-#     for pred in map(i->robot_ICs[i], 1:problem_spec.N)
-#         add_to_schedule!(schedule, problem_spec, pred, get_robot_id(pred))
-#         robot_pred_tips[get_robot_id(pred)] = get_robot_id(pred)
-#         # push!(robot_pred_tips, get_robot_id(pred))
-#     end
-#     # M = length(object_ICs) # number of objects
-#     # N = length(robot_ICs) - M # number of robots
-#     # add operations to graph
-#     for op_vtx in topological_sort(project_spec.graph)
-#         op = project_spec.operations[op_vtx]
-#         operation_id = OperationID(get_id(op))
-#         add_to_schedule!(schedule, problem_spec, op, operation_id)
-#         v = nv(get_graph(schedule))
-#         if op_vtx in project_spec.terminal_vtxs
-#             push!(schedule.terminal_vtxs, v)
-#             schedule.weights[v] = get(project_spec.weights, op_vtx, 1.0)
-#         end
-#         for object_id in get_input_ids(op)
-#             object_ops[ObjectID(object_id)] = operation_id
-#         end
-#         for object_id in get_output_ids(op)
-#             add_edge!(schedule, operation_id, ObjectID(object_id))
-#         end
-#     end
-#     # for (robot_id, pred_id) in robot_pred_tips
-#     for (task_idx, robot_id) in enumerate(assignments)
-#         object_id = get_object_id(object_ICs[task_idx])
-#         # add action sequence
-#         object_ic           = get_node_from_id(schedule, object_id)
-#         pickup_station_id   = get_location_id(object_ic)
-#         object_fc           = object_FCs[get_id(object_id)]
-#         dropoff_station_id  = get_location_id(object_fc)
-#
-#         # TODO Handle collaborative tasks
-#         # robot_id = get(assignments, task_idx, -1)
-#         pred_id = robot_pred_tips[RobotID(robot_id)]
-#         action_id = add_single_robot_delivery_task!(schedule,problem_spec,pred_id,
-#             RobotID(robot_id),object_id,pickup_station_id,dropoff_station_id) # DEPOSIT task id
-#         robot_pred_tips[RobotID(robot_id)] = action_id
-#         operation_id = object_ops[ObjectID(object_id)]
-#         add_edge!(schedule, action_id, operation_id)
-#
-#     end
-#     # end
-#     # add final GO to all robot/deposit nodes
-#     for (robot_id, pred_id) in robot_pred_tips
-#         action_id = ActionID(get_unique_action_id())
-#         add_to_schedule!(schedule, problem_spec, GO(get_id(robot_id), -1, -1,), action_id)
-#         add_edge!(schedule, pred_id, action_id)
-#     end
-#     sort!(schedule.terminal_vtxs)
-#     propagate_valid_ids!(schedule,problem_spec)
-#     return schedule
-# end
-# function construct_project_schedule(
-#     project_spec::P,
-#     problem_spec::T,
-#     robot_ICs::Dict{Int,ROBOT_AT},
-#     assignments::V=Dict{Int,Int}()
-#     ) where {P<:ProjectSpec,T<:ProblemSpec,V<:Union{Dict{Int,Int},Vector{Int}}}
-#     project_schedule = construct_project_schedule(
-#         project_spec,
-#         problem_spec,
-#         project_spec.initial_conditions,
-#         project_spec.final_conditions,
-#         robot_ICs,
-#         assignments
-#     )
-#     return project_schedule
-#     # # TODO just repair a partial schedule by incorporating the assignments: much more straightforward!
-#     # project_schedule = construct_partial_project_schedule(
-#     #     project_spec,
-#     #     problem_spec,
-#     #     map(i->robot_ICs[i], 1:problem_spec.N)
-#     # )
-#     # tip_type = GO
-#     # G = get_graph(project_schedule)
-#     # for (robot_id,task_list) in assignment_dict
-#     #     v = get_vtx(project_schedule, RobotID(robot_id))
-#     #     node = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v))
-#     #     done = false
-#     #     # find leaf node
-#     #     for task_idx in assignment_dict[v]
-#     #         for e in edges(bfs_parents(G, v))
-#     #             v2 = e.dst
-#     #             node2 = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v2))
-#     #             if typeof(node2) <: tip_type && outdegree(G,v2) < sum(values(required_predecessors(node)))
-#     #                 v = v2
-#     #                 break
-#     #             end
-#     #         end
-#     #         task_node =
-#     #         add_edge!(G,v,)
-#     #     end
-#     # end
-# end
-
 export
     construct_partial_project_schedule
 
@@ -1237,10 +1118,11 @@ function construct_partial_project_schedule(
     project_schedule
 end
 function construct_partial_project_schedule(spec::ProjectSpec,problem_spec::ProblemSpec,robot_ICs=Vector{ROBOT_AT}())
+    # @assert length(robot_ICs) == problem_spec.N "length(robot_ICs) == $(length(robot_ICs)), should be $(problem_spec.N)"
     construct_partial_project_schedule(
         spec.initial_conditions,
         spec.final_conditions,
-        map(i->robot_ICs[i], 1:min(length(robot_ICs),problem_spec.N)),
+        robot_ICs,
         spec.operations,
         map(op->op.id, spec.operations[collect(spec.terminal_vtxs)]),
         problem_spec,
@@ -1249,7 +1131,7 @@ end
 
 
 function construct_partial_project_schedule(robot_ICs::Vector{ROBOT_AT},prob_spec=
-        ProblemSpec()
+        ProblemSpec(N=length(robot_ICs))
         )
     construct_partial_project_schedule(
         Vector{OBJECT_AT}(),

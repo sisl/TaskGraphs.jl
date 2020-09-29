@@ -34,7 +34,7 @@ let
     project_spec, problem_spec, robot_ICs, env_graph, assignments = f(;cost_function=cost_model,verbose=true)
     solver = PC_TAPF_Solver(nbs_model=AssignmentMILP(),l1_verbosity=2,l2_verbosity=2,l3_verbosity=0)
 
-    project_schedule = construct_partial_project_schedule(project_spec,problem_spec,map(i->robot_ICs[i], 1:problem_spec.N))
+    project_schedule = construct_partial_project_schedule(project_spec,problem_spec,robot_ICs)
     model = formulate_milp(solver.nbs_model,project_schedule,problem_spec;cost_model=cost_model)
     optimize!(model)
     @test termination_status(model) == MOI.OPTIMAL

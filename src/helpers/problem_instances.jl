@@ -55,17 +55,8 @@ export
     pctapf_problem_8
 
 function get_zero_initial_conditions(G,N)
-    # set initial conditions
-    to0_ = Dict{Int,Float64}()
-    for v in vertices(G)
-        if is_root_node(G,v)
-            to0_[v] = 0.0
-        end
-    end
-    tr0_ = Dict{Int,Float64}()
-    for i in 1:N
-        tr0_[i] = 0.0
-    end
+    to0_ = Dict{Int,Float64}(v=>0.0 for v in get_all_root_nodes(G))
+    tr0_ = Dict{Int,Float64}(i=>0.0 for i in 1:N)
     return to0_, tr0_
 end
 
@@ -86,22 +77,9 @@ end
 function pctapf_problem(r0,config;Δt_op=0)
     tasks = config.tasks
     ops = config.ops
-    M = length(config.tasks)
     s0 = map(t->t.first,tasks)
     sF = map(t->t.second,tasks)
-    object_ICs = Vector{OBJECT_AT}()
-    object_FCs = Vector{OBJECT_AT}()
-    for (o,task) in enumerate(tasks)
-        push!(object_ICs, OBJECT_AT(o,task.first))
-        push!(object_FCs, OBJECT_AT(o,task.second))
-    end
-    robot_ICs = Dict{Int,ROBOT_AT}(r => ROBOT_AT(r,x) for (r,x) in enumerate(r0))
-    # Drs, Dss = cached_pickup_and_delivery_distances(r0,s0,sF,dist_function)
-    project_spec = ProjectSpec(
-        M=M,
-        initial_conditions=object_ICs,
-        final_conditions=object_FCs,
-        )
+    project_spec, _ = pctapf_problem(r0,s0,sF)
     for op in ops
         add_operation!(project_spec,construct_operation(project_spec,-1,
             op.inputs,op.outputs,Δt_op))
@@ -110,20 +88,10 @@ function pctapf_problem(r0,config;Δt_op=0)
 end
 
 function pctapf_problem(r0,s0,sF)
-    N = length(r0)
-    M = length(s0)
-    object_ICs = Vector{OBJECT_AT}([OBJECT_AT(o,s0[o]) for o in 1:M]) # initial_conditions
-    object_FCs = Vector{OBJECT_AT}([OBJECT_AT(o,sF[o]) for o in 1:M]) # final conditions
-    robot_ICs = Dict{Int,ROBOT_AT}(r => ROBOT_AT(r,r0[r]) for r in 1:N)
-    for r in N+1:N+M
-        robot_ICs[r] = ROBOT_AT(r,sF[r-N][1])
-    end
-    # Drs, Dss = cached_pickup_and_delivery_distances(r0,s0,sF,dist_function)
-    project_spec = ProjectSpec(
-        M=M,
-        initial_conditions=object_ICs,
-        final_conditions=object_FCs,
-        )
+    object_ICs = [OBJECT_AT(o,x) for (o,x) in enumerate(s0)] # initial_conditions
+    object_FCs = [OBJECT_AT(o,x) for (o,x) in enumerate(sF)] # final conditions
+    robot_ICs = [ROBOT_AT(r,x) for (r,x) in enumerate(r0)]
+    project_spec = ProjectSpec(object_ICs,object_FCs)
     project_spec, robot_ICs
 end
 
