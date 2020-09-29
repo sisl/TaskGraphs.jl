@@ -54,7 +54,7 @@ Elements:
     N::Int                  = 0 # num robots
     M::Int                  = 0 # num tasks
     graph::G                = DiGraph() # delivery graph
-    D::T                    = zeros(0,0) # full distance matrix
+    D::T                    = get_dist_matrix(graph) # full distance matrix
     Δt::Vector{Float64}     = Vector{Float64}() # durations of operations
     Δt_collect::Vector{Float64} = zeros(M) # duration of COLLECT operations
     Δt_deliver::Vector{Float64} = zeros(M) # duration of DELIVER operations

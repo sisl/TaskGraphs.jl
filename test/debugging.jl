@@ -57,6 +57,9 @@ let
     request = prob.requests[stage]
     remap_object_ids!(request.schedule,env.schedule)
     base_env = replan!(solver,replan_model,env,request)
+    t0,tF,_,_ = process_schedule(base_env.schedule,base_env.cache.t0,base_env.cache.tF)
+    plot_project_schedule(base_env.schedule;mode=:leaf_aligned)
+
     reset_solver!(solver)
     assignment_problem = formulate_assignment_problem(assignment_solver(solver),PC_TAPF(base_env))
     sched, l_bound = solve_assignment_problem!(
@@ -64,9 +67,6 @@ let
                 assignment_problem,
                 PC_TAPF(base_env))
 
-    node_strings = [string(v," → ",string(get_node_from_vtx(sched,v))) for v in vertices(sched)]
-    edge_list = collect(edges(sched))
-    node_strings,edge_list
     plot_project_schedule(sched;mode=:leaf_aligned)
 
     # env, cost = solve!(solver,base_env)
