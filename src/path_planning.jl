@@ -551,7 +551,7 @@ function construct_search_env(
         extra_T=400,
         kwargs...
     )
-    N = problem_spec.N                                          # number of robots
+    # N = problem_spec.N                                          # number of robots
     cost_model, heuristic_model = construct_cost_model(
         solver,
         schedule,
@@ -563,7 +563,8 @@ function construct_search_env(
         )
 
     route_plan = initialize_route_plan(schedule,cost_model)
-    @assert N == length(get_paths(route_plan))
+    # @assert N == length(get_paths(route_plan))
+    N = length(get_paths(route_plan))
 
     search_env = SearchEnv(
         schedule=schedule,
@@ -598,7 +599,7 @@ function construct_search_env(
         extra_T=400,
         kwargs...)
 
-    N = problem_spec.N                                          # number of robots
+    # N = problem_spec.N                                          # number of robots
     cost_model, heuristic_model = construct_cost_model(
         solver,
         schedule,
@@ -610,7 +611,8 @@ function construct_search_env(
         )
 
     route_plan = initialize_route_plan(env,cost_model)
-    @assert N == length(get_paths(route_plan))
+    # @assert N == length(get_paths(route_plan))
+    N = length(get_paths(route_plan))
 
     search_env = SearchEnv(
         schedule=schedule,

@@ -78,33 +78,43 @@ let
         end
     end
 end
+# Problem generation and profiling
 let
     solver = NBSSolver()
-    loader = TaskGraphs.ReplanningProblemLoader()
-    loader.envs["env_1"] = init_env_1()
-    loader.prob_specs["env_1"] = ProblemSpec(N=3,graph=loader.envs["env_1"])
+    loader = ReplanningProblemLoader()
+    add_env!(loader,"env_1",init_env_1())
 
-    simple_prob_def = TaskGraphs.SimpleRepeatedProblemDef(
-        r0 = [1,2,3],
-        env_id = "env_1",
-    )
+    simple_prob_def = SimpleRepeatedProblemDef(r0 = [1,2,3],env_id = "env_1",)
 
     for (i,def) in enumerate([
-        (tasks=[4=>10,5=>11,6=>12],
+        (tasks=[1=>4,2=>5,3=>6],
             ops=[
                 (inputs=[1,2],outputs=[3],Δt_op=0),
                 (inputs=[3],outputs=[],Δt_op=0)]),
-        (tasks=[9=>10,10=>11,11=>12],
+        (tasks=[7=>8,9=>10,11=>12],
             ops=[
                 (inputs=[1,2],outputs=[3],Δt_op=0),
                 (inputs=[3],outputs=[],Δt_op=0)]),
         ])
         t = i*10
         push!(simple_prob_def.requests,
-            TaskGraphs.SimpleReplanningRequest(pctapf_problem(Int[],def),t,t))
+            SimpleReplanningRequest(pctapf_problem(Int[],def),t,t))
     end
-    TaskGraphs.write_simple_repeated_problem_def("problem001",simple_prob_def)
-    simple_prob_def = TaskGraphs.read_simple_repeated_problem_def("problem001")
+    write_simple_repeated_problem_def("problem001",simple_prob_def)
+    simple_prob_def = read_simple_repeated_problem_def("problem001")
     prob = RepeatedPC_TAPF(simple_prob_def,solver,loader)
+
+    search_env = replan!(solver,replan_model,prob.env,prob.requests[1])
+    is_cyclic(search_env.schedule.graph)
+
+    #
+    # is_cyclic(prob.env.schedule.graph)
+    # is_cyclic(prob.requests[1].schedule.graph)
+    # is_cyclic(prob.requests[2].schedule.graph)
+
+    set_verbosity!(solver,5)
+    replan_model = MergeAndBalance()
+    set_real_time_flag!(replan_model,false)
+    profile_replanner!(solver,replan_model,prob)
 
 end

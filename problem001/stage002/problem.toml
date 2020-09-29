@@ -1,21 +1,21 @@
-final_conditions = [[1, 10], [2, 11], [3, 12]]
+final_conditions = [[1, 8], [2, 10], [3, 12]]
 t_request = 20
 r0 = []
-s0 = [9, 10, 11]
-sF = [10, 11, 12]
+s0 = [7, 9, 11]
+sF = [8, 10, 12]
 t_arrival = 20
 shapes = [[1, 1], [1, 1], [1, 1]]
-initial_conditions = [[1, 9], [2, 10], [3, 11]]
+initial_conditions = [[1, 7], [2, 9], [3, 11]]
 
 [[operations]]
-pre = [[1, 10], [2, 11]]
+pre = [[2, 10], [1, 8]]
 post = [[3, 11]]
 station_id = -1
-id = 28
+id = 83
 dt = 0
 [[operations]]
 pre = [[3, 12]]
 post = []
 station_id = -1
-id = 29
+id = 84
 dt = 0

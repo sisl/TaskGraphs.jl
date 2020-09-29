@@ -43,6 +43,9 @@ struct RepeatedPC_TAPF{S<:SearchEnv}
 end
 RepeatedPC_TAPF(env::SearchEnv) = RepeatedPC_TAPF(env,Vector{ProjectRequest}())
 
+export
+    ReplanningProblemLoader,
+    add_env!
 
 """
     ReplanningProblemLoader
@@ -64,7 +67,12 @@ function add_env!(loader::ReplanningProblemLoader,env_id::String,
         loader.envs[env_id] = env
         loader.prob_specs[env_id] = ProblemSpec(graph=env)
     end
+    loader
 end
+
+export
+    SimpleReplanningRequest,
+    read_simple_request
 
 """
     SimpleReplanningRequest
@@ -99,6 +107,11 @@ function ProjectRequest(def::SimpleReplanningRequest,prob_spec)
         t_arrival = def.t_arrival
         )
 end
+
+export
+    SimpleRepeatedProblemDef,
+    write_simple_repeated_problem_def,
+    read_simple_repeated_problem_def
 
 """
     SimpleRepeatedProblemDef
@@ -745,9 +758,9 @@ function replan!(solver, replan_model, search_env, request;
         search_env,
         initialize_planning_cache(new_schedule,t0,tF)
         )
-    @log_info(3,solver,"Previous route plan: ",sprint_route_plan(route_plan))
+    @log_info(3,solver,"Previous route plan: \n",sprint_route_plan(route_plan))
     trimmed_route_plan = trim_route_plan(base_search_env, route_plan, t_commit)
-    @log_info(3,solver,"Trimmed route plan: ",sprint_route_plan(trimmed_route_plan))
+    @log_info(3,solver,"Trimmed route plan: \n",sprint_route_plan(trimmed_route_plan))
     SearchEnv(base_search_env, route_plan=trimmed_route_plan)
 end
 replan!(solver, replan_model::NullReplanner, search_env, args...;kwargs...) = search_env
