@@ -8,14 +8,14 @@ shapes = [[1, 1], [1, 1], [1, 1]]
 initial_conditions = [[1, 1], [2, 2], [3, 3]]
 
 [[operations]]
-pre = [[1, 4], [2, 5]]
+pre = [[2, 5], [1, 4]]
 post = [[3, 3]]
 station_id = -1
-id = 121
+id = 177
 dt = 0
 [[operations]]
 pre = [[3, 6]]
 post = []
 station_id = -1
-id = 122
+id = 178
 dt = 0
