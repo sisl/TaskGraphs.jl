@@ -1,0 +1,21 @@
+final_conditions = [[1, 10], [2, 11], [3, 12]]
+t_request = 20
+r0 = []
+s0 = [9, 10, 11]
+sF = [10, 11, 12]
+t_arrival = 20
+shapes = [[1, 1], [1, 1], [1, 1]]
+initial_conditions = [[1, 9], [2, 10], [3, 11]]
+
+[[operations]]
+pre = [[1, 10], [2, 11]]
+post = [[3, 11]]
+station_id = -1
+id = 28
+dt = 0
+[[operations]]
+pre = [[3, 12]]
+post = []
+station_id = -1
+id = 29
+dt = 0

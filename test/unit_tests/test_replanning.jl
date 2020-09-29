@@ -78,3 +78,34 @@ let
         end
     end
 end
+let
+    solver = NBSSolver()
+    loader = TaskGraphs.ReplanningProblemLoader()
+    loader.envs["env_1"] = init_env_1()
+    loader.prob_specs["env_1"] = ProblemSpec(N=3,graph=loader.envs["env_1"])
+
+    simple_prob_def = TaskGraphs.SimpleRepeatedProblemDef(
+        r0 = [1,2,3],
+        env_id = "env_1",
+    )
+
+    for (i,def) in enumerate([
+        (tasks=[4=>10,5=>11,6=>12],
+            ops=[
+                (inputs=[1,2],outputs=[3],Δt_op=0),
+                (inputs=[3],outputs=[],Δt_op=0)]),
+        (tasks=[9=>10,10=>11,11=>12],
+            ops=[
+                (inputs=[1,2],outputs=[3],Δt_op=0),
+                (inputs=[3],outputs=[],Δt_op=0)]),
+        ])
+        t = i*10
+        push!(simple_prob_def.requests,
+            TaskGraphs.SimpleReplanningRequest(pctapf_problem(Int[],def),t,t))
+    end
+    TaskGraphs.write_simple_repeated_problem_def("problem001",simple_prob_def)
+    simple_prob_def = TaskGraphs.read_simple_repeated_problem_def("problem001")
+    prob = RepeatedPC_TAPF(simple_prob_def,solver,loader)
+
+
+end

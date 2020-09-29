@@ -6,6 +6,8 @@
 # using CRCBS
 # using ..TaskGraphs
 
+using Printf: @sprintf
+
 export
     ProjectRequest
 
@@ -41,6 +43,26 @@ struct RepeatedPC_TAPF{S<:SearchEnv}
 end
 RepeatedPC_TAPF(env::SearchEnv) = RepeatedPC_TAPF(env,Vector{ProjectRequest}())
 
+
+"""
+    ReplanningProblemLoader
+
+Helper cache for loading replanning problems
+"""
+struct ReplanningProblemLoader
+    envs::Dict{String,GridFactoryEnvironment}
+    prob_specs::Dict{String,ProblemSpec}
+    ReplanningProblemLoader() = new(
+        Dict{String,GridFactoryEnvironment}(),
+        Dict{String,ProblemSpec}()
+    )
+end
+
+"""
+    SimpleReplanningRequest
+
+Intermediate representation of a `ProjectRequest` (useful for I/O)
+"""
 struct SimpleReplanningRequest
     def::SimpleProblemDef
     t_request::Int
@@ -55,11 +77,11 @@ end
 function read_simple_request(toml_dict)
     SimpleReplanningRequest(
         read_problem_def(toml_dict),
-        prob_dict["t_request"],
-        prob_dict["t_arrival"]
+        toml_dict["t_request"],
+        toml_dict["t_arrival"]
     )
 end
-read_simple_request(path::String)
+read_simple_request(path::String) = read_simple_request(TOML.parse(path))
 
 function ProjectRequest(def::SimpleReplanningRequest,prob_spec)
     ProjectRequest(
@@ -70,23 +92,30 @@ function ProjectRequest(def::SimpleReplanningRequest,prob_spec)
         )
 end
 
-struct SimpleRepeatedProblemDef
-    requests::Vector{SimpleReplanningRequest}
-    r0::Vector{Int}
-    env_id::String
+"""
+    SimpleRepeatedProblemDef
+
+Intermediate representation of a `RepeatedPC_TAPF` (useful for I/O)
+"""
+@with_kw struct SimpleRepeatedProblemDef
+    requests::Vector{SimpleReplanningRequest} = Vector{SimpleReplanningRequest}()
+    r0::Vector{Int} = Int[]
+    env_id::String = ""
 end
 
 function write_simple_repeated_problem_def(path,def::SimpleRepeatedProblemDef)
-    toml_dict = Dict(
-        "r0" => def.r0,
-        "env_id" => def.env_id
-    )
-    TOML.print(joinpath(path,"config.toml"),toml_dict)
+    toml_dict = Dict("r0" => def.r0,"env_id" => def.env_id)
+    mkpath(path)
+    open(joinpath(path,"config.toml"),"w") do io
+        TOML.print(io,toml_dict)
+    end
     for (i,stage_def) in enumerate(def.requests)
         p = joinpath(path,@sprintf("stage%3.3i",i))
         mkpath(p)
         toml_dict = TOML.parse(stage_def)
-        TOML.print(joinpath(p,"problem.toml"),toml_dict)
+        open(joinpath(p,"problem.toml"),"w") do io
+            TOML.print(io,toml_dict)
+        end
     end
     return true
 end
@@ -106,8 +135,9 @@ function read_simple_repeated_problem_def(path)
     prob_def
 end
 
-function RepeatedPC_TAPF(simple_def::SimpleRepeatedProblemDef,solver,envs,prob_spec)
-    env = envs[simple_def.env_id]
+function RepeatedPC_TAPF(simple_def::SimpleRepeatedProblemDef,solver,loader::ReplanningProblemLoader)
+    env         = loader.envs[simple_def.env_id]
+    prob_spec   = loader.prob_specs[simple_def.env_id]
     sched = construct_partial_project_schedule(
         [ROBOT_AT(r,x) for (r,x) in enumerate(simple_def.r0)],prob_spec)
     search_env = construct_search_env(solver,sched,prob_spec,env)
@@ -116,6 +146,7 @@ function RepeatedPC_TAPF(simple_def::SimpleRepeatedProblemDef,solver,envs,prob_s
         map(req->ProjectRequest(req,prob_spec), simple_def.requests)
     )
 end
+
 
 #
 # problem_path/

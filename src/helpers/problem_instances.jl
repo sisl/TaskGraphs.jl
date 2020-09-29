@@ -21,7 +21,7 @@ init_env_1() = construct_regular_factory_world(;
     obs_width = [4;4], # obs_w = 8/n
     obs_offset = [4;4],
     env_pad = [1;1],
-    env_offset = [1,1],
+    # env_offset = [1,1],
     env_scale = 1
 )
 init_env_2() = construct_regular_factory_world(;
@@ -30,7 +30,7 @@ init_env_2() = construct_regular_factory_world(;
     obs_width = [2;2],
     obs_offset = [2;2],
     env_pad = [1;1],
-    env_offset = [1,1],
+    # env_offset = [1,1],
     env_scale = 1
 )
 init_env_3() = construct_regular_factory_world(;
@@ -39,7 +39,7 @@ init_env_3() = construct_regular_factory_world(;
     obs_width = [1;1],
     obs_offset = [1;1],
     env_pad = [1;1],
-    env_offset = [1,1],
+    # env_offset = [1,1],
     env_scale = 1
 )
 
@@ -80,6 +80,33 @@ function print_toy_problem_specs(prob_name,vtx_grid,r0,s0,sF,project_spec,delive
     print("\n\n")
     display(delivery_graph.tasks)
     print("\n\n")
+end
+
+
+function pctapf_problem(r0,config;Δt_op=0)
+    tasks = config.tasks
+    ops = config.ops
+    M = length(config.tasks)
+    s0 = map(t->t.first,tasks)
+    sF = map(t->t.second,tasks)
+    object_ICs = Vector{OBJECT_AT}()
+    object_FCs = Vector{OBJECT_AT}()
+    for (o,task) in enumerate(tasks)
+        push!(object_ICs, OBJECT_AT(o,task.first))
+        push!(object_FCs, OBJECT_AT(o,task.second))
+    end
+    robot_ICs = Dict{Int,ROBOT_AT}(r => ROBOT_AT(r,x) for (r,x) in enumerate(r0))
+    # Drs, Dss = cached_pickup_and_delivery_distances(r0,s0,sF,dist_function)
+    project_spec = ProjectSpec(
+        M=M,
+        initial_conditions=object_ICs,
+        final_conditions=object_FCs,
+        )
+    for op in ops
+        add_operation!(project_spec,construct_operation(project_spec,-1,
+            op.inputs,op.outputs,Δt_op))
+    end
+    def = SimpleProblemDef(project_spec,r0,s0,sF)
 end
 
 function pctapf_problem(r0,s0,sF)
