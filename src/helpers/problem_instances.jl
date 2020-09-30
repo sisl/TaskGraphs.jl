@@ -117,46 +117,6 @@ function pctapf_problem(
     PC_TAPF(env)
 end
 
-
-"""
-    instantiate_random_pctapf_problem(env,config)
-
-Instantiate a random `PC_TAPF` problem based on the parameters of config.
-"""
-function instantiate_random_pctapf_def(env::GridFactoryEnvironment,config)
-    N                   = get(config,:N,30)
-    M                   = get(config,:M,10)
-    max_parents         = get(config,:max_parents,3)
-    depth_bias          = get(config,:depth_bias,0.4)
-    dt_min              = get(config,:dt_min,0)
-    dt_max              = get(config,:dt_max,0)
-    # dt_collect          = get(config,:dt_collect,0)
-    # dt_deliver          = get(config,:dt_deliver,0)
-    task_sizes          = get(config,:task_sizes,(1=>1.0,2=>0.0,4=>0.0))
-    # num_projects        = get(config,:num_projects,10)
-    # arrival_interval    = get(config,:arrival_interval,40)
-
-    r0,s0,sF = get_random_problem_instantiation(N,M,get_pickup_zones(env),
-        get_dropoff_zones(env),get_free_zones(env))
-    project_spec = construct_random_project_spec(M,s0,sF;
-        max_parents=max_parents,
-        depth_bias=depth_bias,
-        Δt_min=dt_min,
-        Δt_max=dt_max)
-    shapes = choose_random_object_sizes(M,Dict(task_sizes...))
-    problem_def = SimpleProblemDef(project_spec,r0,s0,sF,shapes)
-end
-
-"""
-    instantiate_random_repeated_pctapf_problem(env,config)
-
-Instantiate a random `RepeatedPC_TAPF` problem based on the parameters of config.
-"""
-function instantiate_random_pctapf_sequence(env::GridFactoryEnvironment,config)
-    num_projects        = get(config,:num_projects,10)
-    projects = map(i->instantiate_random_pctapf_problem(env,config), 1:num_projects)
-end
-
 # This is a place to put reusable problem initializers for testing
 """
     pctapf_problem_1
@@ -884,6 +844,142 @@ replanning_test_problems() = [
     replanning_problem_3,
     replanning_problem_4,
 ]
+
+################################################################################
+##################### Random RepeatedPC_TAPF instantiation #####################
+################################################################################
+
+export
+    random_pctapf_def,
+    random_pctapf_def,
+    random_repeated_pctapf_def
+
+"""
+    instantiate_random_pctapf_def(env,config)
+
+Instantiate a random `PC_TAPF` problem based on the parameters of config.
+"""
+function random_pctapf_def(env::GridFactoryEnvironment,
+        config;
+        N                   = get(config,:N,30),
+        M                   = get(config,:M,10),
+        max_parents         = get(config,:max_parents,3),
+        depth_bias          = get(config,:depth_bias,0.4),
+        dt_min              = get(config,:dt_min,0),
+        dt_max              = get(config,:dt_max,0),
+        dt_collect          = get(config,:dt_collect,0),
+        dt_deliver          = get(config,:dt_deliver,0),
+        task_sizes          = get(config,:task_sizes,(1=>1.0,2=>0.0,4=>0.0)),
+    )
+
+    r0,s0,sF = get_random_problem_instantiation(N,M,get_pickup_zones(env),
+        get_dropoff_zones(env),get_free_zones(env))
+    project_spec = construct_random_project_spec(M,s0,sF;
+        max_parents=max_parents,
+        depth_bias=depth_bias,
+        Δt_min=dt_min,
+        Δt_max=dt_max)
+    shapes = choose_random_object_sizes(M,Dict(task_sizes...))
+    problem_def = SimpleProblemDef(project_spec,r0,s0,sF,shapes)
+end
+
+"""
+    instantiate_random_repeated_pctapf_problem(env,config)
+
+Instantiate a random `RepeatedPC_TAPF` problem based on the parameters of config.
+"""
+function random_pctapf_sequence(env::GridFactoryEnvironment,config;
+        num_projects        = get(config,:num_projects,10),
+        kwargs...)
+    projects = map(i->random_pctapf_def(env,config;kwargs...), 1:num_projects)
+end
+
+function random_repeated_pctapf_def(env,config;
+        arrival_interval    = get(config,:arrival_interval,40),
+        warning_time        = get(config,:warning_time,0),
+        N                   = get(config,:N,0),
+        env_id              = get(config,:env_id,""),
+        kwargs...)
+    projects = random_pctapf_sequence(env,config;N=0,kwargs...)
+    requests = map(i->SimpleReplanningRequest(
+        projects[i],
+        i*arrival_interval, # request
+        i*arrival_interval + warning_time # arrival time
+        ), 1:length(projects))
+    r0,_,_ = get_random_problem_instantiation(N,0,[],[],get_free_zones(env))
+    prob_def = SimpleRepeatedProblemDef(
+        requests = requests,
+        r0 = r0,
+        env_id = env_id
+        )
+end
+
+export
+    write_repeated_pctapf_problems!
+
+function write_repeated_pctapf_problems!(loader::ReplanningProblemLoader,config::Dict,base_path::String,prob_counter::Int=1)
+    env = get_env!(loader,config[:env_id])
+    num_trials = get(config,:num_trials,1)
+    for i in 1:num_trials
+        prob_def = random_repeated_pctapf_def(env,config)
+        write_simple_repeated_problem_def(
+            joinpath(base_path,@sprintf("problem%4.4i",prob_counter)),prob_def)
+        prob_counter += 1
+        open(joinpath(base_path,"config.toml"),"w") do io
+            TOML.print(io,config)
+        end
+    end
+    return prob_counter
+end
+function write_repeated_pctapf_problems!(loader::ReplanningProblemLoader,configs::Vector{D},base_path::String,prob_counter::Int=1) where {D<:Dict}
+    for config in configs
+        prob_counter = write_repeated_pctapf_problems!(loader,config,base_path,prob_counter)
+    end
+    prob_counter
+end
+
+
+export
+    replanning_config_1
+
+"""
+    replanning_config_1
+
+Returns a vector of config dictionaries, which can be used to generate random
+problem instances for profiling.
+"""
+function replanning_config_1()
+    base_configs = [
+        Dict(
+            :warning_time=>20,
+            :commit_threshold=>10,
+            :fallback_commit_threshold=>10,
+            :num_trials => 4,
+            :max_parents => 3,
+            :depth_bias => 0.4,
+            :dt_min => 0,
+            :dt_max => 0,
+            :dt_collect => 0,
+            :dt_deliver => 0,
+            # :task_sizes => (1=>1.0,2=>0.0,4=>0.0),
+            :save_paths => false,
+            :env_id=>"env_2",
+            )
+    ]
+    stream_configs = [
+        Dict(:N=>30, :M=>10, :num_projects=>10, :arrival_interval=>40, ),
+        Dict(:N=>30, :M=>15, :num_projects=>10, :arrival_interval=>50, ),
+        Dict(:N=>30, :M=>20, :num_projects=>10, :arrival_interval=>60, ),
+        Dict(:N=>30, :M=>25, :num_projects=>10, :arrival_interval=>70, ),
+        Dict(:N=>30, :M=>30, :num_projects=>10, :arrival_interval=>80, ),
+    ]
+    problem_configs = Dict[]
+    for dicts in Base.Iterators.product(base_configs,stream_configs)
+        push!(problem_configs,merge(dicts...))
+    end
+
+    problem_configs
+end
 
 export
     pctapf_test_problems,

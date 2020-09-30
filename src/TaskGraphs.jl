@@ -4,6 +4,7 @@ using Reexport
 using Parameters
 using LightGraphs, MetaGraphs
 using GraphUtils
+using Random
 using LinearAlgebra
 using DataStructures
 using JuMP, MathOptInterface

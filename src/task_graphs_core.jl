@@ -667,12 +667,12 @@ end
 Add `ScheduleNode` pred to `sched` with associated `AbstractID` `id` and
 `PathSpec` `path_spec`.
 """
-function add_to_schedule!(schedule::P,path_spec::T,pred,id::ID) where {P<:OperatingSchedule,T<:PathSpec,ID<:AbstractID}
-    @assert get_vtx(schedule, id) == -1
-    add_vertex!(get_graph(schedule))
-    insert_to_vtx_map!(schedule,pred,id,nv(get_graph(schedule)))
-    add_path_spec!(schedule,path_spec)
-    schedule
+function add_to_schedule!(sched::P,path_spec::T,pred,id::ID) where {P<:OperatingSchedule,T<:PathSpec,ID<:AbstractID}
+    @assert get_vtx(sched, id) == -1 "Trying to add $(string(id)) => $(string(pred)) to schedule, but $(string(id)) => $(string(get_node_from_id(sched,id))) already exists"
+    add_vertex!(get_graph(sched))
+    insert_to_vtx_map!(sched,pred,id,nv(get_graph(sched)))
+    add_path_spec!(sched,path_spec)
+    sched
 end
 function add_to_schedule!(schedule::P,spec::T,pred,id::ID) where {P<:OperatingSchedule,T<:ProblemSpec,ID<:AbstractID}
     add_to_schedule!(schedule,generate_path_spec(schedule,spec,pred),pred,id)

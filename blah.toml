@@ -1,0 +1,16 @@
+depth_bias = 0.4
+dt_deliver = 0
+dt_collect = 0
+commit_threshold = 10
+M = 10
+dt_min = 0
+N = 30
+num_projects = 10
+warning_time = 20
+env_id = "env_2"
+arrival_interval = 40
+num_trials = 4
+max_parents = 3
+fallback_commit_threshold = 10
+dt_max = 0
+save_paths = false

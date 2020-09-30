@@ -14,6 +14,12 @@
 # using ..PlanningPredicates
 # using ..TaskGraphsCore
 
+
+export to_string_dict
+
+to_string_dict(dict) = Dict(string(k)=>v for (k,v) in dict)
+TOML.print(io::IO,dict::Dict{Symbol,V}) where {V} = TOML.print(io,to_string_dict(dict))
+
 export
     remap_object_id,
     remap_object_ids!

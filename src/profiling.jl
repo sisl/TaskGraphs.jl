@@ -893,28 +893,6 @@ function get_problem_config_2()
     base_problem_dir, base_results_dir, solver_configs, problem_configs, solvers
 end
 function get_replanning_config_1()
-    base_solver_configs = [
-        Dict(
-        :nbs_time_limit=>8,
-        :route_planning_buffer=>2,
-        :env_id=>2,
-        :OutputFlag => 0,
-        :Presolve => -1,
-        ),
-    ]
-    fallback_configs = [
-        Dict(:fallback_model=>ReassignFreeRobots(),),
-    ]
-    replan_configs = [
-        Dict(:replan_model=>MergeAndBalance(),),
-        Dict(:replan_model=>Oracle(),:time_out_buffer=>-105,:route_planning_buffer=>5),
-        Dict(:replan_model=>ReassignFreeRobots(),),
-        Dict(:replan_model=>DeferUntilCompletion(),),
-    ]
-    solver_configs = Dict[]
-    for dicts in Base.Iterators.product(base_solver_configs,fallback_configs,replan_configs)
-        push!(solver_configs,merge(dicts...))
-    end
     base_configs = [
         Dict(
             :warning_time=>20,
@@ -944,34 +922,11 @@ function get_replanning_config_1()
         push!(problem_configs,merge(dicts...))
     end
 
-    solver_template = PC_TAPF_Solver(
-        nbs_model                   = SparseAdjacencyMILP(),
-        DEBUG                       = true,
-        l1_verbosity                = 1,
-        l2_verbosity                = 1,
-        l3_verbosity                = 0,
-        l4_verbosity                = 0,
-        LIMIT_assignment_iterations = 10,
-        LIMIT_A_star_iterations     = 8000
-        );
-    fallback_solver_template = PC_TAPF_Solver(
-        nbs_model                   = GreedyAssignment(),
-        astar_model                 = PrioritizedAStarModel(),
-        DEBUG                       = true,
-        l1_verbosity                = 1,
-        l2_verbosity                = 1,
-        l3_verbosity                = 0,
-        l4_verbosity                = 0,
-        LIMIT_assignment_iterations = 2,
-        LIMIT_A_star_iterations     = 8000
-        );
-
-
     base_dir            = joinpath("/scratch/task_graphs_experiments","replanning")
     base_problem_dir    = joinpath(base_dir,"problem_instances")
     base_results_dir    = joinpath(base_dir,"results")
 
-    base_problem_dir, base_results_dir, solver_configs, problem_configs, solver_template, fallback_solver_template
+    base_problem_dir, base_results_dir, problem_configs
 end
 function get_replanning_config_2()
     base_solver_configs = [

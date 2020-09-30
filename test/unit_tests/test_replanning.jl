@@ -78,34 +78,3 @@ let
         end
     end
 end
-# Problem generation and profiling
-let
-    solver = NBSSolver()
-    loader = ReplanningProblemLoader()
-    add_env!(loader,"env_1",init_env_1())
-
-    simple_prob_def = SimpleRepeatedProblemDef(r0 = [1,2,3],env_id = "env_1",)
-
-    for (i,def) in enumerate([
-        (tasks=[1=>4,2=>5,3=>6],
-            ops=[
-                (inputs=[1,2],outputs=[3],Δt_op=0),
-                (inputs=[3],outputs=[],Δt_op=0)]),
-        (tasks=[7=>8,9=>10,11=>12],
-            ops=[
-                (inputs=[1,2],outputs=[3],Δt_op=0),
-                (inputs=[3],outputs=[],Δt_op=0)]),
-        ])
-        t = i*10
-        push!(simple_prob_def.requests,
-            SimpleReplanningRequest(pctapf_problem(Int[],def),t,t))
-    end
-    write_simple_repeated_problem_def("problem001",simple_prob_def)
-    simple_prob_def = read_simple_repeated_problem_def("problem001")
-
-    prob = RepeatedPC_TAPF(simple_prob_def,solver,loader)
-
-    replan_model = MergeAndBalance()
-    set_real_time_flag!(replan_model,false)
-    profile_replanner!(solver,replan_model,prob)
-end
