@@ -217,9 +217,9 @@ function TOML.parse(op::Operation)
     toml_dict["id"] = get_id(op.id)
     return toml_dict
 end
-function read_operation(toml_dict::Dict)
+function read_operation(toml_dict::Dict,keep_id=false)
     op_id = OperationID(get(toml_dict,"id",-1))
-    if get_id(op_id) == -1
+    if get_id(op_id) == -1 || keep_id == false
         op_id = OperationID(get_unique_operation_id())
     end
     op = Operation(

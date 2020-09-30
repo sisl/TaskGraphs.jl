@@ -126,7 +126,7 @@ end
 function sprint_search_env(io::IO,env::SearchEnv)
     # print(io,"schedule: ",env.schedule,"\n")
     print(io,"SearchEnv: \n")
-    print(io,"cache: ",sprint(show,env.cache))
+    print(io,"cache: ",sprint(sprint_cache,env.cache))
     print(io,"active task nodes:","\n")
     for v in env.cache.active_set
         print(io,"\t","v = ",
