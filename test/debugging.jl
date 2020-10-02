@@ -24,65 +24,31 @@ end
 
 # Replanning problem generation and profiling
 let
+    reset_task_id_counter!()
+    reset_operation_id_counter!()
+
     solver = NBSSolver()
-    replan_model = MergeAndBalance()
-    set_verbosity!(solver,5)
-    set_real_time_flag!(replan_model,false)
     loader = ReplanningProblemLoader()
-    add_env!(loader,"env_1",init_env_1())
+    # add_env!(loader,"env_2",init_env_2())
+    prob = pctapf_problem_1(solver)
+    add_env!(loader,"env_2",prob.env.env_graph)
 
-    simple_prob_def = SimpleRepeatedProblemDef(r0 = [1,2,3],env_id = "env_1",)
+    base_dir            = joinpath("/scratch/task_graphs_experiments","dummy")
+    base_problem_dir    = joinpath(base_dir,"problem_instances")
+    base_results_dir    = joinpath(base_dir,"results")
 
-    for (i,def) in enumerate([
-        (tasks=[1=>4,2=>5,3=>6],
-            ops=[
-                (inputs=[1,2],outputs=[3],Δt_op=0),
-                (inputs=[3],outputs=[],Δt_op=0)]),
-        (tasks=[7=>8,9=>10,11=>12],
-            ops=[
-                (inputs=[1,2],outputs=[3],Δt_op=0),
-                (inputs=[3],outputs=[],Δt_op=0)]),
-        ])
-        t = i*10
-        push!(simple_prob_def.requests,
-            SimpleReplanningRequest(pctapf_problem(Int[],def),t,t))
-    end
-    write_simple_repeated_problem_def("problem001",simple_prob_def)
-    simple_prob_def = read_simple_repeated_problem_def("problem001")
+    problem_configs = replanning_config_2()
+    write_repeated_pctapf_problems!(loader,problem_configs,base_problem_dir)
+    simple_prob_def = read_simple_repeated_problem_def(joinpath(base_problem_dir,"problem0001"))
     prob = RepeatedPC_TAPF(simple_prob_def,solver,loader)
-    plot_project_schedule(prob.env.schedule;mode=:leaf_aligned)
 
-    env = prob.env
-    stage = 1
-    request = prob.requests[stage]
-    remap_object_ids!(request.schedule,env.schedule)
-    base_env = replan!(solver,replan_model,env,request)
-    t0,tF,_,_ = process_schedule(base_env.schedule,base_env.cache.t0,base_env.cache.tF)
-    plot_project_schedule(base_env.schedule;mode=:leaf_aligned)
-
+    replan_model = MergeAndBalance()
+    set_real_time_flag!(replan_model,false)
+    set_verbosity!(solver,2)
     reset_solver!(solver)
-    assignment_problem = formulate_assignment_problem(assignment_solver(solver),PC_TAPF(base_env))
-    sched, l_bound = solve_assignment_problem!(
-                assignment_solver(solver),
-                assignment_problem,
-                PC_TAPF(base_env))
+    search_env, cache = profile_replanner!(solver,replan_model,prob)
 
-    plot_project_schedule(sched;mode=:leaf_aligned)
-
-    # env, cost = solve!(solver,base_env)
-    env, timer_results = profile_solver!(solver,base_env)
-    compile_replanning_results!(cache,solver,env,timer_results,prob,stage,request)
-
-
-    search_env = replan!(solver,replan_model,prob.env,prob.requests[1])
-    plot_project_schedule(search_env.schedule;mode=:leaf_aligned)
-
-    # is_cyclic(prob.env.schedule.graph)
-    # is_cyclic(prob.requests[1].schedule.graph)
-    # is_cyclic(prob.requests[2].schedule.graph)
-
-    profile_replanner!(solver,replan_model,prob)
-
+    plot_project_schedule(cache.schedule;mode=:leaf_aligned)
 end
 
 # Backtracking motivating example

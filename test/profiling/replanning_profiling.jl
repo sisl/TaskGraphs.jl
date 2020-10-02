@@ -10,38 +10,28 @@ using CRCBS
 # using Logging
 
 # Problem generation and profiling
+reset_task_id_counter!()
+reset_operation_id_counter!()
+
 solver = NBSSolver()
 loader = ReplanningProblemLoader()
-add_env!(loader,"env_2",init_env_2())
+# add_env!(loader,"env_2",init_env_2())
+prob = pctapf_problem_1(solver)
+add_env!(loader,"env_2",prob.env.env_graph)
 
-base_dir            = joinpath("/scratch/task_graphs_experiments","replanning2")
+base_dir            = joinpath("/scratch/task_graphs_experiments","dummy")
 base_problem_dir    = joinpath(base_dir,"problem_instances")
 base_results_dir    = joinpath(base_dir,"results")
 
-problem_configs = replanning_config_1()
+problem_configs = replanning_config_2()
 write_repeated_pctapf_problems!(loader,problem_configs,base_problem_dir)
 
-# simple_prob_def = SimpleRepeatedProblemDef(r0 = [1,2,3],env_id = "env_1",)
-#
-# for (i,def) in enumerate([
-#     (tasks=[1=>4,2=>5,3=>6],
-#         ops=[
-#             (inputs=[1,2],outputs=[3],Δt_op=0),
-#             (inputs=[3],outputs=[],Δt_op=0)]),
-#     (tasks=[7=>8,9=>10,11=>12],
-#         ops=[
-#             (inputs=[1,2],outputs=[3],Δt_op=0),
-#             (inputs=[3],outputs=[],Δt_op=0)]),
-#     ])
-#     t = i*10
-#     push!(simple_prob_def.requests,
-#         SimpleReplanningRequest(pctapf_problem(Int[],def),t,t))
-# end
-# write_simple_repeated_problem_def("problem001",simple_prob_def)
 simple_prob_def = read_simple_repeated_problem_def(joinpath(base_problem_dir,"problem0001"))
-map(string,simple_prob_def.requests[2].def.project_spec.operations)
 prob = RepeatedPC_TAPF(simple_prob_def,solver,loader)
 
 replan_model = MergeAndBalance()
 set_real_time_flag!(replan_model,false)
-profile_replanner!(solver,replan_model,prob)
+set_verbosity!(solver,2)
+
+reset_solver!(solver)
+search_env, cache = profile_replanner!(solver,replan_model,prob)

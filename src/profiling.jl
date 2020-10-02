@@ -624,7 +624,7 @@ function run_profiling(solver,MODE=:nothing;
                     println("file ",problem_filename," already exists. Skipping ...")
                     continue # don't overwrite existing files
                 end
-                problem_def = instantiate_random_pctapf_problem(factory_env,problem_config)
+                problem_def = instantiate_random_pctapf_def(factory_env,problem_config)
                 open(problem_filename, "w") do io
                     TOML.print(io, TOML.parse(problem_def))
                 end
@@ -892,7 +892,7 @@ function get_problem_config_2()
 
     base_problem_dir, base_results_dir, solver_configs, problem_configs, solvers
 end
-function get_replanning_config_1()
+function get_replanning_config_1(base_dir=".")
     base_configs = [
         Dict(
             :warning_time=>20,

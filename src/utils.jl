@@ -69,6 +69,32 @@ function remap_object_ids!(new_schedule::OperatingSchedule,old_schedule::Operati
     remap_object_ids!(new_schedule,max_obj_id)
 end
 
+export robot_tip_map
+
+"""
+    robot_tip_map(sched::OperatingSchedule)
+
+Returns a `Dict{RobotID,AbstractID}` mapping `RobotID` to the terminal node of
+the `sched` corresponding to the robot's last assigned task.
+"""
+function robot_tip_map(sched::OperatingSchedule)
+    leaf_vtxs = get_all_terminal_nodes(sched)
+    robot_tips = Dict{RobotID,AbstractID}()
+    for v in leaf_vtxs
+        node_id = get_vtx_id(sched,v)
+        if isa(node_id,Union{RobotID,ActionID})
+            node = get_node_from_id(sched,node_id)
+            robot_id = get_robot_id(node)
+            if get_id(robot_id) != -1
+                @assert !haskey(robot_tips,robot_id)
+                robot_tips[robot_id] = node_id
+            end
+        end
+    end
+    @assert length(robot_tips) == length(get_robot_ICs(sched)) "length(robot_tips) == $(length(robot_tips)), but should be $(length(get_robot_ICs(sched)))"
+    robot_tips
+end
+
 export
     # validate,
     cached_pickup_and_delivery_distances,

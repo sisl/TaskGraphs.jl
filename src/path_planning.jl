@@ -675,9 +675,9 @@ function get_base_path(solver,search_env::SearchEnv,env::PCCBSEnv)
     t0 = search_env.cache.t0[v]
     gap = t0 - get_end_index(base_path)
     if gap > 0
-        @log_info(1, solver, string("LOW LEVEL SEARCH: in node ",v," -- ",
-            string(env.schedule_node),
-            ": cache.t0[v] (",t0,") - get_end_index(base_path) (",
+        @log_info(1, solver, string("get_base_path: ",string(env.schedule_node),
+            ", v = ",v," -- ",": cache.t0[v] (",t0,
+            ") - get_end_index(base_path) (",
             get_end_index(base_path),") = ", gap,
             ". Extending path to ",t0," ..."))
         extend_path!(env,base_path,t0)
@@ -725,7 +725,8 @@ function CRCBS.build_env(
         goal_time = maximum(env.cache.tF)
         goal_vtx = -1
         # deadline = Inf # already taken care of, perhaps?
-        @log_info(1,solver,string("BUILD ENV: setting goal_vtx = ",goal_vtx,", t = maximum(cache.tF) = ",goal_time))
+        @log_info(1,solver,string("BUILD ENV: ",string(schedule_node),
+            " - setting goal_vtx = ",goal_vtx,", t = maximum(cache.tF) = ",goal_time))
     end
     @assert goal_time != Inf "goal time set to $goal_time for node $(string(schedule_node))"
     cbs_env = PCCBSEnv(

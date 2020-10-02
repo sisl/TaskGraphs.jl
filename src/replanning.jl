@@ -354,7 +354,6 @@ function prune_schedule(project_schedule::OperatingSchedule,problem_spec::Proble
     # construct set of all nodes to prune out.
     remove_set = Set{Int}()
     for v in active_vtxs
-    # for v in fixed_vtxs
         if isa(get_node_from_vtx(project_schedule,v),Operation)
             push!(remove_set, v)
         end
@@ -453,7 +452,9 @@ function splice_schedules!(project_schedule::P,next_schedule::P,enforce_unique=t
     for v in vertices(get_graph(next_schedule))
         node_id = get_vtx_id(next_schedule, v)
         if !has_vertex(project_schedule,get_vtx(project_schedule,node_id))
-            add_to_schedule!(project_schedule, get_path_spec(next_schedule,v), get_node_from_id(next_schedule, node_id), node_id)
+            path_spec = get_path_spec(next_schedule,v)
+            node = get_node_from_id(next_schedule, node_id)
+            add_to_schedule!(project_schedule, path_spec, node, node_id)
         elseif enforce_unique
             throw(ErrorException(string("Vertex ",v," = ",
                 string(get_node_from_id(next_schedule,node_id)),
@@ -599,7 +600,8 @@ Stores information during replanning
 * `final_features` - vector of `::FeatureExtractors` to extract after final stage
 """
 @with_kw struct ReplanningProfilerCache
-    schedule::OperatingSchedule             = OperatingSchedule()
+    schedules::Vector{OperatingSchedule}    = Vector{OperatingSchedule}()
+    # schedule::OperatingSchedule             = OperatingSchedule()
     project_ids::Dict{AbstractID,Int}       = Dict{AbstractID,Int}()
     stage_results::Vector{Dict{String,Any}} = Vector{Dict{String,Any}}()
     final_results::Dict{String,Any}         = Dict{String,Any}()
@@ -719,6 +721,9 @@ function replan!(solver, replan_model, search_env, request;
     SearchEnv(base_search_env, route_plan=trimmed_route_plan)
 end
 replan!(solver, replan_model::NullReplanner, search_env, args...;kwargs...) = search_env
+function replan!(solver::FullReplanner,args...;kwargs...)
+    replan!(solver.solver,solver.replanner,args...;kwargs...)
+end
 
 export
     compile_replanning_results!,
@@ -727,8 +732,26 @@ export
 function compile_replanning_results!(
         cache::ReplanningProfilerCache,solver,env,
         timer_results,prob,stage,request)
+    push!(cache.schedules,deepcopy(env.schedule))
     # merge schedule
-    splice_schedules!(cache.schedule,request.schedule,false)
+    # if stage == 1
+    #     splice_schedules!(cache.schedule,env.schedule,false)
+    # else
+    #     splice_schedules!(cache.schedule,request.schedule,false)
+    #     robot_tips = robot_tip_map(cache.schedule)
+    #     for i in 1:num_agents(env)
+    #         robot_id = RobotID(i)
+    #         tip = robot_tips[robot_id]
+    #         v = get_vtx(env.schedule,tip)
+    #         if has_vertex(env.schedule,v)
+    #             for v2 in outneighbors(env.schedule,v)
+    #                 node_id = get_vtx_id(env.schedule,v2)
+    #                 add_edge!(cache.schedule,tip,node_id)
+    #             end
+    #         end
+    #     end
+    # end
+    # propagate_valid_ids!(cache.schedule,env.problem_spec)
     # TODO update a planning cache to store the start/end times of all nodes
     # store project ids
     for v in vertices(request.schedule)
@@ -749,14 +772,14 @@ function profile_replanner!(solver,replan_model,prob::RepeatedPC_TAPF,
     )
     env = prob.env
     for (stage,request) in enumerate(prob.requests)
-        @log_info(2,solver,"REPLANNING: Stage ",stage)
+        @log_info(1,solver,"REPLANNING: Stage ",stage)
         remap_object_ids!(request.schedule,env.schedule)
         base_env = replan!(solver,replan_model,env,request)
         reset_solver!(solver)
         # env, cost = solve!(solver,base_env)
         env, timer_results = profile_solver!(solver,base_env)
         compile_replanning_results!(cache,solver,env,timer_results,prob,stage,request)
-        @log_info(2,solver,"Stage ",stage," - ","route planner iterations: ",
+        @log_info(1,solver,"Stage ",stage," - ","route planner iterations: ",
             iterations(route_planner(solver)))
     end
     return env, cache

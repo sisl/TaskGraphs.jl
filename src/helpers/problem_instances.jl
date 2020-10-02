@@ -22,7 +22,8 @@ init_env_1() = construct_regular_factory_world(;
     obs_offset = [4;4],
     env_pad = [1;1],
     # env_offset = [1,1],
-    env_scale = 1
+    env_scale = 1,
+    exclude_from_free = true,
 )
 init_env_2() = construct_regular_factory_world(;
     n_obstacles_x=4,
@@ -31,7 +32,8 @@ init_env_2() = construct_regular_factory_world(;
     obs_offset = [2;2],
     env_pad = [1;1],
     # env_offset = [1,1],
-    env_scale = 1
+    env_scale = 1,
+    exclude_from_free = true,
 )
 init_env_3() = construct_regular_factory_world(;
     n_obstacles_x=8,
@@ -40,7 +42,8 @@ init_env_3() = construct_regular_factory_world(;
     obs_offset = [1;1],
     env_pad = [1;1],
     # env_offset = [1,1],
-    env_scale = 1
+    env_scale = 1,
+    exclude_from_free = true,
 )
 
 export
@@ -938,9 +941,15 @@ function write_repeated_pctapf_problems!(loader::ReplanningProblemLoader,configs
     prob_counter
 end
 
+export product_config_dicts
+
+function product_config_dicts(configs...)
+    map(dicts->merge(dicts...),Base.Iterators.product(configs...))[:]
+end
 
 export
-    replanning_config_1
+    replanning_config_1,
+    replanning_config_2
 
 """
     replanning_config_1
@@ -973,12 +982,30 @@ function replanning_config_1()
         Dict(:N=>30, :M=>25, :num_projects=>10, :arrival_interval=>70, ),
         Dict(:N=>30, :M=>30, :num_projects=>10, :arrival_interval=>80, ),
     ]
-    problem_configs = Dict[]
-    for dicts in Base.Iterators.product(base_configs,stream_configs)
-        push!(problem_configs,merge(dicts...))
-    end
-
-    problem_configs
+    product_config_dicts(base_configs,stream_configs)
+end
+function replanning_config_2()
+    base_configs = [
+        Dict(
+            :warning_time=>4,
+            :commit_threshold=>4,
+            :fallback_commit_threshold=>4,
+            :num_trials => 1,
+            :max_parents => 3,
+            :depth_bias => 0.4,
+            :dt_min => 0,
+            :dt_max => 0,
+            :dt_collect => 0,
+            :dt_deliver => 0,
+            # :task_sizes => (1=>1.0,2=>0.0,4=>0.0),
+            :save_paths => false,
+            :env_id=>"env_2",
+            )
+    ]
+    stream_configs = [
+        Dict(:N=>2, :M=>3, :num_projects=>4, :arrival_interval=>10, ),
+    ]
+    product_config_dicts(base_configs,stream_configs)
 end
 
 export
