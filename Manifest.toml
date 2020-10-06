@@ -23,9 +23,7 @@ version = "0.5.10"
 
 [[CRCBS]]
 deps = ["DataStructures", "Distributions", "Documenter", "GraphUtils", "JuMP", "LightGraphs", "LinearAlgebra", "Logging", "MetaGraphs", "Parameters", "SparseArrays", "TOML", "Test"]
-git-tree-sha1 = "80fd2e2f5ac59afb8e81dd1b54c443ffe5ac6e8a"
-repo-rev = "master"
-repo-url = "git@github.com:kylejbrown17/CRCBS.jl.git"
+path = "/scratch/kylebrown/.julia/dev/CRCBS"
 uuid = "edef75b8-3ac4-11e9-0392-bf149c536ee3"
 version = "0.1.0"
 

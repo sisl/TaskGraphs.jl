@@ -12,7 +12,7 @@ using Gurobi
 using TOML
 using CRCBS
 using SparseArrays
-using JLD2, FileIO
+# using JLD2, FileIO
 
 export
     DEBUG_PATH,
@@ -37,7 +37,7 @@ include("utils.jl")
 include("task_assignment_solvers.jl")
 include("path_planning.jl")
 include("pc_tapf_solvers.jl")
-include("path_planners/dfs_planner.jl")
+# include("path_planners/dfs_planner.jl")
 include("path_planners/pibt_planner.jl")
 include("replanning.jl")
 include("helpers/problem_instances.jl")
