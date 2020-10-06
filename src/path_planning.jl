@@ -676,7 +676,7 @@ function get_base_path(solver,search_env::SearchEnv,env::PCCBSEnv)
     gap = t0 - get_end_index(base_path)
     if gap > 0
         @log_info(1, solver, string("get_base_path: ",string(env.schedule_node),
-            ", v = ",v," -- ",": cache.t0[v] (",t0,
+            ", v = ",v," : cache.t0[v] (",t0,
             ") - get_end_index(base_path) (",
             get_end_index(base_path),") = ", gap,
             ". Extending path to ",t0," ..."))

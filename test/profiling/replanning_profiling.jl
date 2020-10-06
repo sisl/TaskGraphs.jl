@@ -19,7 +19,7 @@ loader = ReplanningProblemLoader()
 prob = pctapf_problem_1(solver)
 add_env!(loader,"env_2",prob.env.env_graph)
 
-base_dir            = joinpath("/scratch/task_graphs_experiments","dummy")
+base_dir            = joinpath("/scratch/kylebrown/task_graphs_experiments","dummy")
 base_problem_dir    = joinpath(base_dir,"problem_instances")
 base_results_dir    = joinpath(base_dir,"results")
 
@@ -35,3 +35,4 @@ set_verbosity!(solver,2)
 
 reset_solver!(solver)
 search_env, cache = profile_replanner!(solver,replan_model,prob)
+cache.final_results
