@@ -669,6 +669,52 @@ end
 
 include("pccbs.jl")
 
+export evaluate_path_gap
+
+"""
+    evaluate_path_gap(search_env::SearchEnv,path,v)
+
+Returns the gap between a path's length and it's expected length (based on times
+stored in `env.cache.t0`)
+"""
+function evaluate_path_gap(search_env::SearchEnv,path,v)
+    t0 = search_env.cache.t0[v]
+    gap = t0 - get_end_index(path)
+    return gap
+end
+
+
+export tighten_gaps!
+
+"""
+    tighten_gaps!(solver, pc_mapf, env::SearchEnv, node::ConstraintTreeNode)
+
+If any path ends before it should (based on times stored in `env.cache`),
+recomputes the path segment for the final node in that line.
+"""
+function tighten_gaps!(solver, pc_mapf::AbstractPC_MAPF, env::SearchEnv, node::ConstraintTreeNode)
+    # check for gap(s)
+    if !solver.tighten_paths
+        return env
+    end
+    # gaps = zeros(Int,num_agents(env))
+    active_nodes = robot_tip_map(sched,env.cache.active_set)
+    for (i,path) in enumerate(get_paths(pc_mapf))
+        node_id = active_nodes[RobotID(i)]
+        v = get_vtx(env.schedule,node_id)
+        gap = evaluate_path_gap(env,path,v)
+        if gap > 0
+            @log_info(1, solver, "get_base_path: ",
+                string(get_node_from_vtx(search_env.schedule,v)),
+                ", v = ",v," : cache.t0[v] (",t0,") - get_end_index(base_path) (",
+                get_end_index(path),") = ", gap)
+            # replan the previous schedule node to eliminate gap
+            # prev_node = 
+        end
+    end
+    # if gap, run planning to fix it
+end
+
 function get_base_path(solver,search_env::SearchEnv,env::PCCBSEnv)
     base_path = get_paths(search_env)[get_agent_id(env)]
     v = get_vtx(search_env.schedule, env.node_id)

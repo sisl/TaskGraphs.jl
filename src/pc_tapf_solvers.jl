@@ -293,6 +293,7 @@ Path planner that employs Incremental Slack-Prioritized Search.
     logger::SolverLogger{C} = SolverLogger{cost_type(low_level_planner)}(
         iteration_limit = 2
     )
+    tighten_paths::Bool = true
 end
 ISPS(planner) = ISPS(low_level_planner=planner)
 construct_cost_model(solver::ISPS,args...;kwargs...) = construct_cost_model(low_level(solver),args...;kwargs...)

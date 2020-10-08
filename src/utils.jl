@@ -77,14 +77,12 @@ export robot_tip_map
 Returns a `Dict{RobotID,AbstractID}` mapping `RobotID` to the terminal node of
 the `sched` corresponding to the robot's last assigned task.
 """
-function robot_tip_map(sched::OperatingSchedule)
-    leaf_vtxs = get_all_terminal_nodes(sched)
+function robot_tip_map(sched::OperatingSchedule,vtxs=get_all_terminal_nodes(sched))
     robot_tips = Dict{RobotID,AbstractID}()
-    for v in leaf_vtxs
+    for v in vtxs
         node_id = get_vtx_id(sched,v)
-        if isa(node_id,Union{RobotID,ActionID})
-            node = get_node_from_id(sched,node_id)
-            robot_id = get_robot_id(node)
+        if isa(node_id,Union{ActionID,RobotID})
+            robot_id = RobotID(get_path_spec(sched,v).robot_id)
             if get_id(robot_id) != -1
                 @assert !haskey(robot_tips,robot_id)
                 robot_tips[robot_id] = node_id
