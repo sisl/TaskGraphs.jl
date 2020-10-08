@@ -709,7 +709,10 @@ function tighten_gaps!(solver, pc_mapf::AbstractPC_MAPF, env::SearchEnv, node::C
                 ", v = ",v," : cache.t0[v] (",t0,") - get_end_index(base_path) (",
                 get_end_index(path),") = ", gap)
             # replan the previous schedule node to eliminate gap
-            # prev_node = 
+            vtxs = backtrack_node(env.schedule,v)
+            for vp in vtxs
+                # plan path with new goal time
+            end
         end
     end
     # if gap, run planning to fix it

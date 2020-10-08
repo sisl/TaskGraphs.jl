@@ -742,6 +742,27 @@ function delete_nodes!(schedule::OperatingSchedule, vtxs::Vector{Int})
     schedule
 end
 
+export backtrack_node
+
+"""
+    `backtrack_node(sched::OperatingSchedule,v::Int)`
+
+Find the closest ancestor of `v` with matching `RobotID`.
+NOTE: currently does not handle `TEAM_ACTION` nodes.
+"""
+function backtrack_node(sched::OperatingSchedule,v::Int)
+    vtxs = Int[]
+    spec = get_path_spec(sched,v)
+    @assert spec.agent_id > 0 "Can't backtrack b/c robot_id = $(spec.agent_id)"
+    for vp in inneighbors(sched,v)
+        prev_spec = get_path_spec(sched,vp)
+        if spec.agent_id == prev_spec.agent_id
+            push!(vtxs,vp)
+        end
+    end
+    return vtxs
+end
+
 export
     validate,
     sanity_check
