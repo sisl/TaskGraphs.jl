@@ -206,11 +206,12 @@ let
     model = formulate_assignment_problem(assignment_solver(solver),prob)
     sched,_ = solve_assignment_problem!(assignment_solver(solver),model,prob)
     tips = robot_tip_map(sched)
-    [k=>string(get_node_from_id(sched,v)) for (k,v) in tips]
+    [k=>string(get_node_from_id(sched,id)) for (k,id) in tips]
 end
 let
     sched = OperatingSchedule()
     add_to_schedule!(sched,ROBOT_AT(1,1),RobotID(1))
+    add_to_schedule!(sched,ROBOT_AT(2,5),RobotID(2))
     add_to_schedule!(sched,GO(1,1,2),ActionID(1))
     add_to_schedule!(sched,OBJECT_AT(1,2),ObjectID(1))
     add_to_schedule!(sched,COLLECT(1,1,2),ActionID(2))
@@ -219,24 +220,46 @@ let
     add_edge!(sched,ActionID(1),ActionID(2))
     add_edge!(sched,ObjectID(1),ActionID(2))
     add_edge!(sched,ActionID(2),ActionID(3))
-
-    let
-        v = get_vtx(sched,ActionID(3))
-        vtxs = backtrack_node(sched,v)
-        @test vtxs == [get_vtx(sched,ActionID(2))]
+    for (id,vtxs) in [
+        (ActionID(3),[get_vtx(sched,ActionID(2))]),
+        (ActionID(2),[get_vtx(sched,ActionID(1))]),
+        (ActionID(1),[get_vtx(sched,RobotID(1))]),
+        (ObjectID(1),Int[]),
+        ]
+        v = get_vtx(sched,id)
+        @test vtxs == backtrack_node(sched,v)
     end
-    let
-        v = get_vtx(sched,ActionID(2))
-        vtxs = backtrack_node(sched,v)
-        @test vtxs == [get_vtx(sched,ActionID(1))]
-    end
-    let
-        v = get_vtx(sched,ActionID(1))
-        vtxs = backtrack_node(sched,v)
-        @test vtxs == [get_vtx(sched,RobotID(1))]
-    end
-    let
-        v = get_vtx(sched,ObjectID(1))
-        @test_throws AssertionError backtrack_node(sched,v)
+    tips = robot_tip_map(sched)
+    @test tips[RobotID(1)] == ActionID(3)
+    @test tips[RobotID(2)] == RobotID(2)
+end
+let
+    sched = OperatingSchedule()
+    add_to_schedule!(sched,ROBOT_AT(1,1),RobotID(1))
+    add_to_schedule!(sched,ROBOT_AT(2,2),RobotID(2))
+    add_to_schedule!(sched,OBJECT_AT(1,2),ObjectID(1))
+    add_to_schedule!(sched,GO(1,1,2),ActionID(1))
+    add_to_schedule!(sched,GO(2,2,3),ActionID(2))
+    add_to_schedule!(sched,TEAM_ACTION(instructions=[COLLECT(1,1,2),COLLECT(2,1,3),]),ActionID(3))
+    add_edge!(sched,RobotID(1),ActionID(1))
+    add_edge!(sched,RobotID(2),ActionID(2))
+    add_edge!(sched,RobotID(2),ActionID(2))
+    add_edge!(sched,ActionID(1),ActionID(3))
+    add_edge!(sched,ActionID(2),ActionID(3))
+    tips = robot_tip_map(sched)
+    @test tips[RobotID(1)] == ActionID(3)
+    @test tips[RobotID(2)] == ActionID(3)
+end
+let
+    sched = OperatingSchedule()
+    for (robot_ids, node, node_id) in [
+        ([1],ROBOT_AT(1,1),RobotID(1)),
+        ([1],GO(1,1,2),ActionID(1)),
+        ([-1],GO(-1,1,2),ActionID(2)),
+        ([],OBJECT_AT(1,2),ObjectID(1)),
+        ([1,2],TEAM_ACTION{CARRY}(instructions=[CARRY(1,1,2,3),CARRY(2,1,3,4)]),ActionID(3))
+        ]
+        add_to_schedule!(sched,node,node_id)
+        @test get_robot_ids(sched,node_id) == map(i->RobotID(i),robot_ids)
     end
 end

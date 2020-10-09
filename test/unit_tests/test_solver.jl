@@ -352,6 +352,7 @@ end
 # Collaborative gap repair problems
 let
     solver = NBSSolver()
+    set_iteration_limit!(low_level(route_planner(solver)),1)
     pc_tapf = C_PC_TAPF(pctapf_problem_13(solver).env)
     env, cost = solve!(solver,pc_tapf;optimizer=Gurobi.Optimizer)
     @show env.route_plan

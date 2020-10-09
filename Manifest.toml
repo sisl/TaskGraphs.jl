@@ -23,7 +23,7 @@ version = "0.5.10"
 
 [[CRCBS]]
 deps = ["DataStructures", "Distributions", "Documenter", "GraphUtils", "JuMP", "LightGraphs", "LinearAlgebra", "Logging", "MetaGraphs", "Parameters", "SparseArrays", "TOML", "Test"]
-path = "/scratch/kylebrown/.julia/dev/CRCBS"
+path = "/home/kylebrown/.julia/dev/CRCBS"
 uuid = "edef75b8-3ac4-11e9-0392-bf149c536ee3"
 version = "0.1.0"
 

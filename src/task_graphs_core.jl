@@ -747,16 +747,20 @@ export backtrack_node
 """
     `backtrack_node(sched::OperatingSchedule,v::Int)`
 
-Find the closest ancestor of `v` with matching `RobotID`.
-NOTE: currently does not handle `TEAM_ACTION` nodes.
+Find the closest ancestor of `v` with overlapping `RobotID`s.
 """
 function backtrack_node(sched::OperatingSchedule,v::Int)
+    robot_ids = get_robot_ids(sched,get_vtx_id(sched,v),v)
     vtxs = Int[]
-    spec = get_path_spec(sched,v)
-    @assert spec.agent_id > 0 "Can't backtrack b/c robot_id = $(spec.agent_id)"
+    if isempty(robot_ids)
+        return vtxs
+    end
+    # spec = get_path_spec(sched,v)
+    # @assert spec.agent_id > 0 "Can't backtrack b/c robot_id = $(spec.agent_id)"
     for vp in inneighbors(sched,v)
-        prev_spec = get_path_spec(sched,vp)
-        if spec.agent_id == prev_spec.agent_id
+        if !isempty(intersect(get_robot_ids(sched,vp),robot_ids))
+        # prev_spec = get_path_spec(sched,vp)
+        # if spec.agent_id == prev_spec.agent_id
             push!(vtxs,vp)
         end
     end

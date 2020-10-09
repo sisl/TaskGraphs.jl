@@ -380,9 +380,9 @@ function compute_route_plan!(solver::ISPS, pc_mapf::AbstractPC_MAPF, node::N, en
         ) where {N<:ConstraintTreeNode}
 
     while length(env.cache.node_queue) > 0
-        if !(plan_next_path!(solver,pc_mapf,env,node))
-            return false
-        end
+        status = plan_next_path!(solver,pc_mapf,env,node)
+        status ? nothing : return false
+        tighten_gaps!(solver,pc_mapf,env,node)
         enforce_time_limit(solver)
     end
     return true

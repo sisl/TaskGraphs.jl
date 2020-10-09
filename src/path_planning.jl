@@ -692,54 +692,43 @@ If any path ends before it should (based on times stored in `env.cache`),
 recomputes the path segment for the final node in that line.
 """
 function tighten_gaps!(solver, pc_mapf::AbstractPC_MAPF, env::SearchEnv, node::ConstraintTreeNode)
-    # check for gap(s)
-    if !solver.tighten_paths
-        return env
-    end
+    solver.tighten_paths ? nothing : return env
     sched = env.schedule
     active_nodes = robot_tip_map(sched,env.cache.active_set)
-    for (i,path) in enumerate(get_paths(pc_mapf))
-        node_id = active_nodes[RobotID(i)]
+    for (robot_id, node_id) in active_nodes
+        path = get_paths(env)[get_id(robot_id)]
         v = get_vtx(sched,node_id)
         gap = evaluate_path_gap(env,path,v)
         if gap > 0
-            @log_info(1, solver, string("get_base_path: ",string(env.schedule_node),
-                ", v = ",v," : cache.t0[v] (",t0,
-                ") - get_end_index(base_path) (",
-                get_end_index(base_path),") = ", gap,
-                ". Extending path to ",t0," ..."))
-            extend_path!(env,path,t0)
-            # @log_info(1, solver, "Node = ",string(get_node_from_vtx(sched,v)),
-            #     ", v = ",v," : cache.t0[v] (",t0,") - get_end_index(base_path) (",
-            #     get_end_index(path),") = ", gap)
-            # vtxs = backtrack_node(sched,v)
-            # for vp in vtxs
-            #     prev_id = get_vtx_id(sched,vp)
-            #     prev_node = get_node_from_id(sched,prev_id)
-            #     # trim path
-            #     t0 = env.cache.t0[vp]
-            #
-            #     # plan path with new goal time
-            #     plan_path!(low_level(solver),pc_mapf,env,node,prev_node,vp)
-            #
-            # end
+            t0 = env.cache.t0[v]
+            @log_info(1, solver, "tighten_gaps!: base path for ",
+                string(get_node_from_vtx(sched,v)),
+                ", v = ",v," ends at t=",get_end_index(path),
+                " but should end at t=",t0," (gap = ", gap,").")
+            vtxs = backtrack_node(sched,v)
+            for vp in vtxs
+                if env.cache.tF[vp] < t0
+                    prev_id = get_vtx_id(sched,vp)
+                    @log_info(1,solver," Re-launching planner on ",
+                        string(get_node_from_vtx(sched,vp))," (v = ",v,")",
+                        " with horizon ",t0," ...")
+                    prev_node = get_node_from_id(sched,prev_id)
+                    # TODO trim path
+                    # t0 = env.cache.t0[vp]
+                    # cbs_env = build_env(solver,pc_mapf,env,node,VtxID(vp))
+                    # trim_path!(cbs_env,path,t0)
+                    # plan path with new goal time
+                    @log_info(1,solver,"BEFORE:\n",sprint_route_plan(env.route_plan))
+                    plan_path!(low_level(solver),pc_mapf,env,node,prev_node,vp)
+                    @log_info(1,solver,"AFTER:\n",sprint_route_plan(env.route_plan))
+                end
+            end
         end
     end
 end
 
 function get_base_path(solver,search_env::SearchEnv,env::PCCBSEnv)
     base_path = get_paths(search_env)[get_agent_id(env)]
-    v = get_vtx(search_env.schedule, env.node_id)
-    gap = evaluate_path_gap(search_env,base_path,v)
-    if gap > 0
-        t0 = search_env.cache.t0[v]
-        @log_info(-1, solver, string("get_base_path: ",string(env.schedule_node),
-            ", v = ",v," : cache.t0[v] (",t0,
-            ") - get_end_index(base_path) (",
-            get_end_index(base_path),") = ", gap,
-            ". Extending path to ",t0," ..."))
-        extend_path!(env,base_path,t0)
-    end
     return base_path
 end
 function CRCBS.build_env(

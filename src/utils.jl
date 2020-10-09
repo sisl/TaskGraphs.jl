@@ -69,6 +69,35 @@ function remap_object_ids!(new_schedule::OperatingSchedule,old_schedule::Operati
     remap_object_ids!(new_schedule,max_obj_id)
 end
 
+export get_robot_ids
+
+"""
+    get_robot_ids(sched::OperatingSchedule,node_id::AbstractID)
+
+Returns vector of all robot ids associated with the schedule node referenced by
+node_id.
+"""
+function get_robot_ids(sched::OperatingSchedule,node_id::A,v=get_vtx(sched,node_id)) where {A<:Union{ActionID,RobotID}}
+    ids = Vector{RobotID}()
+    robot_id = RobotID(get_path_spec(sched,v).agent_id)
+    node = get_node_from_id(sched,node_id)
+    if isa(node,TEAM_ACTION)
+        for n in node.instructions
+            r = get_robot_id(n)
+            if get_id(r) != -1
+                push!(ids,r)
+            end
+        end
+    else
+        push!(ids,robot_id)
+    end
+    return ids
+end
+function get_robot_ids(sched::OperatingSchedule,node_id::A,v=get_vtx(sched,node_id)) where {A<:Union{ObjectID,OperationID}}
+    return Vector{RobotID}()
+end
+get_robot_ids(s::OperatingSchedule,v::Int) = get_robot_ids(s,get_vtx_id(s,v),v)
+
 export robot_tip_map
 
 """
@@ -81,15 +110,14 @@ function robot_tip_map(sched::OperatingSchedule,vtxs=get_all_terminal_nodes(sche
     robot_tips = Dict{RobotID,AbstractID}()
     for v in vtxs
         node_id = get_vtx_id(sched,v)
-        if isa(node_id,Union{ActionID,RobotID})
-            robot_id = RobotID(get_path_spec(sched,v).robot_id)
+        for robot_id in get_robot_ids(sched,node_id,v)
             if get_id(robot_id) != -1
                 @assert !haskey(robot_tips,robot_id)
                 robot_tips[robot_id] = node_id
             end
         end
     end
-    @assert length(robot_tips) == length(get_robot_ICs(sched)) "length(robot_tips) == $(length(robot_tips)), but should be $(length(get_robot_ICs(sched)))"
+    # @assert length(robot_tips) == length(get_robot_ICs(sched)) "length(robot_tips) == $(length(robot_tips)), but should be $(length(get_robot_ICs(sched)))"
     robot_tips
 end
 
