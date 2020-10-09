@@ -683,7 +683,6 @@ function evaluate_path_gap(search_env::SearchEnv,path,v)
     return gap
 end
 
-
 export tighten_gaps!
 
 """
@@ -697,34 +696,44 @@ function tighten_gaps!(solver, pc_mapf::AbstractPC_MAPF, env::SearchEnv, node::C
     if !solver.tighten_paths
         return env
     end
-    # gaps = zeros(Int,num_agents(env))
+    sched = env.schedule
     active_nodes = robot_tip_map(sched,env.cache.active_set)
     for (i,path) in enumerate(get_paths(pc_mapf))
         node_id = active_nodes[RobotID(i)]
-        v = get_vtx(env.schedule,node_id)
+        v = get_vtx(sched,node_id)
         gap = evaluate_path_gap(env,path,v)
         if gap > 0
-            @log_info(1, solver, "get_base_path: ",
-                string(get_node_from_vtx(search_env.schedule,v)),
-                ", v = ",v," : cache.t0[v] (",t0,") - get_end_index(base_path) (",
-                get_end_index(path),") = ", gap)
-            # replan the previous schedule node to eliminate gap
-            vtxs = backtrack_node(env.schedule,v)
-            for vp in vtxs
-                # plan path with new goal time
-            end
+            @log_info(1, solver, string("get_base_path: ",string(env.schedule_node),
+                ", v = ",v," : cache.t0[v] (",t0,
+                ") - get_end_index(base_path) (",
+                get_end_index(base_path),") = ", gap,
+                ". Extending path to ",t0," ..."))
+            extend_path!(env,path,t0)
+            # @log_info(1, solver, "Node = ",string(get_node_from_vtx(sched,v)),
+            #     ", v = ",v," : cache.t0[v] (",t0,") - get_end_index(base_path) (",
+            #     get_end_index(path),") = ", gap)
+            # vtxs = backtrack_node(sched,v)
+            # for vp in vtxs
+            #     prev_id = get_vtx_id(sched,vp)
+            #     prev_node = get_node_from_id(sched,prev_id)
+            #     # trim path
+            #     t0 = env.cache.t0[vp]
+            #
+            #     # plan path with new goal time
+            #     plan_path!(low_level(solver),pc_mapf,env,node,prev_node,vp)
+            #
+            # end
         end
     end
-    # if gap, run planning to fix it
 end
 
 function get_base_path(solver,search_env::SearchEnv,env::PCCBSEnv)
     base_path = get_paths(search_env)[get_agent_id(env)]
     v = get_vtx(search_env.schedule, env.node_id)
-    t0 = search_env.cache.t0[v]
-    gap = t0 - get_end_index(base_path)
+    gap = evaluate_path_gap(search_env,base_path,v)
     if gap > 0
-        @log_info(1, solver, string("get_base_path: ",string(env.schedule_node),
+        t0 = search_env.cache.t0[v]
+        @log_info(-1, solver, string("get_base_path: ",string(env.schedule_node),
             ", v = ",v," : cache.t0[v] (",t0,
             ") - get_end_index(base_path) (",
             get_end_index(base_path),") = ", gap,

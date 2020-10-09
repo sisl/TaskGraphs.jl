@@ -87,7 +87,7 @@ function pctapf_problem(r0,config;Δt_op=0)
         add_operation!(project_spec,construct_operation(project_spec,-1,
             op.inputs,op.outputs,Δt_op))
     end
-    def = SimpleProblemDef(project_spec,r0,s0,sF)
+    def = SimpleProblemDef(project_spec,r0,s0,sF,config.shapes)
 end
 
 function pctapf_problem(r0,s0,sF)
@@ -502,8 +502,8 @@ function pctapf_problem_8(;cost_function=SumOfMakeSpans(),verbose=false,Δt_op=0
     return project_spec, problem_spec, robot_ICs, env_graph, assignment_dict
 end
 
-export
-    pctapf_problem_9
+export pctapf_problem_9
+
 """
     Project with station-sharing. Station 5 needs to accessed by both robots for picking up their objects.
 """
@@ -541,9 +541,7 @@ function pctapf_problem_9(;cost_function=SumOfMakeSpans(),verbose=false,Δt_op=0
     return project_spec, problem_spec, robot_ICs, env_graph, assignment_dict
 end
 
-
-export
-    pctapf_problem_10
+export pctapf_problem_10
 
 """
     Motivation for backtracking in ISPS
@@ -616,8 +614,7 @@ function pctapf_problem_10(;cost_function=MakeSpan(),verbose=false,Δt_op=0,Δt_
     return project_spec, problem_spec, robot_ICs, env_graph, assignment_dict
 end
 
-export
-    pctapf_problem_11
+export pctapf_problem_11
 
 """
     #### TOY PROBLEM 11 ####
@@ -664,6 +661,99 @@ function pctapf_problem_11(;
     return project_spec, problem_spec, robot_ICs, env_graph, assignment_dict
 end
 
+export pctapf_problem_12
+
+"""
+    #### TOY PROBLEM 12 ####
+
+Robot 1 will plan a path first, but then that path will need to be extended by
+one time step because robot 2 will get delayed by robot 3, which is on the
+critical path.
+"""
+function pctapf_problem_12(;
+        cost_function = MakeSpan(),
+        verbose = false,
+    )
+    vtx_grid = initialize_dense_vtx_grid(4, 8)
+    #  1   2   3   4   5   6   7   8
+    #  9  10  11  12  13  14  15  16
+    # 17  18  19  20  21  22  23  24
+    # 25  26  27  28  29  30  31  32
+    env_graph = construct_factory_env_from_vtx_grid(vtx_grid)
+    r0 = [1, 4, 11]
+
+    tasks = [17=>25,4=>20,15=>16]
+    shapes = map(o->(1,1),tasks)
+    ops = [
+        (inputs=[2],outputs=[1]),
+        (inputs=[1],outputs=[3]),
+        (inputs=[3],outputs=[]),
+    ]
+    config = (tasks=tasks,shapes=shapes,ops=ops)
+    assignment_dict = Dict(1=>[1],2=>[2],3=>[3])
+    def = pctapf_problem(r0,config)
+    project_spec, problem_spec, _, _, robot_ICs = construct_task_graphs_problem(
+        def,env_graph;cost_function=cost_function)
+
+    return project_spec, problem_spec, robot_ICs, env_graph, assignment_dict
+end
+
+export pctapf_problem_13
+
+"""
+    #### TOY PROBLEM 13 ####
+
+Same as problem 12, except that there is a 4th robot who must collect object 1
+with robot 1.
+"""
+function pctapf_problem_13(;
+        cost_function = MakeSpan(),
+        verbose = false,
+    )
+    vtx_grid = initialize_dense_vtx_grid(4, 8)
+    #  1   2   3   4   5   6   7   8
+    #  9  10  11  12  13  14  15  16
+    # 17  18  19  20  21  22  23  24
+    # 25  26  27  28  29  30  31  32
+    env_graph = construct_factory_env_from_vtx_grid(vtx_grid)
+    r0 = [1, 4, 11, 2]
+    tasks = [17=>25,4=>20,15=>16]
+    shapes = [(1, 2), (1, 1), (1, 1)]
+    ops = [
+        (inputs=[2],outputs=[1]),
+        (inputs=[1],outputs=[3]),
+        (inputs=[3],outputs=[]),
+    ]
+    config = (tasks=tasks,shapes=shapes,ops=ops)
+    assignment_dict = Dict(1=>[1],2=>[2],3=>[3],4=>[1])
+    def = pctapf_problem(r0,config)
+    project_spec, problem_spec, _, _, robot_ICs = construct_task_graphs_problem(
+        def,env_graph;cost_function=cost_function)
+
+    return project_spec, problem_spec, robot_ICs, env_graph, assignment_dict
+end
+
+
+export
+    pctapf_test_problems,
+    collaborative_pctapf_test_problems
+
+pctapf_test_problems() = [
+    pctapf_problem_1,
+    pctapf_problem_2,
+    pctapf_problem_3,
+    pctapf_problem_4,
+    pctapf_problem_5,
+    pctapf_problem_6,
+    pctapf_problem_7,
+    pctapf_problem_8,
+    pctapf_problem_9,
+    pctapf_problem_10,
+]
+collaborative_pctapf_test_problems() = [
+    pctapf_problem_11,
+]
+
 for op in [
         :pctapf_problem_1,
         :pctapf_problem_2,
@@ -676,6 +766,8 @@ for op in [
         :pctapf_problem_9,
         :pctapf_problem_10,
         :pctapf_problem_11,
+        :pctapf_problem_12,
+        :pctapf_problem_13,
     ]
     @eval $op(solver,args...;kwargs...) = pctapf_problem(solver,$op(args...;kwargs...)...)
 end
@@ -1008,25 +1100,6 @@ function replanning_config_2()
     product_config_dicts(base_configs,stream_configs)
 end
 
-export
-    pctapf_test_problems,
-    collaborative_pctapf_test_problems
-
-pctapf_test_problems() = [
-    pctapf_problem_1,
-    pctapf_problem_2,
-    pctapf_problem_3,
-    pctapf_problem_4,
-    pctapf_problem_5,
-    pctapf_problem_6,
-    pctapf_problem_7,
-    pctapf_problem_8,
-    pctapf_problem_9,
-    pctapf_problem_10,
-]
-collaborative_pctapf_test_problems() = [
-    pctapf_problem_11,
-]
 
 
 # end

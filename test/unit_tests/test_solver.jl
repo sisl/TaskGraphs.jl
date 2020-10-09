@@ -342,3 +342,17 @@ let
         end
     end
 end
+# Gap repair problems
+let
+    solver = NBSSolver()
+    pc_tapf = pctapf_problem_12(solver)
+    env, cost = solve!(solver,pc_tapf;optimizer=Gurobi.Optimizer)
+    @show env.route_plan
+end
+# Collaborative gap repair problems
+let
+    solver = NBSSolver()
+    pc_tapf = C_PC_TAPF(pctapf_problem_13(solver).env)
+    env, cost = solve!(solver,pc_tapf;optimizer=Gurobi.Optimizer)
+    @show env.route_plan
+end

@@ -981,7 +981,6 @@ function add_headless_delivery_task!(
     object_node = get_node_from_id(schedule,object_id)
     shape = object_node.shape
     # COLLABORATIVE COLLECT
-    prev_team_action_id = ActionID(-1)
     team_action_id = ActionID(get_unique_action_id())
     team_action = TEAM_ACTION(
         n = n,
