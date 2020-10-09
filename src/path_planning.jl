@@ -683,6 +683,23 @@ function evaluate_path_gap(search_env::SearchEnv,path,v)
     return gap
 end
 
+function replan_path!(solver, pc_mapf::AbstractPC_MAPF, env::SearchEnv, node::ConstraintTreeNode, vtx::VtxID)
+    v = get_id(vtx)
+    sched = env.schedule
+    node_id = get_vtx_id(sched,v)
+    schedule_node = get_node_from_id(sched,node_id)
+    ### trim path
+    # @log_info(-1,solver,"BEFORE:\n",sprint_route_plan(env.route_plan))
+    cbs_env = build_env(solver,pc_mapf,env,node,VtxID(v))
+    path = get_base_path(solver,env,cbs_env)
+    # @log_info(-1,solver,"old path cost: ",get_cost(path))
+    trim_path!(cbs_env,path,env.cache.t0[v])
+    # @log_info(-1,solver,"trimmed path cost: ",get_cost(path))
+    ### plan path with new goal time
+    plan_path!(low_level(solver),pc_mapf,env,node,schedule_node,v)
+    # @log_info(-1,solver,"AFTER:\n",sprint_route_plan(env.route_plan))
+end
+
 export tighten_gaps!
 
 """
@@ -708,19 +725,10 @@ function tighten_gaps!(solver, pc_mapf::AbstractPC_MAPF, env::SearchEnv, node::C
             vtxs = backtrack_node(sched,v)
             for vp in vtxs
                 if env.cache.tF[vp] < t0
-                    prev_id = get_vtx_id(sched,vp)
                     @log_info(1,solver," Re-launching planner on ",
                         string(get_node_from_vtx(sched,vp))," (v = ",v,")",
-                        " with horizon ",t0," ...")
-                    prev_node = get_node_from_id(sched,prev_id)
-                    # TODO trim path
-                    # t0 = env.cache.t0[vp]
-                    # cbs_env = build_env(solver,pc_mapf,env,node,VtxID(vp))
-                    # trim_path!(cbs_env,path,t0)
-                    # plan path with new goal time
-                    @log_info(1,solver,"BEFORE:\n",sprint_route_plan(env.route_plan))
-                    plan_path!(low_level(solver),pc_mapf,env,node,prev_node,vp)
-                    @log_info(1,solver,"AFTER:\n",sprint_route_plan(env.route_plan))
+                        " with extended horizon ",t0," ...")
+                    replan_path!(solver, pc_mapf, env, node, VtxID(vp))
                 end
             end
         end
@@ -822,26 +830,13 @@ function get_base_path(solver,search_env::SearchEnv,meta_env::MetaAgentCBS.Abstr
     base_paths = map(env->get_base_path(solver,search_env,env),MetaAgentCBS.get_envs(meta_env))
     cost = aggregate_costs(get_cost_model(meta_env), map(get_cost,base_paths))
     MetaAgentCBS.construct_meta_path(base_paths,cost)
-    # starts = Vector{state_type(search_env)}()
-    # meta_cost = MetaCost(Vector{cost_type(search_env)}(),get_initial_cost(search_env))
-    # for cbs_env in MetaAgentCBS.get_envs(meta_env)
-    #     sub_node = cbs_env.schedule_node
-    #     base_path = get_base_path(solver,search_env,cbs_env)
-    #     push!(starts, get_final_state(base_path))
-    #     push!(meta_cost.independent_costs, get_cost(base_path))
-    # end
-    # meta_path = Path{state_type(meta_env),action_type(meta_env),MetaCost{cost_type(search_env)}}(
-    #     s0 = MetaAgentCBS.State(starts),
-    #     cost = MetaCost(meta_cost.independent_costs, aggregate_costs(get_cost_model(meta_env), meta_cost.independent_costs))
-    # )
 end
 
 """
-For COLLABORATIVE transport problems
+    For COLLABORATIVE transport problems
 """
 function CRCBS.build_env(
     solver,
-    # pc_mapf::AbstractPC_MAPF,
     pc_mapf::C_PC_MAPF,
     env::E,
     node::N,
@@ -852,14 +847,12 @@ function CRCBS.build_env(
     envs = []
     agent_idxs = Int[]
     for (i, sub_node) in enumerate(sub_nodes(schedule_node))
-        # ph = PerfectHeuristic(env.env_graph.dist_function.dist_mtxs[team_configuration(schedule_node)][i])
         ph = PerfectHeuristic(get_team_config_dist_function(env.env_graph,team_configuration(schedule_node),i))
         heuristic = construct_heuristic_model(solver,env.env_graph,ph)
         cbs_env = build_env(solver,PC_MAPF(pc_mapf.env),env,node,VtxID(v),sub_node,generate_path_spec(env.schedule,env.problem_spec,sub_node);
             heuristic=heuristic,
             kwargs...
         )
-        # base_path = get_base_path(solver,env,cbs_env)
         push!(envs, cbs_env)
         push!(agent_idxs, get_id(get_robot_id(sub_node)))
     end
