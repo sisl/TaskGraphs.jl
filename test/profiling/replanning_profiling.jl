@@ -15,6 +15,16 @@ reset_operation_id_counter!()
 
 solver = NBSSolver()
 loader = ReplanningProblemLoader()
+feats = [
+    RunTime(),IterationCount(),TimeOutStatus(),IterationMaxOutStatus(),
+    SolutionCost(),OptimalityGap(),OptimalFlag(),FeasibleFlag(),
+    RobotPaths(),NumConflicts(),
+    ]
+final_feats = [
+    RunTime(),IterationCount(),TimeOutStatus(),IterationMaxOutStatus(),
+    SolutionCost(),OptimalityGap(),OptimalFlag(),FeasibleFlag(),
+    RobotPaths(),NumConflicts(),
+    ]
 # add_env!(loader,"env_2",init_env_2())
 prob = pctapf_problem_1(solver)
 add_env!(loader,"env_2",prob.env.env_graph)
@@ -31,8 +41,10 @@ prob = RepeatedPC_TAPF(simple_prob_def,solver,loader)
 
 replan_model = MergeAndBalance()
 set_real_time_flag!(replan_model,false)
-set_verbosity!(solver,2)
+set_verbosity!(solver,0)
+
+cache = ReplanningProfilerCache(features=feats,final_features=final_feats)
 
 reset_solver!(solver)
-search_env, cache = profile_replanner!(solver,replan_model,prob)
-cache.final_results
+search_env, cache = profile_replanner!(solver,replan_model,prob,cache)
+cache.stage_results

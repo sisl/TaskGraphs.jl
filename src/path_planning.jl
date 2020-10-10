@@ -231,7 +231,7 @@ CRCBS.num_agents(env::SearchEnv) = env.num_agents
 for op in [
     :cost_type,:state_type,:action_type,:path_type,:get_cost,:get_paths,
     :get_path_costs,:set_cost!,:set_solution_path!,:set_path_cost!,
-    :convert_to_vertex_lists,
+    :convert_to_vertex_lists,:detect_conflicts,:detect_conflicts!
     ]
     @eval CRCBS.$op(env::SearchEnv,args...) = $op(env.route_plan,args...)
 end
