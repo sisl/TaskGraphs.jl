@@ -46,5 +46,21 @@ set_verbosity!(solver,0)
 cache = ReplanningProfilerCache(features=feats,final_features=final_feats)
 
 reset_solver!(solver)
-search_env, cache = profile_replanner!(solver,replan_model,prob,cache)
-cache.stage_results
+
+env = prob.env
+stage = 0
+
+stage = max(stage+1, length(prob.requests))
+request = prob.requests[stage]
+remap_object_ids!(request.schedule,env.schedule)
+base_env = replan!(solver,replan_model,env,request)
+reset_solver!(solver)
+
+cprob = PC_TAPF(base_env)
+assignment_problem = formulate_assignment_problem(assignment_solver(solver),cprob)
+
+env, cost = solve!(solver,base_env)
+compile_replanning_results!(cache,solver,env,timer_results,prob,stage,request)
+
+# search_env, cache = profile_replanner!(solver,replan_model,prob,cache)
+# cache.stage_results

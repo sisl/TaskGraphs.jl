@@ -629,8 +629,8 @@ Solve the "assignment problem"--i.e., the relaxation of the full PC-TAPF problem
 wherein we ignore collisions--using the algorithm encoded by solver.
 """
 function solve_assignment_problem!(solver::S, model, prob;
-        t0_ = Dict{AbstractID,Int}(get_vtx_id(prob.env.schedule, v)=>t0 for (v,t0) in enumerate(prob.env.cache.t0)),
-        tF_ = Dict{AbstractID,Int}(get_vtx_id(prob.env.schedule, v)=>tF for (v,tF) in enumerate(prob.env.cache.tF)),
+        t0_ = Dict{AbstractID,Int}(get_vtx_id(prob.env.schedule, v)=>t for (v,t) in enumerate(prob.env.cache.t0)),
+        tF_ = Dict{AbstractID,Int}(get_vtx_id(prob.env.schedule, v)=>t for (v,t) in enumerate(prob.env.cache.tF)),
         TimeLimit=min(deadline(solver)-time(),runtime_limit(solver)),
         buffer=5.0, # to give some extra time to the path planner if the milp terminates late.
         kwargs...) where {S<:TaskGraphsMILPSolver}
