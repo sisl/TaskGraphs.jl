@@ -217,7 +217,6 @@ Defines an instance of a Precedence-Constrained Multi-Agent Task
 struct PC_TAPF{E<:SearchEnv} <: AbstractPC_TAPF
     env::E
 end
-
 construct_routing_problem(prob::PC_TAPF,env) = PC_MAPF(env)
 
 """
@@ -230,10 +229,7 @@ Defines an instance of a Collaborative Precedence-Constrained Multi-Agent Task
 struct C_PC_TAPF{E<:SearchEnv} <: AbstractPC_TAPF
     env::E
 end
-
-
 construct_routing_problem(prob::C_PC_TAPF,env) = C_PC_MAPF(env)
-
 
 CRCBS.get_graph(env::SearchEnv) = env.env_graph
 function CRCBS.get_start(env::SearchEnv,v::Int)

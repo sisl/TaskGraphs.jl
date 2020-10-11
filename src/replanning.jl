@@ -28,20 +28,32 @@ at different times
 end
 
 export
-    RepeatedPC_TAPF
+    RepeatedAbstractPC_TAPF,
+    RepeatedPC_TAPF,
+    RepeatedC_PC_TAPF
+
+abstract type RepeatedAbstractPC_TAPF end
 
 """
-    RepeatedPC_TAPF{S<:SearchEnv}
+    RepeatedPC_TAPF{S<:SearchEnv} <: RepeatedAbstractPC_TAPF
 
 Encodes a Repeated PC_TAPF problem.
 Usage:
     `prob = RepeatedPC_TAPF(env::SearchEnv,requests::Vector{ProjectRequest})`
 """
-struct RepeatedPC_TAPF{S<:SearchEnv}
+struct RepeatedPC_TAPF{S<:SearchEnv} <: RepeatedAbstractPC_TAPF
     env::S
     requests::Vector{ProjectRequest}
 end
 RepeatedPC_TAPF(env::SearchEnv) = RepeatedPC_TAPF(env,Vector{ProjectRequest}())
+struct RepeatedC_PC_TAPF{S<:SearchEnv} <: RepeatedAbstractPC_TAPF
+    env::S
+    requests::Vector{ProjectRequest}
+end
+RepeatedC_PC_TAPF(env::SearchEnv) = RepeatedC_PC_TAPF(env,Vector{ProjectRequest}())
+
+construct_routing_problem(prob::RepeatedPC_TAPF,env) = PC_TAPF(env)
+construct_routing_problem(prob::RepeatedC_PC_TAPF,env) = C_PC_TAPF(env)
 
 export
     ReplanningProblemLoader,
@@ -623,6 +635,7 @@ for op in []
     @eval $op(planner::FullReplanner,args...) = $op(planner.solver,args...)
 end
 
+
 function get_commit_time(replan_model, search_env, t_request, commit_threshold=get_commit_threshold(replan_model))
     t_request + commit_threshold
 end
@@ -713,9 +726,9 @@ function replan!(solver, replan_model, search_env, request;
         search_env,
         initialize_planning_cache(new_schedule,t0,tF)
         )
-    @log_info(3,solver,"Previous route plan: \n",sprint_route_plan(route_plan))
+    # @log_info(3,solver,"Previous route plan: \n",sprint_route_plan(route_plan))
     trimmed_route_plan = trim_route_plan(base_search_env, route_plan, t_commit)
-    @log_info(3,solver,"Trimmed route plan: \n",sprint_route_plan(trimmed_route_plan))
+    # @log_info(3,solver,"Trimmed route plan: \n",sprint_route_plan(trimmed_route_plan))
     SearchEnv(base_search_env, route_plan=trimmed_route_plan)
 end
 replan!(solver, replan_model::NullReplanner, search_env, args...;kwargs...) = search_env
@@ -731,26 +744,6 @@ function compile_replanning_results!(
         cache::ReplanningProfilerCache,solver,env,
         timer_results,prob,stage,request)
     push!(cache.schedules,deepcopy(env.schedule))
-    # merge schedule
-    # if stage == 1
-    #     splice_schedules!(cache.schedule,env.schedule,false)
-    # else
-    #     splice_schedules!(cache.schedule,request.schedule,false)
-    #     robot_tips = robot_tip_map(cache.schedule)
-    #     for i in 1:num_agents(env)
-    #         robot_id = RobotID(i)
-    #         tip = robot_tips[robot_id]
-    #         v = get_vtx(env.schedule,tip)
-    #         if has_vertex(env.schedule,v)
-    #             for v2 in outneighbors(env.schedule,v)
-    #                 node_id = get_vtx_id(env.schedule,v2)
-    #                 add_edge!(cache.schedule,tip,node_id)
-    #             end
-    #         end
-    #     end
-    # end
-    # propagate_valid_ids!(cache.schedule,env.problem_spec)
-    # TODO update a planning cache to store the start/end times of all nodes
     # store project ids
     for v in vertices(request.schedule)
         id = get_vtx_id(request.schedule,v)
@@ -765,7 +758,8 @@ function compile_replanning_results!(
     return cache
 end
 
-function profile_replanner!(solver,replan_model,prob::RepeatedPC_TAPF,
+
+function profile_replanner!(solver,replan_model,prob::RepeatedAbstractPC_TAPF,
         cache = ReplanningProfilerCache()
     )
     env = prob.env
@@ -775,12 +769,61 @@ function profile_replanner!(solver,replan_model,prob::RepeatedPC_TAPF,
         base_env = replan!(solver,replan_model,env,request)
         reset_solver!(solver)
         # env, cost = solve!(solver,base_env)
-        env, timer_results = profile_solver!(solver,base_env)
+        env, timer_results = profile_solver!(solver,construct_routing_problem(prob,base_env))
         compile_replanning_results!(cache,solver,env,timer_results,prob,stage,request)
         @log_info(1,solver,"Stage ",stage," - ","route planner iterations: ",
             iterations(route_planner(solver)))
     end
     return env, cache
+end
+
+export ReplannerWithBackup
+
+"""
+    ReplannerWithBackup{A,B}
+
+Consists of a primary and a backup solver. The backup solver is supposed to be
+fast--it computes a "fallback" plan in case the primary solver fails to find a
+good enough solution before time out.
+"""
+struct ReplannerWithBackup{A,B}
+    primary_planner::A
+    backup_planner::B
+end
+
+function profile_replanner!(planner::ReplannerWithBackup,prob::RepeatedAbstractPC_TAPF)
+    plannerA = planner.primary_planner
+    plannerB = planner.backup_planner
+    env = prob.env
+    for (stage,request) in enumerate(prob.requests)
+        remap_object_ids!(request.schedule,env.schedule)
+
+        base_envB = replan!(plannerB,env,request)
+        envB, resultsB = profile_solver!(plannerB.solver,construct_routing_problem(prob,base_envB))
+        compile_replanning_results!(plannerB.cache,plannerB.solver,envB,
+            resultsB,prob,stage,request)
+
+        base_envA = replan!(plannerA,env,request)
+        envA, resultsA = profile_solver!(plannerA.solver,sub_problem(prob,base_envA))
+        compile_replanning_results!(plannerA.cache,plannerA.solver,envA,
+            resultsA,prob,stage,request)
+
+        if failed_status(plannerA.solver) == false
+            @log_info(-1,0,"REPLANNING: ",
+            "Primary planner succeeded at stage $stage.")
+            env = envA
+        elseif failed_status(plannerB.solver) == false
+            @log_info(-1,0,"REPLANNING: ",
+            "Primary planner failed at stage $stage. Proceeding with backup plan.")
+            env = envB
+        else
+            @log_info(-1,0,"REPLANNING:",
+                "Both primary and backup planners failed at stage $stage.",
+                " Returning early.")
+            break
+        end
+    end
+    return env, planner
 end
 
 

@@ -12,9 +12,6 @@ using CRCBS
 # Problem generation and profiling
 reset_task_id_counter!()
 reset_operation_id_counter!()
-
-solver = NBSSolver()
-loader = ReplanningProblemLoader()
 feats = [
     RunTime(),IterationCount(),TimeOutStatus(),IterationMaxOutStatus(),
     SolutionCost(),OptimalityGap(),OptimalFlag(),FeasibleFlag(),
@@ -25,43 +22,59 @@ final_feats = [
     SolutionCost(),OptimalityGap(),OptimalFlag(),FeasibleFlag(),
     RobotPaths(),NumConflicts(),
     ]
-# add_env!(loader,"env_2",init_env_2())
-prob = pctapf_problem_1(solver)
-add_env!(loader,"env_2",prob.env.env_graph)
 
+# Primary planner
+primary_planner = FullReplanner(
+    solver = NBSSolver(),
+    replanner = MergeAndBalance(),
+    cache = ReplanningProfilerCache(features=feats,final_features=final_feats)
+    )
+set_real_time_flag!(primary_planner.replanner,false)
+set_verbosity!(primary_planner.solver,0)
+
+# Backup planner
+backup_planner = FullReplanner(
+    solver = NBSSolver(
+        assignment_model = TaskGraphsMILPSolver(GreedyAssignment()),
+        path_planner = PIBTPlanner{NTuple{3,Float64}}()
+        ),
+    replanner = MergeAndBalance(),
+    cache = ReplanningProfilerCache(features=feats,final_features=final_feats)
+    )
+set_real_time_flag!(primary_planner.replanner,false)
+set_iteration_limit!(assignment_solver(primary_planner.solver),1)
+set_verbosity!(primary_planner.solver,0)
+
+# Full solver
+planner = ReplannerWithBackup(primary_planner,backup_planner)
+
+###
+
+# get probem config
+problem_configs = replanning_config_2()
+# define paths to problems and results
 base_dir            = joinpath("/scratch/kylebrown/task_graphs_experiments","dummy")
 base_problem_dir    = joinpath(base_dir,"problem_instances")
 base_results_dir    = joinpath(base_dir,"results")
-
-problem_configs = replanning_config_2()
+# initialize loader
+loader = ReplanningProblemLoader()
+# add_env!(loader,"env_2",init_env_2())
+prob = pctapf_problem_1(planner.primary_planner.solver)
+add_env!(loader,"env_2",prob.env.env_graph)
+# write problems
 write_repeated_pctapf_problems!(loader,problem_configs,base_problem_dir)
 
 simple_prob_def = read_simple_repeated_problem_def(joinpath(base_problem_dir,"problem0001"))
-prob = RepeatedPC_TAPF(simple_prob_def,solver,loader)
+prob = RepeatedPC_TAPF(simple_prob_def,planner.primary_planner.solver,loader)
+# cache = ReplanningProfilerCache(features=feats,final_features=final_feats)
 
-replan_model = MergeAndBalance()
-set_real_time_flag!(replan_model,false)
-set_verbosity!(solver,0)
-
-cache = ReplanningProfilerCache(features=feats,final_features=final_feats)
-
-reset_solver!(solver)
-#
-# env = prob.env
-# stage = 0
-#
-# stage = max(stage+1, length(prob.requests))
-# request = prob.requests[stage]
-# remap_object_ids!(request.schedule,env.schedule)
-# base_env = replan!(solver,replan_model,env,request)
+construct_cost_model(
+    planner.backup_planner.solver,
+    prob.env.schedule,
+    prob.env,
+    prob.env.cache
+)
 # reset_solver!(solver)
-#
-# cprob = PC_TAPF(base_env)
-# assignment_problem = formulate_assignment_problem(assignment_solver(solver),cprob)
-# base_env.cache
-#
-# env, cost = solve!(solver,base_env)
-# compile_replanning_results!(cache,solver,env,timer_results,prob,stage,request)
-
-search_env, cache = profile_replanner!(solver,replan_model,prob,cache)
+# search_env, cache = profile_replanner!(solver,replan_model,prob,cache)
+search_env, cache = profile_replanner!(planner,prob)
 cache.stage_results
