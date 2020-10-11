@@ -1012,13 +1012,14 @@ end
 export
     write_repeated_pctapf_problems!
 
+padded_problem_name(number,name="problem",ext=".toml") = @sprintf("%s%4.4i%s",name,number,ext)
 function write_repeated_pctapf_problems!(loader::ReplanningProblemLoader,config::Dict,base_path::String,prob_counter::Int=1)
     env = get_env!(loader,config[:env_id])
     num_trials = get(config,:num_trials,1)
     for i in 1:num_trials
         prob_def = random_repeated_pctapf_def(env,config)
         write_simple_repeated_problem_def(
-            joinpath(base_path,@sprintf("problem%4.4i",prob_counter)),prob_def)
+            joinpath(base_path,padded_problem_name(prob_counter)),prob_def)
         prob_counter += 1
         open(joinpath(base_path,"config.toml"),"w") do io
             TOML.print(io,config)
@@ -1032,6 +1033,41 @@ function write_repeated_pctapf_problems!(loader::ReplanningProblemLoader,configs
     end
     prob_counter
 end
+
+export write_replanning_results
+
+function write_replanning_results(
+    loader::ReplanningProblemLoader,
+    planner::ReplannerWithBackup,
+    results_dir,
+    problem_file,
+    primary_prefix="primary_planner",
+    backup_prefix="backup_planner",
+    )
+
+    problem_name = splitext(splitdir(problem_file)[end])[1]
+    results_path = joinpath(results_dir,problem_name)
+
+    mkpath(joinpath(results_path,primary_prefix))
+    # primary planner
+    for (i,results) in enumerate(planner.primary_planner.cache.stage_results)
+        path = joinpath(results_path,primary_prefix,padded_problem_name(i,"stage"))
+        @show path
+        open(path,"w") do io
+            TOML.print(io,results)
+        end
+    end
+    mkpath(joinpath(results_path,backup_prefix))
+    for (i,results) in enumerate(planner.backup_planner.cache.stage_results)
+        path = joinpath(results_path,backup_prefix,padded_problem_name(i,"stage"))
+        @show path
+        open(path,"w") do io
+            TOML.print(io,results)
+        end
+    end
+    results_path
+end
+
 
 export product_config_dicts
 

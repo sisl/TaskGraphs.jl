@@ -54,7 +54,7 @@ planner = ReplannerWithBackup(primary_planner,backup_planner)
 # get probem config
 problem_configs = replanning_config_2()
 # define paths to problems and results
-base_dir            = joinpath("/scratch/kylebrown/task_graphs_experiments","dummy")
+base_dir            = joinpath("/scratch/task_graphs_experiments","dummy")
 base_problem_dir    = joinpath(base_dir,"problem_instances")
 base_results_dir    = joinpath(base_dir,"results")
 # initialize loader
@@ -65,7 +65,8 @@ add_env!(loader,"env_2",prob.env.env_graph)
 # write problems
 write_repeated_pctapf_problems!(loader,problem_configs,base_problem_dir)
 
-simple_prob_def = read_simple_repeated_problem_def(joinpath(base_problem_dir,"problem0001"))
+problem_file = joinpath(base_problem_dir,"problem0001")
+simple_prob_def = read_simple_repeated_problem_def(problem_file)
 prob = RepeatedPC_TAPF(simple_prob_def,planner.primary_planner.solver,loader)
 # cache = ReplanningProfilerCache(features=feats,final_features=final_feats)
 
@@ -78,3 +79,4 @@ prob = RepeatedPC_TAPF(simple_prob_def,planner.primary_planner.solver,loader)
 # reset_solver!(solver)
 # search_env, cache = profile_replanner!(solver,replan_model,prob,cache)
 search_env, planner = profile_replanner!(planner,prob)
+write_replanning_results(loader,planner,base_results_dir,problem_file)
