@@ -265,8 +265,8 @@ function formulate_optimization_problem(N,M,G,D,Δt,Δt_collect,Δt_deliver,to0_
     shapes = [(1,1) for j in 1:M],
     assignments=Dict{Int64,Int64}(),
     cost_model=MakeSpan(),
-    t0_ = Dict(),
-    tF_ = Dict(),
+    t0_ = Dict(), # TODO start times for objects
+    tF_ = Dict(), # TODO end times for objects
     Mm = 10000,
     # Mm = sum([D[s1,s2] for s1 in r0 for s2 in s0]) + sum([D[s1,s2] for s1 in s0 for s2 in sF])
     )
@@ -764,8 +764,6 @@ function formulate_milp(milp_model::SparseAdjacencyMILP,project_schedule::Operat
 
     # Precedence relationships
     Xa = SparseMatrixCSC{VariableRef,Int}(nv(G),nv(G),ones(Int,nv(G)+1),Int[],VariableRef[])
-    # @variable(model, Xa[1:nv(G),1:nv(G)], binary = true); # Precedence Adjacency Matrix TODO make sparse
-    # @constraint(model, Xa .+ Xa' .<= 1) # no bidirectional or self edges
     # set all initial times that are provided
     for (id,t) in t0_
         v = get_vtx(project_schedule, id)

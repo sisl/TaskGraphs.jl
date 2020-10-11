@@ -543,7 +543,7 @@ function CRCBS.solve!(solver::NBSSolver, prob::E;kwargs...) where {E<:AbstractPC
             schedule, l_bound = solve_assignment_problem!(
                 assignment_solver(solver),
                 assignment_problem,
-                prob;kwargs...)
+                prob)
             set_lower_bound!(solver,l_bound)
             if optimality_gap(solver) > 0
                 env, cost = plan_route!(route_planner(solver),
@@ -596,13 +596,22 @@ to being resolved.
 """
 function formulate_assignment_problem(solver,prob;
         kwargs...)
-
-    base_env = prob.env
-    project_schedule    = base_env.schedule
-    problem_spec        = base_env.problem_spec
-    formulate_milp(solver,project_schedule,problem_spec;
-        cost_model=base_env.problem_spec.cost_function,
+    # TODO needs to pass in base_env--not just the schedule
+    formulate_milp(solver,prob.env;
+        cost_model=prob.env.problem_spec.cost_function,
         kwargs...)
+end
+
+function formulate_milp(milp_model::TaskGraphsMILP,env::SearchEnv;kwargs...)
+    t0,tF = get_node_start_and_end_times(env)
+    formulate_milp(milp_model,env.schedule,env.problem_spec;
+        t0_=t0,
+        tF_=tF,
+        kwargs...
+        )
+end
+function formulate_milp(model::AssignmentMILP,env::SearchEnv;kwargs...)
+    formulate_milp(model,env.schedule,env.problem_spec;kwargs...)
 end
 
 export
@@ -623,18 +632,12 @@ export
     solve_assignment_problem!
 
 """
-    solve_assignment_problem!(solver,base_env;kwargs...)
+    solve_assignment_problem!(solver,model,prob)
 
 Solve the "assignment problem"--i.e., the relaxation of the full PC-TAPF problem
 wherein we ignore collisions--using the algorithm encoded by solver.
 """
-function solve_assignment_problem!(solver::S, model, prob;
-        t0_ = Dict{AbstractID,Int}(get_vtx_id(prob.env.schedule, v)=>t for (v,t) in enumerate(prob.env.cache.t0)),
-        tF_ = Dict{AbstractID,Int}(get_vtx_id(prob.env.schedule, v)=>t for (v,t) in enumerate(prob.env.cache.tF)),
-        TimeLimit=min(deadline(solver)-time(),runtime_limit(solver)),
-        buffer=5.0, # to give some extra time to the path planner if the milp terminates late.
-        kwargs...) where {S<:TaskGraphsMILPSolver}
-
+function solve_assignment_problem!(solver::TaskGraphsMILPSolver, model, prob)
     l_bound = lower_bound(solver)
     optimize!(model)
     if primal_status(model) != MOI.FEASIBLE_POINT
@@ -649,7 +652,6 @@ function solve_assignment_problem!(solver::S, model, prob;
     update_project_schedule!(solver, model, sched, prob.env.problem_spec)
     sched, lower_bound(solver)
 end
-
 
 export
     plan_route!

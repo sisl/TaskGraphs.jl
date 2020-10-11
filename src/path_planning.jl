@@ -103,6 +103,7 @@ function reset_cache!(cache::PlanningCache,schedule::OperatingSchedule,t0=cache.
     cache
 end
 
+
 function initialize_route_plan end
 
 const State = CRCBS.GraphState
@@ -142,6 +143,21 @@ function sprint_search_env(io::IO,env::SearchEnv)
 end
 function Base.show(io::IO,env::SearchEnv)
     sprint_search_env(io,env)
+end
+
+export get_node_start_and_end_times
+"""
+    get_start_and_end_maps(sched,cache,default=0)
+
+Return dictionaries mapping each node id in schedule to its start and end time
+"""
+function get_node_start_and_end_times(sched::OperatingSchedule,cache::PlanningCache,default=0)
+    t0 = Dict{AbstractID,Int}(get_vtx_id(sched, v)=>get(cache.t0, v, default) for v in vertices(sched))
+    tF = Dict{AbstractID,Int}(get_vtx_id(sched, v)=>get(cache.tF, v, default) for v in vertices(sched))
+    return t0,tF
+end
+function get_node_start_and_end_times(env::SearchEnv,args...)
+    get_node_start_and_end_times(env.schedule,env.cache,args...)
 end
 
 export

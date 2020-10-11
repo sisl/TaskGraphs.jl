@@ -709,6 +709,7 @@ function replan!(solver, replan_model, search_env, request;
     # NOTE: better performance is obtained when t_commit is the default t0 (tighter constraint on milp)
     t0 = map(v->get(new_cache.t0, v, t_commit), vertices(get_graph(new_schedule)))
     tF = map(v->get(new_cache.tF, v, t_commit), vertices(get_graph(new_schedule)))
+    # t0,tF = get_node_start_and_end_times(new_schedule,new_cache,t_commit)
     base_search_env = construct_search_env(
         solver,
         new_schedule,
