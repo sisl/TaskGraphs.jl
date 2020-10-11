@@ -542,9 +542,24 @@ function initialize_route_plan(schedule::OperatingSchedule,cost_model)
     cost = aggregate_costs(cost_model, costs)
     LowLevelSolution(paths=paths, cost_model=cost_model,costs=costs, cost=cost)
 end
-function initialize_route_plan(env::SearchEnv,cost_model=get_cost_model(env))
+function initialize_route_plan(env::SearchEnv)
+    cost_model=get_cost_model(env)
     paths=deepcopy(get_paths(env.route_plan))
     costs = map(p->get_cost(p), paths)
+    LowLevelSolution(
+        paths=paths,
+        cost_model=cost_model,
+        costs=costs,
+        cost=aggregate_costs(cost_model, costs)
+        )
+end
+function initialize_route_plan(env::SearchEnv,cost_model)
+    paths = [Path(
+        path_nodes=deepcopy(p.path_nodes),
+        s0=p.s0,
+        cost = compute_path_cost(cost_model,env.env_graph,p,i)
+    ) for (i,p) in enumerate(get_paths(env.route_plan))]
+    costs=map(p->get_cost(p),paths)
     LowLevelSolution(
         paths=paths,
         cost_model=cost_model,

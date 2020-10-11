@@ -726,8 +726,9 @@ function replan!(solver, replan_model, search_env, request;
         search_env,
         initialize_planning_cache(new_schedule,t0,tF)
         )
+    base_route_plan = initialize_route_plan(search_env,get_cost_model(base_search_env))
     # @log_info(3,solver,"Previous route plan: \n",sprint_route_plan(route_plan))
-    trimmed_route_plan = trim_route_plan(base_search_env, route_plan, t_commit)
+    trimmed_route_plan = trim_route_plan(base_search_env, base_route_plan, t_commit)
     # @log_info(3,solver,"Trimmed route plan: \n",sprint_route_plan(trimmed_route_plan))
     SearchEnv(base_search_env, route_plan=trimmed_route_plan)
 end
@@ -804,7 +805,7 @@ function profile_replanner!(planner::ReplannerWithBackup,prob::RepeatedAbstractP
             resultsB,prob,stage,request)
 
         base_envA = replan!(plannerA,env,request)
-        envA, resultsA = profile_solver!(plannerA.solver,sub_problem(prob,base_envA))
+        envA, resultsA = profile_solver!(plannerA.solver,construct_routing_problem(prob,base_envA))
         compile_replanning_results!(plannerA.cache,plannerA.solver,envA,
             resultsA,prob,stage,request)
 

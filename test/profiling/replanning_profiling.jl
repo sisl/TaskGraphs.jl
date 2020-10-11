@@ -41,9 +41,10 @@ backup_planner = FullReplanner(
     replanner = MergeAndBalance(),
     cache = ReplanningProfilerCache(features=feats,final_features=final_feats)
     )
-set_real_time_flag!(primary_planner.replanner,false)
-set_iteration_limit!(assignment_solver(primary_planner.solver),1)
-set_verbosity!(primary_planner.solver,0)
+set_real_time_flag!(backup_planner.replanner,false)
+set_iteration_limit!(backup_planner.solver,1)
+set_iteration_limit!(route_planner(backup_planner.solver),500)
+set_verbosity!(backup_planner.solver,0)
 
 # Full solver
 planner = ReplannerWithBackup(primary_planner,backup_planner)
@@ -68,13 +69,12 @@ simple_prob_def = read_simple_repeated_problem_def(joinpath(base_problem_dir,"pr
 prob = RepeatedPC_TAPF(simple_prob_def,planner.primary_planner.solver,loader)
 # cache = ReplanningProfilerCache(features=feats,final_features=final_feats)
 
-construct_cost_model(
-    planner.backup_planner.solver,
-    prob.env.schedule,
-    prob.env,
-    prob.env.cache
-)
+# construct_search_env(
+#     planner.backup_planner.solver,
+#     prob.env.schedule,
+#     prob.env,
+#     prob.env.cache,
+# ).route_plan.paths[1].cost
 # reset_solver!(solver)
 # search_env, cache = profile_replanner!(solver,replan_model,prob,cache)
-search_env, cache = profile_replanner!(planner,prob)
-cache.stage_results
+search_env, planner = profile_replanner!(planner,prob)
