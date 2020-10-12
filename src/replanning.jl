@@ -850,11 +850,12 @@ function profile_replanner!(planner::ReplannerWithBackup,prob::RepeatedAbstractP
         compile_replanning_results!(plannerA.cache,plannerA.solver,envA,
             resultsA,prob,stage,request)
 
-        if failed_status(plannerA) == false
+        # if failed_status(plannerA) == false
+        if feasible_status(plannerA)
             @log_info(-1,0,"REPLANNING: ",
             "Primary planner succeeded at stage $stage.")
             env = envA
-        elseif failed_status(plannerB) == false
+        elseif feasible_status(plannerB) 
             @log_info(-1,0,"REPLANNING: ",
             "Primary planner failed at stage $stage. Proceeding with backup plan.")
             env = envB
@@ -862,7 +863,6 @@ function profile_replanner!(planner::ReplannerWithBackup,prob::RepeatedAbstractP
             @log_info(-1,0,"REPLANNING:",
                 "Both primary and backup planners failed at stage $stage.",
                 " Returning early.")
-                @assert failed_status(plannerA) && failed_status(plannerB) "Should only reach this condition if "
             break
         end
     end
