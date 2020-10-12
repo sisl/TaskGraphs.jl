@@ -800,13 +800,15 @@ function profile_replanner!(
     for f in readdir(base_problem_dir;join=true)
         if !isfile(f)
             problem_name = splitdir(f)[end]
+            outpath = joinpath(base_results_dir,problem_name)
+            ispath(outpath) ? continue : nothing
             if problem_name[1:7] == "problem"
                 @log_info(-1,0,"PROFILING: testing on problem ",problem_name)
                 simple_prob_def = read_simple_repeated_problem_def(f)
                 prob = RepeatedPC_TAPF(simple_prob_def,planner.primary_planner.solver,loader)
                 search_env, planner = profile_replanner!(planner,prob)
                 @log_info(-1,0,"PROFILING: writing results for problem ",problem_name)
-                write_replanning_results(loader,planner,base_results_dir,f)
+                write_replanning_results(loader,planner,outpath)
             end
         end
     end

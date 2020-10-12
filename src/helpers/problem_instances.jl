@@ -1043,14 +1043,11 @@ export write_replanning_results
 function write_replanning_results(
     loader::ReplanningProblemLoader,
     planner::ReplannerWithBackup,
-    results_dir,
-    problem_file,
+    results_path,
+    problem_name = splitext(splitdir(results_path)[end])[1],
     primary_prefix="primary_planner",
     backup_prefix="backup_planner",
     )
-
-    problem_name = splitext(splitdir(problem_file)[end])[1]
-    results_path = joinpath(results_dir,problem_name)
 
     mkpath(joinpath(results_path,primary_prefix))
     # primary planner

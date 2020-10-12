@@ -927,7 +927,7 @@ function CRCBS.initialize_root_node(env::SearchEnv)
             ),
         id = 1)
 end
-function CRCBS.discrete_constraint_table(env::SearchEnv,agent_id=-1,tf=2*maximum(env.cache.tF)+50*num_agents(env))
+function CRCBS.discrete_constraint_table(env::SearchEnv,agent_id=-1,tf=2*maximum(env.cache.tF)+100*num_agents(env))
     discrete_constraint_table(num_states(env),num_actions(env),agent_id,tf)
 end
 CRCBS.initialize_root_node(solver,pc_mapf::AbstractPC_MAPF) = initialize_root_node(pc_mapf.env)
