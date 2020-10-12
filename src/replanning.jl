@@ -492,24 +492,17 @@ end
     cache::ReplanningProfilerCache  = ReplanningProfilerCache()
 end
 reset_cache!(planner::FullReplanner) = reset_cache!(planner.cache)
+get_replanner_config(planner::FullReplanner) = get_replanner_config(planner.replanner)
 for op in [:replan!,
-        :get_timeout_buffer,
-        :set_timeout_buffer!,
-        :get_route_planning_buffer,
-        :set_route_planning_buffer!,
-        :get_commit_threshold,
-        :set_commit_threshold!,
-        :get_real_time_flag,
-        :set_real_time_flag!,
         :get_commit_time,
-        :break_assignments!,:set_time_limits!,:split_active_vtxs!,
+        :break_assignments!,
+        :set_time_limits!,
+        :split_active_vtxs!,
         :fix_precutoff_nodes!,
         ]
     @eval $op(planner::FullReplanner,args...) = $op(planner.replanner,args...)
 end
-for op in []
-    @eval $op(planner::FullReplanner,args...) = $op(planner.solver,args...)
-end
+CRCBS.get_logger(planner::FullReplanner) = CRCBS.get_logger(planner.solver)
 
 export ReplannerWithBackup
 
@@ -632,82 +625,6 @@ end
 replan!(solver, replan_model::NullReplanner, search_env, args...;kwargs...) = search_env
 function replan!(solver::FullReplanner,args...;kwargs...)
     replan!(solver.solver,solver.replanner,args...;kwargs...)
-end
-
-export
-    compile_replanning_results!,
-    profile_replanner!
-
-function compile_replanning_results!(
-        cache::ReplanningProfilerCache,solver,env,
-        timer_results,prob,stage,request)
-    push!(cache.schedules,deepcopy(env.schedule))
-    # store project ids
-    for v in vertices(request.schedule)
-        id = get_vtx_id(request.schedule,v)
-        cache.project_ids[id] = stage
-    end
-    # store results
-    push!(cache.stage_results, compile_results(solver,cache.features,prob,env,timer_results))
-    # store final results
-    if stage == length(prob.requests)
-        merge!(cache.final_results, compile_results(solver,cache.final_features,prob,env,timer_results))
-    end
-    return cache
-end
-
-function profile_replanner!(solver,replan_model,prob::RepeatedAbstractPC_TAPF,
-        cache = ReplanningProfilerCache()
-    )
-    env = prob.env
-    for (stage,request) in enumerate(prob.requests)
-        @log_info(1,solver,"REPLANNING: Stage ",stage)
-        remap_object_ids!(request.schedule,env.schedule)
-        base_env = replan!(solver,replan_model,env,request)
-        reset_solver!(solver)
-        # env, cost = solve!(solver,base_env)
-        env, timer_results = profile_solver!(solver,construct_routing_problem(prob,base_env))
-        compile_replanning_results!(cache,solver,env,timer_results,prob,stage,request)
-        @log_info(1,solver,"Stage ",stage," - ","route planner iterations: ",
-            iterations(route_planner(solver)))
-    end
-    return env, cache
-end
-
-function profile_replanner!(planner::ReplannerWithBackup,prob::RepeatedAbstractPC_TAPF)
-    reset_cache!(planner)
-    plannerA = planner.primary_planner
-    plannerB = planner.backup_planner
-    env = prob.env
-    for (stage,request) in enumerate(prob.requests)
-        remap_object_ids!(request.schedule,env.schedule)
-
-        base_envB = replan!(plannerB,env,request)
-        envB, resultsB = profile_solver!(plannerB.solver,construct_routing_problem(prob,base_envB))
-        compile_replanning_results!(plannerB.cache,plannerB.solver,envB,
-            resultsB,prob,stage,request)
-
-        base_envA = replan!(plannerA,env,request)
-        envA, resultsA = profile_solver!(plannerA.solver,construct_routing_problem(prob,base_envA))
-        compile_replanning_results!(plannerA.cache,plannerA.solver,envA,
-            resultsA,prob,stage,request)
-
-        if failed_status(plannerA.solver) == false
-            @log_info(-1,0,"REPLANNING: ",
-            "Primary planner succeeded at stage $stage.")
-            env = envA
-        elseif failed_status(plannerB.solver) == false
-            @log_info(-1,0,"REPLANNING: ",
-            "Primary planner failed at stage $stage. Proceeding with backup plan.")
-            env = envB
-        else
-            @log_info(-1,0,"REPLANNING:",
-                "Both primary and backup planners failed at stage $stage.",
-                " Returning early.")
-            break
-        end
-    end
-    return env, planner
 end
 
 
@@ -852,6 +769,27 @@ function RepeatedPC_TAPF(simple_def::SimpleRepeatedProblemDef,solver,loader::Rep
     )
 end
 
+export
+    compile_replanning_results!,
+    profile_replanner!
+
+function compile_replanning_results!(
+        cache::ReplanningProfilerCache,solver,env,
+        timer_results,prob,stage,request)
+    push!(cache.schedules,deepcopy(env.schedule))
+    # store project ids
+    for v in vertices(request.schedule)
+        id = get_vtx_id(request.schedule,v)
+        cache.project_ids[id] = stage
+    end
+    # store results
+    push!(cache.stage_results, compile_results(solver,cache.features,prob,env,timer_results))
+    # store final results
+    if stage == length(prob.requests)
+        merge!(cache.final_results, compile_results(solver,cache.final_features,prob,env,timer_results))
+    end
+    return cache
+end
 
 function profile_replanner!(
     loader::ReplanningProblemLoader,
@@ -872,6 +810,61 @@ function profile_replanner!(
             end
         end
     end
+end
+
+function profile_replanner!(solver,replan_model,prob::RepeatedAbstractPC_TAPF,
+        cache = ReplanningProfilerCache()
+    )
+    env = prob.env
+    for (stage,request) in enumerate(prob.requests)
+        @log_info(1,solver,"REPLANNING: Stage ",stage)
+        remap_object_ids!(request.schedule,env.schedule)
+        base_env = replan!(solver,replan_model,env,request)
+        reset_solver!(solver)
+        # env, cost = solve!(solver,base_env)
+        env, timer_results = profile_solver!(solver,construct_routing_problem(prob,base_env))
+        compile_replanning_results!(cache,solver,env,timer_results,prob,stage,request)
+        @log_info(1,solver,"Stage ",stage," - ","route planner iterations: ",
+            iterations(route_planner(solver)))
+    end
+    return env, cache
+end
+
+function profile_replanner!(planner::ReplannerWithBackup,prob::RepeatedAbstractPC_TAPF)
+    reset_cache!(planner)
+    plannerA = planner.primary_planner
+    plannerB = planner.backup_planner
+    env = prob.env
+    for (stage,request) in enumerate(prob.requests)
+        remap_object_ids!(request.schedule,env.schedule)
+
+        base_envB = replan!(plannerB,env,request)
+        envB, resultsB = profile_solver!(plannerB.solver,construct_routing_problem(prob,base_envB))
+        compile_replanning_results!(plannerB.cache,plannerB.solver,envB,
+            resultsB,prob,stage,request)
+
+        base_envA = replan!(plannerA,env,request)
+        envA, resultsA = profile_solver!(plannerA.solver,construct_routing_problem(prob,base_envA))
+        compile_replanning_results!(plannerA.cache,plannerA.solver,envA,
+            resultsA,prob,stage,request)
+
+        if failed_status(plannerA) == false
+            @log_info(-1,0,"REPLANNING: ",
+            "Primary planner succeeded at stage $stage.")
+            env = envA
+        elseif failed_status(plannerB) == false
+            @log_info(-1,0,"REPLANNING: ",
+            "Primary planner failed at stage $stage. Proceeding with backup plan.")
+            env = envB
+        else
+            @log_info(-1,0,"REPLANNING:",
+                "Both primary and backup planners failed at stage $stage.",
+                " Returning early.")
+                @assert failed_status(plannerA) && failed_status(plannerB) "Should only reach this condition if "
+            break
+        end
+    end
+    return env, planner
 end
 
 

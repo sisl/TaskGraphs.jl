@@ -807,7 +807,7 @@ function CRCBS.build_env(
         goal_time = maximum(env.cache.tF)
         goal_vtx = -1
         # deadline = Inf # already taken care of, perhaps?
-        @log_info(1,solver,string("BUILD ENV: ",string(schedule_node),
+        @log_info(3,solver,string("BUILD ENV: ",string(schedule_node),
             " - setting goal_vtx = ",goal_vtx,", t = maximum(cache.tF) = ",goal_time))
     end
     @assert goal_time != Inf "goal time set to $goal_time for node $(string(schedule_node))"

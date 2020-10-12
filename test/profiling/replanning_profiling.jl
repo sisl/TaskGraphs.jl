@@ -38,7 +38,6 @@ primary_planner = FullReplanner(
     replanner = MergeAndBalance(),
     cache = ReplanningProfilerCache(features=feats,final_features=final_feats)
     )
-set_real_time_flag!(primary_planner.replanner,false)
 set_verbosity!(primary_planner.solver,0)
 # set_iteration_limit!(low_level(low_level(route_planner(primary_planner.solver))),5000)
 # set_iteration_limit!(route_planner(primary_planner.solver),1000)
@@ -51,13 +50,13 @@ backup_planner = FullReplanner(
     replanner = MergeAndBalance(),
     cache = ReplanningProfilerCache(features=feats,final_features=final_feats)
     )
-set_real_time_flag!(backup_planner.replanner,false)
-set_iteration_limit!(backup_planner.solver,1)
+set_iteration_limit!(backup_planner,1)
 set_iteration_limit!(route_planner(backup_planner.solver),5000)
-set_verbosity!(backup_planner.solver,0)
+set_verbosity!(backup_planner.solver,1)
 # Full solver
 planner = ReplannerWithBackup(primary_planner,backup_planner)
 # warm up so that the planner doesn't fail because of slow compilation
 warmup(planner,loader)
 # profile
+# set_real_time_flag!(planner,false)
 profile_replanner!(loader,planner,base_problem_dir,base_results_dir)

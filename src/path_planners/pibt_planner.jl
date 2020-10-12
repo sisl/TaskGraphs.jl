@@ -61,6 +61,14 @@ function CRCBS.pibt_update_solution!(solver,solution::SearchEnv,cache)
     update_planning_cache!(solver,solution)
     solution
 end
+function pibt_info_strings(cache)
+    info_strings = String[]
+    for (i,(s,env)) in enumerate(zip(cache.states,cache.envs))
+        str = "\t$i : $(get_vtx(cache.solution.schedule,env.node_id)) $(string(env.schedule_node)), $(string(s)) -> $(string(env.goal))\n"
+        push!(info_strings,str)
+    end
+    return info_strings
+end
 function CRCBS.pibt_update_envs!(solver,pc_mapf::PC_MAPF,cache)
     solution = CRCBS.get_solution(cache)
     node = initialize_root_node(solver,pc_mapf)
@@ -89,12 +97,7 @@ function CRCBS.pibt_update_envs!(solver,pc_mapf::PC_MAPF,cache)
             end
         end
     end
-    # debugging
-    info_strings = String[]
-    for (i,(s,env)) in enumerate(zip(cache.states,cache.envs))
-        str = "\t$i : $(get_vtx(cache.solution.schedule,env.node_id)) $(string(env.schedule_node)), $(string(s)) -> $(string(env.goal))\n"
-        push!(info_strings,str)
-    end
-    @log_info(0,solver,"PIBT iteration $(iterations(solver)) update_cache!\n",info_strings...)
-    cache
+    @log_info(2,solver,"PIBT iteration $(iterations(solver)) update_cache!\n",
+        pibt_info_strings(cache)...)
+    return cache
 end
