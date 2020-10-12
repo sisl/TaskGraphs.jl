@@ -52,7 +52,7 @@ backup_planner = FullReplanner(
     )
 set_iteration_limit!(backup_planner,1)
 set_iteration_limit!(route_planner(backup_planner.solver),5000)
-set_verbosity!(backup_planner.solver,1)
+set_verbosity!(backup_planner.solver,0)
 # Full solver
 planner = ReplannerWithBackup(primary_planner,backup_planner)
 # warm up so that the planner doesn't fail because of slow compilation
