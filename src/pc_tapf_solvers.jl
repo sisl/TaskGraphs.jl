@@ -383,7 +383,7 @@ function compute_route_plan!(solver::ISPS, pc_mapf::AbstractPC_MAPF, node::N, en
         status = plan_next_path!(solver,pc_mapf,env,node)
         status ? nothing : return false
         tighten_gaps!(solver,pc_mapf,env,node)
-        enforce_time_limit(solver)
+        enforce_time_limit!(solver)
     end
     return true
 end
@@ -554,7 +554,7 @@ function CRCBS.solve!(solver::NBSSolver, prob::E;kwargs...) where {E<:AbstractPC
                 end
             end
             increment_iteration_count!(solver)
-            enforce_time_limit(solver)
+            enforce_time_limit!(solver)
             if check_iterations(solver)
                 @log_info(1,solver,
                     "NBS: Reached $(iteration_limit(solver))-iteration limit.")

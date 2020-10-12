@@ -272,7 +272,7 @@ function prioritized_dfs_search(solver,search_env,envs,paths;
      actions    = map(path->get_a(get_path_node(path,t+1)), paths)
      while true
          increment_iteration_count(solver)
-         enforce_iteration_limit(solver)
+         enforce_iteration_limit!(solver)
          update_envs!(solver,search_env,envs,paths)
          if length(search_env.cache.active_set) == 0
              return envs, paths, true
