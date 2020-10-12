@@ -47,7 +47,7 @@ Fields:
     timeout.
 """
 @with_kw struct AStarSC{C} <: AbstractAStarPlanner
-    logger::SolverLogger{C} = SolverLogger{C}()
+    logger::SolverLogger{C} = SolverLogger{C}(iteration_limit=1000)
     replan::Bool            = false
 end
 search_trait(solver::AStarSC) = NonPrioritized()
@@ -679,5 +679,13 @@ function plan_route!(
     solution, cost = solve!(solver, pc_mapf)
     solution, primary_cost(solver,get_cost(solution))
 end
+
+CRCBS.solver_type(::NBSSolver)          = "NBSSolver"
+CRCBS.solver_type(::CBSSolver)          = "CBSSolver"
+CRCBS.solver_type(::PIBTPlanner)        = "PIBTPlanner"
+CRCBS.solver_type(::ISPS)               = "ISPS"
+CRCBS.solver_type(::AStarSC)            = "AStarSC"
+CRCBS.solver_type(::PrioritizedAStarSC) = "PrioritizedAStarSC"
+CRCBS.solver_type(::AStar)              = "AStar"
 
 # end

@@ -1,17 +1,23 @@
 using TaskGraphs
 using CRCBS
-# using LightGraphs, MetaGraphs, GraphUtils
-# using JuMP, MathOptInterface
-# using Gurobi
-# using Random
-# using TOML
-#
-# using Test
-# using Logging
+using Random
 
+# initialize loader
+loader = ReplanningProblemLoader()
+add_env!(loader,"env_2",init_env_2())
+# get probem config
+problem_configs = replanning_config_1()
+# define paths to problems and results
+base_dir            = joinpath("/scratch/task_graphs_experiments","replanning2")
+base_problem_dir    = joinpath(base_dir,"problem_instances")
+base_results_dir    = joinpath(base_dir,"results")
+# write problems
+Random.seed!(0)
 # Problem generation and profiling
 reset_task_id_counter!()
 reset_operation_id_counter!()
+write_repeated_pctapf_problems!(loader,problem_configs,base_problem_dir)
+# set up planner and profiling features
 feats = [
     RunTime(),IterationCount(),TimeOutStatus(),IterationMaxOutStatus(),
     SolutionCost(),OptimalityGap(),OptimalFlag(),FeasibleFlag(),
@@ -22,16 +28,20 @@ final_feats = [
     SolutionCost(),OptimalityGap(),OptimalFlag(),FeasibleFlag(),
     RobotPaths(),NumConflicts(),
     ]
-
 # Primary planner
+path_finder = DefaultAStarSC()
+set_iteration_limit!(path_finder,5000)
+primary_route_planner = CBSSolver(ISPS(path_finder))
+set_iteration_limit!(primary_route_planner,1000)
 primary_planner = FullReplanner(
-    solver = NBSSolver(),
+    solver = NBSSolver(path_planner=primary_route_planner),
     replanner = MergeAndBalance(),
     cache = ReplanningProfilerCache(features=feats,final_features=final_feats)
     )
 set_real_time_flag!(primary_planner.replanner,false)
 set_verbosity!(primary_planner.solver,0)
-
+# set_iteration_limit!(low_level(low_level(route_planner(primary_planner.solver))),5000)
+# set_iteration_limit!(route_planner(primary_planner.solver),1000)
 # Backup planner
 backup_planner = FullReplanner(
     solver = NBSSolver(
@@ -43,40 +53,11 @@ backup_planner = FullReplanner(
     )
 set_real_time_flag!(backup_planner.replanner,false)
 set_iteration_limit!(backup_planner.solver,1)
-set_iteration_limit!(route_planner(backup_planner.solver),500)
+set_iteration_limit!(route_planner(backup_planner.solver),5000)
 set_verbosity!(backup_planner.solver,0)
-
 # Full solver
 planner = ReplannerWithBackup(primary_planner,backup_planner)
-
-###
-
-# get probem config
-problem_configs = replanning_config_2()
-# define paths to problems and results
-base_dir            = joinpath("/scratch/task_graphs_experiments","dummy")
-base_problem_dir    = joinpath(base_dir,"problem_instances")
-base_results_dir    = joinpath(base_dir,"results")
-# initialize loader
-loader = ReplanningProblemLoader()
-# add_env!(loader,"env_2",init_env_2())
-prob = pctapf_problem_1(planner.primary_planner.solver)
-add_env!(loader,"env_2",prob.env.env_graph)
-# write problems
-write_repeated_pctapf_problems!(loader,problem_configs,base_problem_dir)
-
-problem_file = joinpath(base_problem_dir,"problem0001")
-simple_prob_def = read_simple_repeated_problem_def(problem_file)
-prob = RepeatedPC_TAPF(simple_prob_def,planner.primary_planner.solver,loader)
-# cache = ReplanningProfilerCache(features=feats,final_features=final_feats)
-
-# construct_search_env(
-#     planner.backup_planner.solver,
-#     prob.env.schedule,
-#     prob.env,
-#     prob.env.cache,
-# ).route_plan.paths[1].cost
-# reset_solver!(solver)
-# search_env, cache = profile_replanner!(solver,replan_model,prob,cache)
-search_env, planner = profile_replanner!(planner,prob)
-write_replanning_results(loader,planner,base_results_dir,problem_file)
+# warm up so that the planner doesn't fail because of slow compilation
+warmup(planner,loader)
+# profile
+profile_replanner!(loader,planner,base_problem_dir,base_results_dir)

@@ -772,6 +772,10 @@ for op in [
     @eval $op(solver,args...;kwargs...) = pctapf_problem(solver,$op(args...;kwargs...)...)
 end
 
+################################################################################
+############################# Replanning Problems ##############################
+################################################################################
+
 export
     replanning_problem,
     replanning_problem_1,
@@ -1019,7 +1023,7 @@ function write_repeated_pctapf_problems!(loader::ReplanningProblemLoader,config:
     for i in 1:num_trials
         prob_def = random_repeated_pctapf_def(env,config)
         write_simple_repeated_problem_def(
-            joinpath(base_path,padded_problem_name(prob_counter)),prob_def)
+            joinpath(base_path,padded_problem_name(prob_counter,"problem","")),prob_def)
         prob_counter += 1
         open(joinpath(base_path,"config.toml"),"w") do io
             TOML.print(io,config)
@@ -1031,7 +1035,7 @@ function write_repeated_pctapf_problems!(loader::ReplanningProblemLoader,configs
     for config in configs
         prob_counter = write_repeated_pctapf_problems!(loader,config,base_path,prob_counter)
     end
-    prob_counter
+    return prob_counter
 end
 
 export write_replanning_results
@@ -1052,7 +1056,6 @@ function write_replanning_results(
     # primary planner
     for (i,results) in enumerate(planner.primary_planner.cache.stage_results)
         path = joinpath(results_path,primary_prefix,padded_problem_name(i,"stage"))
-        @show path
         open(path,"w") do io
             TOML.print(io,results)
         end
@@ -1060,12 +1063,37 @@ function write_replanning_results(
     mkpath(joinpath(results_path,backup_prefix))
     for (i,results) in enumerate(planner.backup_planner.cache.stage_results)
         path = joinpath(results_path,backup_prefix,padded_problem_name(i,"stage"))
-        @show path
         open(path,"w") do io
             TOML.print(io,results)
         end
     end
     results_path
+end
+
+export warmup
+
+function warmup(planner::ReplannerWithBackup,loader::ReplanningProblemLoader,
+    base_dir            = joinpath("/tmp","warmup"),
+    base_problem_dir    = joinpath(base_dir,"problem_instances"),
+    base_results_dir    = joinpath(base_dir,"results"),
+    config = Dict(
+        :N => 10,
+        :M => 5,
+        :num_projects => 3,
+        :env_id => sort(collect(keys(loader.envs)))[1],
+        ),
+)
+    Random.seed!(0)
+    write_repeated_pctapf_problems!(loader,config,base_problem_dir)
+    env = get_env!(loader,config[:env_id])
+    # turn off time constraints for warm up
+    set_real_time_flag!(planner,false)
+    profile_replanner!(loader,planner,base_problem_dir,base_results_dir)
+    # turn real time constraints back on
+    set_real_time_flag!(planner,true)
+    run(`rm -rf $base_dir`) # remove dummy warmup folder
+    reset_cache!(planner)
+    return planner
 end
 
 

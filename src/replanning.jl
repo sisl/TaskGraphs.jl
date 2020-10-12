@@ -55,147 +55,6 @@ RepeatedC_PC_TAPF(env::SearchEnv) = RepeatedC_PC_TAPF(env,Vector{ProjectRequest}
 construct_routing_problem(prob::RepeatedPC_TAPF,env) = PC_TAPF(env)
 construct_routing_problem(prob::RepeatedC_PC_TAPF,env) = C_PC_TAPF(env)
 
-export
-    ReplanningProblemLoader,
-    add_env!,
-    get_env!
-
-"""
-    ReplanningProblemLoader
-
-Helper cache for loading replanning problems
-"""
-struct ReplanningProblemLoader
-    envs::Dict{String,GridFactoryEnvironment}
-    prob_specs::Dict{String,ProblemSpec}
-    ReplanningProblemLoader() = new(
-        Dict{String,GridFactoryEnvironment}(),
-        Dict{String,ProblemSpec}()
-    )
-end
-function add_env!(loader::ReplanningProblemLoader,env_id::String,
-    env=read_env(env_id))
-    if haskey(loader.envs,env_id)
-    else
-        loader.envs[env_id] = env
-        loader.prob_specs[env_id] = ProblemSpec(graph=env)
-    end
-    loader
-end
-function get_env!(loader::ReplanningProblemLoader,env_id::String)
-    if !haskey(loader.envs,env_id)
-        loader.envs[env_id] = read_env(env_id)
-    end
-    return loader.envs[env_id]
-end
-
-export
-    SimpleReplanningRequest,
-    read_simple_request
-
-"""
-    SimpleReplanningRequest
-
-Intermediate representation of a `ProjectRequest` (useful for I/O)
-"""
-struct SimpleReplanningRequest
-    def::SimpleProblemDef
-    t_request::Int
-    t_arrival::Int
-end
-function TOML.parse(def::SimpleReplanningRequest)
-    toml_dict = TOML.parse(def.def)
-    toml_dict["t_request"] = def.t_request
-    toml_dict["t_arrival"] = def.t_arrival
-    toml_dict
-end
-function read_simple_request(toml_dict)
-    SimpleReplanningRequest(
-        read_problem_def(toml_dict),
-        toml_dict["t_request"],
-        toml_dict["t_arrival"]
-    )
-end
-read_simple_request(path::String) = read_simple_request(TOML.parse(path))
-
-function ProjectRequest(def::SimpleReplanningRequest,prob_spec)
-    ProjectRequest(
-        schedule = construct_partial_project_schedule(
-            def.def.project_spec,prob_spec),
-        t_request = def.t_request,
-        t_arrival = def.t_arrival
-        )
-end
-
-export
-    SimpleRepeatedProblemDef,
-    write_simple_repeated_problem_def,
-    read_simple_repeated_problem_def
-
-"""
-    SimpleRepeatedProblemDef
-
-Intermediate representation of a `RepeatedPC_TAPF` (useful for I/O)
-"""
-@with_kw struct SimpleRepeatedProblemDef
-    requests::Vector{SimpleReplanningRequest} = Vector{SimpleReplanningRequest}()
-    r0::Vector{Int} = Int[]
-    env_id::String = ""
-end
-
-# problem_path/
-#   config.toml - # robot initial positions, env_id
-#   stages/
-#       stage1/
-#           problem.toml
-#       ...
-#       stageN/
-#           problem.toml
-function write_simple_repeated_problem_def(path,def::SimpleRepeatedProblemDef)
-    toml_dict = Dict("r0" => def.r0,"env_id" => def.env_id)
-    mkpath(path)
-    open(joinpath(path,"def.toml"),"w") do io
-        TOML.print(io,toml_dict)
-    end
-    for (i,stage_def) in enumerate(def.requests)
-        p = joinpath(path,@sprintf("stage%3.3i",i))
-        mkpath(p)
-        toml_dict = TOML.parse(stage_def)
-        open(joinpath(p,"problem.toml"),"w") do io
-            TOML.print(io,toml_dict)
-        end
-    end
-    return true
-end
-
-function read_simple_repeated_problem_def(path)
-    toml_dict = TOML.parsefile(joinpath(path,"def.toml"))
-    prob_def = SimpleRepeatedProblemDef(
-        SimpleReplanningRequest[],
-        toml_dict["r0"],
-        toml_dict["env_id"],
-    )
-    for p in readdir(path;join=true,sort=true)
-        isdir(p) ? nothing : continue
-        prob_dict = TOML.parsefile(joinpath(p,"problem.toml"))
-        push!(prob_def.requests,read_simple_request(prob_dict))
-    end
-    prob_def
-end
-
-function RepeatedPC_TAPF(simple_def::SimpleRepeatedProblemDef,solver,loader::ReplanningProblemLoader)
-    env         = loader.envs[simple_def.env_id]
-    prob_spec   = ProblemSpec(loader.prob_specs[simple_def.env_id],
-        r0=simple_def.r0,N=length(simple_def.r0))
-    sched = construct_partial_project_schedule(
-        [ROBOT_AT(r,x) for (r,x) in enumerate(simple_def.r0)],prob_spec)
-    search_env = construct_search_env(solver,sched,prob_spec,env)
-    r_pc_tapf = RepeatedPC_TAPF(
-        search_env,
-        map(req->ProjectRequest(req,prob_spec), simple_def.requests)
-    )
-end
-
 
 
 export
@@ -234,7 +93,7 @@ export
     get_active_and_fixed_vtxs(project_schedule::OperatingSchedule,
         cache::PlanningCache,t)
 
-"active" vertices "straddle" the query time t
+"active" vertices "straddle" the query time ti
 "fixed" vertices finish before the query time t
 """
 function get_active_and_fixed_vtxs(project_schedule::OperatingSchedule,cache::PlanningCache,t)
@@ -613,12 +472,18 @@ Stores information during replanning
 """
 @with_kw struct ReplanningProfilerCache
     schedules::Vector{OperatingSchedule}    = Vector{OperatingSchedule}()
-    # schedule::OperatingSchedule             = OperatingSchedule()
     project_ids::Dict{AbstractID,Int}       = Dict{AbstractID,Int}()
     stage_results::Vector{Dict{String,Any}} = Vector{Dict{String,Any}}()
     final_results::Dict{String,Any}         = Dict{String,Any}()
     features::Vector{FeatureExtractor}      = Vector{FeatureExtractor}()
     final_features::Vector{FeatureExtractor}= Vector{FeatureExtractor}()
+end
+function reset_cache!(cache::ReplanningProfilerCache)
+    empty!(cache.schedules)
+    empty!(cache.project_ids)
+    empty!(cache.stage_results)
+    empty!(cache.final_results)
+    cache
 end
 
 @with_kw struct FullReplanner{R,S}
@@ -626,15 +491,47 @@ end
     replanner::R                    = MergeAndBalance()
     cache::ReplanningProfilerCache  = ReplanningProfilerCache()
 end
-for op in [:replan!,:get_timeout_buffer,:get_route_planning_buffer,:get_commit_time,
+reset_cache!(planner::FullReplanner) = reset_cache!(planner.cache)
+for op in [:replan!,
+        :get_timeout_buffer,
+        :set_timeout_buffer!,
+        :get_route_planning_buffer,
+        :set_route_planning_buffer!,
+        :get_commit_threshold,
+        :set_commit_threshold!,
+        :get_real_time_flag,
+        :set_real_time_flag!,
+        :get_commit_time,
         :break_assignments!,:set_time_limits!,:split_active_vtxs!,
-        :fix_precutoff_nodes!]
+        :fix_precutoff_nodes!,
+        ]
     @eval $op(planner::FullReplanner,args...) = $op(planner.replanner,args...)
 end
 for op in []
     @eval $op(planner::FullReplanner,args...) = $op(planner.solver,args...)
 end
 
+export ReplannerWithBackup
+
+"""
+    ReplannerWithBackup{A,B}
+
+Consists of a primary and a backup solver. The backup solver is supposed to be
+fast--it computes a "fallback" plan in case the primary solver fails to find a
+good enough solution before time out.
+"""
+struct ReplannerWithBackup{A,B}
+    primary_planner::A
+    backup_planner::B
+end
+function set_real_time_flag!(model::ReplannerWithBackup,val)
+    set_real_time_flag!(model.backup_planner,val)
+    set_real_time_flag!(model.primary_planner,val)
+end
+function reset_cache!(planner::ReplannerWithBackup)
+    reset_cache!(planner.primary_planner)
+    reset_cache!(planner.backup_planner)
+end
 
 function get_commit_time(replan_model, search_env, t_request, commit_threshold=get_commit_threshold(replan_model))
     t_request + commit_threshold
@@ -759,7 +656,6 @@ function compile_replanning_results!(
     return cache
 end
 
-
 function profile_replanner!(solver,replan_model,prob::RepeatedAbstractPC_TAPF,
         cache = ReplanningProfilerCache()
     )
@@ -778,21 +674,8 @@ function profile_replanner!(solver,replan_model,prob::RepeatedAbstractPC_TAPF,
     return env, cache
 end
 
-export ReplannerWithBackup
-
-"""
-    ReplannerWithBackup{A,B}
-
-Consists of a primary and a backup solver. The backup solver is supposed to be
-fast--it computes a "fallback" plan in case the primary solver fails to find a
-good enough solution before time out.
-"""
-struct ReplannerWithBackup{A,B}
-    primary_planner::A
-    backup_planner::B
-end
-
 function profile_replanner!(planner::ReplannerWithBackup,prob::RepeatedAbstractPC_TAPF)
+    reset_cache!(planner)
     plannerA = planner.primary_planner
     plannerB = planner.backup_planner
     env = prob.env
@@ -826,6 +709,172 @@ function profile_replanner!(planner::ReplannerWithBackup,prob::RepeatedAbstractP
     end
     return env, planner
 end
+
+
+export
+    ReplanningProblemLoader,
+    add_env!,
+    get_env!
+
+"""
+    ReplanningProblemLoader
+
+Helper cache for loading replanning problems
+"""
+struct ReplanningProblemLoader
+    envs::Dict{String,GridFactoryEnvironment}
+    prob_specs::Dict{String,ProblemSpec}
+    ReplanningProblemLoader() = new(
+        Dict{String,GridFactoryEnvironment}(),
+        Dict{String,ProblemSpec}()
+    )
+end
+function add_env!(loader::ReplanningProblemLoader,env_id::String,
+    env=read_env(env_id))
+    if haskey(loader.envs,env_id)
+    else
+        loader.envs[env_id] = env
+        loader.prob_specs[env_id] = ProblemSpec(graph=env)
+    end
+    loader
+end
+function get_env!(loader::ReplanningProblemLoader,env_id::String)
+    if !haskey(loader.envs,env_id)
+        loader.envs[env_id] = read_env(env_id)
+    end
+    return loader.envs[env_id]
+end
+
+export
+    SimpleReplanningRequest,
+    read_simple_request
+
+"""
+    SimpleReplanningRequest
+
+Intermediate representation of a `ProjectRequest` (useful for I/O)
+"""
+struct SimpleReplanningRequest
+    def::SimpleProblemDef
+    t_request::Int
+    t_arrival::Int
+end
+function TOML.parse(def::SimpleReplanningRequest)
+    toml_dict = TOML.parse(def.def)
+    toml_dict["t_request"] = def.t_request
+    toml_dict["t_arrival"] = def.t_arrival
+    toml_dict
+end
+function read_simple_request(toml_dict)
+    SimpleReplanningRequest(
+        read_problem_def(toml_dict),
+        toml_dict["t_request"],
+        toml_dict["t_arrival"]
+    )
+end
+read_simple_request(path::String) = read_simple_request(TOML.parse(path))
+
+function ProjectRequest(def::SimpleReplanningRequest,prob_spec)
+    ProjectRequest(
+        schedule = construct_partial_project_schedule(
+            def.def.project_spec,prob_spec),
+        t_request = def.t_request,
+        t_arrival = def.t_arrival
+        )
+end
+
+export
+    SimpleRepeatedProblemDef,
+    write_simple_repeated_problem_def,
+    read_simple_repeated_problem_def
+
+"""
+    SimpleRepeatedProblemDef
+
+Intermediate representation of a `RepeatedPC_TAPF` (useful for I/O)
+"""
+@with_kw struct SimpleRepeatedProblemDef
+    requests::Vector{SimpleReplanningRequest} = Vector{SimpleReplanningRequest}()
+    r0::Vector{Int} = Int[]
+    env_id::String = ""
+end
+
+# problem_path/
+#   config.toml - # robot initial positions, env_id
+#   stages/
+#       stage1/
+#           problem.toml
+#       ...
+#       stageN/
+#           problem.toml
+function write_simple_repeated_problem_def(path,def::SimpleRepeatedProblemDef)
+    toml_dict = Dict("r0" => def.r0,"env_id" => def.env_id)
+    mkpath(path)
+    open(joinpath(path,"def.toml"),"w") do io
+        TOML.print(io,toml_dict)
+    end
+    for (i,stage_def) in enumerate(def.requests)
+        p = joinpath(path,@sprintf("stage%3.3i",i))
+        mkpath(p)
+        toml_dict = TOML.parse(stage_def)
+        open(joinpath(p,"problem.toml"),"w") do io
+            TOML.print(io,toml_dict)
+        end
+    end
+    return true
+end
+
+function read_simple_repeated_problem_def(path)
+    toml_dict = TOML.parsefile(joinpath(path,"def.toml"))
+    prob_def = SimpleRepeatedProblemDef(
+        SimpleReplanningRequest[],
+        toml_dict["r0"],
+        toml_dict["env_id"],
+    )
+    for p in readdir(path;join=true,sort=true)
+        isdir(p) ? nothing : continue
+        prob_dict = TOML.parsefile(joinpath(p,"problem.toml"))
+        push!(prob_def.requests,read_simple_request(prob_dict))
+    end
+    prob_def
+end
+
+function RepeatedPC_TAPF(simple_def::SimpleRepeatedProblemDef,solver,loader::ReplanningProblemLoader)
+    env         = loader.envs[simple_def.env_id]
+    prob_spec   = ProblemSpec(loader.prob_specs[simple_def.env_id],
+        r0=simple_def.r0,N=length(simple_def.r0))
+    sched = construct_partial_project_schedule(
+        [ROBOT_AT(r,x) for (r,x) in enumerate(simple_def.r0)],prob_spec)
+    search_env = construct_search_env(solver,sched,prob_spec,env)
+    r_pc_tapf = RepeatedPC_TAPF(
+        search_env,
+        map(req->ProjectRequest(req,prob_spec), simple_def.requests)
+    )
+end
+
+
+function profile_replanner!(
+    loader::ReplanningProblemLoader,
+    planner::ReplannerWithBackup,
+    base_problem_dir,
+    base_results_dir,
+    )
+    for f in readdir(base_problem_dir;join=true)
+        if !isfile(f)
+            problem_name = splitdir(f)[end]
+            if problem_name[1:7] == "problem"
+                @log_info(-1,0,"PROFILING: testing on problem ",problem_name)
+                simple_prob_def = read_simple_repeated_problem_def(f)
+                prob = RepeatedPC_TAPF(simple_prob_def,planner.primary_planner.solver,loader)
+                search_env, planner = profile_replanner!(planner,prob)
+                @log_info(-1,0,"PROFILING: writing results for problem ",problem_name)
+                write_replanning_results(loader,planner,base_results_dir,f)
+            end
+        end
+    end
+end
+
+
 
 
 # end
