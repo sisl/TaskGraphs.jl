@@ -1173,6 +1173,11 @@ end
 Compute the optimistic start and end times, along with the slack associated
 with each vertex in the `schedule`. Slack for each vertex is represented as
 a vector in order to handle multi-headed projects.
+
+Args:
+* schedule::OperatingSchedule
+* [OPTIONAL] t0::Vector{Int}: default = zeros(Int,nv(schedule))
+* [OPTIONAL] tF::Vector{Int}: default = zeros(Int,nv(schedule))
 """
 function process_schedule(schedule::P,t0=zeros(Int,nv(schedule)),
         tF=zeros(Int,nv(schedule))
