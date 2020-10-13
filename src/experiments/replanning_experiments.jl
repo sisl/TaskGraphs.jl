@@ -277,6 +277,9 @@ function profile_replanner!(
     end
 end
 
+function profile_replanner!(planner::FullReplanner,prob::RepeatedAbstractPC_TAPF)
+    profile_replanner!(planner.solver,planner.replanner,prob,planner.cache)
+end
 function profile_replanner!(solver,replan_model,prob::RepeatedAbstractPC_TAPF,
         cache = ReplanningProfilerCache()
     )
