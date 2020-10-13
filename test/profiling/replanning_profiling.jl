@@ -20,14 +20,9 @@ write_repeated_pctapf_problems!(loader,problem_configs,base_problem_dir)
 # set up planner and profiling features
 feats = [
     RunTime(),IterationCount(),TimeOutStatus(),IterationMaxOutStatus(),
-    SolutionCost(),OptimalityGap(),OptimalFlag(),FeasibleFlag(),
-    RobotPaths(),NumConflicts(),
+    SolutionCost(),OptimalityGap(),OptimalFlag(),FeasibleFlag(),NumConflicts(),
     ]
-final_feats = [
-    RunTime(),IterationCount(),TimeOutStatus(),IterationMaxOutStatus(),
-    SolutionCost(),OptimalityGap(),OptimalFlag(),FeasibleFlag(),
-    RobotPaths(),NumConflicts(),
-    ]
+final_feats = [SolutionCost(),NumConflicts(),RobotPaths()]
 # Primary planner
 path_finder = DefaultAStarSC()
 set_iteration_limit!(path_finder,5000)

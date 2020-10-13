@@ -17,7 +17,7 @@
 
 export to_string_dict
 
-to_string_dict(dict) = Dict(string(k)=>v for (k,v) in dict)
+to_string_dict(dict::Dict{K,V}) where {K,V} = Dict{String,V}(string(k)=>v for (k,v) in dict)
 TOML.print(io::IO,dict::Dict{Symbol,V}) where {V} = TOML.print(io,to_string_dict(dict))
 
 export
@@ -97,6 +97,9 @@ function get_robot_ids(sched::OperatingSchedule,node_id::A,v=get_vtx(sched,node_
     return Vector{RobotID}()
 end
 get_robot_ids(s::OperatingSchedule,v::Int) = get_robot_ids(s,get_vtx_id(s,v),v)
+get_robot_ids(node) = RobotID[]
+get_robot_ids(node::AbstractRobotAction) = [get_robot_id(node)]
+get_robot_ids(node::TEAM_ACTION) = map(n->get_robot_id(n),node.instructions)
 
 export robot_tip_map
 

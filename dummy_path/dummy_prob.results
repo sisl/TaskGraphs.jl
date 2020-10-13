@@ -1,0 +1,28 @@
+RobotPaths = [[1, 5, 9, 13, 14, 15], [4, 8, 12, 12, 12, 12]]
+
+[ObjectPathSummaries.1]
+start_time = 0
+collect_time = 1
+start_vtx = 5
+end_vtx = 13
+object_id = 1
+deposit_time = 3
+robot_ids = [1]
+
+[ObjectPathSummaries.2]
+start_time = 0
+collect_time = 1
+start_vtx = 8
+end_vtx = 12
+object_id = 2
+deposit_time = 2
+robot_ids = [2]
+
+[ObjectPathSummaries.3]
+start_time = 3
+collect_time = 4
+start_vtx = 14
+end_vtx = 15
+object_id = 3
+deposit_time = 5
+robot_ids = [1]

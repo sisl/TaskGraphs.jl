@@ -1021,13 +1021,15 @@ function write_repeated_pctapf_problems!(loader::ReplanningProblemLoader,config:
     env = get_env!(loader,config[:env_id])
     num_trials = get(config,:num_trials,1)
     for i in 1:num_trials
-        prob_def = random_repeated_pctapf_def(env,config)
-        write_simple_repeated_problem_def(
-            joinpath(base_path,padded_problem_name(prob_counter,"problem","")),prob_def)
-        prob_counter += 1
-        open(joinpath(base_path,"config.toml"),"w") do io
+        prob_name = padded_problem_name(prob_counter,"problem","")
+        prob_path = joinpath(base_path,prob_name)
+        mkpath(prob_path)
+        open(joinpath(prob_path,"config.toml"),"w") do io
             TOML.print(io,config)
         end
+        prob_def = random_repeated_pctapf_def(env,config)
+        write_simple_repeated_problem_def(prob_path,prob_def)
+        prob_counter += 1
     end
     return prob_counter
 end
@@ -1040,31 +1042,32 @@ end
 
 export write_replanning_results
 
+function write_replanning_results(cache::ReplanningProfilerCache,results_path)
+    mkpath(results_path)
+    for (i,results) in enumerate(cache.stage_results)
+        path = joinpath(results_path,padded_problem_name(i,"stage"))
+        open(path,"w") do io
+            TOML.print(io,results)
+        end
+    end
+    open(joinpath(results_path,"final_results.toml"),"w") do io
+        TOML.print(io,cache.final_results)
+    end
+    return results_path
+end
+
 function write_replanning_results(
     loader::ReplanningProblemLoader,
     planner::ReplannerWithBackup,
     results_path,
-    problem_name = splitext(splitdir(results_path)[end])[1],
     primary_prefix="primary_planner",
     backup_prefix="backup_planner",
     )
-
-    mkpath(joinpath(results_path,primary_prefix))
-    # primary planner
-    for (i,results) in enumerate(planner.primary_planner.cache.stage_results)
-        path = joinpath(results_path,primary_prefix,padded_problem_name(i,"stage"))
-        open(path,"w") do io
-            TOML.print(io,results)
-        end
-    end
-    mkpath(joinpath(results_path,backup_prefix))
-    for (i,results) in enumerate(planner.backup_planner.cache.stage_results)
-        path = joinpath(results_path,backup_prefix,padded_problem_name(i,"stage"))
-        open(path,"w") do io
-            TOML.print(io,results)
-        end
-    end
-    results_path
+    write_replanning_results(planner.primary_planner.cache,
+        joinpath(results_path,primary_prefix))
+    write_replanning_results(planner.backup_planner.cache,
+        joinpath(results_path,backup_prefix))
+    return results_path
 end
 
 export warmup
