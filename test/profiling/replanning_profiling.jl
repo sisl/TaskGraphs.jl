@@ -8,7 +8,9 @@ for planner in planners
     # warm up to precompile replanning code
     warmup(planner,loader)
     # profile
-    # planner_name = string(typeof(planner.primary_planner.replanner))
-    # results_path = joinpath(base_results_dir,planner_name)
-    # profile_replanner!(loader,planner,base_problem_dir,results_path)
+    planner_name = string(typeof(planner.primary_planner.replanner))
+    results_path = joinpath(base_results_dir,planner_name)
+    profile_replanner!(loader,planner,base_problem_dir,results_path)
 end
+# if results show ''"CRCBS.Feature" = val', use the following line to convert:
+# sed -i 's/\"CRCBS\.\([A-Za-z]*\)\"/\1/g' **/**/*.toml
