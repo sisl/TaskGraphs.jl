@@ -302,6 +302,8 @@ function profile_replanner!(planner::ReplannerWithBackup,prob::RepeatedAbstractP
     reset_cache!(planner)
     plannerA = planner.primary_planner
     plannerB = planner.backup_planner
+    hard_reset_solver!(planner.primary_planner.solver)
+    hard_reset_solver!(planner.backup_planner.solver)
     env = prob.env
     for (stage,request) in enumerate(prob.requests)
         remap_object_ids!(request.schedule,env.schedule)
@@ -381,7 +383,7 @@ problem instances for profiling.
 function replanning_config_1()
     base_configs = [
         Dict(
-            :warning_time=>20,
+            :warning_time=>0,
             :commit_threshold=>10,
             :fallback_commit_threshold=>10,
             :num_trials => 4,
@@ -482,7 +484,7 @@ function setup_replanning_experiments(base_dir)
     loader = ReplanningProblemLoader()
     add_env!(loader,"env_2",init_env_2())
     # get probem config
-    problem_configs = replanning_config_1()
+    problem_configs = replanning_config_3()
     # define paths to problems and results
     base_problem_dir    = joinpath(base_dir,"problem_instances")
     base_results_dir    = joinpath(base_dir,"results")
@@ -492,37 +494,47 @@ function setup_replanning_experiments(base_dir)
     reset_task_id_counter!()
     reset_operation_id_counter!()
     write_repeated_pctapf_problems!(loader,problem_configs,base_problem_dir)
-    # set up planner and profiling features
+    # set up profiling features
     feats = [
-        RunTime(),IterationCount(),TimeOutStatus(),IterationMaxOutStatus(),
+        RunTime(),IterationCount(),LowLevelIterationCount(),
+        TimeOutStatus(),IterationMaxOutStatus(),
         SolutionCost(),OptimalityGap(),OptimalFlag(),FeasibleFlag(),NumConflicts(),
         ObjectPathSummaries(),
         ]
     final_feats = [SolutionCost(),NumConflicts(),RobotPaths()]
-    # Primary planner
-    path_finder = DefaultAStarSC()
-    set_iteration_limit!(path_finder,5000)
-    primary_route_planner = CBSSolver(ISPS(path_finder))
-    set_iteration_limit!(primary_route_planner,1000)
-    primary_planner = FullReplanner(
-        solver = NBSSolver(path_planner=primary_route_planner),
-        replanner = MergeAndBalance(),
-        cache = ReplanningProfilerCache(features=feats,final_features=final_feats)
-        )
-    set_verbosity!(primary_planner.solver,0)
-    # Backup planner
-    backup_planner = FullReplanner(
-        solver = NBSSolver(
-            assignment_model = TaskGraphsMILPSolver(GreedyAssignment()),
-            path_planner = PIBTPlanner{NTuple{3,Float64}}()
-            ),
-        replanner = MergeAndBalance(),
-        cache = ReplanningProfilerCache(features=feats,final_features=final_feats)
-        )
-    set_iteration_limit!(backup_planner,1)
-    set_iteration_limit!(route_planner(backup_planner.solver),5000)
-    set_verbosity!(backup_planner.solver,0)
-    # Full solver
-    planner = ReplannerWithBackup(primary_planner,backup_planner)
-    return loader, planner, base_results_dir, base_problem_dir
+    # set up planners
+    planners = Vector{ReplannerWithBackup}()
+    for (primary_replanner, backup_replanner) in [
+            (MergeAndBalance(),MergeAndBalance()),
+            (ReassignFreeRobots(),ReassignFreeRobots()),
+            (DeferUntilCompletion(),DeferUntilCompletion()),
+        ]
+        # Primary planner
+        path_finder = DefaultAStarSC()
+        set_iteration_limit!(path_finder,5000)
+        primary_route_planner = CBSSolver(ISPS(path_finder))
+        set_iteration_limit!(primary_route_planner,1000)
+        primary_planner = FullReplanner(
+            solver = NBSSolver(path_planner=primary_route_planner),
+            replanner = primary_replanner,
+            cache = ReplanningProfilerCache(features=feats,final_features=final_feats)
+            )
+        # set_verbosity!(primary_planner.solver,0)
+        # Backup planner
+        backup_planner = FullReplanner(
+            solver = NBSSolver(
+                assignment_model = TaskGraphsMILPSolver(GreedyAssignment()),
+                path_planner = PIBTPlanner{NTuple{3,Float64}}()
+                ),
+            replanner = backup_replanner,
+            cache = ReplanningProfilerCache(features=feats,final_features=final_feats)
+            )
+        set_iteration_limit!(backup_planner,1)
+        set_iteration_limit!(route_planner(backup_planner.solver),5000)
+        # set_verbosity!(backup_planner.solver,0)
+        # Full solver
+        planner = ReplannerWithBackup(primary_planner,backup_planner)
+        push!(planners,planner)
+    end
+    return loader, planners, base_results_dir, base_problem_dir
 end

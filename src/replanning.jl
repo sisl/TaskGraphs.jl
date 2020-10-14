@@ -350,7 +350,6 @@ export
     ReassignFreeRobots,
     MergeAndBalance,
     Oracle,
-    FallBackPlanner,
     NullReplanner,
     get_commit_time,
     replan!
@@ -368,8 +367,7 @@ function replan! end
     ReplannerModel
 
 Abstract type. Concrete subtypes currently include `DeferUntilCompletion`,
-`ReassignFreeRobots`, `MergeAndBalance`, `Oracle`, `FallBackPlanner`,
-`NullReplanner`
+`ReassignFreeRobots`, `MergeAndBalance`, `Oracle`, `NullReplanner`
 """
 abstract type ReplannerModel end
 
@@ -448,9 +446,6 @@ end
         route_planning_buffer   = 10,
         commit_threshold        = 0,
     )
-end
-@with_kw struct FallBackPlanner      <: ReplannerModel
-    config::ReplannerConfig = ReplannerConfig()
 end
 @with_kw struct NullReplanner        <: ReplannerModel
     config::ReplannerConfig = ReplannerConfig()
@@ -531,6 +526,18 @@ function get_commit_time(replan_model, search_env, t_request, commit_threshold=g
 end
 get_commit_time(replan_model::Oracle, search_env, t_request, args...) = t_request
 get_commit_time(replan_model::DeferUntilCompletion, search_env, t_request, commit_threshold) = max(t_request + commit_threshold,maximum(search_env.cache.tF))
+function get_commit_time(replan_model::ReassignFreeRobots, search_env, t_request, commit_threshold)
+    free_time = maximum(search_env.cache.tF)
+    for v in vertices(search_env.schedule)
+        node = get_node_from_vtx(search_env.schedule,v)
+        if isa(node,GO)
+            if get_id(get_destination_location_id(node)) == -1
+                free_time = min(free_time, search_env.cache.t0[v])
+            end
+        end
+    end
+    max(t_request + commit_threshold,free_time)
+end
 
 break_assignments!(replan_model::ReplannerModel,args...) = break_assignments!(args...)
 break_assignments!(replan_model::ReassignFreeRobots,args...) = nothing

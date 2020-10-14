@@ -64,3 +64,8 @@ function reconstruct_object_paths(robot_paths,object_path_summaries)
     end
     return object_paths, object_intervals
 end
+
+export LowLevelIterationCount
+struct LowLevelIterationCount   <: FeatureExtractor{Int} end
+CRCBS.extract_feature(solver,::LowLevelIterationCount, args...) = -1
+CRCBS.extract_feature(solver::NBSSolver,::LowLevelIterationCount, args...) = max_iterations(route_planner(solver))
