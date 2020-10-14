@@ -949,7 +949,7 @@ function formulate_milp(speed_up::Bool,milp_model::SparseAdjacencyMILP,project_s
     for v in topological_sort(G)
         if indegree(G,v) == cache.n_eligible_predecessors == 0
             node_id = get_vtx_id(project_schedule,v)
-            t0[v] = @expression(model,get(t0_,node_id,0.0))
+            t0[v] = @expression(model,get(t0_,node_id,0))
             tF[v] = @expression(model,t0[v] + Δt[v])
         elseif indegree(G,v) == cache.n_eligible_predecessors == 1
             vp = inneighbors(G,v)[1]
