@@ -245,6 +245,17 @@ function write_replanning_results(
     return results_path
 end
 
+function load_replanning_results(loader::ReplanningProblemLoader,solver::ReplannerWithBackup,results_path,
+    primary_prefix="primary_planner",
+    backup_prefix="backup_planner",
+    )
+    results_dict = Dict(
+        p=>load_replanning_results(loader,joinpath(results_path,p)) for p in [
+            primary_prefix,backup_prefix
+        ]
+    )
+end
+
 export profile_replanner!
 
 function is_problem_file(path)

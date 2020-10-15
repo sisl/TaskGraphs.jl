@@ -67,3 +67,120 @@ function reconstruct_object_paths(robot_paths,object_path_summaries)
     end
     return object_paths, object_intervals
 end
+
+export
+    AbstractProblemLoader,
+    add_env!,
+    get_env!,
+    problem_type,
+    PCTAPF_Loader,
+    PCTA_Loader,
+    PCMAPF_Loader,
+    ReplanningProblemLoader
+
+abstract type AbstractProblemLoader end
+
+function add_env!(loader::AbstractProblemLoader,env_id::String,
+    env=read_env(env_id))
+    if haskey(loader.envs,env_id)
+    else
+        loader.envs[env_id] = env
+        loader.prob_specs[env_id] = ProblemSpec(graph=env)
+    end
+    loader
+end
+function get_env!(loader::AbstractProblemLoader,env_id::String)
+    if !haskey(loader.envs,env_id)
+        loader.envs[env_id] = read_env(env_id)
+    end
+    return loader.envs[env_id]
+end
+
+"""
+    TaskGraphsProblemLoader{T}
+
+Helper cache for loading problems of type `T`
+"""
+struct TaskGraphsProblemLoader{T}
+    envs::Dict{String,GridFactoryEnvironment}
+    prob_specs::Dict{String,ProblemSpec}
+    TaskGraphsProblemLoader{T}() = new(
+        Dict{String,GridFactoryEnvironment}(),
+        Dict{String,ProblemSpec}()
+    )
+end
+problem_type(::TaskGraphsProblemLoader{T}) where {T} = T
+const PCTAPF_Loader = TaskGraphsProblemLoader{PC_TAPF}
+const PCMAPF_Loader = TaskGraphsProblemLoader{PC_MAPF}
+const PCTA_Loader   = TaskGraphsProblemLoader{PC_TA}
+const ReplanningProblemLoader = TaskGraphsProblemLoader{PC_TA}
+
+# """
+#     PCTAPF_Loader
+#
+# Helper cache for loading `PCTAPF` problems
+# """
+# struct PCTAPF_Loader
+#     envs::Dict{String,GridFactoryEnvironment}
+#     prob_specs::Dict{String,ProblemSpec}
+#     PCTAPF_Loader() = new(
+#         Dict{String,GridFactoryEnvironment}(),
+#         Dict{String,ProblemSpec}()
+#     )
+# end
+# problem_type(::PCTAPF_Loader) = PC_TAPF
+#
+# """
+#     PCMAPF_Loader
+#
+# Helper cache for loading `PCMAPF` problems
+# """
+# struct PCMAPF_Loader
+#     envs::Dict{String,GridFactoryEnvironment}
+#     prob_specs::Dict{String,ProblemSpec}
+#     PCMAPF_Loader() = new(
+#         Dict{String,GridFactoryEnvironment}(),
+#         Dict{String,ProblemSpec}()
+#     )
+# end
+# problem_type(::PCMAPF_Loader) = PC_MAPF
+#
+# """
+#     PCTA_Loader
+#
+# Helper cache for loading `PCTA` (assignment) problems
+# """
+# struct PCTA_Loader
+#     envs::Dict{String,GridFactoryEnvironment}
+#     prob_specs::Dict{String,ProblemSpec}
+#     PCTA_Loader() = new(
+#         Dict{String,GridFactoryEnvironment}(),
+#         Dict{String,ProblemSpec}()
+#     )
+# end
+# problem_type(::PCTA_Loader) = PC_TA
+#
+# """
+#     ReplanningProblemLoader
+#
+# Helper cache for loading replanning problems
+# """
+# struct ReplanningProblemLoader
+#     envs::Dict{String,GridFactoryEnvironment}
+#     prob_specs::Dict{String,ProblemSpec}
+#     ReplanningProblemLoader() = new(
+#         Dict{String,GridFactoryEnvironment}(),
+#         Dict{String,ProblemSpec}()
+#     )
+# end
+
+"""
+Currently only impemented for PC_TAPF and PC_TA
+"""
+function CRCBS.load_problem(loader::TaskGraphsProblemLoader,solver,prob_file)
+    toml_dict = TOML.parse(prob_file)
+    def = read_problem_def(toml_dict)
+    env_id = toml_dict["env_id"]
+    env = get_env!(loader,env_id)
+    problem_type(loader)(solver,def,env)
+end

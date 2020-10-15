@@ -924,7 +924,6 @@ function formulate_milp(milp_model::SparseAdjacencyMILP,project_schedule::Operat
     @objective(milp.model, Min, cost1)
     milp
 end
-
 function formulate_milp(milp_model::FastSparseAdjacencyMILP,project_schedule::OperatingSchedule,problem_spec::ProblemSpec;
         optimizer = Gurobi.Optimizer,
         TimeLimit=100,

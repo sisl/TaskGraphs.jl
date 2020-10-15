@@ -166,6 +166,7 @@ export
     C_PC_MAPF,
     AbstractPC_TAPF,
     PC_TAPF,
+    PC_TA,
     C_PC_TAPF
 
 export
@@ -180,14 +181,49 @@ problems are concrete subtypes.
 abstract type AbstractPC_MAPF <: AbstractMAPF end
 
 """
+    AbstractPC_TAPF <: AbstractPC_MAPF
+
+An abstract type of which all Precedence-Constrained Multi-Agent Task Assignment
+and Path-Finding problems are concrete subtypes.
+"""
+abstract type AbstractPC_TAPF <: AbstractPC_MAPF end
+
+"""
+    PC_TAPF{E<:SearchEnv}
+
+Precedence-Constrained Multi-Agent Task Assignment and Path-Finding problem.
+"""
+struct PC_TAPF{E<:SearchEnv} <: AbstractPC_TAPF
+    env::E
+end
+function PC_TAPF(solver,def::SimpleProblemDef,env::GridFactoryEnvironment)
+    proj_spec, prob_spec, _, _, robot_ICs = construct_task_graphs_problem(def,env)
+    pctapf = pctapf_problem(solver,proj_spec,prob_spec,robot_ICs,env)
+    return pctapf
+end
+
+"""
+    PC_TA{E<:SearchEnv}
+
+Precedence-Constrained Multi-Agent Task Assignment problem (no route planning).
+"""
+struct PC_TA{E<:SearchEnv} <: AbstractPC_TAPF
+    env::E
+end
+function PC_TA(solver,def::SimpleProblemDef,env::GridFactoryEnvironment)
+    pctapf = PC_TAPF(solver,def,env)
+    return PC_TA(pctapf.env)
+end
+
+"""
     `PC_MAPF`
 
-A precedence-constrained multi-agent path-finding problem. All agents have
-assigned tasks, but there are precedence constraints between tasks.
+A precedence-constrained multi-agent path-finding problem (no task assignment).
 """
 struct PC_MAPF{E<:SearchEnv} <: AbstractPC_MAPF
     env::E
 end
+construct_routing_problem(prob::PC_TAPF,env) = PC_MAPF(env)
 
 """
     `C_PC_MAPF`
@@ -199,25 +235,6 @@ some tasks must be done in teams.
 struct C_PC_MAPF{E<:SearchEnv} <: AbstractPC_MAPF
     env::E
 end
-
-"""
-    AbstractPC_TAPF <: AbstractPC_MAPF
-
-An abstract type of which all Precedence-Constrained Multi-Agent Task Assignment
-and Path-Finding problems are concrete subtypes.
-"""
-abstract type AbstractPC_TAPF <: AbstractPC_MAPF end
-
-"""
-    PC_TAPF{L<:LowLevelSolution}
-
-Defines an instance of a Precedence-Constrained Multi-Agent Task
-    Assignment and Path-Finding problem.
-"""
-struct PC_TAPF{E<:SearchEnv} <: AbstractPC_TAPF
-    env::E
-end
-construct_routing_problem(prob::PC_TAPF,env) = PC_MAPF(env)
 
 """
     C_PC_TAPF{L<:LowLevelSolution}
