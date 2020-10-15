@@ -656,8 +656,8 @@ end
 function CRCBS.solve!(solver,pcta::PC_TA)
     prob = formulate_assignment_problem(solver,pcta)
     sched, l_bound = solve_assignment_problem!(solver,prob,pcta)
-    env = construct_search_env(solver, sched, pcta.env)
-    return env, l_bound
+    # env = construct_search_env(solver, sched, pcta.env)
+    # return env, l_bound
 end
 
 export

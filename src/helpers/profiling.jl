@@ -235,9 +235,13 @@ function CRCBS.load_problem(loader::PCTA_Loader,solver_config,prob_path)
     env = get_env!(loader,env_id)
     problem_type(loader)(def,env,solver_config.objective)
 end
+function is_problem_file(loader::PCTA_Loader,path)
+    isfile(joinpath(path,"problem.toml")) && isfile(joinpath(path,"config.toml"))
+end
 
 
-function run_profiling(loader::TaskGraphsProblemLoader,solver_config,problem_dir)
+CRCBS.extract_feature(solver,::SolutionCost,  mapf,solution::OperatingSchedule,timer_results) = best_cost(solver)
+function CRCBS.run_profiling(loader::TaskGraphsProblemLoader,solver_config,problem_dir)
     solver = solver_config.solver
     for prob_path in readdir(problem_dir;join=true)
         is_problem_file(loader,prob_path) ? nothing : continue
