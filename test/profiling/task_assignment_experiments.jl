@@ -49,5 +49,7 @@ problem_configs = map(d->merge(d,base_config), size_configs)
 loader = PCTA_Loader()
 add_env!(loader,"env_2",init_env_2())
 write_problems!(loader,problem_configs,problem_dir)
-load_problem(loader,solver_configs[1],joinpath(problem_dir,"problem0001"))
+
+prob = load_problem(loader,solver_configs[1],joinpath(problem_dir,"problem0001"))
+profile_solver!(solver_configs[1],prob)
 # run_profiling()
