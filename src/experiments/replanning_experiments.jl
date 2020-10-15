@@ -296,8 +296,6 @@ function profile_replanner!(planner::ReplannerWithBackup,prob::RepeatedAbstractP
     return env, planner
 end
 
-export warmup
-
 function warmup(planner::ReplannerWithBackup,loader::ReplanningProblemLoader,
         base_dir            = joinpath("/tmp","warmup"),
         base_problem_dir    = joinpath(base_dir,"problem_instances"),

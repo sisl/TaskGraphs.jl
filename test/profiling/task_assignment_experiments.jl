@@ -33,7 +33,6 @@ solver_configs = [
 base_config = Dict(
     :env_id => "env_2",
     :num_trials => 16,
-    :num_trials => 1,
     :max_parents => 3,
     :depth_bias => 0.4,
     :dt_min => 0,
@@ -52,5 +51,6 @@ add_env!(loader,"env_2",init_env_2())
 write_problems!(loader,problem_configs,problem_dir)
 
 for solver_config in solver_configs
+    warmup(loader,solver_config,problem_dir)
     run_profiling(loader,solver_config,problem_dir)
 end

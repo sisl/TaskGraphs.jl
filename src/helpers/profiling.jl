@@ -258,3 +258,26 @@ function CRCBS.run_profiling(loader::TaskGraphsProblemLoader,solver_config,probl
         write_results(loader,solver_config,prob,prob_path,results_dict)
     end
 end
+
+export warmup
+
+function warmup(loader::TaskGraphsProblemLoader,solver_config,problem_dir,dummy_path = "dummy_path")
+    solver = solver_config.solver
+    for prob_path in readdir(problem_dir;join=true)
+        is_problem_file(loader,prob_path) ? nothing : continue
+        prob = load_problem(loader,solver_config,prob_path)
+        solution, timer_results = profile_solver!(solver,prob)
+        results_dict = compile_results(
+            solver,
+            solver_config.feats,
+            prob,
+            solution,
+            timer_results
+            )
+        results_dict["problem_file"] = dummy_path
+        write_results(loader,solver_config,prob,prob_path,results_dict)
+        break
+    end
+    run(`rm -rf $dummy_path`)
+    return loader
+end
