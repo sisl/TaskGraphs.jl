@@ -1,37 +1,4 @@
 
-export
-    ReplanningProblemLoader,
-    add_env!,
-    get_env!
-
-"""
-    ReplanningProblemLoader
-
-Helper cache for loading replanning problems
-"""
-struct ReplanningProblemLoader
-    envs::Dict{String,GridFactoryEnvironment}
-    prob_specs::Dict{String,ProblemSpec}
-    ReplanningProblemLoader() = new(
-        Dict{String,GridFactoryEnvironment}(),
-        Dict{String,ProblemSpec}()
-    )
-end
-function add_env!(loader::ReplanningProblemLoader,env_id::String,
-    env=read_env(env_id))
-    if haskey(loader.envs,env_id)
-    else
-        loader.envs[env_id] = env
-        loader.prob_specs[env_id] = ProblemSpec(graph=env)
-    end
-    loader
-end
-function get_env!(loader::ReplanningProblemLoader,env_id::String)
-    if !haskey(loader.envs,env_id)
-        loader.envs[env_id] = read_env(env_id)
-    end
-    return loader.envs[env_id]
-end
 
 export SimpleReplanningRequest
 
@@ -60,7 +27,7 @@ function read_simple_request(toml_dict)
         toml_dict["t_arrival"]
     )
 end
-read_simple_request(path::String) = read_simple_request(TOML.parse(path))
+read_simple_request(path::String) = read_simple_request(TOML.parsefile(path))
 
 function ProjectRequest(def::SimpleReplanningRequest,prob_spec)
     ProjectRequest(
@@ -120,8 +87,9 @@ function read_simple_repeated_problem_def(path)
     )
     for p in readdir(path;join=true,sort=true)
         isdir(p) ? nothing : continue
-        prob_dict = TOML.parsefile(joinpath(p,"problem.toml"))
-        push!(prob_def.requests,read_simple_request(prob_dict))
+        # prob_dict = TOML.parsefile(joinpath(p,"problem.toml"))
+        # push!(prob_def.requests,read_simple_request(prob_dict))
+        push!(prob_def.requests,read_simple_request(joinpath(p,"problem.toml")))
     end
     prob_def
 end
@@ -169,31 +137,11 @@ function random_repeated_pctapf_def(env,config;
         )
 end
 
-export write_repeated_pctapf_problems!
+export write_problems!
 
 padded_problem_name(number,name="problem",ext=".toml") = @sprintf("%s%4.4i%s",name,number,ext)
-function write_repeated_pctapf_problems!(loader::ReplanningProblemLoader,config::Dict,base_path::String,prob_counter::Int=1)
-    env = get_env!(loader,config[:env_id])
-    num_trials = get(config,:num_trials,1)
-    for i in 1:num_trials
-        prob_name = padded_problem_name(prob_counter,"problem","")
-        prob_path = joinpath(base_path,prob_name)
-        mkpath(prob_path)
-        open(joinpath(prob_path,"config.toml"),"w") do io
-            TOML.print(io,config)
-        end
-        prob_def = random_repeated_pctapf_def(env,config)
-        write_simple_repeated_problem_def(prob_path,prob_def)
-        prob_counter += 1
-    end
-    return prob_counter
-end
-function write_repeated_pctapf_problems!(loader::ReplanningProblemLoader,configs::Vector{D},base_path::String,prob_counter::Int=1) where {D<:Dict}
-    for config in configs
-        prob_counter = write_repeated_pctapf_problems!(loader,config,base_path,prob_counter)
-    end
-    return prob_counter
-end
+init_random_problem(loader::ReplanningProblemLoader,env,config) = random_repeated_pctapf_def(env,config)
+write_problem(loader::ReplanningProblemLoader,problem_def,prob_file,args...) = write_simple_repeated_problem_def(prob_file,problem_def)
 
 export compile_replanning_results!
 
@@ -258,7 +206,7 @@ end
 
 export profile_replanner!
 
-function is_problem_file(path)
+function is_problem_file(loader::ReplanningProblemLoader,path)
     if isdir(path) # each replanning problem is in a directory
         prob_name = splitdir(path)[end]
         if !isnothing(findfirst("problem",prob_name))
@@ -274,7 +222,7 @@ function profile_replanner!(
     base_results_dir,
     )
     for f in readdir(base_problem_dir;join=true)
-        if is_problem_file(f)
+        if is_problem_file(loader,f)
             problem_name = splitdir(f)[end]
             outpath = joinpath(base_results_dir,problem_name)
             ispath(outpath) ? continue : nothing # skip over this if results already exist
@@ -362,7 +310,7 @@ function warmup(planner::ReplannerWithBackup,loader::ReplanningProblemLoader,
             ),
     )
     Random.seed!(0)
-    write_repeated_pctapf_problems!(loader,config,base_problem_dir)
+    write_problems!(loader,config,base_problem_dir)
     env = get_env!(loader,config[:env_id])
     # turn off time constraints for warm up
     set_real_time_flag!(planner,false)
@@ -504,7 +452,7 @@ function setup_replanning_experiments(base_dir)
     # Problem generation and profiling
     reset_task_id_counter!()
     reset_operation_id_counter!()
-    write_repeated_pctapf_problems!(loader,problem_configs,base_problem_dir)
+    write_problems!(loader,problem_configs,base_problem_dir)
     # set up profiling features
     feats = [
         RunTime(),IterationCount(),LowLevelIterationCount(),

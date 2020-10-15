@@ -196,11 +196,6 @@ Precedence-Constrained Multi-Agent Task Assignment and Path-Finding problem.
 struct PC_TAPF{E<:SearchEnv} <: AbstractPC_TAPF
     env::E
 end
-function PC_TAPF(solver,def::SimpleProblemDef,env::GridFactoryEnvironment)
-    proj_spec, prob_spec, _, _, robot_ICs = construct_task_graphs_problem(def,env)
-    pctapf = pctapf_problem(solver,proj_spec,prob_spec,robot_ICs,env)
-    return pctapf
-end
 
 """
     PC_TA{E<:SearchEnv}
@@ -209,10 +204,6 @@ Precedence-Constrained Multi-Agent Task Assignment problem (no route planning).
 """
 struct PC_TA{E<:SearchEnv} <: AbstractPC_TAPF
     env::E
-end
-function PC_TA(solver,def::SimpleProblemDef,env::GridFactoryEnvironment)
-    pctapf = PC_TAPF(solver,def,env)
-    return PC_TA(pctapf.env)
 end
 
 """

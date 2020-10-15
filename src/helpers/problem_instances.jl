@@ -119,7 +119,40 @@ function pctapf_problem(
         )
     PC_TAPF(env)
 end
+function PC_TAPF(solver,def::SimpleProblemDef,env::GridFactoryEnvironment)
+    proj_spec, prob_spec, _, _, robot_ICs = construct_task_graphs_problem(def,env)
+    pctapf = pctapf_problem(solver,proj_spec,prob_spec,robot_ICs,env)
+    return pctapf
+end
 
+function pcta_problem(
+        project_spec::ProjectSpec,
+        problem_spec::ProblemSpec,
+        robot_ICs,
+        env_graph,
+        primary_objective = MakeSpan()
+    )
+    project_schedule = construct_partial_project_schedule(
+        project_spec,
+        problem_spec,
+        robot_ICs,
+        )
+    cache=initialize_planning_cache(project_schedule)
+    env = SearchEnv(
+        schedule=project_schedule,
+        cache=cache,
+        env_graph=env_graph,
+        problem_spec = problem_spec,
+        cost_model = typeof(primary_objective)(project_schedule,cache),
+        heuristic_model = NullHeuristic()
+        )
+    PC_TA(env)
+end
+
+function PC_TA(def::SimpleProblemDef,env::GridFactoryEnvironment,objective)
+    proj_spec, prob_spec, _, _, robot_ICs = construct_task_graphs_problem(def,env)
+    pcta = pcta_problem(proj_spec,prob_spec,robot_ICs,env,objective)
+end
 # This is a place to put reusable problem initializers for testing
 """
     pctapf_problem_1

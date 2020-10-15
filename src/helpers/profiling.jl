@@ -69,32 +69,10 @@ function reconstruct_object_paths(robot_paths,object_path_summaries)
 end
 
 export
-    AbstractProblemLoader,
+    TaskGraphsProblemLoader,
     add_env!,
     get_env!,
-    problem_type,
-    PCTAPF_Loader,
-    PCTA_Loader,
-    PCMAPF_Loader,
-    ReplanningProblemLoader
-
-abstract type AbstractProblemLoader end
-
-function add_env!(loader::AbstractProblemLoader,env_id::String,
-    env=read_env(env_id))
-    if haskey(loader.envs,env_id)
-    else
-        loader.envs[env_id] = env
-        loader.prob_specs[env_id] = ProblemSpec(graph=env)
-    end
-    loader
-end
-function get_env!(loader::AbstractProblemLoader,env_id::String)
-    if !haskey(loader.envs,env_id)
-        loader.envs[env_id] = read_env(env_id)
-    end
-    return loader.envs[env_id]
-end
+    problem_type
 
 """
     TaskGraphsProblemLoader{T}
@@ -104,16 +82,38 @@ Helper cache for loading problems of type `T`
 struct TaskGraphsProblemLoader{T}
     envs::Dict{String,GridFactoryEnvironment}
     prob_specs::Dict{String,ProblemSpec}
-    TaskGraphsProblemLoader{T}() = new(
+    TaskGraphsProblemLoader{T}() where {T} = new{T}(
         Dict{String,GridFactoryEnvironment}(),
         Dict{String,ProblemSpec}()
     )
 end
+function add_env!(loader::TaskGraphsProblemLoader,env_id::String,
+    env=read_env(env_id))
+    if haskey(loader.envs,env_id)
+    else
+        loader.envs[env_id] = env
+        loader.prob_specs[env_id] = ProblemSpec(graph=env)
+    end
+    loader
+end
+function get_env!(loader::TaskGraphsProblemLoader,env_id::String)
+    if !haskey(loader.envs,env_id)
+        loader.envs[env_id] = read_env(env_id)
+    end
+    return loader.envs[env_id]
+end
 problem_type(::TaskGraphsProblemLoader{T}) where {T} = T
+
+export
+    PCTAPF_Loader,
+    PCTA_Loader,
+    PCMAPF_Loader,
+    ReplanningProblemLoader
+
 const PCTAPF_Loader = TaskGraphsProblemLoader{PC_TAPF}
 const PCMAPF_Loader = TaskGraphsProblemLoader{PC_MAPF}
 const PCTA_Loader   = TaskGraphsProblemLoader{PC_TA}
-const ReplanningProblemLoader = TaskGraphsProblemLoader{PC_TA}
+const ReplanningProblemLoader = TaskGraphsProblemLoader{RepeatedPC_TAPF}
 
 # """
 #     PCTAPF_Loader
@@ -174,13 +174,83 @@ const ReplanningProblemLoader = TaskGraphsProblemLoader{PC_TA}
 #     )
 # end
 
+export write_problem
+
+function write_problem(loader::TaskGraphsProblemLoader,problem_def,prob_path,env_id="")
+    if isdir(prob_path)
+        prob_path = joinpath(prob_path,"problem.toml")
+    end
+    toml_dict = TOML.parse(problem_def)
+    toml_dict["env_id"] = env_id
+    open(prob_path, "w") do io
+        TOML.print(io, toml_dict)
+    end
+    prob_path
+end
+
+init_random_problem(loader::TaskGraphsProblemLoader,env,config) = random_pctapf_def(env,config)
+function write_problems!(loader::TaskGraphsProblemLoader,config::Dict,base_path::String,prob_counter::Int=1)
+    env = get_env!(loader,config[:env_id])
+    num_trials = get(config,:num_trials,1)
+    for i in 1:num_trials
+        prob_name = padded_problem_name(prob_counter,"problem","")
+        prob_path = joinpath(base_path,prob_name)
+        mkpath(prob_path)
+        open(joinpath(prob_path,"config.toml"),"w") do io
+            TOML.print(io,config)
+        end
+        prob_def = init_random_problem(loader,env,config)
+        write_problem(loader,prob_def,prob_path,config[:env_id])
+        prob_counter += 1
+    end
+    return prob_counter
+end
+function write_problems!(loader::TaskGraphsProblemLoader,configs::Vector{D},base_path::String,prob_counter::Int=1) where {D<:Dict}
+    for config in configs
+        prob_counter = write_problems!(loader,config,base_path,prob_counter)
+    end
+    return prob_counter
+end
+
 """
 Currently only impemented for PC_TAPF and PC_TA
 """
-function CRCBS.load_problem(loader::TaskGraphsProblemLoader,solver,prob_file)
-    toml_dict = TOML.parse(prob_file)
+function CRCBS.load_problem(loader::TaskGraphsProblemLoader,solver_config,prob_path)
+    if !isfile(prob_path)
+        prob_path = joinpath(prob_path,"problem.toml")
+    end
+    toml_dict = TOML.parsefile(prob_path)
     def = read_problem_def(toml_dict)
     env_id = toml_dict["env_id"]
     env = get_env!(loader,env_id)
-    problem_type(loader)(solver,def,env)
+    problem_type(loader)(solver_config.solver,def,env)
+end
+function CRCBS.load_problem(loader::PCTA_Loader,solver_config,prob_path)
+    if !isfile(prob_path)
+        prob_path = joinpath(prob_path,"problem.toml")
+    end
+    toml_dict = TOML.parsefile(prob_path)
+    def = read_problem_def(toml_dict)
+    env_id = toml_dict["env_id"]
+    env = get_env!(loader,env_id)
+    problem_type(loader)(def,env,solver_config.objective)
+end
+
+
+function run_profiling(loader::TaskGraphsProblemLoader,solver_config,problem_dir)
+    solver = solver_config.solver
+    for prob_path in readdir(problem_dir;join=true)
+        is_problem_file(loader,prob_path) ? nothing : continue
+        prob = load_problem(loader,solver_config,prob_path)
+        solution, timer_results = profile_solver!(solver,prob)
+        results_dict = compile_results(
+            solver,
+            solver_config.feats,
+            prob,
+            solution,
+            timer_results
+            )
+        results_dict["problem_file"] = prob_path
+        write_results(loader,solver_config,prob,prob_path,results_dict)
+    end
 end

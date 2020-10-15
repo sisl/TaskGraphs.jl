@@ -38,7 +38,7 @@ let
     base_results_dir    = joinpath(base_dir,"results")
 
     problem_configs = replanning_config_2()
-    write_repeated_pctapf_problems!(loader,problem_configs,base_problem_dir)
+    write_problems!(loader,problem_configs,base_problem_dir)
     simple_prob_def = read_simple_repeated_problem_def(joinpath(base_problem_dir,"problem0001"))
     prob = RepeatedPC_TAPF(simple_prob_def,solver,loader)
 
