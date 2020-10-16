@@ -165,19 +165,19 @@ end
 
 export write_replanning_results
 
-function write_replanning_results(cache::ReplanningProfilerCache,results_path)
-    mkpath(results_path)
-    for (i,results) in enumerate(cache.stage_results)
-        path = joinpath(results_path,padded_problem_name(i,"stage"))
-        open(path,"w") do io
-            TOML.print(io,results)
-        end
-    end
-    open(joinpath(results_path,"final_results.toml"),"w") do io
-        TOML.print(io,cache.final_results)
-    end
-    return results_path
-end
+# function write_replanning_results(cache::ReplanningProfilerCache,results_path)
+#     mkpath(results_path)
+#     for (i,results) in enumerate(cache.stage_results)
+#         path = joinpath(results_path,padded_problem_name(i,"stage"))
+#         open(path,"w") do io
+#             TOML.print(io,results)
+#         end
+#     end
+#     open(joinpath(results_path,"final_results.toml"),"w") do io
+#         TOML.print(io,cache.final_results)
+#     end
+#     return results_path
+# end
 
 function write_replanning_results(
     loader::ReplanningProblemLoader,
@@ -186,22 +186,35 @@ function write_replanning_results(
     primary_prefix="primary_planner",
     backup_prefix="backup_planner",
     )
-    write_replanning_results(planner.primary_planner.cache,
-        joinpath(results_path,primary_prefix))
-    write_replanning_results(planner.backup_planner.cache,
-        joinpath(results_path,backup_prefix))
+    results = Dict()
+    for (pre,cache) in [
+            (backup_prefix,planner.backup_planner.cache),
+            (primary_prefix,planner.primary_planner.cache),
+        ]
+
+        results[pre]  = cache.stage_results
+        results[string(pre,"_final")] = cache.final_results
+    end
+    open(joinpath(results_path,"results.toml"),"w") do io
+        TOML.print(io,results)
+    end
+    # write_replanning_results(planner.primary_planner.cache,
+    #     joinpath(results_path,primary_prefix))
+    # write_replanning_results(planner.backup_planner.cache,
+    #     joinpath(results_path,backup_prefix))
     return results_path
 end
 
 function load_replanning_results(loader::ReplanningProblemLoader,solver::ReplannerWithBackup,results_path,
-    primary_prefix="primary_planner",
-    backup_prefix="backup_planner",
+    # primary_prefix="primary_planner",
+    # backup_prefix="backup_planner",
     )
-    results_dict = Dict(
-        p=>load_replanning_results(loader,joinpath(results_path,p)) for p in [
-            primary_prefix,backup_prefix
-        ]
-    )
+    TOML.parsefile(joinpath(results_path,"results.toml"))
+    # results_dict = Dict(
+    #     p=>load_replanning_results(loader,joinpath(results_path,p)) for p in [
+    #         primary_prefix,backup_prefix
+    #     ]
+    # )
 end
 
 export profile_replanner!

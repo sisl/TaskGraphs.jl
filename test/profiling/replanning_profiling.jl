@@ -14,3 +14,7 @@ for planner in planners
 end
 # if results show ''"CRCBS.Feature" = val', use the following line to convert:
 # sed -i 's/\"CRCBS\.\([A-Za-z]*\)\"/\1/g' **/**/*.toml
+using TOML
+
+results_file = joinpath(base_results_dir,"MergeAndBalance","problem0001")
+TaskGraphs.load_replanning_results(loader,planners[1],results_file)
