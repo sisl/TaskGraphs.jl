@@ -626,7 +626,7 @@ function construct_search_env(
         env::SearchEnv,
         # cache::PlanningCache=deepcopy(env.cache),
         cache::PlanningCache=initialize_planning_cache(schedule,
-            t0=deepcopy(env.cache.t0), tF = deepcopy(env.cache.tF)),
+            deepcopy(env.cache.t0), deepcopy(env.cache.tF)),
         # cache=env.cache,
         env_graph=env.env_graph,
         problem_spec = env.problem_spec,

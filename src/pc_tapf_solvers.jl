@@ -679,8 +679,7 @@ function plan_route!(
         prob;
         kwargs...)
 
-    env = construct_search_env(solver, schedule, prob.env,
-        deepcopy(prob.env.cache);kwargs...)
+    env = construct_search_env(solver, schedule, prob.env;kwargs...)
     pc_mapf = construct_routing_problem(prob,env)
     solution, cost = solve!(solver, pc_mapf)
     solution, primary_cost(solver,get_cost(solution))
