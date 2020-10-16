@@ -656,8 +656,6 @@ end
 function CRCBS.solve!(solver,pcta::PC_TA)
     prob = formulate_assignment_problem(solver,pcta)
     sched, l_bound = solve_assignment_problem!(solver,prob,pcta)
-    # env = construct_search_env(solver, sched, pcta.env)
-    # return env, l_bound
 end
 
 export
@@ -681,7 +679,8 @@ function plan_route!(
         prob;
         kwargs...)
 
-    env = construct_search_env(solver, schedule, prob.env;kwargs...)
+    env = construct_search_env(solver, schedule, prob.env,
+        deepcopy(prob.env.cache);kwargs...)
     pc_mapf = construct_routing_problem(prob,env)
     solution, cost = solve!(solver, pc_mapf)
     solution, primary_cost(solver,get_cost(solution))

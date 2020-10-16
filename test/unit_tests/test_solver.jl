@@ -126,7 +126,7 @@ let
                         NBSSolver(assignment_model = TaskGraphsMILPSolver(SparseAdjacencyMILP())),
                         NBSSolver(assignment_model = TaskGraphsMILPSolver(GreedyAssignment())),
                         ]
-                    set_verbosity!(assignment_solver(solver),3)
+                    # set_verbosity!(assignment_solver(solver),3)
                     # @show i, f, solver
                     pc_tapf = f(solver;cost_function=cost_model,verbose=false);
                     search_env = pc_tapf.env
