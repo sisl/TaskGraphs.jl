@@ -450,14 +450,11 @@ end
 
 export setup_replanning_experiments
 
-function setup_replanning_experiments(base_dir)
+function setup_replanning_experiments(base_problem_dir,base_results_dir)
     loader = ReplanningProblemLoader()
     add_env!(loader,"env_2",init_env_2())
     # get probem config
     problem_configs = replanning_config_3()
-    # define paths to problems and results
-    base_problem_dir    = joinpath(base_dir,"problem_instances")
-    base_results_dir    = joinpath(base_dir,"results")
     # write problems
     Random.seed!(0)
     # Problem generation and profiling
@@ -489,7 +486,6 @@ function setup_replanning_experiments(base_dir)
             replanner = primary_replanner,
             cache = ReplanningProfilerCache(features=feats,final_features=final_feats)
             )
-        # set_verbosity!(primary_planner.solver,0)
         # Backup planner
         backup_planner = FullReplanner(
             solver = NBSSolver(
@@ -501,10 +497,50 @@ function setup_replanning_experiments(base_dir)
             )
         set_iteration_limit!(backup_planner,1)
         set_iteration_limit!(route_planner(backup_planner.solver),5000)
-        # set_verbosity!(backup_planner.solver,0)
         # Full solver
         planner = ReplannerWithBackup(primary_planner,backup_planner)
         push!(planners,planner)
     end
-    return loader, planners, base_results_dir, base_problem_dir
+    return loader, planners
+end
+
+"""
+    add start_time, completion_time, and makespan for each stage
+"""
+function post_process_replanning_results!(results,config)
+    M = config[:M]
+    for k in ["primary_planner","backup_planner"]
+        for (i,dict) in enumerate(results[k])
+            id_range = (1+(i-1)*M,i*M)
+            dict["start_time"] = i*config[:arrival_interval]
+            completion_time = 0
+            if dict["FeasibleFlag"]
+                for (id_string,object_summary) in dict["ObjectPathSummaries"]
+                    if id_range[1] <= object_summary["object_id"] <= id_range[2]
+                        completion_time = max(completion_time,object_summary["deposit_time"])
+                    end
+                end
+            else
+                completion_time = typemax(Int)
+            end
+            dict["completion_time"] = completion_time
+            dict["makespan"] = completion_time - dict["start_time"]
+        end
+    end
+    makespans = Int[]
+    backup_flags = Bool[]
+    for (resultsA,resultsB) in zip(results["primary_planner"],results["backup_planner"])
+        if resultsA["FeasibleFlag"] == true
+            push!(makespans,resultsA["makespan"])
+            push!(backup_flags,false)
+        elseif resultsB["FeasibleFlag"] == true
+            push!(makespans,resultsB["makespan"])
+            push!(backup_flags,true)
+        else
+            break
+        end
+    end
+    results["makespans"] = makespans
+    results["backup_flags"] = backup_flags
+    return results
 end
