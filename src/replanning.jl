@@ -488,7 +488,7 @@ end
 end
 reset_cache!(planner::FullReplanner) = reset_cache!(planner.cache)
 get_replanner_config(planner::FullReplanner) = get_replanner_config(planner.replanner)
-for op in [:replan!,
+for op in [
         :get_commit_time,
         :break_assignments!,
         :set_time_limits!,

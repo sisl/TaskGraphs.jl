@@ -4,6 +4,7 @@ using Compose
 using Colors
 using Gadfly
 using DataFrames
+using GraphUtils
 
 using PGFPlotsX
 latexengine!(PGFPlotsX.PDFLATEX)

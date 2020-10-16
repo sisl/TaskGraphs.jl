@@ -115,65 +115,6 @@ const PCMAPF_Loader = TaskGraphsProblemLoader{PC_MAPF}
 const PCTA_Loader   = TaskGraphsProblemLoader{PC_TA}
 const ReplanningProblemLoader = TaskGraphsProblemLoader{RepeatedPC_TAPF}
 
-# """
-#     PCTAPF_Loader
-#
-# Helper cache for loading `PCTAPF` problems
-# """
-# struct PCTAPF_Loader
-#     envs::Dict{String,GridFactoryEnvironment}
-#     prob_specs::Dict{String,ProblemSpec}
-#     PCTAPF_Loader() = new(
-#         Dict{String,GridFactoryEnvironment}(),
-#         Dict{String,ProblemSpec}()
-#     )
-# end
-# problem_type(::PCTAPF_Loader) = PC_TAPF
-#
-# """
-#     PCMAPF_Loader
-#
-# Helper cache for loading `PCMAPF` problems
-# """
-# struct PCMAPF_Loader
-#     envs::Dict{String,GridFactoryEnvironment}
-#     prob_specs::Dict{String,ProblemSpec}
-#     PCMAPF_Loader() = new(
-#         Dict{String,GridFactoryEnvironment}(),
-#         Dict{String,ProblemSpec}()
-#     )
-# end
-# problem_type(::PCMAPF_Loader) = PC_MAPF
-#
-# """
-#     PCTA_Loader
-#
-# Helper cache for loading `PCTA` (assignment) problems
-# """
-# struct PCTA_Loader
-#     envs::Dict{String,GridFactoryEnvironment}
-#     prob_specs::Dict{String,ProblemSpec}
-#     PCTA_Loader() = new(
-#         Dict{String,GridFactoryEnvironment}(),
-#         Dict{String,ProblemSpec}()
-#     )
-# end
-# problem_type(::PCTA_Loader) = PC_TA
-#
-# """
-#     ReplanningProblemLoader
-#
-# Helper cache for loading replanning problems
-# """
-# struct ReplanningProblemLoader
-#     envs::Dict{String,GridFactoryEnvironment}
-#     prob_specs::Dict{String,ProblemSpec}
-#     ReplanningProblemLoader() = new(
-#         Dict{String,GridFactoryEnvironment}(),
-#         Dict{String,ProblemSpec}()
-#     )
-# end
-
 export write_problem
 
 function write_problem(loader::TaskGraphsProblemLoader,problem_def,prob_path,env_id="")

@@ -8,11 +8,12 @@ feats = [
     OptimalFlag(),
     OptimalityGap(),
     SolutionCost(),
+    PrimaryCost(),
 ]
 solver_configs = [
     (
-        solver = TaskGraphsMILPSolver(AssignmentMILP()),
-        results_path = joinpath(base_results_path,"AssignmentMILP"),
+        solver = TaskGraphsMILPSolver(FastSparseAdjacencyMILP()),
+        results_path = joinpath(base_results_path,"FastSparseAdjacencyMILP"),
         feats = feats,
         objective = MakeSpan(),
     ),
@@ -23,8 +24,8 @@ solver_configs = [
         objective = MakeSpan(),
     ),
     (
-        solver = TaskGraphsMILPSolver(FastSparseAdjacencyMILP()),
-        results_path = joinpath(base_results_path,"FastSparseAdjacencyMILP"),
+        solver = TaskGraphsMILPSolver(AssignmentMILP()),
+        results_path = joinpath(base_results_path,"AssignmentMILP"),
         feats = feats,
         objective = MakeSpan(),
     ),
@@ -48,9 +49,22 @@ problem_configs = map(d->merge(d,base_config), size_configs)
 
 loader = PCTA_Loader()
 add_env!(loader,"env_2",init_env_2())
-write_problems!(loader,problem_configs,problem_dir)
+# write_problems!(loader,problem_configs,problem_dir)
+#
+# for solver_config in solver_configs
+#     set_runtime_limit!(solver_config.solver,100)
+#     warmup(loader,solver_config,problem_dir)
+#     run_profiling(loader,solver_config,problem_dir)
+# end
 
+# plot results
+config_template = problem_configs[1]
+config_df = construct_config_dataframe(loader,problem_dir,config_template)
 for solver_config in solver_configs
-    warmup(loader,solver_config,problem_dir)
-    run_profiling(loader,solver_config,problem_dir)
+    results_df = construct_results_dataframe(loader,solver_config,config_template)
+    df = innerjoin(config_df,results_df,on=:problem_name)
+    include(joinpath(pathof(TaskGraphs),"..","helpers/render_tools.jl"))
+    # plt = get_box_plot_group_plot(df;obj=:RunTime,title=split(solver_config.results_path,"/")[end])
+    plt = get_runtime_box_plot(df;scale=1.0,obj=:RunTime,title=split(solver_config.results_path,"/")[end])
+    display(plt);
 end
