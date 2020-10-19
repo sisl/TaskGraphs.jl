@@ -10,8 +10,8 @@ add_env!(loader,"env_2",init_env_2())
 
 reset_task_id_counter!()
 reset_operation_id_counter!()
-# # get probem config
-# problem_configs = replanning_config_3()
+# get probem config
+problem_configs = replanning_config_3()
 # # write problems
 # Random.seed!(0)
 # write_problems!(loader,problem_configs,base_problem_dir)
@@ -72,12 +72,57 @@ end
 # if results show ''"CRCBS.Feature" = val', use the following line to convert:
 # sed -i 's/\"CRCBS\.\([A-Za-z]*\)\"/\1/g' **/**/*.toml
 
-prob_name = "problem0001"
-prob_file = joinpath(base_problem_dir,prob_name)
-results_file = joinpath(base_results_dir,"MergeAndBalance",prob_name)
-results = TaskGraphs.load_replanning_results(loader,planner_configs[1].planner,results_file)
-config = CRCBS.load_config(loader,prob_file)
+include(joinpath(pathof(TaskGraphs),"..","helpers/render_tools.jl"))
 
-TaskGraphs.post_process_replanning_results!(results,config)
-dummy_path = "dummy.toml"
-results["primary_planner"][1]
+# # plotting results
+config_df = construct_config_dataframe(loader,base_problem_dir,problem_configs[1])
+plotting_config = (
+    feats = Dict(
+            :makespans => Int[],
+            :arrival_times => Int[],
+            :backup_flags => Bool[],
+            :runtime_gaps => Float64[],
+    ),
+    results_path = joinpath(base_results_dir,"MergeAndBalance"),
+    problem_path = base_problem_dir,
+)
+results_df = TaskGraphs.construct_replanning_results_dataframe(loader,plotting_config,plotting_config.feats)
+df = innerjoin(config_df,results_df;on=:problem_name)
+
+df_list = [df,]
+
+plot_axes = Vector{PGFPlots.Axis}()
+
+push!()
+
+plot_histories_pgf(df_list;
+    y_key=:runtime_gaps,
+    include_keys = [:num_projects=>30,:M=>30,:arrival_interval=>80],
+    xlabel = "time",
+    ylabel = "makespans",
+    ytick_show = true,
+    ymode="linear",
+    lines=false
+)
+
+
+plt = PGFPlots.GroupPlot(3,5)
+for (n_vals, m_vals) in [
+    ([10,],[20,30,40,]),
+    ([15,],[30,40,50,]),
+    ([20,],[40,50,60,]),
+    ([25,],[50,60,70,]),
+    ([30,],[60,70,80,]),
+    ]
+    gp = group_history_plot(df_list;
+        y_key = :runtime_gaps,
+        n_key = :M,
+        n_vals = n_vals,
+        m_key = :arrival_interval,
+        m_vals = m_vals,
+        ymode="linear",
+        lines=false,
+    )
+    append!(plt.axes,gp.axes)
+end
+plt

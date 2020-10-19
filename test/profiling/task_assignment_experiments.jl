@@ -51,11 +51,11 @@ loader = PCTA_Loader()
 add_env!(loader,"env_2",init_env_2())
 # write_problems!(loader,problem_configs,problem_dir)
 #
-# for solver_config in solver_configs
-#     set_runtime_limit!(solver_config.solver,100)
-#     warmup(loader,solver_config,problem_dir)
-#     run_profiling(loader,solver_config,problem_dir)
-# end
+for solver_config in solver_configs
+    set_runtime_limit!(solver_config.solver,100)
+    warmup(loader,solver_config,problem_dir)
+    run_profiling(loader,solver_config,problem_dir)
+end
 
 # plot results
 config_template = problem_configs[1]
@@ -65,6 +65,6 @@ for solver_config in solver_configs
     df = innerjoin(config_df,results_df,on=:problem_name)
     include(joinpath(pathof(TaskGraphs),"..","helpers/render_tools.jl"))
     # plt = get_box_plot_group_plot(df;obj=:RunTime,title=split(solver_config.results_path,"/")[end])
-    plt = get_runtime_box_plot(df;scale=1.0,obj=:RunTime,title=split(solver_config.results_path,"/")[end])
+    plt = get_titled_group_box_plot(df;scale=1.0,obj=:RunTime,title=split(solver_config.results_path,"/")[end])
     display(plt);
 end

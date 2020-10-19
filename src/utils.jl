@@ -17,8 +17,13 @@
 
 export to_string_dict
 
-to_string_dict(dict::Dict{K,V}) where {K,V} = Dict{String,V}(string(k)=>v for (k,v) in dict)
+to_string_dict(dict::Dict) = Dict{String,Any}(string(k)=>v for (k,v) in dict)
 TOML.print(io::IO,dict::Dict{Symbol,V}) where {V} = TOML.print(io,to_string_dict(dict))
+
+export to_symbol_dict
+to_symbol_dict(el) = el
+to_symbol_dict(dict::Dict) = Dict{Symbol,Any}(Symbol(k)=>to_symbol_dict(v) for (k,v) in dict)
+to_symbol_dict(v::Vector) = map(to_symbol_dict, v)
 
 export
     remap_object_id,

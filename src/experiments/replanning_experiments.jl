@@ -209,12 +209,20 @@ function load_replanning_results(loader::ReplanningProblemLoader,solver::Replann
     # primary_prefix="primary_planner",
     # backup_prefix="backup_planner",
     )
-    TOML.parsefile(joinpath(results_path,"results.toml"))
+    results = TOML.parsefile(joinpath(results_path,"results.toml"))
+    results["problem_name"] = CRCBS.get_problem_name(loader,results_path)
+    return results
     # results_dict = Dict(
     #     p=>load_replanning_results(loader,joinpath(results_path,p)) for p in [
     #         primary_prefix,backup_prefix
     #     ]
     # )
+end
+function CRCBS.load_results(loader::ReplanningProblemLoader,results_path)
+    dict = TOML.parsefile(joinpath(results_path,"results.toml"))
+    results = to_symbol_dict(dict)
+    results[:problem_name] = CRCBS.get_problem_name(loader,results_path)
+    return results
 end
 
 export profile_replanner!
@@ -509,38 +517,65 @@ end
 """
 function post_process_replanning_results!(results,config)
     M = config[:M]
-    for k in ["primary_planner","backup_planner"]
-        for (i,dict) in enumerate(results[k])
+    for k in [:primary_planner,:backup_planner]
+        for (i,stage_dict) in enumerate(results[k])
             id_range = (1+(i-1)*M,i*M)
-            dict["start_time"] = i*config[:arrival_interval]
+            stage_dict[:start_time] = i*config[:arrival_interval]
             completion_time = 0
-            if dict["FeasibleFlag"]
-                for (id_string,object_summary) in dict["ObjectPathSummaries"]
-                    if id_range[1] <= object_summary["object_id"] <= id_range[2]
-                        completion_time = max(completion_time,object_summary["deposit_time"])
+            if stage_dict[:FeasibleFlag]
+                for (id_string,object_summary) in stage_dict[:ObjectPathSummaries]
+                    if id_range[1] <= object_summary[:object_id] <= id_range[2]
+                        completion_time = max(completion_time,object_summary[:deposit_time])
                     end
                 end
             else
                 completion_time = typemax(Int)
             end
-            dict["completion_time"] = completion_time
-            dict["makespan"] = completion_time - dict["start_time"]
+            stage_dict[:completion_time] = completion_time
+            stage_dict[:makespan] = completion_time - stage_dict[:start_time]
         end
     end
     makespans = Int[]
+    arrival_times = Int[]
     backup_flags = Bool[]
-    for (resultsA,resultsB) in zip(results["primary_planner"],results["backup_planner"])
-        if resultsA["FeasibleFlag"] == true
-            push!(makespans,resultsA["makespan"])
+    primary_runtimes = Float64[]
+    backup_runtimes = Float64[]
+    runtime_gaps = Float64[]
+    for (resultsA,resultsB) in zip(results[:primary_planner],results[:backup_planner])
+        push!(primary_runtimes,resultsA[:RunTime])
+        push!(backup_runtimes,resultsB[:RunTime])
+        push!(runtime_gaps,(resultsA[:RunTime])/(resultsA[:RunTime]+resultsB[:RunTime]))
+        if resultsA[:FeasibleFlag] == true
+            push!(makespans,resultsA[:makespan])
+            push!(arrival_times,resultsA[:start_time])
             push!(backup_flags,false)
-        elseif resultsB["FeasibleFlag"] == true
-            push!(makespans,resultsB["makespan"])
+        elseif resultsB[:FeasibleFlag] == true
+            push!(makespans,resultsB[:makespan])
+            push!(arrival_times,resultsB[:start_time])
             push!(backup_flags,true)
         else
             break
         end
     end
-    results["makespans"] = makespans
-    results["backup_flags"] = backup_flags
+    results[:makespans] = makespans
+    results[:arrival_times] = arrival_times
+    results[:backup_flags] = backup_flags
+    results[:runtime_gaps] = runtime_gaps
+    results[:primary_runtimes] = primary_runtimes
+    results[:backup_runtimes] = backup_runtimes
     return results
+end
+
+
+function construct_replanning_results_dataframe(loader,solver_config,feats)
+    results_df = init_dataframe(feats)
+    for results_file in readdir(solver_config.results_path;join=true)
+        results = load_results(loader,results_file)
+        prob_name = results[:problem_name]
+        prob_file = joinpath(solver_config.problem_path,prob_name)
+        config = CRCBS.load_config(loader,prob_file)
+        TaskGraphs.post_process_replanning_results!(results,config)
+        push!(results_df,results)
+    end
+    results_df
 end

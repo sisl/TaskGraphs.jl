@@ -8,6 +8,7 @@ using GraphUtils
 
 using PGFPlotsX
 latexengine!(PGFPlotsX.PDFLATEX)
+using PGFPlots
 using Printf
 
 interpolate(a,b,t) = (1 - t)*a + t*b
@@ -557,7 +558,7 @@ function get_box_plot_group_plot(df;
     end;
     gp
 end
-function get_runtime_box_plot(df;
+function get_titled_group_box_plot(df;
         title="",
         title_shift=[3.3,2.55],
         scale=0.7,
@@ -716,6 +717,106 @@ function plot_collab_counts(df;
         Guide.ylabel("computation time (s)"),
         latex_fonts
     )
+end
+
+function plot_histories_pgf(df_list::Vector,ax=PGFPlots.Axis();
+        y_key=:makespans,
+        x_key=:arrival_times,
+        m_key=:M,
+        m_vals=sort(intersect([unique(df[m_key]) for df in df_list]...)),
+        n_key=:arrival_interval,
+        n_vals=sort(intersect([unique(df[n_key]) for df in df_list]...)),
+        include_keys=[],
+        exclude_keys=[],
+        opt_key=:backup_flags,
+        # ymin=minimum(df[y_key]),
+        # ymax=maximum(df[y_key]),
+        xlabel=string("\$",string(m_key)," = ",m_vals...,"\$"),
+        ylabel=string("\$",string(n_key)," = ",n_vals...,"\$"),
+        # ylabel=string("M = ",m_vals...),
+        colors=["red","blue","black","brown"],
+        ytick_show=false,
+        ymode="log",
+        lines=true,
+    )
+
+    ax.ymode    =   ymode
+    ax.xlabel   =   xlabel
+    ax.ylabel   =   ytick_show ? ylabel : ""
+    
+    for (i,m_val) in enumerate(m_vals)
+        for (j,n_val) in enumerate(n_vals)
+            for (df,color) in zip(df_list,colors)
+                idxs = .&(
+                    (df[!,m_key] .== m_val),
+                    (df[!,n_key] .== n_val),
+                    )
+                if !isempty(include_keys)
+                    idxs = .&(idxs, [(df[!,k] .== v) for (k,v) in include_keys]...)
+                end
+                if !isempty(exclude_keys)
+                    idxs = .&(idxs, [(df[!,k] .!= v) for (k,v) in exclude_keys]...)
+                end
+                df_cut = df[idxs,:]
+                style=string(color,",solid, mark options={solid,fill=",color,"}")
+                for k in 1:nrow(df_cut)
+                    y_arr = df_cut[y_key][k]
+                    x_arr = df_cut[x_key][k]
+                    opt_vals = df_cut[opt_key][k] # tracks whether the fall back was employed
+
+                    # idx = findfirst(y_arr .< 0)
+                    # idx = idx == nothing ? length(y_arr) : idx-1
+                    idx = length(y_arr)
+                    # Overall trend
+                    if lines
+                        push!(ax,
+                            Plots.Linear(x_arr[1:idx], y_arr[1:idx], style=style, mark="none")
+                        )
+                    end
+                    # Timeouts
+                    if 0 < idx < length(y_arr)
+                        # End points
+                        push!(ax,
+                            Plots.Linear([x_arr[idx]], [y_arr[idx]], mark="o", style=style, onlyMarks=true, )
+                        )
+                        idx -= 1 # decrement so that the final point is not covered twice
+                    end
+
+                    tmidxs=findall(.~opt_vals[1:idx])
+                    if length(tmidxs) > 0
+                        push!(ax,
+                            Plots.Linear(x_arr[tmidxs], y_arr[tmidxs], style=style, onlyMarks=true, mark="x")
+                        )
+                    end
+                end
+            end
+        end
+    end
+    return ax
+end
+
+function group_history_plot(df_list::Vector;
+    m_key=:M,
+    m_vals=sort(intersect([unique(df[m_key]) for df in df_list]...)),
+    n_key=:arrival_interval,
+    n_vals=sort(intersect([unique(df[n_key]) for df in df_list]...)),
+    kwargs...
+    )
+    g = PGFPlots.GroupPlot(length(m_vals),length(n_vals))
+    for (i,m_val) in enumerate(m_vals)
+        ytick_show = (i == 1)
+        for (j,n_val) in enumerate(n_vals)
+            plt = plot_histories_pgf(df_list;
+                m_key=m_key,
+                m_vals=[m_val,],
+                n_key=n_key,
+                n_vals=[n_val,],
+                ytick_show = ytick_show,
+                kwargs...)
+            push!(g,plt)
+        end
+    end
+    return g
 end
 
 # For rendering the factory floor as a custom ImageAppearance in Webots
