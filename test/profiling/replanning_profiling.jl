@@ -82,6 +82,8 @@ plotting_config = (
             :arrival_times => Int[],
             :backup_flags => Bool[],
             :runtime_gaps => Float64[],
+            :primary_runtimes => Float64[],
+            :backup_runtimes => Float64[],
     ),
     results_path = joinpath(base_results_dir,"MergeAndBalance"),
     problem_path = base_problem_dir,
@@ -91,20 +93,15 @@ df = innerjoin(config_df,results_df;on=:problem_name)
 
 df_list = [df,]
 
-plot_axes = Vector{PGFPlots.Axis}()
-
-push!()
-
-plot_histories_pgf(df_list;
-    y_key=:runtime_gaps,
-    include_keys = [:num_projects=>30,:M=>30,:arrival_interval=>80],
-    xlabel = "time",
-    ylabel = "makespans",
-    ytick_show = true,
-    ymode="linear",
-    lines=false
-)
-
+# plot_histories_pgf(df_list;
+#     y_key=:runtime_gaps,
+#     include_keys = [:num_projects=>30,:M=>30,:arrival_interval=>80],
+#     xlabel = "time",
+#     ylabel = "makespans",
+#     ytick_show = true,
+#     ymode="linear",
+#     lines=false
+# )
 
 plt = PGFPlots.GroupPlot(3,5)
 for (n_vals, m_vals) in [
@@ -115,7 +112,8 @@ for (n_vals, m_vals) in [
     ([30,],[60,70,80,]),
     ]
     gp = group_history_plot(df_list;
-        y_key = :runtime_gaps,
+        y_key = :primary_runtimes,
+        x_key=:none,
         n_key = :M,
         n_vals = n_vals,
         m_key = :arrival_interval,
@@ -123,6 +121,22 @@ for (n_vals, m_vals) in [
         ymode="linear",
         lines=false,
     )
+    gp2 = group_history_plot(df_list;
+        y_key = :backup_runtimes,
+        x_key=:none,
+        n_key = :M,
+        n_vals = n_vals,
+        m_key = :arrival_interval,
+        m_vals = m_vals,
+        ymode="linear",
+        lines=false,
+        colors=["blue"],
+    )
+    for (ax,ax2) in zip(gp.axes,gp2.axes)
+        append!(ax.plots,ax2.plots)
+    end
+
     append!(plt.axes,gp.axes)
 end
 plt
+save("replanning_plots.pdf",plt)

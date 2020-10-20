@@ -743,7 +743,7 @@ function plot_histories_pgf(df_list::Vector,ax=PGFPlots.Axis();
     ax.ymode    =   ymode
     ax.xlabel   =   xlabel
     ax.ylabel   =   ytick_show ? ylabel : ""
-    
+
     for (i,m_val) in enumerate(m_vals)
         for (j,n_val) in enumerate(n_vals)
             for (df,color) in zip(df_list,colors)
@@ -761,7 +761,8 @@ function plot_histories_pgf(df_list::Vector,ax=PGFPlots.Axis();
                 style=string(color,",solid, mark options={solid,fill=",color,"}")
                 for k in 1:nrow(df_cut)
                     y_arr = df_cut[y_key][k]
-                    x_arr = df_cut[x_key][k]
+                    x_arr = x_key == :none ? collect(1:length(y_arr)) : df_cut[x_key][k]
+                    # x_arr = df_cut[x_key][k]
                     opt_vals = df_cut[opt_key][k] # tracks whether the fall back was employed
 
                     # idx = findfirst(y_arr .< 0)
