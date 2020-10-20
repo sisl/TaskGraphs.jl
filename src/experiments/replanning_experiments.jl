@@ -155,7 +155,11 @@ function compile_replanning_results!(
         cache.project_ids[id] = stage
     end
     # store results
-    push!(cache.stage_results, compile_results(solver,cache.features,prob,env,timer_results))
+    stage_results = compile_results(solver,cache.features,prob,env,timer_results)
+    if debug(solver) && !feasible_status(solver)
+        merge!(stage_results, compile_results(solver,cache.final_features,prob,env,timer_results))
+    end
+    push!(cache.stage_results, stage_results)
     # store final results
     if stage == length(prob.requests)
         merge!(cache.final_results, compile_results(solver,cache.final_features,prob,env,timer_results))
@@ -195,6 +199,7 @@ function write_replanning_results(
         results[pre]  = cache.stage_results
         results[string(pre,"_final")] = cache.final_results
     end
+    mkpath(results_path)
     open(joinpath(results_path,"results.toml"),"w") do io
         TOML.print(io,results)
     end

@@ -3,7 +3,8 @@ using TaskGraphs, CRCBS, TOML
 # initialize loader
 base_dir = joinpath("/scratch/task_graphs_experiments","replanning3")
 base_problem_dir    = joinpath(base_dir,"problem_instances")
-base_results_dir    = joinpath(base_dir,"results")
+# base_results_dir    = joinpath(base_dir,"results")
+base_results_dir    = joinpath(base_dir,"results_debug")
 
 loader = ReplanningProblemLoader()
 add_env!(loader,"env_2",init_env_2())
@@ -50,6 +51,9 @@ for (primary_replanner, backup_replanner) in [
         )
     set_iteration_limit!(backup_planner,1)
     set_iteration_limit!(route_planner(backup_planner.solver),5000)
+    set_verbosity!(route_planner(backup_planner.solver),3)
+    set_debug!(backup_planner,true)
+    # set_debug!(route_planner(backup_planner.solver),true)
     # Full solver
     planner = ReplannerWithBackup(primary_planner,backup_planner)
     planner_config = (
@@ -60,14 +64,15 @@ for (primary_replanner, backup_replanner) in [
     push!(planner_configs,planner_config)
 end
 
-# for planner in planners
-#     # warm up to precompile replanning code
-#     warmup(planner,loader)
-#     # profile
-#     planner_name = string(typeof(planner.primary_planner.replanner))
-#     results_path = joinpath(base_results_dir,planner_name)
-#     profile_replanner!(loader,planner,base_problem_dir,results_path)
-# end
+for planner_config in planner_configs
+    # warm up to precompile replanning code
+    warmup(planner_config.planner,loader)
+    # profile
+    profile_replanner!(loader,
+        planner_config.planner,
+        base_problem_dir,
+        planner_config.results_path)
+end
 
 # if results show ''"CRCBS.Feature" = val', use the following line to convert:
 # sed -i 's/\"CRCBS\.\([A-Za-z]*\)\"/\1/g' **/**/*.toml

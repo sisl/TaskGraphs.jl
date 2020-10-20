@@ -10,8 +10,31 @@ using PGFPlotsX
 latexengine!(PGFPlotsX.PDFLATEX)
 using PGFPlots
 using Printf
+using Parameters
+using Measures
 
 interpolate(a,b,t) = (1 - t)*a + t*b
+
+function interp_position(path::Vector{Int},vtxs,t)
+    t1 = Int(floor(t))+1
+    idx1 = path[max(1,min(t1,length(path)))]
+    idx2 = path[max(1,min(t1+1,length(path)))]
+    x=interpolate(vtxs[idx1][1],vtxs[idx2][1],t-(t1-1))
+    y=interpolate(vtxs[idx1][2],vtxs[idx2][2],t-(t1-1))
+    return x,y
+end
+function interp_position(paths::Vector{Vector{Int}},vtxs,t)
+    coords = map(p->interp_position(p,vtxs,t),paths)
+end
+function interp_path(path::Vector{Int},vtxs,t)
+    x,y = interp_position(path,vtxs,t)
+    t1 = Int(floor(t))+1
+    idx1 = max(1,min(t1,length(path)))
+    idx2 = max(1,min(t1+1,length(path)))
+    xpath = [x, map(v->v[1],vtxs[path[idx2:end]])...]
+    ypath = [y, map(v->v[2],vtxs[path[idx2:end]])...]
+    return xpath,ypath
+end
 
 function gen_object_colors(n)
   cs = distinguishable_colors(n,
@@ -25,6 +48,26 @@ function gen_object_colors(n)
   convert(Vector{Color}, cs)
 end
 
+function record_video(outfile_name,render_function;
+        t0 = 0,
+        tf = 10,
+        dt = 0.25,
+        t_history=t0:dt:tf,
+        fps = 10,
+        ext = "png",
+        s = (4inch, 4inch),
+        res = "1080x1080"
+    )
+    tmpdir = mktempdir()
+    for (i,t) in enumerate(t_history)
+        filename = joinpath(tmpdir,string(i,".",ext))
+        render_function(t) |> PNG(filename, s[1], s[2])
+    end
+    outfile = outfile_name
+    run(pipeline(`ffmpeg -y -r $fps -f image2 -i $tmpdir/%d.$ext -crf 20 $outfile`, stdout=devnull, stderr=devnull))
+    run(pipeline(`rm -rf $tmpdir`, stdout=devnull, stderr=devnull))
+end
+
 function get_grid_world_layer(vtxs,color,cw)
     if length(vtxs) > 0
         return layer(
@@ -36,6 +79,170 @@ function get_grid_world_layer(vtxs,color,cw)
     else
         return layer(x=[],y=[])
     end
+end
+
+@with_kw struct SolutionSummary
+    robot_paths::Vector{Vector{Int}} = Vector{Vector{Int}}()
+    object_paths::Dict{Int,Vector{Int}} = Dict{Int,Vector{Int}}()
+    object_intervals::Dict{Int,Tuple{Int,Int}} = Dict{Int,Tuple{Int,Int}}()
+end
+
+abstract type RenderModel end
+struct RenderStack{T}
+    models::T
+end
+@with_kw mutable struct RobotPositions <: RenderModel
+    label_robots    ::Bool              = true
+    colors_vec      ::Vector{Color}     = Color[]
+    rsize           ::Measures.Length   = 5pt
+    line_width      ::Measures.Length   = 2pt
+    show_paths      ::Bool              = false
+end
+function RobotPositions(n::Int)
+    color_scale = Scale.color_discrete_hue()
+    RobotPositions(colors_vec = color_scale.f(n))
+end
+@with_kw mutable struct ObjectPositions <: RenderModel
+    label_objects           ::Bool          = true
+    show_inactive_objects   ::Bool          = true
+    # show_completed_objects   ::Bool          = true
+    osize                   ::Measures.Length = 5pt
+    inactive_object_colors  ::Vector{Color} = Color[]
+    completed_object_colors ::Vector{Color} = Color[]
+    active_object_colors    ::Vector{Color} = Color[]
+end
+function ObjectPositions(n::Int)
+    ObjectPositions(
+        active_object_colors = map(i->colorant"Black",1:n),
+        inactive_object_colors = map(i->colorant"Gray",1:n),
+        completed_object_colors = map(i->colorant"Gray",1:n),
+    )
+end
+@with_kw mutable struct Floor <: RenderModel
+    cell_width      ::Float64   = 0.9
+    floor_color     ::Color     = colorant"LightGray"
+    pickup_color    ::Color     = colorant"LightBlue"
+    dropoff_color   ::Color     = colorant"Pink"
+end
+function render_layer(model::RobotPositions,env::GridFactoryEnvironment,summary,t,theme=Theme())
+    robot_paths = summary.robot_paths
+    vtxs = get_vtxs(env)
+    robot_layers = []
+    path_layers = []
+    for (i,p) in enumerate(robot_paths)
+        if length(p) > 0
+            x,y = interp_position(p,vtxs,t)
+            label = model.label_robots ? string("R",i) : ""
+            push!(robot_layers,
+                layer(
+                    x=[x],
+                    y=[y],
+                    label=[label],
+                    Geom.label(position=:centered,hide_overlaps=false),
+                    Geom.point,
+                    size=[model.rsize],
+                    Theme(
+                        theme,
+                        default_color=model.colors_vec[i],
+                        # highlight_width=0pt,
+                        # point_label_font=point_label_font,
+                        # point_label_color=point_label_color,
+                        # point_label_font_size=point_label_font_size
+                        )
+                    )
+            )
+            if model.show_paths
+                xpath,ypath = interp_path(p,vtxs,t)
+                push!(path_layers,
+                    layer(x=xpath,y=ypath,Geom.path,
+                        Theme(theme,line_width=model.line_width,default_color=model.colors_vec[i])
+                    )
+                )
+            end
+        end
+    end
+    return [robot_layers..., path_layers...]
+end
+function render_layer(model::ObjectPositions,env::GridFactoryEnvironment,summary,t,theme=Theme())
+    object_paths = summary.object_paths
+    object_intervals = summary.object_intervals
+    object_layers = []
+    for (i,k) in enumerate(sort(collect(keys(object_paths)))) # dictionary
+        p = object_paths[k]
+        interval = object_intervals[k]
+        if interval[1] > t
+            object_color = model.inactive_object_colors[i]
+        elseif interval[2] < t
+            object_color = model.completed_object_colors[i]
+        else
+            object_color = model.active_object_colors[i]
+        end
+        if length(p) > 0 && interval[2] > t
+            if (interval[1] <= t) || model.show_inactive_objects
+                x,y = interp_position(p,get_vtxs(env),t)
+                label = model.label_objects ? string("O",k) : ""
+                push!(object_layers,
+                    layer(
+                        x=[x],
+                        y=[y],
+                        label=[label],
+                        Geom.label(position=:centered,hide_overlaps=false),
+                        Geom.point,
+                        size=[model.osize],
+                        Theme(
+                            theme,
+                            default_color=object_color,
+                            )
+                        )
+                )
+            end
+        end
+    end
+    return object_layers
+end
+function render_layer(model::Floor,env::GridFactoryEnvironment,summary,t,theme=Theme())
+    map(args->get_grid_world_layer(args...,model.cell_width/2.0),
+        [
+            (get_pickup_vtxs(env),  model.pickup_color),
+            (get_dropoff_vtxs(env), model.dropoff_color),
+            (get_vtxs(env),         model.floor_color),
+        ]
+    )
+end
+
+function render_env(rstack::RenderStack,env,summary,t;
+        cell_width=1.0,
+        plot_padding=[1mm],
+        background_color="Gray",
+        highlight_width=0pt,
+        point_label_font="arial",
+        point_label_color="White",
+        point_label_font_size=10pt,
+        theme = Theme(
+            plot_padding=plot_padding,
+            background_color=background_color,
+            highlight_width=highlight_width,
+            point_label_font=point_label_font,
+            point_label_color=point_label_color,
+            point_label_font_size=point_label_font_size,
+        )
+    )
+    layers = vcat(map(m->render_layer(m,env,summary,t,theme),rstack.models)...)
+    xpts = map(v->v[1],get_vtxs(env))
+    ypts = map(v->v[2],get_vtxs(env))
+    Gadfly.plot(
+        layers...,
+        Coord.cartesian(fixed=true,
+            xmin=minimum(xpts) - cell_width/2,
+            ymin=minimum(ypts) - cell_width/2,
+            xmax=maximum(xpts) + cell_width/2,
+            ymax=maximum(ypts) + cell_width/2),
+        Guide.xticks(;ticks=nothing),
+        Guide.yticks(;ticks=nothing),
+        Guide.xlabel(nothing),
+        Guide.ylabel(nothing),
+        theme
+    )
 end
 
 """
@@ -56,9 +263,9 @@ function visualize_env(search_env::S,vtxs,pickup_vtxs,dropoff_vtxs,t=0;
         rsize=5pt,
         osize=3pt,
         cell_width=1.0,
-        floor_color = "light gray",
-        pickup_color= "light blue",
-        dropoff_color="pink",
+        floor_color = "LightGray",
+        pickup_color= "LightBlue",
+        dropoff_color="Pink",
         line_width=2pt) where {S<:SearchEnv}
 
     cache = search_env.cache
@@ -134,12 +341,12 @@ function visualize_env(search_env::S,vtxs,pickup_vtxs,dropoff_vtxs,t=0;
                 layer(
                     x=[interpolate(vtxs[idx1][1],vtxs[idx2][1],t-(t1-1))],
                     y=[interpolate(vtxs[idx1][2],vtxs[idx2][2],t-(t1-1))],
-                    Geom.point,size=[osize],Theme(default_color="black"))
+                    Geom.point,size=[osize],Theme(default_color="Black"))
             )
         end
     end
     # object_layer = layer( x=map(v->vtxs[v][1], object_vtxs), y=map(v->vtxs[v][2], object_vtxs),
-    # size=[3pt], Geom.point, Theme(default_color="black") )
+    # size=[3pt], Geom.point, Theme(default_color="Black") )
 
     plot(
         object_layers...,
@@ -161,8 +368,8 @@ function visualize_env(search_env::S,vtxs,pickup_vtxs,dropoff_vtxs,t=0;
         Guide.ylabel(nothing),
         Theme(
             plot_padding=[1mm],
-            # default_color="light gray",
-            background_color="gray"
+            # default_color="LightGray",
+            background_color="Gray"
         )
     )
 end
@@ -189,21 +396,21 @@ function visualize_env(vtxs,pickup_vtxs,dropoff_vtxs,t=0;
         line_width=2pt,
         color_scale = Scale.color_discrete_hue(),
         colors_vec = color_scale.f(n),
-        floor_color = "light gray",
-        pickup_color= "light blue",
-        dropoff_color="pink",
-        active_object_color="black",
+        floor_color = "LightGray",
+        pickup_color= "LightBlue",
+        dropoff_color="Pink",
+        active_object_color="Black",
         project_idxs=map(i->1,object_paths),
         proj_colors_vec = gen_object_colors(maximum([1,project_idxs...])),
         active_object_colors=map(idx->proj_colors_vec[idx],project_idxs),
         label_objects=false,
         label_robots=false,
         point_label_font="arial",
-        point_label_color="white",
+        point_label_color="White",
         point_label_font_size=10pt,
-        inactive_object_color="gray",
+        inactive_object_color="Gray",
         inactive_object_colors=map(idx->inactive_object_color,project_idxs),
-        completed_object_color="gray",
+        completed_object_color="Gray",
         completed_object_colors=map(idx->completed_object_color,project_idxs),
         show_inactive_objects=true,
         show_paths=true
@@ -214,6 +421,15 @@ function visualize_env(vtxs,pickup_vtxs,dropoff_vtxs,t=0;
     xpts = map(vtx->vtx[1], vtxs)
     ypts = map(vtx->vtx[2], vtxs)
 
+    theme = Theme(
+        plot_padding=[1mm],
+        background_color="Gray",
+        highlight_width=0pt,
+        point_label_font=point_label_font,
+        point_label_color=point_label_color,
+        point_label_font_size=point_label_font_size
+    )
+
     t1 = Int(floor(t))+1
     path_layers = []
     if show_paths
@@ -221,7 +437,7 @@ function visualize_env(vtxs,pickup_vtxs,dropoff_vtxs,t=0;
             if length(p) > 0
                 push!(path_layers,
                     layer(x=map(v->vtxs[v][1],p),y=map(v->vtxs[v][2],p),Geom.path,
-                        Theme(line_width=line_width,default_color=colors_vec[i]))
+                        Theme(theme,line_width=line_width,default_color=colors_vec[i]))
                 )
             end
         end
@@ -242,11 +458,8 @@ function visualize_env(vtxs,pickup_vtxs,dropoff_vtxs,t=0;
                     Geom.point,
                     size=[rsize],
                     Theme(
+                        theme,
                         default_color=colors_vec[i],
-                        highlight_width=0pt,
-                        point_label_font=point_label_font,
-                        point_label_color=point_label_color,
-                        point_label_font_size=point_label_font_size
                         )
                     )
             )
@@ -261,11 +474,11 @@ function visualize_env(vtxs,pickup_vtxs,dropoff_vtxs,t=0;
                 df = DataFrame(x=map(s->vtxs[s[1]][1],p[1:idx]),y=map(s->vtxs[s[1]][2],p[1:idx]),t=map(s->s[2],p[1:idx]))
                 push!(search_pattern_layers,
                     layer(x=[df.x[end]],y=[df.y[end]],Geom.point,size=[search_size],
-                        Theme(default_color="black",highlight_width=0pt))
+                        Theme(default_color="Black",highlight_width=0pt))
                     )
                 push!(search_pattern_layers,
                     layer(df,x="x",y="y",Geom.point,size=[search_size],
-                        Theme(default_color="gray",highlight_width=0pt))
+                        Theme(default_color="Gray",highlight_width=0pt))
                     )
             end
         end
@@ -303,11 +516,8 @@ function visualize_env(vtxs,pickup_vtxs,dropoff_vtxs,t=0;
                         Geom.point,
                         size=[osize],
                         Theme(
+                            theme,
                             default_color=object_color,
-                            highlight_width=0pt,
-                            point_label_font=point_label_font,
-                            point_label_color=point_label_color,
-                            point_label_font_size=point_label_font_size
                             )
                         )
                 )
@@ -316,7 +526,7 @@ function visualize_env(vtxs,pickup_vtxs,dropoff_vtxs,t=0;
     end
     if length(object_vtxs) > 0
         push!(object_layers,layer( x=map(v->vtxs[v][1], object_vtxs), y=map(v->vtxs[v][2], object_vtxs),
-            size=[3pt], Geom.point, Theme(default_color="black")))
+            size=[3pt], Geom.point, Theme(default_color="Black")))
     end
     for (i,idx) in enumerate(robot_vtxs)
         push!(robot_layers,
@@ -327,7 +537,7 @@ function visualize_env(vtxs,pickup_vtxs,dropoff_vtxs,t=0;
         )
     end
 
-    plot(
+    Gadfly.plot(
         search_pattern_layers...,
         goal_layers...,
         object_layers...,
@@ -345,34 +555,13 @@ function visualize_env(vtxs,pickup_vtxs,dropoff_vtxs,t=0;
         Guide.yticks(;ticks=nothing),
         Guide.xlabel(nothing),
         Guide.ylabel(nothing),
-        Theme(
-            plot_padding=[1mm],
-            background_color="gray"
-        )
+        theme
     )
 end
 function visualize_env(env::GridFactoryEnvironment,t=0;kwargs...)
     visualize_env(get_vtxs(env),get_pickup_vtxs(env),get_dropoff_vtxs(env),t;kwargs...)
 end
-function record_video(outfile_name,render_function;
-        t0 = 0,
-        tf = 10,
-        dt = 0.25,
-        t_history=t0:dt:tf,
-        fps = 10,
-        ext = "png",
-        s = (4inch, 4inch),
-        res = "1080x1080"
-    )
-    tmpdir = mktempdir()
-    for (i,t) in enumerate(t_history)
-        filename = joinpath(tmpdir,string(i,".",ext))
-        render_function(t) |> PNG(filename, s[1], s[2])
-    end
-    outfile = outfile_name
-    run(pipeline(`ffmpeg -y -r $fps -f image2 -i $tmpdir/%d.$ext -crf 20 $outfile`, stdout=devnull, stderr=devnull))
-    run(pipeline(`rm -rf $tmpdir`, stdout=devnull, stderr=devnull))
-end
+
 
 render_env(t) = visualize_env(factory_env,t;robot_vtxs=r0,object_vtxs=s0,paths=paths,search_patterns=[],goals=[])
 render_paths(t,factory_env,robot_paths,object_paths=[];kwargs...) = visualize_env(factory_env,t;robot_paths=robot_paths,object_paths=object_paths,kwargs...)

@@ -53,17 +53,22 @@ function reconstruct_object_paths(robot_paths,object_path_summaries)
     object_paths = Dict{Int,Vector{Int}}()
     object_intervals = Dict{Int,Tuple{Int,Int}}()
     for object_summary in values(object_path_summaries)
-        id = object_summary["object_id"]
-        t0 = object_summary["start_time"]
-        tC = object_summary["collect_time"]
-        tF = object_summary["deposit_time"]
-        v0 = object_summary["start_vtx"]
-        vF = object_summary["end_vtx"]
-        robot_ids = object_summary["robot_ids"]
-        p1 = map(t->v0,t0:tC-1)
-        p2 = robot_paths[robot_ids[1]][tC+1:tF+1]
-        object_paths[id] = vcat(p1,p2)
-        object_intervals[id] = (t0,tF)
+        id = object_summary[:object_id]
+        t0 = object_summary[:start_time]
+        tC = object_summary[:collect_time]
+        tF = object_summary[:deposit_time]
+        v0 = object_summary[:start_vtx]
+        vF = object_summary[:end_vtx]
+        robot_ids = object_summary[:robot_ids]
+        if robot_ids[1] != -1
+            T = length(robot_paths[robot_ids[1]])
+            if T >= tC-1
+                p1 = map(t->v0, 0:tC-1)
+                p2 = robot_paths[robot_ids[1]][tC+1:min(tF+1,T)]
+                object_paths[id] = vcat(p1,p2)
+                object_intervals[id] = (t0,tF)
+            end
+        end
     end
     return object_paths, object_intervals
 end
