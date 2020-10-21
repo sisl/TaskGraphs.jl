@@ -8,7 +8,7 @@ stage_results[:RobotPaths]
 include(joinpath(pathof(TaskGraphs),"..","helpers/render_tools.jl"))
 
 env = get_env!(loader,"env_2")
-visualize_env(env,0.5;robot_paths=stage_results[:RobotPaths])
+# visualize_env(env,0.5;robot_paths=stage_results[:RobotPaths])
 
 object_paths, object_intervals = TaskGraphs.reconstruct_object_paths(
     stage_results[:RobotPaths],stage_results[:ObjectPathSummaries]

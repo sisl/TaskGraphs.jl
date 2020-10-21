@@ -35,8 +35,10 @@ end
 function CRCBS.pibt_priority_law(solver,pc_mapf::PC_MAPF,cache,i)
     env = CRCBS.get_envs(cache)[i]
     return (
-        ~isa(env.schedule_node,Union{COLLECT,DEPOSIT}),
+        ~CRCBS.is_valid(env,get_goal(env)),
+        ~isa(env.schedule_node,DEPOSIT),
         ~isa(env.schedule_node,CARRY),
+        ~isa(env.schedule_node,COLLECT),
         minimum(cache.solution.cache.slack[get_vtx(
             cache.solution.schedule,env.node_id)]),
         -CRCBS.get_timers(cache)[i],
@@ -63,8 +65,13 @@ function CRCBS.pibt_update_solution!(solver,solution::SearchEnv,cache)
 end
 function pibt_info_strings(cache)
     info_strings = String[]
-    for (i,(s,env)) in enumerate(zip(cache.states,cache.envs))
-        str = "\t$i : $(get_vtx(cache.solution.schedule,env.node_id)) $(string(env.schedule_node)), $(string(s)) -> $(string(env.goal))\n"
+    for i in CRCBS.get_ordering(cache)
+        s = CRCBS.get_states(cache)[i]
+        a = CRCBS.get_actions(cache)[i]
+        env = CRCBS.get_envs(cache)[i]
+        # env = cache.envs[i]
+    # for (i,(s,env)) in enumerate(zip(cache.states,cache.envs))
+        str = "\t$i : $(get_vtx(cache.solution.schedule,env.node_id)) $(string(env.schedule_node)), s=$(string(s)), a=$(string(a)), goal=$(string(env.goal))\n"
         push!(info_strings,str)
     end
     return info_strings
