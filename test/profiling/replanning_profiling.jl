@@ -53,7 +53,6 @@ for (primary_replanner, backup_replanner) in [
     set_iteration_limit!(route_planner(backup_planner.solver),5000)
     set_commit_threshold!(primary_planner,10)
     set_commit_threshold!(backup_planner,10)
-    # set_verbosity!(route_planner(backup_planner.solver),3)
     set_debug!(backup_planner,true)
     # set_debug!(route_planner(backup_planner.solver),true)
     # Full solver
