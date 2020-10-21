@@ -174,10 +174,11 @@ let
                             ),
                         ]
                     # @show i, f, solver
+                    # set_verbosity!(solver,3)
                     set_iteration_limit!(solver,1)
                     set_iteration_limit!(route_planner(solver),100)
                     pc_tapf = f(solver;cost_function=cost_model,verbose=false);
-                    env, cost = solve!(solver,pc_tapf;optimizer=Gurobi.Optimizer)
+                    env, cost = solve!(solver,pc_tapf)
                     # @show convert_to_vertex_lists(env.route_plan)
                     if !isa(solver.assignment_model.milp,GreedyAssignment)
                         push!(costs, cost[1])
