@@ -63,15 +63,25 @@ function CRCBS.pibt_update_solution!(solver,solution::SearchEnv,cache)
     update_planning_cache!(solver,solution)
     solution
 end
+function pibt_info_string(cache,i,
+        env=CRCBS.get_envs(cache)[i],
+        s=CRCBS.get_states(cache)[i],
+        a=CRCBS.get_actions(cache)[i]
+    )
+    string("\t",i,": ", get_vtx(cache.solution.schedule,env.node_id)," ",
+        string(env.schedule_node)," s=",string(s),", a=",string(a),
+        ", goal=",string(env.goal),"\n")
+end
 function pibt_info_strings(cache)
     info_strings = String[]
     for i in CRCBS.get_ordering(cache)
-        s = CRCBS.get_states(cache)[i]
-        a = CRCBS.get_actions(cache)[i]
-        env = CRCBS.get_envs(cache)[i]
+        # s = CRCBS.get_states(cache)[i]
+        # a = CRCBS.get_actions(cache)[i]
+        # env = CRCBS.get_envs(cache)[i]
         # env = cache.envs[i]
     # for (i,(s,env)) in enumerate(zip(cache.states,cache.envs))
-        str = "\t$i : $(get_vtx(cache.solution.schedule,env.node_id)) $(string(env.schedule_node)), s=$(string(s)), a=$(string(a)), goal=$(string(env.goal))\n"
+        # str = "\t$i : $(get_vtx(cache.solution.schedule,env.node_id)) $(string(env.schedule_node)), s=$(string(s)), a=$(string(a)), goal=$(string(env.goal))\n"
+        str = pibt_info_string(cache,i)
         push!(info_strings,str)
     end
     return info_strings
@@ -83,9 +93,11 @@ function CRCBS.pibt_update_envs!(solver,pc_mapf::PC_MAPF,cache)
         # NOTE rebuild all envs to ensure that goal times are up to date
         v_next = get_next_vtx_matching_agent_id(solution,i)
         if has_vertex(solution.schedule,v_next)
+            # @log_info(2,solver,"OLD: ",pibt_info_string(cache,i))
             # if v_next != get_vtx(solution.schedule,env.node_id)
                 CRCBS.get_envs(cache)[i] = build_env(solver,pc_mapf,solution,node,AgentID(i))
             # end
+            # @log_info(2,solver,"NEW: ",pibt_info_string(cache,i))
         end
         env = CRCBS.get_envs(cache)[i]
         # Update the SearchEnv and rebuild any low level envs for which

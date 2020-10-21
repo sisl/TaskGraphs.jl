@@ -88,9 +88,11 @@ function CRCBS.is_goal(env::PCCBSEnv,s)
             # updated goal time
             v = get_vtx(env.search_env.schedule,env.node_id)
             path_spec = get_path_spec(env.search_env.schedule, v)
-            goal_time = env.search_env.cache.tF[v] # time after which goal can be satisfied
+            # goal_time = env.search_env.cache.tF[v] # time after which goal can be satisfied
+            goal_time = get_t(get_goal(env))
             if path_spec.tight == true
-                goal_time += minimum(env.search_env.cache.local_slack[v])
+                goal_time = env.search_env.cache.tF[v] + minimum(env.search_env.cache.local_slack[v])
+                # goal_time += minimum(env.search_env.cache.local_slack[v])
             end
             if (path_spec.free == true) && is_terminal_node(get_graph(env.search_env.schedule),v)
                 goal_time = maximum(env.search_env.cache.tF)
