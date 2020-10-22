@@ -336,7 +336,7 @@ function plan_next_path!(solver::ISPS, pc_mapf::AbstractPC_MAPF, env::SearchEnv,
         if get_path_spec(env.schedule, v).plan_path == true
             try
                 @log_info(2,solver,sprint(show,env))
-                @log_info(-1,solver,
+                @log_info(2,solver,
                 """
                 ISPS:
                     schedule_node: $(string(schedule_node))
@@ -347,7 +347,6 @@ function plan_next_path!(solver::ISPS, pc_mapf::AbstractPC_MAPF, env::SearchEnv,
                     @log_info(-1,solver,"Exiting ISPS with failed status")
                     return false
                 end
-                @log_info(-1,solver,"ISPS success on ",string(schedule_node))
                 @log_info(2,solver,"""
                 ISPS:
                     routes:
