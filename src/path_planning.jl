@@ -726,28 +726,15 @@ function replan_path!(solver, pc_mapf::AbstractPC_MAPF, env::SearchEnv, node::Co
     node_id = get_vtx_id(sched,v)
     schedule_node = get_node_from_id(sched,node_id)
     ### trim path
-    lg = deepcopy(get_logger(low_level(solver)))
-    if string(schedule_node) == "GO(26,197->380)"
-        set_verbosity!(low_level(solver),5)
-        set_iteration_limit!(low_level(solver),75)
-    end
     cbs_env = build_env(solver,pc_mapf,env,node,VtxID(v))
     path = get_base_path(solver,env,cbs_env)
     # @log_info(-1,solver,"old path cost: ",get_cost(path))
-    @log_info(3,low_level(solver),"old path: \n",convert_to_vertex_lists(path))
+    # @log_info(3,low_level(solver),"old path: \n",convert_to_vertex_lists(path))
     trim_path!(cbs_env,path,env.cache.t0[v])
-    @log_info(3,low_level(solver),"trimmed path: \n",convert_to_vertex_lists(path))
+    # @log_info(3,low_level(solver),"trimmed path: \n",convert_to_vertex_lists(path))
     # @log_info(-1,solver,"trimmed path cost: ",get_cost(path))
     ### plan path with new goal time
-    # TODO Set deadline appropriately
     status = plan_path!(low_level(solver),pc_mapf,env,node,schedule_node,v)
-    # @log_info(-1,solver,"AFTER:\n",sprint_route_plan(env.route_plan))
-    if string(schedule_node) == "GO(26,197->380)"
-        @log_info(3,low_level(solver),"BEFORE:\n",convert_to_vertex_lists(env.route_plan))
-        set_verbosity!(low_level(solver),verbosity(lg))
-        set_iteration_limit!(low_level(solver),iteration_limit(lg))
-        @assert false "Breaking out of routine"
-    end
     return status
 end
 
@@ -769,23 +756,19 @@ function tighten_gaps!(solver, pc_mapf::AbstractPC_MAPF, env::SearchEnv, node::C
         gap = evaluate_path_gap(env,path,v)
         if gap > 0
             t0 = env.cache.t0[v]
-            @log_info(-1, solver, "tighten_gaps!: base path for ",
+            @log_info(2, solver, "tighten_gaps!: base path for ",
                 string(get_node_from_vtx(sched,v)),
                 ", v = ",v," ends at t=",get_end_index(path),
                 " but should end at t=",t0," (gap = ", gap,").")
             vtxs = backtrack_node(sched,v)
             for vp in vtxs
                 if env.cache.tF[vp] < t0
-                    @log_info(-1,solver," Re-launching planner on ",
-                        string(get_node_from_vtx(sched,vp))," (v = ",v,")",
-                        " with extended horizon ",t0," ...")
-                    if ~replan_path!(solver, pc_mapf, env, node, VtxID(vp),t0)
-                        @log_info(-1,solver,"tightening failed on ",string(get_node_from_vtx(sched,vp))," (v = ",v,")",
-                        " with extended horizon ",t0)
-                        return false
+                    @log_info(2,solver," Re-launching planner on ",string(get_node_from_vtx(sched,vp))," (v = ",v,")"," with extended horizon ",t0," ...")
+                    if replan_path!(solver, pc_mapf, env, node, VtxID(vp),t0)
+                        @log_info(2,solver,"tightening succeeded on ",string(get_node_from_vtx(sched,vp))," (v = ",v,")"," with extended horizon ",t0)
                     else
-                        @log_info(-1,solver,"tightening succeeded on ",string(get_node_from_vtx(sched,vp))," (v = ",v,")",
-                        " with extended horizon ",t0)
+                        @log_info(2,solver,"tightening failed on ",string(get_node_from_vtx(sched,vp))," (v = ",v,")"," with extended horizon ",t0)
+                        return false
                     end
                 end
             end

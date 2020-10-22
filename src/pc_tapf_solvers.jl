@@ -251,7 +251,6 @@ function plan_path!(solver::AStarSC, pc_mapf::AbstractPC_MAPF, env::SearchEnv, n
         end
         if cost == get_infeasible_cost(cbs_env)
             @log_info(-1,solver,"A*: returned infeasible path for node ", string(schedule_node))
-            @log_info(-1,solver,"A*: returning false")
             return false
         end
     end
@@ -343,10 +342,7 @@ function plan_next_path!(solver::ISPS, pc_mapf::AbstractPC_MAPF, env::SearchEnv,
                     cache.tF[v]: $(env.cache.tF[v])
                     maximum(env.cache.tF): $(maximum(env.cache.tF))
                 """)
-                if ~plan_path!(low_level(solver),pc_mapf,env,node,schedule_node,v)
-                    @log_info(-1,solver,"Exiting ISPS with failed status")
-                    return false
-                end
+                valid_flag = plan_path!(low_level(solver),pc_mapf,env,node,schedule_node,v)
                 @log_info(2,solver,"""
                 ISPS:
                     routes:
