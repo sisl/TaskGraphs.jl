@@ -533,6 +533,15 @@ function post_process_replanning_results!(results,config)
                         completion_time = max(completion_time,object_summary[:deposit_time])
                     end
                 end
+                # Make sure object path summaries are up to date
+                results[:ObjectPathSummaries] = merge!(
+                    get(results,:ObjectPathSummaries,Dict{Symbol,Any}()),
+                    stage_dict[:ObjectPathSummaries]
+                    )
+                if i == length(results[k])
+                    kp = Symbol(string(k,"_final"))
+                    results[:RobotPaths] = results[kp][:RobotPaths]
+                end
             else
                 completion_time = typemax(Int)
             end

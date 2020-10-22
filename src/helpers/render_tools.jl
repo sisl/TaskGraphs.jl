@@ -178,7 +178,7 @@ function render_layer(model::ObjectPositions,env::GridFactoryEnvironment,summary
             object_color = model.active_object_colors[i]
         end
         if length(p) > 0 && interval[2] > t
-            if (interval[1] <= t) || model.show_inactive_objects
+            if (interval[1] <= t) #|| model.show_inactive_objects
                 x,y = interp_position(p,get_vtxs(env),t)
                 label = model.label_objects ? string("O",k) : ""
                 push!(object_layers,
