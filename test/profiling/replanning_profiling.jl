@@ -60,7 +60,7 @@ for (primary_replanner, backup_replanner) in [
     planner_config = (
         planner=planner,
         results_path=joinpath(base_results_dir,string(typeof(primary_replanner))),
-        objective = SumOfMakeSpans()
+        objective = SumOfMakeSpans(),
     )
     push!(planner_configs,planner_config)
 end

@@ -55,6 +55,10 @@ function CRCBS.get_possible_actions(node,env::PCCBSEnv,s::State)
     return Action[]
 end
 function CRCBS.get_possible_actions(node::Union{COLLECT,DEPOSIT},env::PCCBSEnv,s::State)
+    # @assert get_vtx(s) == get_id(get_initial_location_id(node)) "Robot $(get_agent_id(env)) should not be at s=$(string(s)) when task=$(string(node))"
+    if !(get_vtx(s) == get_id(get_initial_location_id(node)))
+        @log_info(-1,0,"Robot $(get_agent_id(env)) should not be at s=$(string(s)) when task=$(string(node))")
+    end
     if CRCBS.is_valid(env,s)
         return [CRCBS.wait(env,s)]
     end

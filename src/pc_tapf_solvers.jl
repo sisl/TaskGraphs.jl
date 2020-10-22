@@ -251,6 +251,7 @@ function plan_path!(solver::AStarSC, pc_mapf::AbstractPC_MAPF, env::SearchEnv, n
         end
         if cost == get_infeasible_cost(cbs_env)
             @log_info(-1,solver,"A*: returned infeasible path for node ", string(schedule_node))
+            @log_info(-1,solver,"A*: returning false")
             return false
         end
     end
@@ -335,14 +336,18 @@ function plan_next_path!(solver::ISPS, pc_mapf::AbstractPC_MAPF, env::SearchEnv,
         if get_path_spec(env.schedule, v).plan_path == true
             try
                 @log_info(2,solver,sprint(show,env))
-                @log_info(2,solver,
+                @log_info(-1,solver,
                 """
                 ISPS:
                     schedule_node: $(string(schedule_node))
                     cache.tF[v]: $(env.cache.tF[v])
                     maximum(env.cache.tF): $(maximum(env.cache.tF))
                 """)
-                valid_flag = plan_path!(low_level(solver),pc_mapf,env,node,schedule_node,v)
+                if ~plan_path!(low_level(solver),pc_mapf,env,node,schedule_node,v)
+                    @log_info(-1,solver,"Exiting ISPS with failed status")
+                    return false
+                end
+                @log_info(-1,solver,"ISPS success on ",string(schedule_node))
                 @log_info(2,solver,"""
                 ISPS:
                     routes:
@@ -356,8 +361,10 @@ function plan_next_path!(solver::ISPS, pc_mapf::AbstractPC_MAPF, env::SearchEnv,
             catch e
                 if isa(e, SolverException)
                     handle_solver_exception(solver,e)
+                    @log_info(-1,solver,"Exiting ISPS with failed status")
                     valid_flag = false
-                    return valid_flag
+                    # return valid_flag
+                    return false
                 else
                     rethrow(e)
                 end
@@ -381,8 +388,14 @@ function compute_route_plan!(solver::ISPS, pc_mapf::AbstractPC_MAPF, node::N, en
 
     while length(env.cache.node_queue) > 0
         status = plan_next_path!(solver,pc_mapf,env,node)
+        # @log_info(-1,solver,"ISPS status = ",status)
+        # if status == false
+        #     @log_info(-1,solver,"Exiting ISPS with failed status")
+        #     return false
+        # end
         status ? nothing : return false
-        tighten_gaps!(solver,pc_mapf,env,node)
+        status = tighten_gaps!(solver,pc_mapf,env,node)
+        status ? nothing : return false
         enforce_time_limit!(solver)
     end
     return true

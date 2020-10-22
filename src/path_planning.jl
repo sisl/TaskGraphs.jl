@@ -730,11 +730,18 @@ function replan_path!(solver, pc_mapf::AbstractPC_MAPF, env::SearchEnv, node::Co
     cbs_env = build_env(solver,pc_mapf,env,node,VtxID(v))
     path = get_base_path(solver,env,cbs_env)
     # @log_info(-1,solver,"old path cost: ",get_cost(path))
+    @log_info(-1,solver,"old path: \n",convert_to_vertex_lists(path))
     trim_path!(cbs_env,path,env.cache.t0[v])
+    @log_info(-1,solver,"trimmed path: \n",convert_to_vertex_lists(path))
+    if string(schedule_node) == "GO(26,197->380)"
+        set_verbosity!(low_level(solver),4)
+    end
     # @log_info(-1,solver,"trimmed path cost: ",get_cost(path))
     ### plan path with new goal time
-    plan_path!(low_level(solver),pc_mapf,env,node,schedule_node,v)
+    # TODO Set deadline appropriately
+    status = plan_path!(low_level(solver),pc_mapf,env,node,schedule_node,v)
     # @log_info(-1,solver,"AFTER:\n",sprint_route_plan(env.route_plan))
+    return status
 end
 
 export tighten_gaps!
@@ -755,21 +762,26 @@ function tighten_gaps!(solver, pc_mapf::AbstractPC_MAPF, env::SearchEnv, node::C
         gap = evaluate_path_gap(env,path,v)
         if gap > 0
             t0 = env.cache.t0[v]
-            @log_info(1, solver, "tighten_gaps!: base path for ",
+            @log_info(-1, solver, "tighten_gaps!: base path for ",
                 string(get_node_from_vtx(sched,v)),
                 ", v = ",v," ends at t=",get_end_index(path),
                 " but should end at t=",t0," (gap = ", gap,").")
             vtxs = backtrack_node(sched,v)
             for vp in vtxs
                 if env.cache.tF[vp] < t0
-                    @log_info(1,solver," Re-launching planner on ",
+                    @log_info(-1,solver," Re-launching planner on ",
                         string(get_node_from_vtx(sched,vp))," (v = ",v,")",
                         " with extended horizon ",t0," ...")
-                    replan_path!(solver, pc_mapf, env, node, VtxID(vp))
+                    if ~replan_path!(solver, pc_mapf, env, node, VtxID(vp))
+                        @log_info(-1,0,"tightening failed on ",string(get_node_from_vtx(sched,vp))," (v = ",v,")",
+                        " with extended horizon ",t0)
+                        return false
+                    end
                 end
             end
         end
     end
+    return true
 end
 
 function get_base_path(solver,search_env::SearchEnv,env::PCCBSEnv)
