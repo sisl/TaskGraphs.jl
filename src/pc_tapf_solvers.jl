@@ -460,7 +460,9 @@ TaskGraphsMILPSolver(milp) = TaskGraphsMILPSolver(milp,SolverLogger{Int}())
 get_assignment_matrix(solver::TaskGraphsMILPSolver) = get_assignment_matrix(solver.milp)
 
 function formulate_milp(solver::TaskGraphsMILPSolver,args...;kwargs...)
-    formulate_milp(solver.milp,args...;kwargs...)
+    formulate_milp(solver.milp,args...;
+        TimeLimit=max(0,min(runtime_limit(solver),deadline(solver)-time())),
+        kwargs...)
 end
 
 
@@ -563,7 +565,7 @@ function CRCBS.solve!(solver::NBSSolver, prob::E;kwargs...) where {E<:AbstractPC
                 end
             end
             increment_iteration_count!(solver)
-            enforce_time_limit!(solver)
+            # enforce_time_limit!(solver)
             if check_iterations(solver)
                 @log_info(1,solver,
                     "NBS: Reached $(iteration_limit(solver))-iteration limit.")

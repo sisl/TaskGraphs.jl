@@ -4,7 +4,7 @@ using TaskGraphs, CRCBS, TOML
 base_dir = joinpath("/scratch/task_graphs_experiments","replanning3")
 base_problem_dir    = joinpath(base_dir,"problem_instances")
 # base_results_dir    = joinpath(base_dir,"results")
-base_results_dir    = joinpath(base_dir,"results_debug")
+base_results_dir    = joinpath(base_dir,"results_no_fail")
 
 loader = ReplanningProblemLoader()
 add_env!(loader,"env_2",init_env_2())
@@ -26,9 +26,10 @@ feats = [
 final_feats = [SolutionCost(),NumConflicts(),RobotPaths()]
 planner_configs = []
 for (primary_replanner, backup_replanner) in [
-        (MergeAndBalance(),MergeAndBalance()),
-        (ReassignFreeRobots(),ReassignFreeRobots()),
+        (MergeAndBalance(),     DeferUntilCompletion()),
+        (ReassignFreeRobots(),  DeferUntilCompletion()),
         (DeferUntilCompletion(),DeferUntilCompletion()),
+        (NullReplanner(),       DeferUntilCompletion()),
     ]
     # Primary planner
     path_finder = DefaultAStarSC()
@@ -44,7 +45,7 @@ for (primary_replanner, backup_replanner) in [
     backup_planner = FullReplanner(
         solver = NBSSolver(
             assignment_model = TaskGraphsMILPSolver(GreedyAssignment()),
-            path_planner = PIBTPlanner{NTuple{3,Float64}}()
+            path_planner = PIBTPlanner{NTuple{3,Float64}}(partial=true)
             ),
         replanner = backup_replanner,
         cache = ReplanningProfilerCache(features=feats,final_features=final_feats)
@@ -70,10 +71,10 @@ for planner_config in planner_configs
     # warm up to precompile replanning code
     warmup(planner_config.planner,loader)
     # profile
-    profile_replanner!(loader,
-        planner_config.planner,
-        base_problem_dir,
-        planner_config.results_path)
+    # profile_replanner!(loader,
+    #     planner_config.planner,
+    #     base_problem_dir,
+    #     planner_config.results_path)
 end
 
 # if results show ''"CRCBS.Feature" = val', use the following line to convert:

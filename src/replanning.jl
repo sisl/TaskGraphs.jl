@@ -526,6 +526,7 @@ function get_commit_time(replan_model, search_env, t_request, commit_threshold=g
 end
 get_commit_time(replan_model::Oracle, search_env, t_request, args...) = t_request
 get_commit_time(replan_model::DeferUntilCompletion, search_env, t_request, commit_threshold) = max(t_request + commit_threshold,maximum(search_env.cache.tF))
+get_commit_time(replan_model::NullReplanner,args...) = get_commit_time(DeferUntilCompletion(),args...)
 function get_commit_time(replan_model::ReassignFreeRobots, search_env, t_request, commit_threshold)
     free_time = maximum(search_env.cache.tF)
     for v in vertices(search_env.schedule)
@@ -542,6 +543,7 @@ end
 break_assignments!(replan_model::ReplannerModel,args...) = break_assignments!(args...)
 break_assignments!(replan_model::ReassignFreeRobots,args...) = nothing
 break_assignments!(replan_model::DeferUntilCompletion,args...) = nothing
+break_assignments!(replan_model::NullReplanner,args...) = nothing
 
 function set_time_limits!(replan_model,solver,t_request,t_commit)
     real_time = get_real_time_flag(replan_model)
@@ -565,7 +567,7 @@ function set_time_limits!(flag::Bool,replan_model::DeferUntilCompletion,solver,t
     solver
 end
 function set_time_limits!(flag::Bool,replan_model::NullReplanner,solver,t_request,t_commit)
-    set_runtime_limit!(solver,0.0)
+    set_runtime_limit!(solver,-1.0)
     return solver
 end
 
@@ -633,7 +635,7 @@ function replan!(solver, replan_model, search_env, request;
     # @log_info(3,solver,"Trimmed route plan: \n",sprint_route_plan(trimmed_route_plan))
     SearchEnv(base_search_env, route_plan=trimmed_route_plan)
 end
-replan!(solver, replan_model::NullReplanner, search_env, args...;kwargs...) = search_env
+# replan!(solver, replan_model::NullReplanner, search_env, args...;kwargs...) = search_env
 function replan!(solver::FullReplanner,args...;kwargs...)
     replan!(solver.solver,solver.replanner,args...;kwargs...)
 end
