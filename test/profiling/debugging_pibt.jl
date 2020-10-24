@@ -34,7 +34,7 @@ rstack = RenderStack(
 rstack.models.robot_model.rsize = 8pt
 rstack.models.robot_model.show_paths = false
 rstack.models.robot_model.label_robots = false
-rstack.models.robot_model.colors_vec .= RGB(0.1,0.5,0.9)
+rstack.models.robot_model.colors_vec .= ROBOT_COLOR
 rstack.models.object_model.osize = 4pt
 rstack.models.object_model.label_objects = false
 rstack.models.object_model.inactive_object_colors .= colorant"Black"
@@ -48,9 +48,10 @@ t0 = minimum(map(p->findlast(p .!= p[end]), summary.robot_paths))
 tF = maximum(map(p->findlast(p .!= p[end]), summary.robot_paths)) + 1
 
 Compose.set_default_graphic_size(20cm,20cm)
-render_env(rstack,env,summary,t0+143.0;
+env_pic = render_env(rstack,env,summary,t0+143.0;
     point_label_font_size=8pt,
 )
+env_pic |> SVG("env_pic.svg",8inch,8inch)
 
 record_video(outfile,t->render_env(rstack,env,summary,t;point_label_font_size=8pt);
     t0 = t0,
