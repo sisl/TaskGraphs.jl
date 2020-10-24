@@ -1225,7 +1225,11 @@ function update_greedy_sets!(model,G,C,Ai,Ao,v,n_required_predecessors,n_eligibl
     end
 end
 
-function select_next_edge(model,D,Ao,Ai)
+"""
+Identifies the nodes `v1 ∈ Ai` and `v2 ∈ Ao` with the shortest distance
+`D[v1,v2]`.
+"""
+function select_next_edges(model,D,Ao,Ai)
     c = Inf
     a = -1
     b = -2
@@ -1238,7 +1242,6 @@ function select_next_edge(model,D,Ao,Ai)
             end
         end
     end
-    a,b
     if a < 0 || b < 0
         println("debugging edge selection for model ",typeof(model))
         for v in Ai
@@ -1248,9 +1251,26 @@ function select_next_edge(model,D,Ao,Ai)
             @show indegree(model.schedule,v)
         end
     end
-    a,b
+    return [(a,b)]
 end
 
+"""
+GreedyAssignment maintains three sets: The "satisfied set" `C`, the "required
+incoming" set `Ai`, and the "available outgoing" set `Ao`.
+
+At each step, the algorithm identifies the nodes `v1 ∈ Ai` and `v2 ∈ Ao` with
+shortest "distance" (in the context of `OperatingSchedule`s, this distance
+refers to the duration of `v1` if an edge `v1 → v2` is added) and adds an edge
+between them. The distance corresponding to an ineligible edge is set to Inf.
+
+After adding the edge, the algorithm sweeps through a topological ordering of
+the vertices and updates `C`, `Ai`, and `Ao`. In order for `v` to be placed in
+`C`, `v` must have enough incoming edges and all of `v`'s predecessors must
+already be in `C`. In order to be added to `Ai`, `v` must have less than the
+required number of incoming edges and all of `v`'s predecessors must
+already be in `C`. In order for `v` to be added to `Ao`, `v` must have less than
+the allowable number of outgoing edges, and must be in `C`.
+"""
 function JuMP.optimize!(model::GreedyAssignment)
 
     project_schedule    = model.schedule
@@ -1259,18 +1279,18 @@ function JuMP.optimize!(model::GreedyAssignment)
     (_, _, n_eligible_successors, _, _, n_required_predecessors, _, _) = preprocess_project_schedule(project_schedule)
     D = construct_schedule_distance_matrix(project_schedule,problem_spec)
 
-    C = Set{Int}()
-    Ai = Set{Int}()
-    Ao = Set{Int}()
+    C = Set{Int}() # Closed set (these nodes have enough predecessors)
+    Ai = Set{Int}() # Nodes that don't have enough incoming edges
+    Ao = Set{Int}() # Nodes that can have more outgoing edges
     for v in topological_sort(G)
         update_greedy_sets!(model,G,C,Ai,Ao,v,n_required_predecessors,n_eligible_successors)
     end
-    # while length(C) < nv(G)
     while length(Ai) > 0
-        v,v2 = select_next_edge(model,D,Ao,Ai)
-        setdiff!(Ao,v)
-        setdiff!(Ai,v2)
-        add_edge!(G,v,v2)
+        for (v,v2) in select_next_edges(model,D,Ao,Ai)
+            setdiff!(Ao,v)
+            setdiff!(Ai,v2)
+            add_edge!(G,v,v2)
+        end
         for v in topological_sort(G)
             update_greedy_sets!(model,G,C,Ai,Ao,v,n_required_predecessors,n_eligible_successors)
         end

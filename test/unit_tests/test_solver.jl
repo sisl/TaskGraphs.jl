@@ -130,10 +130,7 @@ let
                     # @show i, f, solver
                     pc_tapf = f(solver;cost_function=cost_model,verbose=false);
                     search_env = pc_tapf.env
-                    prob = formulate_assignment_problem(solver.assignment_model,
-                        pc_tapf;
-                        optimizer=Gurobi.Optimizer,
-                    )
+                    prob = formulate_assignment_problem(solver.assignment_model,pc_tapf)
                     sched, cost = solve_assignment_problem!(solver.assignment_model,prob,pc_tapf)
                     if !isa(solver.assignment_model.milp,GreedyAssignment)
                         push!(costs, cost)

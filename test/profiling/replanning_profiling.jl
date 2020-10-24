@@ -59,6 +59,7 @@ for (primary_replanner, backup_replanner) in [
     planner = ReplannerWithBackup(primary_planner,backup_planner)
     planner_config = (
         planner=planner,
+        planner_name=string(typeof(primary_replanner)),
         results_path=joinpath(base_results_dir,string(typeof(primary_replanner))),
         objective = SumOfMakeSpans(),
     )
@@ -81,33 +82,37 @@ end
 include(joinpath(pathof(TaskGraphs),"..","helpers/render_tools.jl"))
 
 # # plotting results
-config_df = construct_config_dataframe(loader,base_problem_dir,problem_configs[1])
-plotting_config = (
-    feats = Dict(
-            :makespans => Int[],
-            :arrival_times => Int[],
-            :backup_flags => Bool[],
-            :runtime_gaps => Float64[],
-            :primary_runtimes => Float64[],
-            :backup_runtimes => Float64[],
-    ),
-    results_path = joinpath(base_results_dir,"MergeAndBalance"),
-    problem_path = base_problem_dir,
+
+df_list = Vector{DataFrame}()
+for planner_config in planner_configs
+    config_df = construct_config_dataframe(loader,base_problem_dir,problem_configs[1])
+    plotting_config = (
+        feats = Dict(
+                :makespans => Int[],
+                :arrival_times => Int[],
+                :backup_flags => Bool[],
+                :runtime_gaps => Float64[],
+                :primary_runtimes => Float64[],
+                :backup_runtimes => Float64[],
+        ),
+        results_path = joinpath(base_results_dir,planner_config.planner_name),
+        problem_path = base_problem_dir,
+    )
+    results_df = TaskGraphs.construct_replanning_results_dataframe(loader,plotting_config,plotting_config.feats)
+    df = innerjoin(config_df,results_df;on=:problem_name)
+    push!(df_list,df)
+end
+
+plot_histories_pgf(df_list;
+    y_key=:makespans,
+    x_key=:none,
+    include_keys = [:num_projects=>30,:M=>10,:arrival_interval=>40],
+    xlabel = "time",
+    ylabel = "makespans",
+    ytick_show = true,
+    ymode="linear",
+    lines=false
 )
-results_df = TaskGraphs.construct_replanning_results_dataframe(loader,plotting_config,plotting_config.feats)
-df = innerjoin(config_df,results_df;on=:problem_name)
-
-df_list = [df,]
-
-# plot_histories_pgf(df_list;
-#     y_key=:runtime_gaps,
-#     include_keys = [:num_projects=>30,:M=>30,:arrival_interval=>80],
-#     xlabel = "time",
-#     ylabel = "makespans",
-#     ytick_show = true,
-#     ymode="linear",
-#     lines=false
-# )
 
 plt = PGFPlots.GroupPlot(3,5)
 for (n_vals, m_vals) in [
@@ -118,31 +123,55 @@ for (n_vals, m_vals) in [
     ([30,],[60,70,80,]),
     ]
     gp = group_history_plot(df_list;
-        y_key = :primary_runtimes,
+        y_key = :makespans,
         x_key=:none,
         n_key = :M,
         n_vals = n_vals,
         m_key = :arrival_interval,
         m_vals = m_vals,
-        ymode="linear",
+        ymode="log",
         lines=false,
     )
-    gp2 = group_history_plot(df_list;
-        y_key = :backup_runtimes,
-        x_key=:none,
-        n_key = :M,
-        n_vals = n_vals,
-        m_key = :arrival_interval,
-        m_vals = m_vals,
-        ymode="linear",
-        lines=false,
-        colors=["blue"],
-    )
-    for (ax,ax2) in zip(gp.axes,gp2.axes)
-        append!(ax.plots,ax2.plots)
-    end
-
     append!(plt.axes,gp.axes)
 end
-plt
-save("replanning_plots.pdf",plt)
+display(plt)
+
+for (df,planner_config) in zip(df_list,planner_configs)
+    plt = PGFPlots.GroupPlot(3,5)
+    for (n_vals, m_vals) in [
+        ([10,],[20,30,40,]),
+        ([15,],[30,40,50,]),
+        ([20,],[40,50,60,]),
+        ([25,],[50,60,70,]),
+        ([30,],[60,70,80,]),
+        ]
+        gp = group_history_plot([df];
+            y_key = :primary_runtimes,
+            x_key=:none,
+            n_key = :M,
+            n_vals = n_vals,
+            m_key = :arrival_interval,
+            m_vals = m_vals,
+            ymode="log", #"linear"
+            lines=false,
+        )
+        gp2 = group_history_plot([df];
+            y_key = :backup_runtimes,
+            x_key=:none,
+            n_key = :M,
+            n_vals = n_vals,
+            m_key = :arrival_interval,
+            m_vals = m_vals,
+            ymode="log",
+            lines=false,
+            colors=["blue"],
+        )
+        for (ax,ax2) in zip(gp.axes,gp2.axes)
+            append!(ax.plots,ax2.plots)
+        end
+
+        append!(plt.axes,gp.axes)
+    end
+    display(plt)
+    save("/home/kylebrown/Desktop/$(planner_config.planner_name)_runtimes.pdf",plt)
+end

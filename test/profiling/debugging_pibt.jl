@@ -32,21 +32,30 @@ rstack = RenderStack(
     )
 )
 rstack.models.robot_model.rsize = 8pt
-rstack.models.robot_model.show_paths = true
+rstack.models.robot_model.show_paths = false
+rstack.models.robot_model.label_robots = false
+rstack.models.robot_model.colors_vec .= RGB(0.1,0.5,0.9)
 rstack.models.object_model.osize = 4pt
-rstack.models.object_model.label_objects = true
+rstack.models.object_model.label_objects = false
+rstack.models.object_model.inactive_object_colors .= colorant"Black"
+rstack.models.object_model.completed_object_colors .= colorant"Black"
+rstack.models.floor_model.pickup_color = colorant"LightGray"
+rstack.models.floor_model.dropoff_color = colorant"LightGray"
 
-Compose.set_default_graphic_size(20cm,20cm)
-render_env(rstack,env,summary,0.5;
-    point_label_font_size=8pt,
-)
 
 outfile = "pibt_debug.mp4"
 t0 = minimum(map(p->findlast(p .!= p[end]), summary.robot_paths))
 tF = maximum(map(p->findlast(p .!= p[end]), summary.robot_paths)) + 1
+
+Compose.set_default_graphic_size(20cm,20cm)
+render_env(rstack,env,summary,t0+143.0;
+    point_label_font_size=8pt,
+)
+
 record_video(outfile,t->render_env(rstack,env,summary,t;point_label_font_size=8pt);
     t0 = t0,
     tf = tF,
     dt = 0.25,
+    fps = 10,
     s = (20cm,20cm),
 )

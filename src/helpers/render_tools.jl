@@ -13,6 +13,8 @@ using Printf
 using Parameters
 using Measures
 
+ROBOT_COLOR = RGB(0.1,0.5,0.9)
+
 interpolate(a,b,t) = (1 - t)*a + t*b
 
 function interp_position(path::Vector{Int},vtxs,t)
@@ -956,7 +958,10 @@ function plot_histories_pgf(df_list::Vector,ax=PGFPlots.Axis();
 
                     # idx = findfirst(y_arr .< 0)
                     # idx = idx == nothing ? length(y_arr) : idx-1
-                    idx = length(y_arr)
+                    idx = minimum([length(x_arr),length(y_arr),length(opt_vals)])
+                    # x_arr = x_arr[1:idx]
+                    # y_arr = y_arr[1:idx]
+                    # @show x_arr, y_arr, opt_vals
                     # Overall trend
                     if lines
                         push!(ax,
