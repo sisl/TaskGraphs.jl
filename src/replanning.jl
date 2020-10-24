@@ -564,6 +564,10 @@ function set_time_limits!(flag::Bool,replan_model::DeferUntilCompletion,solver,t
     @assert runtime_limit(solver) > 0.0
     solver
 end
+function set_time_limits!(flag::Bool,replan_model::NullReplanner,solver,t_request,t_commit)
+    set_runtime_limit!(solver,0.0)
+    return solver
+end
 
 split_active_vtxs!(replan_model::ReplannerModel,new_schedule,problem_spec,new_cache,t_commit;kwargs...) = split_active_vtxs!(new_schedule,problem_spec,new_cache,t_commit;kwargs...)
 

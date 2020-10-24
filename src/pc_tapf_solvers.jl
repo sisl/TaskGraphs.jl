@@ -546,6 +546,7 @@ function CRCBS.solve!(solver::NBSSolver, prob::E;kwargs...) where {E<:AbstractPC
         prob;kwargs...)
     while optimality_gap(solver) > 0
         try
+            enforce_time_limit!(solver)
             update_assignment_problem!(assignment_solver(solver),
                 assignment_problem, prob)
             schedule, l_bound = solve_assignment_problem!(
