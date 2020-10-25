@@ -55,8 +55,6 @@ RepeatedC_PC_TAPF(env::SearchEnv) = RepeatedC_PC_TAPF(env,Vector{ProjectRequest}
 construct_routing_problem(prob::RepeatedPC_TAPF,env) = PC_TAPF(env)
 construct_routing_problem(prob::RepeatedC_PC_TAPF,env) = C_PC_TAPF(env)
 
-
-
 export
     get_env_snapshot,
     trim_route_plan
@@ -77,8 +75,6 @@ Construct a trimmed route_plan that stops at a certain time step
 function trim_route_plan(search_env, route_plan, T)
     trim_solution!(build_env(search_env),route_plan,T)
 end
-
-
 
 export
     get_active_and_fixed_vtxs,
@@ -174,6 +170,10 @@ function fix_precutoff_nodes!(project_schedule::OperatingSchedule,problem_spec::
     @assert all(map(v->cache.t0[v], collect(fixed_vtxs)) .<= t)
     @assert all(map(v->cache.tF[v] + minimum(cache.local_slack[v]), collect(active_vtxs)) .>= t)
     project_schedule, cache
+end
+function fix_precutoff_nodes!(env::SearchEnv,t=minimum(map(length, get_paths(env.route_plan))))
+    fix_precutoff_nodes!(env.schedule,env.problem_spec,env.cache,t)
+    return env
 end
 
 """
@@ -525,7 +525,7 @@ function get_commit_time(replan_model, search_env, t_request, commit_threshold=g
     t_request + commit_threshold
 end
 get_commit_time(replan_model::Oracle, search_env, t_request, args...) = t_request
-get_commit_time(replan_model::DeferUntilCompletion, search_env, t_request, commit_threshold) = max(t_request + commit_threshold,maximum(search_env.cache.tF))
+get_commit_time(replan_model::DeferUntilCompletion, search_env, t_request, commit_threshold) = max(t_request + commit_threshold, maximum(search_env.cache.tF))
 get_commit_time(replan_model::NullReplanner,args...) = get_commit_time(DeferUntilCompletion(),args...)
 function get_commit_time(replan_model::ReassignFreeRobots, search_env, t_request, commit_threshold)
     free_time = maximum(search_env.cache.tF)
@@ -602,17 +602,20 @@ function replan!(solver, replan_model, search_env, request;
     @assert sanity_check(project_schedule," in replan!()")
     # Freeze route_plan and schedule at t_commit
     t_commit = get_commit_time(replan_model, search_env, t_request, commit_threshold)
+    t_final = minimum(map(length, get_paths(search_env.route_plan)))
+    t_split = min(t_commit,t_final)
+    # t_split = t_commit
     reset_solver!(solver)
     set_time_limits!(replan_model,solver,t_request,t_commit)
     # Update operating schedule
-    new_schedule, new_cache = prune_schedule(search_env,t_commit)
+    new_schedule, new_cache = prune_schedule(search_env,t_split)
     @assert sanity_check(new_schedule," after prune_schedule()")
     # split active nodes
-    robot_positions=get_env_snapshot(search_env,t_commit)
-    new_schedule, new_cache = split_active_vtxs!(replan_model,new_schedule,problem_spec,new_cache,t_commit;robot_positions=robot_positions)
+    robot_positions=get_env_snapshot(search_env,t_split)
+    new_schedule, new_cache = split_active_vtxs!(replan_model,new_schedule,problem_spec,new_cache,t_split;robot_positions=robot_positions)
     @assert sanity_check(new_schedule," after split_active_vtxs!()")
     # freeze nodes that terminate before cutoff time
-    new_schedule, new_cache = fix_precutoff_nodes!(replan_model,new_schedule,problem_spec,new_cache,t_commit)
+    new_schedule, new_cache = fix_precutoff_nodes!(replan_model,new_schedule,problem_spec,new_cache,t_split)
     # Remove all "assignments" from schedule
     break_assignments!(replan_model,new_schedule,problem_spec)
     @assert sanity_check(new_schedule," after break_assignments!()")
