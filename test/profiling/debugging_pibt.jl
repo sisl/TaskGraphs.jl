@@ -1,12 +1,12 @@
-problem_name = "problem0150"
+problem_name = "problem0001"
 problem_file = joinpath(base_problem_dir,problem_name)
-results_path = joinpath(planner_configs[1].results_path,problem_name)
+results_path = joinpath(planner_configs[4].results_path,problem_name)
 results = load_results(loader,results_path)
 config = CRCBS.load_config(loader,problem_file)
 TaskGraphs.post_process_replanning_results!(results,config)
 
 
-stage = 15
+stage = 1
 stage_results = results[:backup_planner][stage]
 stage_results[:RobotPaths]
 
