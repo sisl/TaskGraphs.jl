@@ -390,6 +390,7 @@ Fields:
     timeout_buffer::Float64         = 1
     route_planning_buffer::Float64  = 2
     commit_threshold::Int           = 10
+    max_time_limit::Int             = 100
 end
 get_replanner_config(config::ReplannerConfig) = config
 get_replanner_config(model) = model.config
@@ -399,19 +400,23 @@ export
     get_timeout_buffer,
     get_route_planning_buffer,
     get_commit_threshold,
+    get_max_time_limit,
     set_real_time_flag!,
     set_timeout_buffer!,
     set_route_planning_buffer!,
-    set_commit_threshold!
+    set_commit_threshold!,
+    set_max_time_limit!
 
 get_real_time_flag(model)           = get_replanner_config(model).real_time
 get_timeout_buffer(model)           = get_replanner_config(model).timeout_buffer
 get_route_planning_buffer(model)    = get_replanner_config(model).route_planning_buffer
 get_commit_threshold(model)         = get_replanner_config(model).commit_threshold
+get_max_time_limit(model)           = get_replanner_config(model).max_time_limit
 function set_real_time_flag!(model,val) get_replanner_config(model).real_time = val end
 function set_timeout_buffer!(model,val) get_replanner_config(model).timeout_buffer = val end
 function set_route_planning_buffer!(model,val) get_replanner_config(model).route_planning_buffer = val end
 function set_commit_threshold!(model,val) get_replanner_config(model).commit_threshold = val end
+function set_max_time_limit!(model,val) get_replanner_config(model).max_time_limit = val end
 
 """
     DeferUntilCompletion <: ReplannerModel
@@ -419,7 +424,6 @@ function set_commit_threshold!(model,val) get_replanner_config(model).commit_thr
 Allow work to begin on the new project only after all other work is completed.
 """
 @with_kw struct DeferUntilCompletion <: ReplannerModel
-    max_time_limit::Float64 = 100
     config::ReplannerConfig = ReplannerConfig()
 end
 """
@@ -553,19 +557,25 @@ function set_time_limits!(replan_model,solver,t_request,t_commit)
 end
 
 function set_time_limits!(flag::Bool,replan_model,solver,t_request,t_commit)
+    # set_runtime_limit!(solver, (t_commit - t_request) - get_timeout_buffer(replan_model))
+    # # set_runtime_limit!(assignment_solver(solver), solver.time_limit - get_route_planning_buffer(replan_model))
+    # set_runtime_limit!(solver.assignment_model, runtime_limit(solver) - get_route_planning_buffer(replan_model))
+    # @assert runtime_limit(solver) > 0.0
+    # solver
     set_runtime_limit!(solver, (t_commit - t_request) - get_timeout_buffer(replan_model))
-    # set_runtime_limit!(assignment_solver(solver), solver.time_limit - get_route_planning_buffer(replan_model))
-    set_runtime_limit!(solver.assignment_model, runtime_limit(solver) - get_route_planning_buffer(replan_model))
-    @assert runtime_limit(solver) > 0.0
-    solver
-end
-function set_time_limits!(flag::Bool,replan_model::DeferUntilCompletion,solver,t_request,t_commit)
-    set_runtime_limit!(solver, (t_commit - t_request) - get_timeout_buffer(replan_model))
-    set_runtime_limit!(solver, min(runtime_limit(solver),replan_model.max_time_limit))
+    set_runtime_limit!(solver, min(runtime_limit(solver),get_max_time_limit(replan_model)))
     set_runtime_limit!(assignment_solver(solver), runtime_limit(solver) - get_route_planning_buffer(replan_model))
     @assert runtime_limit(solver) > 0.0
+    set_deadline!(solver, time() + (t_commit - t_request))
     solver
 end
+# function set_time_limits!(flag::Bool,replan_model::DeferUntilCompletion,solver,t_request,t_commit)
+#     set_runtime_limit!(solver, (t_commit - t_request) - get_timeout_buffer(replan_model))
+#     set_runtime_limit!(solver, min(runtime_limit(solver),get_max_time_limit(replan_model)))
+#     set_runtime_limit!(assignment_solver(solver), runtime_limit(solver) - get_route_planning_buffer(replan_model))
+#     @assert runtime_limit(solver) > 0.0
+#     solver
+# end
 function set_time_limits!(flag::Bool,replan_model::NullReplanner,solver,t_request,t_commit)
     set_runtime_limit!(solver,-1.0)
     return solver

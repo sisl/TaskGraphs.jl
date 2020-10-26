@@ -41,6 +41,8 @@ for (primary_replanner, backup_replanner) in [
         replanner = primary_replanner,
         cache = ReplanningProfilerCache(features=feats,final_features=final_feats)
         )
+    set_max_time_limit!(primary_planner,50)
+    set_commit_threshold!(primary_planner,10)
     # Backup planner
     backup_planner = FullReplanner(
         solver = NBSSolver(
@@ -52,7 +54,6 @@ for (primary_replanner, backup_replanner) in [
         )
     set_iteration_limit!(backup_planner,1)
     set_iteration_limit!(route_planner(backup_planner.solver),5000)
-    set_commit_threshold!(primary_planner,10)
     set_commit_threshold!(backup_planner,10)
     set_debug!(backup_planner,true)
     # set_debug!(route_planner(backup_planner.solver),true)
