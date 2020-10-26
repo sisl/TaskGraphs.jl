@@ -654,10 +654,12 @@ function solve_assignment_problem!(solver::TaskGraphsMILPSolver, model, prob)
     if primal_status(model) != MOI.FEASIBLE_POINT
         throw(SolverException("Assignment problem is infeasible -- in `solve_assignment_problem!()`"))
     end
+    # set_lower_bound!(solver, Int(round(value(objective_bound(model)))) )
+    # set_best_cost!(solver, Int(round(value(objective_function(model)))) )
     set_lower_bound!(solver, Int(round(value(objective_bound(model)))) )
     set_best_cost!(solver, Int(round(value(objective_function(model)))) )
     if termination_status(model) == MOI.OPTIMAL
-        @assert lower_bound(solver) == best_cost(solver)
+        @assert lower_bound(solver) <= best_cost(solver) "lower_bound($(solver_type(solver))) = $(value(objective_bound(model))) -> $(lower_bound(solver)) but should be equal to best_cost($(solver_type(solver))) = $(value(objective_function(model))) -> $(best_cost(solver))"
     end
     sched = deepcopy(prob.env.schedule)
     update_project_schedule!(solver, model, sched, prob.env.problem_spec)
@@ -703,5 +705,6 @@ CRCBS.solver_type(::ISPS)               = "ISPS"
 CRCBS.solver_type(::AStarSC)            = "AStarSC"
 CRCBS.solver_type(::PrioritizedAStarSC) = "PrioritizedAStarSC"
 CRCBS.solver_type(::AStar)              = "AStar"
+CRCBS.solver_type(::TaskGraphsMILPSolver{M,C}) where {M,C} = "TaskGraphsMILPSolver{$M}"
 
 # end
