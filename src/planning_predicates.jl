@@ -28,12 +28,10 @@ end
 
 export
 	AbstractRobotType,
-	DeliveryBot,
-	CleanUpBot
+	DeliveryBot
 
 abstract type AbstractRobotType end
 struct DeliveryBot <: AbstractRobotType end
-struct CleanUpBot <: AbstractRobotType end
 
 export
     AbstractID,
@@ -84,7 +82,9 @@ export
 get_id(id::AbstractID) = id.id
 get_id(id::Int) = id
 Base.:+(id::A,i::Int) where {A<:AbstractID} = A(get_id(id)+i)
+Base.:+(id::A,i::A) where {A<:AbstractID} = A(get_id(id)+get_id(i))
 Base.:-(id::A,i::Int) where {A<:AbstractID} = A(get_id(id)-i)
+Base.:-(id::A,i::A) where {A<:AbstractID} = A(get_id(id)-get_id(i))
 Base.:(<)(id1::AbstractID,id2::AbstractID) = get_id(id1) < get_id(id2)
 Base.:(>)(id1::AbstractID,id2::AbstractID) = get_id(id1) > get_id(id2)
 Base.convert(::Type{ID},i::Int) where {ID<:AbstractID} = ID(i)
@@ -121,8 +121,9 @@ struct BOT_AT{R<:AbstractRobotType} <: AbstractPlanningPredicate
     x::LocationID
 end
 
+export ROBOT_AT
 const ROBOT_AT = BOT_AT{DeliveryBot}
-const CLBOT_AT = BOT_AT{CleanUpBot}
+
 
 export
     get_object_id,
@@ -184,7 +185,6 @@ Encodes the event "robot `r` goes from `x1` to `x2`"
     x2::LocationID	= LocationID()
 end
 const GO = BOT_GO{DeliveryBot}
-const CL_GO = BOT_GO{CleanUpBot}
 
 export BOT_CARRY
 """
@@ -226,14 +226,28 @@ Encodes the event "robot `r` collects object `o` from `x`
 end
 const DEPOSIT = BOT_DEPOSIT{DeliveryBot}
 
+export
+	CleanUpBot,
+	CleanUpBotID,
+	CUB_AT,
+	CUB_GO,
+	CLEAN_UP
+
+struct CleanUpBot <: AbstractRobotType end
+const CleanUpBotID = BotID{CleanUpBot}
+export CUB_AT
+const CUB_AT = BOT_AT{CleanUpBot}
+export CUB_GO
+const CUB_GO = BOT_GO{CleanUpBot}
+
 """
 	CLEAN_UP <: AbstractRobotAction
 
-Encodes the event "robot `r` cleans up location x`
+Encodes the event "robot `r` cleans up locations vtxs`
 """
 @with_kw struct CLEAN_UP <: AbstractRobotAction{CleanUpBot}
 	r::BotID{CleanUpBot} = BotID{CleanUpBot}()
-	x::Vector{LocationID} = Vector{LocationID}()
+	vtxs::Vector{LocationID} = Vector{LocationID}()
 end
 
 get_initial_location_id(a::A) where {A<:Union{GO,CARRY}}        						= a.x1
@@ -277,12 +291,6 @@ split_node(node::BOT_GO,x::LocationID) = BOT_GO(node, x2=x), BOT_GO(node, x1=x)
 split_node(node::BOT_CARRY,x::LocationID) = BOT_CARRY(node, x2=x), BOT_CARRY(node, x1=x)
 split_node(node::BOT_COLLECT,x::LocationID) = BOT_COLLECT(node, x=x), BOT_COLLECT(node, x=x)
 split_node(node::BOT_DEPOSIT,x::LocationID) = BOT_DEPOSIT(node, x=x), BOT_DEPOSIT(node, x=x)
-# function split_node(node::N,x::LocationID) where {N<:Union{GO,CARRY}}
-# 	N(node, x2=x), N(node, x1=x)
-# end
-# function split_node(node::N,x::LocationID) where {N<:Union{DEPOSIT,COLLECT}}
-# 	N(node, x=x), N(node, x=x)
-# end
 
 export
 	TEAM_ACTION,
@@ -409,37 +417,6 @@ eligible_predecessors(node) 			= required_predecessors(node)
 eligible_successors(node) 				= required_successors(node)
 eligible_successors(node::BOT_GO{R}) where {R} = Dict((BOT_GO{R},TEAM_ACTION{R,BOT_COLLECT{R}},TEAM_ACTION{R,BOT_GO{R}},BOT_COLLECT{R})=>1)
 eligible_predecessors(node::OBJECT_AT)  = Dict(Operation=>1)
-
-# required_predecessors(node::GO)         = Dict((GO,ROBOT_AT,DEPOSIT,TEAM_ACTION{DEPOSIT})=>1)
-# required_successors(node::GO)           = Dict()
-# required_predecessors(node::COLLECT)    = Dict(OBJECT_AT=>1,GO=>1)
-# required_successors(node::COLLECT)      = Dict(CARRY=>1)
-# required_predecessors(node::CARRY)      = Dict(COLLECT=>1)
-# required_successors(node::CARRY)        = Dict(DEPOSIT=>1)
-# required_predecessors(node::DEPOSIT)    = Dict(CARRY=>1)
-# required_successors(node::DEPOSIT)      = Dict(Operation=>1,GO=>1)
-# required_predecessors(node::Operation)  = Dict((DEPOSIT,OBJECT_AT)=>length(node.pre))
-# required_successors(node::Operation)    = Dict(OBJECT_AT=>length(node.post))
-# required_predecessors(node::OBJECT_AT)  = Dict()
-# required_successors(node::OBJECT_AT)    = Dict(COLLECT=>1)
-# required_predecessors(node::ROBOT_AT)   = Dict()
-# required_successors(node::ROBOT_AT)     = Dict(GO=>1)
-
-
-# required_predecessors(node::TEAM_ACTION{GO})        = Dict(GO=>length(node.instructions))
-# required_predecessors(node::TEAM_ACTION{COLLECT})   = Dict(GO=>length(node.instructions),OBJECT_AT=>1)
-# required_predecessors(node::TEAM_ACTION{CARRY})     = Dict(TEAM_ACTION{COLLECT}=>1)
-# required_predecessors(node::TEAM_ACTION{DEPOSIT})   = Dict(TEAM_ACTION{CARRY}=>1)
-#
-# required_successors(node::TEAM_ACTION{GO})         	= Dict(TEAM_ACTION{COLLECT}=>1)
-# required_successors(node::TEAM_ACTION{COLLECT})    	= Dict(TEAM_ACTION{CARRY}=>1)
-# required_successors(node::TEAM_ACTION{CARRY})      	= Dict(TEAM_ACTION{DEPOSIT}=>1)
-# required_successors(node::TEAM_ACTION{DEPOSIT})    	= Dict(GO=>length(node.instructions),Operation=>1)
-#
-# eligible_predecessors(node) 			= required_predecessors(node)
-# eligible_successors(node) 				= required_successors(node)
-# eligible_successors(node::GO)           = Dict((GO,TEAM_ACTION{COLLECT},TEAM_ACTION{GO},COLLECT)=>1)
-# eligible_predecessors(node::OBJECT_AT)  = Dict(Operation=>1)
 
 """
 	num_required_predecessors(node)
@@ -607,69 +584,5 @@ validate_edge(n1::DEPOSIT,		n2::CARRY		) = false
 validate_edge(n1::DEPOSIT,		n2::GO			) = (n1.x 	== n2.x1)
 validate_edge(n1::N,n2::N) where {N<:Union{COLLECT,DEPOSIT}} = (n1.x == n2.x) # job shop edges are valid
 
-# """ Planning Resources (at the assignment level) """
-# abstract type AbstractResource end
-# abstract type ActiveResource <: AbstractResource end
-# abstract type PassiveResource <: AbstractResource end
-# """ Robot Types """
-# abstract type AbstractRobotType end
-# struct GenericRobot <: AbstractRobotType end
-# """ Object Types """
-# abstract type AbstractObjectType end
-# struct GenericObject <: AbstractObjectType end
-# """ Manufacturing Station Types """
-# abstract type AbstractStationType end
-# struct GenericStation <: AbstractStationType end
-# """ Loading Zone Types """
-# abstract type AbstractLoadingZoneType end
-# struct GenericLoadingZone <: AbstractLoadingZoneType end
-#
-# @with_kw struct PlanningResource{T} <: AbstractResource
-#     id::Int 	= -1
-#     rtype::T 	= GenericRobot()
-# end
-# @with_kw struct RobotResource{T<:AbstractRobotType} <: AbstractResource
-#     id::Int 	= -1
-#     rtype::T 	= GenericRobot()
-# end
-# @with_kw struct ObjectResource{T<:AbstractObjectType} <: AbstractResource
-#     id::Int		= -1
-#     rtype::T	= GenericObject()
-# end
-# @with_kw struct LoadingZoneResource{T<:AbstractLoadingZoneType} <: AbstractResource
-#     id::Int		= -1
-#     rtype::T	= GenericLoadingZone()
-# end
-# struct StationResource{T<:AbstractStationType} <: AbstractResource
-#     id::Int
-#     rtype::T
-# end
-#
-# get_id(r::R) where {R<:AbstractResource} = r.id
-# get_type(r::R) where {R<:AbstractResource} = r.rtype
-#
-# function matches_resource_spec(required_type::T,required_id::Int,available::R) where {T<:DataType,R<:AbstractResource}
-#     if get_type(available) <: required_type
-#         if (get_id(available) == required_id) || (required_id == -1)
-#             return true
-#         end
-#     end
-#     return false
-# end
-# function matches_resource_spec(required::T,available::R) where {T<:AbstractResource,R<:AbstractResource}
-#     matches_resource_spec(get_type(required),get_id(required),available)
-# end
-#
-# """
-# 	`ResourceTable`
-#
-# 	Defines all available resources
-# """
-# struct ResourceTable
-#     robots::Dict{Int,RobotResource}
-#     objects::Dict{Int,ObjectResource}
-#     loading_zones::Dict{Int,LoadingZoneResource}
-#     stations::Dict{Int,StationResource}
-# end
 
 end # module PlanningPredicates

@@ -12,3 +12,9 @@ d = OilSpill(env_graph,vtxs)
 
 TaskGraphs.apply_disturbance!(env_graph,d)
 TaskGraphs.remove_disturbance!(env_graph,d)
+
+solver = NBSSolver()
+pctapf = pctapf_problem_1(solver)
+
+search_env = pctapf.env
+add_to_schedule!(search_env.schedule,CUB_AT(1,2),CleanUpBotID(1))

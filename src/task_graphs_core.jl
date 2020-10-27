@@ -540,7 +540,7 @@ Arguments:
 * spec::ProblemSpec
 * node::T <: AbstractPlanningPredicate
 """
-function generate_path_spec(schedule::P,spec::T,a::GO) where {P<:OperatingSchedule,T<:ProblemSpec}
+function generate_path_spec(schedule::P,spec::T,a::BOT_GO) where {P<:OperatingSchedule,T<:ProblemSpec}
     s0 = get_id(get_initial_location_id(a))
     s = get_id(get_destination_location_id(a))
     r = get_id(get_robot_id(a))
@@ -608,7 +608,7 @@ function generate_path_spec(schedule::P,spec::T,pred::OBJECT_AT) where {P<:Opera
         object_id = get_id(get_object_id(pred))
         )
 end
-function generate_path_spec(schedule::P,spec::T,pred::ROBOT_AT) where {P<:OperatingSchedule,T<:ProblemSpec}
+function generate_path_spec(schedule::P,spec::T,pred::BOT_AT) where {P<:OperatingSchedule,T<:ProblemSpec}
     r = get_id(get_robot_id(pred))
     path_spec = PathSpec(
         node_type=Symbol(typeof(pred)),
