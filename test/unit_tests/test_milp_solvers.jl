@@ -88,7 +88,6 @@ let
                             problem_spec;
                             cost_model = cost_model,
                         )
-                        # model = formulate_optimization_problem(problem_spec,Gurobi.Optimizer;cost_model=cost_model)
                         optimize!(model)
                         optimal = (termination_status(model) == MathOptInterface.OPTIMAL)
                         optimal_TA_cost = Int(round(value(objective_function(model))))

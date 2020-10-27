@@ -9,10 +9,7 @@ let
     # proj_spec, prob_spec, robot_ics, env_graph, _ = f(;cost_function=cost_model,verbose=false)
 
     base_search_env = pc_tapf.env
-    prob = formulate_assignment_problem(solver.assignment_model,
-        pc_tapf;
-        optimizer=Gurobi.Optimizer,
-    )
+    prob = formulate_assignment_problem(solver.assignment_model,pc_tapf)
     sched, cost = solve_assignment_problem!(solver.assignment_model,prob,pc_tapf)
     @test validate(sched)
     search_env = construct_search_env(solver,deepcopy(sched),base_search_env)

@@ -266,7 +266,7 @@ initialize_planning_cache(env::SearchEnv) = initialize_planning_cache(env.schedu
 
 Return the node_id of the active node assigned to an agent.
 """
-function get_next_vtx_matching_agent_id(env::SearchEnv,agent_id)
+function get_next_vtx_matching_agent_id(env::SearchEnv,agent_id::BotID)
     for v in env.cache.active_set
         if agent_id == get_path_spec(env.schedule, v).agent_id
             return v
@@ -280,12 +280,13 @@ end
 
 Return the node_id of the active node assigned to an agent.
 """
-function get_next_node_matching_agent_id(env::SearchEnv,agent_id)
-    v = get_next_vtx_matching_agent_id(env::SearchEnv,agent_id)
+function get_next_node_matching_agent_id(env::SearchEnv,agent_id::BotID)
+    v = get_next_vtx_matching_agent_id(env,agent_id)
     if has_vertex(env.schedule,v)
         return get_vtx_id(env.schedule,v)
     end
-    return RobotID(agent_id)
+    # return RobotID(agent_id)
+    return agent_id
 end
 
 export
@@ -497,7 +498,7 @@ function update_planning_cache!(solver,env)
     end
     for v in collect(cache.active_set)
         path_spec = get_path_spec(schedule,v)
-        agent_id = path_spec.agent_id
+        agent_id = get_id(path_spec.agent_id)
         if 1 <= agent_id <= num_agents(env)
             # @show string(get_node_from_vtx(env.schedule,v))
             path = get_paths(env)[agent_id]
@@ -679,7 +680,7 @@ update_cost_model!(env::S) where {S<:SearchEnv} = update_cost_model!(get_cost_mo
     `v` is the vertex id
 """
 function update_env!(solver,env::SearchEnv,v::Int,path::P,
-        agent_id::Int=get_path_spec(env.schedule,v).agent_id
+        agent_id::Int=get_id(get_path_spec(env.schedule,v).agent_id)
         ) where {P<:Path}
     route_plan = env.route_plan
     cache = env.cache
@@ -793,7 +794,7 @@ function CRCBS.build_env(
         heuristic = get_heuristic_model(env),
         cost_model = get_cost_model(env)
     ) where {T}
-    agent_id = path_spec.agent_id
+    agent_id = get_id(path_spec.agent_id)
     goal_vtx = path_spec.final_vtx
     goal_time = env.cache.tF[v] # time after which goal can be satisfied
     # deadline = env.cache.tF[v] .+ min.(env.cache.max_deadline[v],env.cache.slack[v]) # NOTE iterative deadline tightening was causing problems with slack running out before the goal time, so this line has been replaced by the original
@@ -864,7 +865,7 @@ function CRCBS.build_env(
         node::ConstraintTreeNode,
         agent_id::AgentID
         )
-    node_id = get_next_node_matching_agent_id(env,get_id(agent_id))
+    node_id = get_next_node_matching_agent_id(env,RobotID(get_id(agent_id)))
     build_env(solver,pc_mapf,env,node,VtxID(get_vtx(env.schedule,node_id)))
     # get_node_from_id(env.schedule,node_id),
 end

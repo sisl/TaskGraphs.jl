@@ -32,10 +32,7 @@ let
     solver = NBSSolver(assignment_model = TaskGraphsMILPSolver(GreedyAssignment()))
     pc_tapf = f(solver;cost_function=cost_model,verbose=false)
     base_env = pc_tapf.env
-    prob = formulate_assignment_problem(solver.assignment_model,
-        pc_tapf;
-        optimizer=Gurobi.Optimizer,
-    )
+    prob = formulate_assignment_problem(solver.assignment_model,pc_tapf)
     sched, cost = solve_assignment_problem!(solver.assignment_model,prob,pc_tapf)
     @test validate(sched)
     # Test AStarSC
@@ -106,7 +103,7 @@ let
         solver = NBSSolver(assignment_model = TaskGraphsMILPSolver(GreedyAssignment()))
         # solver = NBSSolver(assignment_model = TaskGraphsMILPSolver())
         set_iteration_limit!(solver,3)
-        env, cost = solve!(solver,base_env;optimizer=Gurobi.Optimizer)
+        env, cost = solve!(solver,base_env)
         # @show convert_to_vertex_lists(env.route_plan)
         # @show get_logger(solver)
         # @show optimality_gap(solver) > 0
@@ -170,7 +167,6 @@ let
                             path_planner = PIBTPlanner{NTuple{3,Float64}}()
                             ),
                         ]
-                    # @show i, f, solver
                     # set_verbosity!(solver,3)
                     set_iteration_limit!(solver,1)
                     set_iteration_limit!(route_planner(solver),100)
@@ -212,7 +208,7 @@ let
                 ]
             let
                 pc_tapf = f(solver;cost_function=cost_model,verbose=false);
-                env, cost = solve!(solver,pc_tapf;optimizer=Gurobi.Optimizer)
+                env, cost = solve!(solver,pc_tapf)
                 @test expected_cost == cost
             end
         end
@@ -232,7 +228,7 @@ let
                 ]
             let
                 pc_tapf = f(solver;cost_function=cost_model,verbose=false);
-                env, cost = solve!(solver,pc_tapf;optimizer=Gurobi.Optimizer)
+                env, cost = solve!(solver,pc_tapf)
                 @test expected_cost == cost
             end
         end
@@ -278,7 +274,7 @@ let
                 verbose=false,
                 Δt_op=Δt
                 );
-            env, cost = solve!(solver,pc_tapf;optimizer=Gurobi.Optimizer)
+            env, cost = solve!(solver,pc_tapf)
             paths = convert_to_vertex_lists(env.route_plan)
             # @show paths[1]
             # @show paths[2]
@@ -305,7 +301,7 @@ let
             Δt_collect=[0,Δt_collect_2,0],
             Δt_deliver=[Δt_deliver_1,0,0]
             );
-        env, cost = solve!(solver,pc_tapf;optimizer=Gurobi.Optimizer)
+        env, cost = solve!(solver,pc_tapf)
         paths = convert_to_vertex_lists(env.route_plan)
         @test cost == true_cost
     end
@@ -327,7 +323,7 @@ let
                 pc_tapf = f(solver;cost_function=cost_model);
                 c_pc_tapf = C_PC_TAPF(pc_tapf.env)
                 # set_verbosity!(solver,4)
-                env, cost = solve!(solver,c_pc_tapf;optimizer=Gurobi.Optimizer)
+                env, cost = solve!(solver,c_pc_tapf)
                 paths = convert_to_vertex_lists(env.route_plan)
                 @log_info(-1,solver,sprint_route_plan(env.route_plan))
                 # @show paths
@@ -345,7 +341,7 @@ let
     solver = NBSSolver()
     set_iteration_limit!(low_level(route_planner(solver)),1)
     pc_tapf = pctapf_problem_12(solver)
-    env, cost = solve!(solver,pc_tapf;optimizer=Gurobi.Optimizer)
+    env, cost = solve!(solver,pc_tapf)
     cost
     # @show env.route_plan
 end
@@ -354,7 +350,7 @@ let
     solver = NBSSolver()
     set_iteration_limit!(low_level(route_planner(solver)),1)
     pc_tapf = C_PC_TAPF(pctapf_problem_13(solver).env)
-    env, cost = solve!(solver,pc_tapf;optimizer=Gurobi.Optimizer)
+    env, cost = solve!(solver,pc_tapf)
     cost
     # @show env.route_plan
 end

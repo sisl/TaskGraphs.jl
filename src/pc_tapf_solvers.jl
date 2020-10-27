@@ -177,7 +177,8 @@ export
 """
     update_route_plan!()
 """
-function update_route_plan!(solver,pc_mapf::AbstractPC_MAPF,env,v,path,cost,schedule_node,agent_id = get_path_spec(env.schedule, v).agent_id)
+function update_route_plan!(solver,pc_mapf::AbstractPC_MAPF,env,v,path,cost,schedule_node,
+    agent_id = get_id(get_path_spec(env.schedule, v).agent_id))
     # add to solution
     # @log_info(3,solver,string("agent_path = ", convert_to_vertex_lists(path)))
     # @log_info(3,solver,string("cost = ", get_cost(path)))

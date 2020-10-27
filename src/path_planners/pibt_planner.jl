@@ -96,7 +96,7 @@ function CRCBS.pibt_update_envs!(solver,pc_mapf::PC_MAPF,cache)
     while true
         done = true
         for (i,p) in enumerate(get_paths(solution))
-            v_next = get_next_vtx_matching_agent_id(solution,i)
+            v_next = get_next_vtx_matching_agent_id(solution,RobotID(i))
             if has_vertex(solution.schedule,v_next)
                 # rebuild env to ensure that the goal time is up to date
                 CRCBS.get_envs(cache)[i] = build_env(solver,pc_mapf,solution,node,AgentID(i))
@@ -108,7 +108,7 @@ function CRCBS.pibt_update_envs!(solver,pc_mapf::PC_MAPF,cache)
                 done = false
                 update_env!(solver,solution,v,p)
                 update_planning_cache!(solver,solution)
-                v_next = get_next_vtx_matching_agent_id(solution,i)
+                v_next = get_next_vtx_matching_agent_id(solution,RobotID(i))
                 @assert v_next != v
                 if has_vertex(solution.schedule,v_next)
                     CRCBS.get_timers(cache)[i] = 0
@@ -118,37 +118,6 @@ function CRCBS.pibt_update_envs!(solver,pc_mapf::PC_MAPF,cache)
         sweeps += 1
         done ? break : nothing
     end
-    # @show sweeps
-
-    # for (i,p) in enumerate(get_paths(solution))
-    #     # NOTE rebuild all envs to ensure that goal times are up to date
-    #     env = CRCBS.get_envs(cache)[i]
-    #     v = get_vtx(solution.schedule,env.node_id)
-    #     v_next = get_next_vtx_matching_agent_id(solution,i)
-    #     sp = get_final_state(p)
-    #     if has_vertex(solution.schedule,v_next)
-    #         # @log_info(2,solver,"OLD: ",pibt_info_string(cache,i))
-    #         # if v_next != v
-    #             CRCBS.get_envs(cache)[i] = build_env(solver,pc_mapf,solution,node,AgentID(i))
-    #         # end
-    #         # @log_info(2,solver,"NEW: ",pibt_info_string(cache,i))
-    #     end
-    #     env = CRCBS.get_envs(cache)[i]
-    #     # Update the SearchEnv and rebuild any low level envs for which
-    #     # the goal has been reached
-    #     if is_goal(env,sp) && CRCBS.is_valid(env,get_goal(env))
-    #         v = get_vtx(solution.schedule,env.node_id)
-    #         # NOTE Is update_env! the reason for the delays? I.e., does it unnecessarily push back solution.cache.tF?
-    #         update_env!(solver,solution,v,p)
-    #         update_planning_cache!(solver,solution)
-    #         # NOTE Even if the current goal is reached, we only want to build a
-    #         # new env if there is a valid available next vtx.
-    #         if has_vertex(solution.schedule,get_next_vtx_matching_agent_id(solution,i))
-    #             CRCBS.get_timers(cache)[i] = 0
-    #             CRCBS.get_envs(cache)[i] = build_env(solver,pc_mapf,solution,node,AgentID(i))
-    #         end
-    #     end
-    # end
     @log_info(2,solver,"PIBT iteration $(iterations(solver)) POST UPDATE:\n",
         pibt_info_strings(cache)...)
     return cache

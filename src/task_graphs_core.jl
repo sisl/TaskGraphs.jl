@@ -409,8 +409,8 @@ Fields:
     start_vtx           ::Int           = -1
     final_vtx           ::Int           = -1
     min_path_duration   ::Int           =  0
-    agent_id            ::Int           = -1
-    object_id           ::Int           = -1
+    agent_id            ::BotID         = RobotID()
+    object_id           ::ObjectID      = ObjectID()
     plan_path           ::Bool          = true
     tight               ::Bool          = false
     static              ::Bool          = false
@@ -543,7 +543,7 @@ Arguments:
 function generate_path_spec(schedule::P,spec::T,a::BOT_GO) where {P<:OperatingSchedule,T<:ProblemSpec}
     s0 = get_id(get_initial_location_id(a))
     s = get_id(get_destination_location_id(a))
-    r = get_id(get_robot_id(a))
+    r = get_robot_id(a)
     path_spec = PathSpec(
         node_type=Symbol(typeof(a)),
         start_vtx=s0,
@@ -557,7 +557,7 @@ end
 function generate_path_spec(schedule::P,spec::T,a::CARRY) where {P<:OperatingSchedule,T<:ProblemSpec}
     s0 = get_id(get_initial_location_id(a))
     s = get_id(get_destination_location_id(a))
-    r = get_id(get_robot_id(a))
+    r = get_robot_id(a)
     o = get_id(get_object_id(a))
     path_spec = PathSpec(
         node_type=Symbol(typeof(a)),
@@ -571,7 +571,7 @@ end
 function generate_path_spec(schedule::P,spec::T,a::COLLECT) where {P<:OperatingSchedule,T<:ProblemSpec}
     s0 = get_id(get_initial_location_id(a))
     s = get_id(get_destination_location_id(a))
-    r = get_id(get_robot_id(a))
+    r = get_robot_id(a)
     o = get_id(get_object_id(a))
     path_spec = PathSpec(
         node_type=Symbol(typeof(a)),
@@ -586,7 +586,7 @@ end
 function generate_path_spec(schedule::P,spec::T,a::DEPOSIT) where {P<:OperatingSchedule,T<:ProblemSpec}
     s0 = get_id(get_initial_location_id(a))
     s = get_id(get_destination_location_id(a))
-    r = get_id(get_robot_id(a))
+    r = get_robot_id(a)
     o = get_id(get_object_id(a))
     path_spec = PathSpec(
         node_type=Symbol(typeof(a)),
@@ -609,7 +609,7 @@ function generate_path_spec(schedule::P,spec::T,pred::OBJECT_AT) where {P<:Opera
         )
 end
 function generate_path_spec(schedule::P,spec::T,pred::BOT_AT) where {P<:OperatingSchedule,T<:ProblemSpec}
-    r = get_id(get_robot_id(pred))
+    r = get_robot_id(pred)
     path_spec = PathSpec(
         node_type=Symbol(typeof(pred)),
         start_vtx=get_id(get_location_id(pred)),
@@ -757,12 +757,8 @@ function backtrack_node(sched::OperatingSchedule,v::Int)
     if isempty(robot_ids)
         return vtxs
     end
-    # spec = get_path_spec(sched,v)
-    # @assert spec.agent_id > 0 "Can't backtrack b/c robot_id = $(spec.agent_id)"
     for vp in inneighbors(sched,v)
         if !isempty(intersect(get_robot_ids(sched,vp),robot_ids))
-        # prev_spec = get_path_spec(sched,vp)
-        # if spec.agent_id == prev_spec.agent_id
             push!(vtxs,vp)
         end
     end
@@ -865,7 +861,7 @@ function validate(project_schedule::OperatingSchedule,paths::Vector{Vector{Int}}
     for v in vertices(project_schedule)
         node = get_node_from_vtx(project_schedule, v)
         path_spec = get_path_spec(project_schedule, v)
-        agent_id = path_spec.agent_id
+        agent_id = get_id(path_spec.agent_id)
         if agent_id != -1
             path = paths[agent_id]
             start_vtx = path_spec.start_vtx

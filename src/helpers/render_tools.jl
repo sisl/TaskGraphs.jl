@@ -288,7 +288,7 @@ function visualize_env(search_env::S,vtxs,pickup_vtxs,dropoff_vtxs,t=0;
             node = get_node_from_id(project_schedule,vtx_id)
             if (cache.t0[v] <= t) && (cache.tF[v] >= t)
                 spec = get_path_spec(project_schedule, v)
-                agent_id = spec.agent_id
+                agent_id = get_id(spec.agent_id)
                 agent_path = robot_paths[agent_id]
                 p = agent_path[max(1,min(t1+1,cache.tF[v]+1)):cache.tF[v]+1]
                 if length(p) > 0
@@ -1110,7 +1110,7 @@ function plot_project_schedule(
             )
         )
     rg = get_display_metagraph(project_schedule;
-        f=(v,p)->string(v,",",get_path_spec(project_schedule,v).agent_id))
+        f=(v,p)->string(v,",",get_id(get_path_spec(project_schedule,v).agent_id)))
     plot_graph_bfs(rg;
         mode=mode,
         shape_function=shape_function,

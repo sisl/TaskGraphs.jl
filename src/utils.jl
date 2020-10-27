@@ -86,7 +86,7 @@ node_id.
 """
 function get_robot_ids(sched::OperatingSchedule,node_id::A,v=get_vtx(sched,node_id)) where {A<:Union{ActionID,RobotID}}
     ids = Vector{RobotID}()
-    robot_id = RobotID(get_path_spec(sched,v).agent_id)
+    robot_id = get_path_spec(sched,v).agent_id
     node = get_node_from_id(sched,node_id)
     if isa(node,TEAM_ACTION)
         for n in node.instructions
