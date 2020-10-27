@@ -60,9 +60,11 @@ struct DroppedObject <: AbstractDisturbance
 end
 
 
-function account_for_disturbance!(env_graph::GridFactoryEnvironment,d::OilSpill)
-    for e in d.edges
-        rem_edge!(env_graph.graph,e)
-    end
+function apply_disturbance!(env_graph::GridFactoryEnvironment,d::OilSpill)
+    remove_edges!(env_graph,d.edges)
+    return env_graph
+end
+function remove_disturbance!(env_graph::GridFactoryEnvironment,d::OilSpill)
+    add_edges!(env_graph,d.edges)
     return env_graph
 end

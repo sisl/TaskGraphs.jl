@@ -27,6 +27,15 @@ function reset_action_id_counter!()
 end
 
 export
+	AbstractRobotType,
+	DeliveryBot,
+	CleanUpBot
+
+abstract type AbstractRobotType end
+struct DeliveryBot <: AbstractRobotType end
+struct CleanUpBot <: AbstractRobotType end
+
+export
     AbstractID,
     ObjectID,
     RobotID,
@@ -41,6 +50,10 @@ abstract type AbstractID end
 	id::Int = -1
 end
 @with_kw struct RobotID <: AbstractID
+	id::Int = -1
+end
+""" Clean-Up Bot ID """
+@with_kw struct CLBotID <: AbstractID
 	id::Int = -1
 end
 @with_kw struct LocationID <: AbstractID
