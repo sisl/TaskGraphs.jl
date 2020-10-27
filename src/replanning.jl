@@ -128,7 +128,7 @@ function split_active_vtxs!(project_schedule::OperatingSchedule,problem_spec::Pr
             x = robot_positions[node.r].x
             node1,node2 = split_node(node,x)
             replace_in_schedule!(project_schedule,problem_spec,node1,node_id)
-            node_id2 = ActionID(get_unique_action_id())
+            node_id2 = get_unique_action_id()
             add_to_schedule!(project_schedule,problem_spec,node2,node_id2)
             # remap edges
             v2 = get_vtx(project_schedule, node_id2)

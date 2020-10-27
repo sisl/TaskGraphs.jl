@@ -3,30 +3,6 @@ module PlanningPredicates
 using Parameters
 
 export
-    reset_task_id_counter!,
-    get_unique_task_id,
-    reset_operation_id_counter!,
-    get_unique_operation_id,
-    reset_action_id_counter!,
-    get_unique_action_id
-
-TASK_ID_COUNTER = 0
-get_unique_task_id() = Int(global TASK_ID_COUNTER += 1)
-function reset_task_id_counter!()
-    global TASK_ID_COUNTER = 0
-end
-OPERATION_ID_COUNTER = 0
-get_unique_operation_id() = Int(global OPERATION_ID_COUNTER += 1)
-function reset_operation_id_counter!()
-    global OPERATION_ID_COUNTER = 0
-end
-ACTION_ID_COUNTER = 0
-get_unique_action_id() = Int(global ACTION_ID_COUNTER += 1)
-function reset_action_id_counter!()
-    global ACTION_ID_COUNTER = 0
-end
-
-export
 	AbstractRobotType,
 	DeliveryBot
 
@@ -75,6 +51,31 @@ Special helper for identifying schedule vertices.
 @with_kw struct VtxID <: AbstractID
 	id::Int = -1
 end
+
+export
+    reset_task_id_counter!,
+    get_unique_task_id,
+    reset_operation_id_counter!,
+    get_unique_operation_id,
+    reset_action_id_counter!,
+    get_unique_action_id
+
+TASK_ID_COUNTER = 0
+get_unique_task_id() = Int(global TASK_ID_COUNTER += 1)
+function reset_task_id_counter!()
+    global TASK_ID_COUNTER = 0
+end
+OPERATION_ID_COUNTER = 0
+get_unique_operation_id() = OperationID(Int(global OPERATION_ID_COUNTER += 1))
+function reset_operation_id_counter!()
+    global OPERATION_ID_COUNTER = 0
+end
+ACTION_ID_COUNTER = 0
+get_unique_action_id() = ActionID(Int(global ACTION_ID_COUNTER += 1))
+function reset_action_id_counter!()
+    global ACTION_ID_COUNTER = 0
+end
+
 
 export
 	get_id
@@ -250,11 +251,11 @@ Encodes the event "robot `r` cleans up locations vtxs`
 	vtxs::Vector{LocationID} = Vector{LocationID}()
 end
 
-get_initial_location_id(a::A) where {A<:Union{GO,CARRY}}        						= a.x1
-get_destination_location_id(a::A) where {A<:Union{GO,CARRY}}    						= a.x2
+get_initial_location_id(a::A) where {A<:Union{BOT_GO,CARRY}}        					= a.x1
+get_destination_location_id(a::A) where {A<:Union{BOT_GO,CARRY}}    					= a.x2
 get_location_id(a::A) where {A<:Union{COLLECT,DEPOSIT}}             					= a.x
-get_initial_location_id(a::A) where {A<:Union{COLLECT,DEPOSIT,ROBOT_AT,OBJECT_AT}}     	= get_location_id(a)
-get_destination_location_id(a::A) where {A<:Union{COLLECT,DEPOSIT,ROBOT_AT,OBJECT_AT}} 	= get_location_id(a)
+get_initial_location_id(a::A) where {A<:Union{COLLECT,DEPOSIT,BOT_AT,OBJECT_AT}}     	= get_location_id(a)
+get_destination_location_id(a::A) where {A<:Union{COLLECT,DEPOSIT,BOT_AT,OBJECT_AT}} 	= get_location_id(a)
 get_object_id(a::A) where {A<:Union{CARRY,COLLECT,DEPOSIT}}         					= a.o
 get_robot_id(a::A) where {A<:AbstractRobotAction} = a.r
 

@@ -68,3 +68,30 @@ function remove_disturbance!(env_graph::GridFactoryEnvironment,d::OilSpill)
     add_edges!(env_graph,d.edges)
     return env_graph
 end
+
+function add_headless_cleanup_task!(
+        sched::OperatingSchedule,
+        spec::ProblemSpec,
+        d::OilSpill,
+        return_vtx::LocationID=LocationID(-1)
+        )
+
+    robot_id = CleanUpBotID(-1)
+    action_id = get_unique_action_id()
+    add_to_sched!(sched, spec, CLEAN_UP(robot_id, d.vtxs), action_id)
+
+    prev_action_id = action_id
+    action_id = get_unique_action_id()
+    add_to_sched!(sched, spec, CUB_GO(robot_id, d.vtxs[1], return_vtx), action_id)
+    add_edge!(sched, prev_action_id, action_id)
+
+    return
+end
+
+function remove_robot!(env::SearchEnv,id::BotID,t::Int)
+    G = get_graph(env.schedule)
+    # schedule
+    # - remove BOT_AT node
+    # set assignment ids to -1 with replace_robot_id()
+    # if in the middle of CARRY, another robot needs to get the object
+end

@@ -18,3 +18,8 @@ pctapf = pctapf_problem_1(solver)
 
 search_env = pctapf.env
 add_to_schedule!(search_env.schedule,CUB_AT(1,2),CleanUpBotID(1))
+id = get_unique_action_id()
+add_to_schedule!(search_env.schedule,CUB_GO(1,2,-1),id)
+add_edge!(search_env.schedule,CleanUpBotID(1),id)
+
+get_node_from_id(search_env.schedule,CleanUpBotID(1))

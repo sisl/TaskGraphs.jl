@@ -156,7 +156,7 @@ set_final_condition!(spec,object_id,pred) = set_condition!(spec,object_id,pred,s
 get_condition(spec,object_id,array) = get(array,get(spec.object_id_to_idx,object_id,-1),OBJECT_AT(object_id,-1))
 get_initial_condition(spec,object_id) = get_condition(spec,object_id,spec.initial_conditions)
 get_final_condition(spec,object_id) = get_condition(spec,object_id,spec.final_conditions)
-function construct_operation(spec::ProjectSpec, station_id, input_ids, output_ids, Δt, id=OperationID(get_unique_operation_id()))
+function construct_operation(spec::ProjectSpec, station_id, input_ids, output_ids, Δt, id=get_unique_operation_id())
     Operation(
         pre = Set{OBJECT_AT}(map(id->get(spec.final_conditions, spec.object_id_to_idx[id], OBJECT_AT(id,station_id)), input_ids)),
         post = Set{OBJECT_AT}(map(id->get(spec.initial_conditions, spec.object_id_to_idx[id], OBJECT_AT(id,station_id)), output_ids)),
@@ -220,7 +220,7 @@ end
 function read_operation(toml_dict::Dict,keep_id=false)
     op_id = OperationID(get(toml_dict,"id",-1))
     if get_id(op_id) == -1 || keep_id == false
-        op_id = OperationID(get_unique_operation_id())
+        op_id = get_unique_operation_id()
     end
     op = Operation(
         pre     = Set{OBJECT_AT}(map(arr->OBJECT_AT(arr[1],arr[2]),toml_dict["pre"])),
@@ -455,7 +455,7 @@ constraint between them.
     # TODO add UID vector so that vertex deletion can be constant time
     vtx_ids             ::Vector{AbstractID}    = Vector{AbstractID}() # maps vertex uid to actual graph node
     path_specs          ::Vector{PathSpec}      = Vector{PathSpec}()
-    terminal_vtxs           ::Vector{Int}           = Vector{Int}() # list of "project heads"
+    terminal_vtxs       ::Vector{Int}           = Vector{Int}() # list of "project heads"
     weights             ::Dict{Int,Float64}     = Dict{Int,Float64}() # weights corresponding to project heads
 end
 Base.zero(schedule::OperatingSchedule{G}) where {G} = OperatingSchedule(graph=G())
@@ -913,23 +913,23 @@ function add_single_robot_delivery_task!(
     end
 
     # THIS NODE IS DETERMINED BY THE TASK ASSIGNMENT.
-    action_id = ActionID(get_unique_action_id())
+    action_id = get_unique_action_id()
     add_to_schedule!(schedule, problem_spec, GO(robot_id, robot_start_station_id, pickup_station_id), action_id)
     add_edge!(schedule, pred_id, action_id)
 
     prev_action_id = action_id
-    action_id = ActionID(get_unique_action_id())
+    action_id = get_unique_action_id()
     add_to_schedule!(schedule, problem_spec, COLLECT(robot_id, object_id, pickup_station_id), action_id)
     add_edge!(schedule, prev_action_id, action_id)
     add_edge!(schedule, ObjectID(object_id), action_id)
 
     prev_action_id = action_id
-    action_id = ActionID(get_unique_action_id())
+    action_id = get_unique_action_id()
     add_to_schedule!(schedule, problem_spec, CARRY(robot_id, object_id, pickup_station_id, dropoff_station_id), action_id)
     add_edge!(schedule, prev_action_id, action_id)
 
     prev_action_id = action_id
-    action_id = ActionID(get_unique_action_id())
+    action_id = get_unique_action_id()
     add_to_schedule!(schedule, problem_spec, DEPOSIT(robot_id, object_id, dropoff_station_id), action_id)
     add_edge!(schedule, prev_action_id, action_id)
 
@@ -945,23 +945,23 @@ function add_headless_delivery_task!(
         )
 
     robot_id = RobotID(-1)
-    action_id = ActionID(get_unique_action_id())
+    action_id = get_unique_action_id()
     add_to_schedule!(schedule, problem_spec, COLLECT(robot_id, object_id, pickup_station_id), action_id)
     add_edge!(schedule, object_id, action_id)
 
     prev_action_id = action_id
-    action_id = ActionID(get_unique_action_id())
+    action_id = get_unique_action_id()
     add_to_schedule!(schedule, problem_spec, CARRY(robot_id, object_id, pickup_station_id, dropoff_station_id), action_id)
     add_edge!(schedule, prev_action_id, action_id)
 
     prev_action_id = action_id
-    action_id = ActionID(get_unique_action_id())
+    action_id = get_unique_action_id()
     add_to_schedule!(schedule, problem_spec, DEPOSIT(robot_id, object_id, dropoff_station_id), action_id)
     add_edge!(schedule, action_id, operation_id)
     add_edge!(schedule, prev_action_id, action_id)
 
     prev_action_id = action_id
-    action_id = ActionID(get_unique_action_id())
+    action_id = get_unique_action_id()
     add_to_schedule!(schedule, problem_spec, GO(robot_id, dropoff_station_id,LocationID(-1)), action_id)
     add_edge!(schedule, prev_action_id, action_id)
 
@@ -983,7 +983,7 @@ function add_headless_delivery_task!(
     object_node = get_node_from_id(schedule,object_id)
     shape = object_node.shape
     # COLLABORATIVE COLLECT
-    team_action_id = ActionID(get_unique_action_id())
+    team_action_id = get_unique_action_id()
     team_action = TEAM_COLLECT(
         # n = n,
         instructions = map(x->COLLECT(robot_id, object_id, x), pickup_station_ids),
@@ -994,13 +994,13 @@ function add_headless_delivery_task!(
     add_edge!(schedule,object_id,team_action_id)
     # Add GO inputs to TEAM_COLLECT
     for x in pickup_station_ids
-        action_id = ActionID(get_unique_action_id())
+        action_id = get_unique_action_id()
         add_to_schedule!(schedule,problem_spec,GO(robot_id,x,x),action_id)
         add_edge!(schedule,action_id,team_action_id)
     end
     # Add TEAM_CARRY
     prev_team_action_id = team_action_id
-    team_action_id = ActionID(get_unique_action_id())
+    team_action_id = get_unique_action_id()
     team_action = TEAM_CARRY(
         # n = n,
         instructions = [CARRY(robot_id, object_id, x1, x2) for (x1,x2) in zip(pickup_station_ids,dropoff_station_ids)],
@@ -1010,7 +1010,7 @@ function add_headless_delivery_task!(
     add_edge!(schedule,prev_team_action_id,team_action_id)
     # TEAM_DEPOSIT
     prev_team_action_id = team_action_id
-    team_action_id = ActionID(get_unique_action_id())
+    team_action_id = get_unique_action_id()
     team_action = TEAM_DEPOSIT(
         # n = n,
         instructions = map(x->DEPOSIT(robot_id, object_id, x), dropoff_station_ids),
@@ -1022,7 +1022,7 @@ function add_headless_delivery_task!(
     add_edge!(schedule,team_action_id,operation_id)
     # Individual GO nodes
     for x in dropoff_station_ids
-        action_id = ActionID(get_unique_action_id())
+        action_id = get_unique_action_id()
         add_to_schedule!(schedule,problem_spec,GO(robot_id,x,-1),action_id)
         add_edge!(schedule, team_action_id, action_id)
     end
@@ -1074,11 +1074,11 @@ Constructs a partial project graph
 function construct_partial_project_schedule(
     object_ICs::Vector{OBJECT_AT},
     object_FCs::Vector{OBJECT_AT},
-    robot_ICs::Vector{ROBOT_AT},
+    robot_ICs::Vector{R},
     operations::Vector{Operation},
     root_ops::Vector{OperationID},
     problem_spec::ProblemSpec,
-    )
+    ) where {R<:BOT_AT}
 
     # Construct Partial Project Schedule
     project_schedule = OperatingSchedule()
@@ -1091,8 +1091,8 @@ function construct_partial_project_schedule(
     for pred in robot_ICs
         robot_id = get_robot_id(pred)
         add_to_schedule!(project_schedule, problem_spec, pred, robot_id)
-        action_id = ActionID(get_unique_action_id())
-        action = GO(r=robot_id,x1=get_location_id(pred))
+        action_id = get_unique_action_id()
+        action = BOT_GO(r=robot_id,x1=get_location_id(pred))
         add_to_schedule!(project_schedule, problem_spec, action, action_id)
         add_edge!(project_schedule, robot_id, action_id)
     end
@@ -1130,7 +1130,7 @@ function construct_partial_project_schedule(
     for (id, pred) in get_object_ICs(project_schedule)
         v = get_vtx(project_schedule, ObjectID(id))
         if indegree(get_graph(project_schedule),v) == 0
-            op_id = OperationID(get_unique_operation_id())
+            op_id = get_unique_operation_id()
             op = Operation(post=Set{OBJECT_AT}([pred]),id=op_id)
             add_to_schedule!(project_schedule,op,op_id)
             add_edge!(project_schedule,op_id,ObjectID(id))
@@ -1139,7 +1139,7 @@ function construct_partial_project_schedule(
     set_leaf_operation_vtxs!(project_schedule)
     project_schedule
 end
-function construct_partial_project_schedule(spec::ProjectSpec,problem_spec::ProblemSpec,robot_ICs=Vector{ROBOT_AT}())
+function construct_partial_project_schedule(spec::ProjectSpec,problem_spec::ProblemSpec,robot_ICs=Vector{R}()) where {R<:BOT_AT}
     # @assert length(robot_ICs) == problem_spec.N "length(robot_ICs) == $(length(robot_ICs)), should be $(problem_spec.N)"
     construct_partial_project_schedule(
         spec.initial_conditions,
@@ -1152,9 +1152,9 @@ function construct_partial_project_schedule(spec::ProjectSpec,problem_spec::Prob
 end
 
 
-function construct_partial_project_schedule(robot_ICs::Vector{ROBOT_AT},prob_spec=
+function construct_partial_project_schedule(robot_ICs::Vector{R},prob_spec=
         ProblemSpec(N=length(robot_ICs))
-        )
+        ) where {R<:BOT_AT}
     construct_partial_project_schedule(
         Vector{OBJECT_AT}(),
         Vector{OBJECT_AT}(),

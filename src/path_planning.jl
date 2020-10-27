@@ -266,9 +266,11 @@ initialize_planning_cache(env::SearchEnv) = initialize_planning_cache(env.schedu
 
 Return the node_id of the active node assigned to an agent.
 """
-function get_next_vtx_matching_agent_id(env::SearchEnv,agent_id::BotID)
+function get_next_vtx_matching_agent_id(env::SearchEnv,agent_id)
+    @assert isa(agent_id,BotID)
     for v in env.cache.active_set
         if agent_id == get_path_spec(env.schedule, v).agent_id
+        # if agent_id == get_robot_id(get_node_from_vtx(env.schedule, v))
             return v
         end
     end
@@ -280,7 +282,8 @@ end
 
 Return the node_id of the active node assigned to an agent.
 """
-function get_next_node_matching_agent_id(env::SearchEnv,agent_id::BotID)
+function get_next_node_matching_agent_id(env::SearchEnv,agent_id)
+    @assert isa(agent_id,BotID)
     v = get_next_vtx_matching_agent_id(env,agent_id)
     if has_vertex(env.schedule,v)
         return get_vtx_id(env.schedule,v)
