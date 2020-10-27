@@ -286,7 +286,6 @@ function visualize_env(search_env::S,vtxs,pickup_vtxs,dropoff_vtxs,t=0;
         vtx_id = get_vtx_id(project_schedule, v)
         if typeof(vtx_id) <: ActionID
             node = get_node_from_id(project_schedule,vtx_id)
-            # if typeof(node) <: Union{GO,CARRY}
             if (cache.t0[v] <= t) && (cache.tF[v] >= t)
                 spec = get_path_spec(project_schedule, v)
                 agent_id = spec.agent_id

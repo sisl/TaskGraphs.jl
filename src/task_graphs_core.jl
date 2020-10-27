@@ -418,6 +418,8 @@ Fields:
     fixed               ::Bool          = false
 end
 
+remap_object_id(spec::PathSpec,max_obj_id)  = PathSpec(spec,object_id=spec.object_id + max_obj_id)
+
 export
     OperatingSchedule,
     get_graph,
@@ -626,7 +628,7 @@ function generate_path_spec(schedule::P,spec::T,op::Operation) where {P<:Operati
         min_path_duration=duration(op)
         )
 end
-function generate_path_spec(schedule::P,spec::T,pred::TEAM_ACTION{A}) where {P<:OperatingSchedule,T<:ProblemSpec,A}
+function generate_path_spec(schedule::P,spec::T,pred::TEAM_ACTION) where {P<:OperatingSchedule,T<:ProblemSpec}
     s0 = get_id(get_initial_location_id(pred.instructions[1]))
     s = get_id(get_destination_location_id(pred.instructions[1]))
     path_spec = PathSpec(
@@ -634,7 +636,7 @@ function generate_path_spec(schedule::P,spec::T,pred::TEAM_ACTION{A}) where {P<:
         # min_path_duration = maximum(map(a->generate_path_spec(schedule,spec,a).min_path_duration, pred.instructions)),
         min_path_duration = get_distance(spec.D,s0,s,team_configuration(pred)),
         plan_path = true,
-        static = (A <: Union{COLLECT,DEPOSIT})
+        static = (team_action_type(pred) <: Union{COLLECT,DEPOSIT})
         )
 end
 function generate_path_spec(schedule::P,pred) where {P<:OperatingSchedule}
@@ -837,10 +839,10 @@ function validate(project_schedule::OperatingSchedule)
             node = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v))
             @assert( outdegree(G,v) >= sum([0, values(required_successors(node))...]) , string("node = ", string(node), " outdegree = ",outdegree(G,v), " "))
             @assert( indegree(G,v) >= sum([0, values(required_predecessors(node))...]), string("node = ", string(node), " indegree = ",indegree(G,v), " ") )
-            if isa(node, Union{GO,COLLECT,CARRY,DEPOSIT})
+            if isa(node, Union{BOT_GO,BOT_COLLECT,BOT_CARRY,BOT_DEPOSIT})
                 for v2 in outneighbors(G,v)
                     node2 = get_node_from_vtx(project_schedule, v2)
-                    if isa(node2, Union{GO,COLLECT,CARRY,DEPOSIT})
+                    if isa(node2, Union{BOT_GO,BOT_COLLECT,BOT_CARRY,BOT_DEPOSIT})
                         if length(intersect(resources_reserved(node),resources_reserved(node2))) == 0 # job shop constraint
                             @assert( get_robot_id(node) == get_robot_id(node2), string("robot IDs do not match: ",string(node), " --> ", string(node2)))
                         end
@@ -986,8 +988,8 @@ function add_headless_delivery_task!(
     shape = object_node.shape
     # COLLABORATIVE COLLECT
     team_action_id = ActionID(get_unique_action_id())
-    team_action = TEAM_ACTION(
-        n = n,
+    team_action = TEAM_COLLECT(
+        # n = n,
         instructions = map(x->COLLECT(robot_id, object_id, x), pickup_station_ids),
         shape=shape
         )
@@ -1003,8 +1005,8 @@ function add_headless_delivery_task!(
     # Add TEAM_CARRY
     prev_team_action_id = team_action_id
     team_action_id = ActionID(get_unique_action_id())
-    team_action = TEAM_ACTION(
-        n = n,
+    team_action = TEAM_CARRY(
+        # n = n,
         instructions = [CARRY(robot_id, object_id, x1, x2) for (x1,x2) in zip(pickup_station_ids,dropoff_station_ids)],
         shape = shape
         )
@@ -1013,8 +1015,8 @@ function add_headless_delivery_task!(
     # TEAM_DEPOSIT
     prev_team_action_id = team_action_id
     team_action_id = ActionID(get_unique_action_id())
-    team_action = TEAM_ACTION(
-        n = n,
+    team_action = TEAM_DEPOSIT(
+        # n = n,
         instructions = map(x->DEPOSIT(robot_id, object_id, x), dropoff_station_ids),
         shape=shape
         )

@@ -22,6 +22,7 @@ let
     @test ObjectID(1) == ObjectID(2) - 1
 end
 let
+    ROBOT_AT(RobotID(1),LocationID(2))
     ROBOT_AT(1,2)
     get_robot_id(ROBOT_AT(1,2))
 end
@@ -100,6 +101,21 @@ let
     end
 end
 let
+    @test split_node(GO(1,2,3),LocationID(4))[1] == GO(1,2,4)
+    @test split_node(GO(1,2,3),LocationID(4))[2] == GO(1,4,3)
+    @test split_node(CARRY(1,1,2,3),LocationID(4))[1] == CARRY(1,1,2,4)
+    @test split_node(CARRY(1,1,2,3),LocationID(4))[2] == CARRY(1,1,4,3)
+    @test split_node(COLLECT(1,2,3),LocationID(4))[1] == COLLECT(1,2,4)
+    @test split_node(COLLECT(1,2,3),LocationID(4))[2] == COLLECT(1,2,4)
+    @test split_node(DEPOSIT(1,2,3),LocationID(4))[1] == DEPOSIT(1,2,4)
+    @test split_node(DEPOSIT(1,2,3),LocationID(4))[2] == DEPOSIT(1,2,4)
+end
+let
+    for n in [GO(),CARRY(),COLLECT(),DEPOSIT()]
+        @test TaskGraphs.replace_robot_id(n,RobotID(2)).r == RobotID(2)
+    end
+end
+let
     n1 = GO(1,2,3)
     n2 = GO(-1,-1,4)
     n = align_with_predecessor(n2,n1)
@@ -152,13 +168,12 @@ let
     @test n.r == n1.r
 end
 let
-    TEAM_ACTION()
-    TEAM_ACTION(instructions=[CARRY(1,2,3,4),CARRY(2,3,4,4)],shape=(2,1))
+    TEAM_CARRY(instructions=[CARRY(1,2,3,4),CARRY(2,3,4,4)],shape=(2,1))
 
     sequence = [
-        TEAM_ACTION(instructions=[COLLECT(1,2,3),COLLECT(2,3,4)],shape=(2,1)),
-        TEAM_ACTION(instructions=[CARRY(-1,2,3,4),CARRY(-1,3,4,5)],shape=(2,1)),
-        TEAM_ACTION(instructions=[DEPOSIT(-1,2,4),DEPOSIT(-1,3,5)],shape=(2,1)),
+        TEAM_COLLECT(instructions=[COLLECT(1,2,3),COLLECT(2,3,4)],shape=(2,1)),
+        TEAM_CARRY(instructions=[CARRY(-1,2,3,4),CARRY(-1,3,4,5)],shape=(2,1)),
+        TEAM_DEPOSIT(instructions=[DEPOSIT(-1,2,4),DEPOSIT(-1,3,5)],shape=(2,1)),
     ]
     @test all(map(p->get_id(get_robot_id(p)) == -1, sequence[2].instructions))
     sequence[2] = align_with_predecessor(sequence[2],sequence[1])

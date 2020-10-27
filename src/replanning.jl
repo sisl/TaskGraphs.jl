@@ -124,8 +124,7 @@ function split_active_vtxs!(project_schedule::OperatingSchedule,problem_spec::Pr
     for v in active_vtxs
         node_id = get_vtx_id(project_schedule,v)
         node = get_node_from_id(project_schedule, node_id)
-        # if isa(node,Union{GO,CARRY,COLLECT,DEPOSIT}) # split
-        if isa(node,GO) # split
+        if isa(node,BOT_GO) # split TODO why aren't we splitting CARRY, COLLECT, and DEPOSIT as well?
             x = robot_positions[node.r].x
             node1,node2 = split_node(node,x)
             replace_in_schedule!(project_schedule,problem_spec,node1,node_id)
@@ -191,9 +190,9 @@ function break_assignments!(project_schedule::OperatingSchedule,problem_spec::Pr
         node_id = get_vtx_id(project_schedule,v)
         node = get_node_from_id(project_schedule,node_id)
         if isa(node, AbstractRobotAction)
-            new_node = typeof(node)(node,r=RobotID(-1))
-            if isa(node,GO)
-                new_node = GO(new_node,x2=LocationID(-1))
+            new_node = replace_robot_id(node,RobotID(-1))
+            if isa(node,BOT_GO)
+                new_node = replace_destination(new_node,LocationID(-1))
                 for v2 in outneighbors(G,v)
                     rem_edge!(G,v,v2)
                 end
@@ -202,7 +201,7 @@ function break_assignments!(project_schedule::OperatingSchedule,problem_spec::Pr
         elseif isa(node,TEAM_ACTION)
             for i in 1:length(node.instructions)
                 n = node.instructions[i]
-                node.instructions[i] = typeof(n)(n,r=RobotID(-1))
+                node.instructions[i] = replace_robot_id(node,RobotID(-1))
             end
         end
     end
@@ -263,9 +262,9 @@ function prune_schedule(project_schedule::OperatingSchedule,problem_spec::Proble
     for v in vertices(get_graph(new_schedule))
         node_id = get_vtx_id(new_schedule,v)
         node = get_node_from_id(new_schedule, node_id)
-        if isa(node,GO) && indegree(get_graph(new_schedule),v) == 0
+        if isa(node,BOT_GO) && indegree(get_graph(new_schedule),v) == 0
             robot_id = get_robot_id(node)
-            replace_in_schedule!(new_schedule, ROBOT_AT(robot_id, node.x1), robot_id)
+            replace_in_schedule!(new_schedule, BOT_AT(robot_id, node.x1), robot_id)
             t0[get_vtx(new_schedule,robot_id)] = t0[v]
             add_edge!(new_schedule, robot_id, node_id)
         end

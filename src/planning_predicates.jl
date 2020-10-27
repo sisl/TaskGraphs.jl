@@ -38,6 +38,7 @@ struct CleanUpBot <: AbstractRobotType end
 export
     AbstractID,
     ObjectID,
+    BotID,
     RobotID,
     LocationID,
     ActionID,
@@ -49,13 +50,10 @@ abstract type AbstractID end
 @with_kw struct ObjectID <: AbstractID
 	id::Int = -1
 end
-@with_kw struct RobotID <: AbstractID
+@with_kw struct BotID{R<:AbstractRobotType} <: AbstractID
 	id::Int = -1
 end
-""" Clean-Up Bot ID """
-@with_kw struct CLBotID <: AbstractID
-	id::Int = -1
-end
+const RobotID = BotID{DeliveryBot}
 @with_kw struct LocationID <: AbstractID
 	id::Int = -1
 end
@@ -89,6 +87,7 @@ Base.:+(id::A,i::Int) where {A<:AbstractID} = A(get_id(id)+i)
 Base.:-(id::A,i::Int) where {A<:AbstractID} = A(get_id(id)-i)
 Base.:(<)(id1::AbstractID,id2::AbstractID) = get_id(id1) < get_id(id2)
 Base.:(>)(id1::AbstractID,id2::AbstractID) = get_id(id1) > get_id(id2)
+Base.convert(::Type{ID},i::Int) where {ID<:AbstractID} = ID(i)
 
 export
     AbstractPlanningPredicate,
@@ -108,23 +107,22 @@ struct OBJECT_AT <: AbstractPlanningPredicate
 	# n::Int # number of robots required for transport
 	shape::Tuple{Int,Int}
 end
-OBJECT_AT(o::ObjectID,x::Vector{LocationID}) = OBJECT_AT(o,x,(1,1))
-OBJECT_AT(o::ObjectID,x::LocationID,args...) = OBJECT_AT(o,[x],args...)
-OBJECT_AT(o::ObjectID,x::Vector{Int},args...) = OBJECT_AT(o,map(idx->LocationID(idx),x),args...)
-OBJECT_AT(o::ObjectID,x::Int,args...) 		= OBJECT_AT(o,[LocationID(x)],args...)
-OBJECT_AT(o::Int,args...) 					= OBJECT_AT(ObjectID(o),args...)
+OBJECT_AT(o,x) = OBJECT_AT(o,x,(1,1))
+OBJECT_AT(o,x::Union{Int,LocationID},args...) = OBJECT_AT(o,[x],args...)
 
+export BOT_AT
 """
-	ROBOT_AT <: AbstractPlanningPredicate
+	BOT_AT <: AbstractPlanningPredicate
 
 Encodes the location of robot with id `r`
 """
-struct ROBOT_AT <: AbstractPlanningPredicate
-    r::RobotID
+struct BOT_AT{R<:AbstractRobotType} <: AbstractPlanningPredicate
+    r::BotID{R}
     x::LocationID
 end
-ROBOT_AT(r::Int,args...) = ROBOT_AT(RobotID(r),args...)
-ROBOT_AT(r::RobotID,x::Int) = ROBOT_AT(r,LocationID(x))
+
+const ROBOT_AT = BOT_AT{DeliveryBot}
+const CLBOT_AT = BOT_AT{CleanUpBot}
 
 export
     get_object_id,
@@ -133,10 +131,10 @@ export
     get_robot_id
 
 get_object_id(pred::OBJECT_AT) = pred.o
-get_location_id(pred::ROBOT_AT) = pred.x
+get_location_id(pred::BOT_AT) = pred.x
 get_location_id(pred::OBJECT_AT) = pred.x[1]
 get_location_ids(pred::OBJECT_AT) = pred.x
-get_robot_id(pred::ROBOT_AT) = pred.r
+get_robot_id(pred::BOT_AT) = pred.r
 
 export
     Operation,
@@ -172,65 +170,71 @@ export
     GO,COLLECT,CARRY,DEPOSIT,
 	get_initial_location_id, get_destination_location_id
 
-abstract type AbstractRobotAction <: AbstractPlanningPredicate end
+abstract type AbstractRobotAction{R<:AbstractRobotType} <: AbstractPlanningPredicate end
 
+export BOT_GO
 """
-	GO <: AbstractRobotAction
+	BOT_GO <: AbstractRobotAction
 
 Encodes the event "robot `r` goes from `x1` to `x2`"
 """
-@with_kw struct GO <: AbstractRobotAction # go to position x
-    r::RobotID 		= RobotID()
+@with_kw struct BOT_GO{R} <: AbstractRobotAction{R} # go to position x
+    r::BotID{R} 		= BotID{R}()
     x1::LocationID	= LocationID()
     x2::LocationID	= LocationID()
 end
-GO(r::Int,args...) = GO(RobotID(r),args...)
-GO(r::RobotID,x1::Int,args...) = GO(r,LocationID(x1),args...)
-GO(r::RobotID,x1::LocationID,x2::Int) = GO(r,x1,LocationID(x2))
+const GO = BOT_GO{DeliveryBot}
+const CL_GO = BOT_GO{CleanUpBot}
 
+export BOT_CARRY
 """
-	CARRY <: AbstractRobotAction
+	BOT_CARRY <: AbstractRobotAction
 
 Encodes the event "robot `r` carries object `o` from `x1` to `x2`"
 """
-@with_kw struct CARRY <: AbstractRobotAction # carry object o to position x
-    r::RobotID		= RobotID()
+@with_kw struct BOT_CARRY{R} <: AbstractRobotAction{R} # carry object o to position x
+    r::BotID{R}		= BotID{R}()
     o::ObjectID		= ObjectID()
     x1::LocationID	= LocationID()
     x2::LocationID	= LocationID()
 end
-CARRY(r::Int,args...) = CARRY(RobotID(r),args...)
-CARRY(r::RobotID,o::Int,args...) 					= CARRY(r,ObjectID(o),args...)
-CARRY(r::RobotID,o::ObjectID,x1::Int,args) 			= CARRY(r,o,LocationID(x1),args...)
-CARRY(r::RobotID,o::ObjectID,x1::LocationID,x2::Int) = CARRY(r,o,x1,LocationID(x2))
+const CARRY = BOT_CARRY{DeliveryBot}
 
+export BOT_COLLECT
 """
-	COLLECT <: AbstractRobotAction
+	BOT_COLLECT <: AbstractRobotAction
 
 Encodes the event "robot `r` collects object `o` from `x`
 """
-@with_kw struct COLLECT <: AbstractRobotAction
-    r::RobotID 		= RobotID()
+@with_kw struct BOT_COLLECT{R} <: AbstractRobotAction{R}
+    r::BotID{R}     = BotID{R}()
     o::ObjectID 	= ObjectID()
     x::LocationID 	= LocationID()
 end
-COLLECT(r::Int,args...) 				= COLLECT(RobotID(r),args...)
-COLLECT(r::RobotID,o::Int,args...) 		= COLLECT(r,ObjectID(o),args...)
-COLLECT(r::RobotID,o::ObjectID,x::Int) 	= COLLECT(r,o,LocationID(x))
+const COLLECT = BOT_COLLECT{DeliveryBot}
 
+export BOT_DEPOSIT
 """
-	DEPOSIT <: AbstractRobotAction
+	BOT_DEPOSIT <: AbstractRobotAction
 
-Encodes the event "robot `r` deposits object `o` at `x`
+Encodes the event "robot `r` collects object `o` from `x`
 """
-@with_kw struct DEPOSIT <: AbstractRobotAction
-    r::RobotID 		= RobotID()
+@with_kw struct BOT_DEPOSIT{R} <: AbstractRobotAction{R}
+    r::BotID{R}     = BotID{R}()
     o::ObjectID 	= ObjectID()
     x::LocationID 	= LocationID()
 end
-DEPOSIT(r::Int,args...) 				= DEPOSIT(RobotID(r),args...)
-DEPOSIT(r::RobotID,o::Int,args...) 		= DEPOSIT(r,ObjectID(o),args...)
-DEPOSIT(r::RobotID,o::ObjectID,x::Int) 	= DEPOSIT(r,o,LocationID(x))
+const DEPOSIT = BOT_DEPOSIT{DeliveryBot}
+
+"""
+	CLEAN_UP <: AbstractRobotAction
+
+Encodes the event "robot `r` cleans up location x`
+"""
+@with_kw struct CLEAN_UP <: AbstractRobotAction{CleanUpBot}
+	r::BotID{CleanUpBot} = BotID{CleanUpBot}()
+	x::Vector{LocationID} = Vector{LocationID}()
+end
 
 get_initial_location_id(a::A) where {A<:Union{GO,CARRY}}        						= a.x1
 get_destination_location_id(a::A) where {A<:Union{GO,CARRY}}    						= a.x2
@@ -241,6 +245,26 @@ get_object_id(a::A) where {A<:Union{CARRY,COLLECT,DEPOSIT}}         					= a.o
 get_robot_id(a::A) where {A<:AbstractRobotAction} = a.r
 
 export
+	replace_robot_id,
+	replace_destination,
+	replace_initial_location
+
+function replace_robot_id end
+function replace_destination end
+function replace_initial_location end
+for T in [:BOT_AT,:BOT_GO,:BOT_COLLECT,:BOT_CARRY,:BOT_DEPOSIT]
+	@eval replace_robot_id(node::$T,id) = $T(node,r=id)
+end
+for T in [:BOT_GO,:BOT_CARRY]
+	@eval replace_destination(node::$T,id) = $T(node,x2=id)
+	@eval replace_initial_location(node::$T,id) = $T(node,x1=id)
+end
+for T in [:BOT_AT,:BOT_COLLECT,:BOT_DEPOSIT]
+	@eval replace_destination(node::$T,id) = $T(node,x=id)
+	@eval replace_initial_location(node::$T,id) = $T(node,x=id)
+end
+
+export
 	split_node
 
 """
@@ -249,20 +273,26 @@ export
 Creates two new nodes of type `N`, where the destination of the first node
 and the starting location of the second node are both set to `x`.
 """
-function split_node(node::N,x::LocationID) where {N<:Union{GO,CARRY}}
-	N(node, x2=x), N(node, x1=x)
-end
-function split_node(node::N,x::LocationID) where {N<:Union{DEPOSIT,COLLECT}}
-	N(node, x=x), N(node, x=x)
-end
+split_node(node::BOT_GO,x::LocationID) = BOT_GO(node, x2=x), BOT_GO(node, x1=x)
+split_node(node::BOT_CARRY,x::LocationID) = BOT_CARRY(node, x2=x), BOT_CARRY(node, x1=x)
+split_node(node::BOT_COLLECT,x::LocationID) = BOT_COLLECT(node, x=x), BOT_COLLECT(node, x=x)
+split_node(node::BOT_DEPOSIT,x::LocationID) = BOT_DEPOSIT(node, x=x), BOT_DEPOSIT(node, x=x)
+# function split_node(node::N,x::LocationID) where {N<:Union{GO,CARRY}}
+# 	N(node, x2=x), N(node, x1=x)
+# end
+# function split_node(node::N,x::LocationID) where {N<:Union{DEPOSIT,COLLECT}}
+# 	N(node, x=x), N(node, x=x)
+# end
 
 export
 	TEAM_ACTION,
 	sub_nodes,
-	team_configuration
+	team_configuration,
+	robot_type,
+	team_action_type
 
 """
-	TEAM_ACTION{A}
+	TEAM_ACTION{R<:AbstractRobotType,A<:AbstractRobotAction{R}}
 
 For collaborative tasks.
 
@@ -272,8 +302,8 @@ For collaborative tasks.
     (except between collaborating team members) are ignored for a TEAM_GO task. This is
     because of the "push-and-rotate" thing once they reach the goal vertices.
 """
-@with_kw struct TEAM_ACTION{A<:AbstractRobotAction} <: AbstractRobotAction
-    instructions::Vector{A} = Vector{CARRY}()
+@with_kw struct TEAM_ACTION{R,A<:AbstractRobotAction{R}} <: AbstractRobotAction{R}
+    instructions::Vector{A} = Vector{A}()
 	shape::Tuple{Int,Int} 	= (1,1)
     n::Int 					= length(instructions) # number of robots
     # config::Matrix{Int} = ones(n) # defines configuration of agents relative to each other during collaborative task
@@ -282,6 +312,19 @@ sub_nodes(n) = [n]
 sub_nodes(n::TEAM_ACTION) = n.instructions
 team_configuration(n) = (1,1)
 team_configuration(n::TEAM_ACTION) = n.shape
+robot_type(n::TEAM_ACTION{R,A}) where {R,A} = R
+team_action_type(n::TEAM_ACTION{R,A}) where {R,A} = A
+
+export
+	TEAM_GO,
+	TEAM_COLLECT,
+	TEAM_CARRY,
+	TEAM_DEPOSIT
+
+const TEAM_GO 	 	= TEAM_ACTION{DeliveryBot,GO}
+const TEAM_COLLECT 	= TEAM_ACTION{DeliveryBot,COLLECT}
+const TEAM_CARRY 	= TEAM_ACTION{DeliveryBot,CARRY}
+const TEAM_DEPOSIT 	= TEAM_ACTION{DeliveryBot,DEPOSIT}
 
 export
 	required_predecessors,
@@ -333,24 +376,70 @@ function eligible_predecessors end
 Identifies the types (and how many) of eligible successors to `node`
 
 Example:
-	`eligible_successors(node::GO) = Dict((GO,TEAM_ACTION{COLLECT},TEAM_ACTION{GO},COLLECT)=>1)`
+	`eligible_successors(node::GO) = Dict((GO,TEAM_COLLECT,TEAM_GO,COLLECT)=>1)`
 """
 function eligible_successors end
 
-required_predecessors(node::GO)         = Dict((GO,ROBOT_AT,DEPOSIT,TEAM_ACTION{DEPOSIT})=>1)
-required_successors(node::GO)           = Dict()
-required_predecessors(node::COLLECT)    = Dict(OBJECT_AT=>1,GO=>1)
-required_successors(node::COLLECT)      = Dict(CARRY=>1)
-required_predecessors(node::CARRY)      = Dict(COLLECT=>1)
-required_successors(node::CARRY)        = Dict(DEPOSIT=>1)
-required_predecessors(node::DEPOSIT)    = Dict(CARRY=>1)
-required_successors(node::DEPOSIT)      = Dict(Operation=>1,GO=>1)
-required_predecessors(node::Operation)  = Dict((DEPOSIT,OBJECT_AT)=>length(node.pre))
-required_successors(node::Operation)    = Dict(OBJECT_AT=>length(node.post))
-required_predecessors(node::OBJECT_AT)  = Dict()
-required_successors(node::OBJECT_AT)    = Dict(COLLECT=>1)
-required_predecessors(node::ROBOT_AT)   = Dict()
-required_successors(node::ROBOT_AT)     = Dict(GO=>1)
+required_predecessors(node::BOT_GO{R}) where {R} 		= Dict((BOT_GO{R},BOT_AT{R},BOT_DEPOSIT{R},TEAM_ACTION{R,BOT_DEPOSIT{R}})=>1)
+required_successors(node::BOT_GO) where {R}       		= Dict()
+required_predecessors(node::BOT_COLLECT{R}) where {R} 	= Dict(OBJECT_AT=>1,BOT_GO{R}=>1)
+required_successors(node::BOT_COLLECT{R}) where {R} 	= Dict(BOT_CARRY{R}=>1)
+required_predecessors(node::BOT_CARRY{R}) where {R} 	= Dict(BOT_COLLECT{R}=>1)
+required_successors(node::BOT_CARRY{R}) where {R} 		= Dict(BOT_DEPOSIT{R}=>1)
+required_predecessors(node::BOT_DEPOSIT{R}) where {R} 	= Dict(BOT_CARRY{R}=>1)
+required_successors(node::BOT_DEPOSIT{R}) where {R} 	= Dict(Operation=>1,BOT_GO{R}=>1)
+required_predecessors(node::Operation)  				= Dict((BOT_DEPOSIT{DeliveryBot},OBJECT_AT)=>length(node.pre))
+required_successors(node::Operation)    				= Dict(OBJECT_AT=>length(node.post))
+required_predecessors(node::OBJECT_AT)  				= Dict()
+required_successors(node::OBJECT_AT)    				= Dict(BOT_COLLECT{DeliveryBot}=>1)
+required_predecessors(node::BOT_AT{R}) where {R}   		= Dict()
+required_successors(node::BOT_AT{R}) where {R}     		= Dict(BOT_GO{R}=>1)
+
+required_predecessors(node::TEAM_ACTION{R,GO}) where {R} 		= Dict(GO=>length(node.instructions))
+required_predecessors(node::TEAM_ACTION{R,COLLECT}) where {R} 	= Dict(GO=>length(node.instructions),OBJECT_AT=>1)
+required_predecessors(node::TEAM_ACTION{R,CARRY}) where {R} 	= Dict(TEAM_ACTION{R,COLLECT}=>1)
+required_predecessors(node::TEAM_ACTION{R,DEPOSIT}) where {R} 	= Dict(TEAM_ACTION{R,CARRY}=>1)
+
+required_successors(node::TEAM_ACTION{R,GO}) where {R}        	= Dict(TEAM_ACTION{R,COLLECT}=>1)
+required_successors(node::TEAM_ACTION{R,COLLECT}) where {R}   	= Dict(TEAM_ACTION{R,CARRY}=>1)
+required_successors(node::TEAM_ACTION{R,CARRY}) where {R}     	= Dict(TEAM_ACTION{R,DEPOSIT}=>1)
+required_successors(node::TEAM_ACTION{R,DEPOSIT}) where {R}   	= Dict(GO=>length(node.instructions),Operation=>1)
+
+eligible_predecessors(node) 			= required_predecessors(node)
+eligible_successors(node) 				= required_successors(node)
+eligible_successors(node::BOT_GO{R}) where {R} = Dict((BOT_GO{R},TEAM_ACTION{R,BOT_COLLECT{R}},TEAM_ACTION{R,BOT_GO{R}},BOT_COLLECT{R})=>1)
+eligible_predecessors(node::OBJECT_AT)  = Dict(Operation=>1)
+
+# required_predecessors(node::GO)         = Dict((GO,ROBOT_AT,DEPOSIT,TEAM_ACTION{DEPOSIT})=>1)
+# required_successors(node::GO)           = Dict()
+# required_predecessors(node::COLLECT)    = Dict(OBJECT_AT=>1,GO=>1)
+# required_successors(node::COLLECT)      = Dict(CARRY=>1)
+# required_predecessors(node::CARRY)      = Dict(COLLECT=>1)
+# required_successors(node::CARRY)        = Dict(DEPOSIT=>1)
+# required_predecessors(node::DEPOSIT)    = Dict(CARRY=>1)
+# required_successors(node::DEPOSIT)      = Dict(Operation=>1,GO=>1)
+# required_predecessors(node::Operation)  = Dict((DEPOSIT,OBJECT_AT)=>length(node.pre))
+# required_successors(node::Operation)    = Dict(OBJECT_AT=>length(node.post))
+# required_predecessors(node::OBJECT_AT)  = Dict()
+# required_successors(node::OBJECT_AT)    = Dict(COLLECT=>1)
+# required_predecessors(node::ROBOT_AT)   = Dict()
+# required_successors(node::ROBOT_AT)     = Dict(GO=>1)
+
+
+# required_predecessors(node::TEAM_ACTION{GO})        = Dict(GO=>length(node.instructions))
+# required_predecessors(node::TEAM_ACTION{COLLECT})   = Dict(GO=>length(node.instructions),OBJECT_AT=>1)
+# required_predecessors(node::TEAM_ACTION{CARRY})     = Dict(TEAM_ACTION{COLLECT}=>1)
+# required_predecessors(node::TEAM_ACTION{DEPOSIT})   = Dict(TEAM_ACTION{CARRY}=>1)
+#
+# required_successors(node::TEAM_ACTION{GO})         	= Dict(TEAM_ACTION{COLLECT}=>1)
+# required_successors(node::TEAM_ACTION{COLLECT})    	= Dict(TEAM_ACTION{CARRY}=>1)
+# required_successors(node::TEAM_ACTION{CARRY})      	= Dict(TEAM_ACTION{DEPOSIT}=>1)
+# required_successors(node::TEAM_ACTION{DEPOSIT})    	= Dict(GO=>length(node.instructions),Operation=>1)
+#
+# eligible_predecessors(node) 			= required_predecessors(node)
+# eligible_successors(node) 				= required_successors(node)
+# eligible_successors(node::GO)           = Dict((GO,TEAM_ACTION{COLLECT},TEAM_ACTION{GO},COLLECT)=>1)
+# eligible_predecessors(node::OBJECT_AT)  = Dict(Operation=>1)
 
 """
 	num_required_predecessors(node)
@@ -378,13 +467,6 @@ function num_required_successors(node)
 	n
 end
 
-eligible_predecessors(node) 			= required_predecessors(node)
-eligible_successors(node) 				= required_successors(node)
-
-eligible_successors(node::GO)           = Dict((GO,TEAM_ACTION{COLLECT},TEAM_ACTION{GO},COLLECT)=>1)
-eligible_predecessors(node::OBJECT_AT)  = Dict(Operation=>1)
-
-
 """
 	num_eligible_predecessors(node)
 
@@ -411,16 +493,6 @@ function num_eligible_successors(node)
 	n
 end
 
-required_predecessors(node::TEAM_ACTION{GO})        = Dict(GO=>length(node.instructions))
-required_predecessors(node::TEAM_ACTION{COLLECT})   = Dict(GO=>length(node.instructions),OBJECT_AT=>1)
-required_predecessors(node::TEAM_ACTION{CARRY})     = Dict(TEAM_ACTION{COLLECT}=>1)
-required_predecessors(node::TEAM_ACTION{DEPOSIT})   = Dict(TEAM_ACTION{CARRY}=>1)
-
-required_successors(node::TEAM_ACTION{GO})         	= Dict(TEAM_ACTION{COLLECT}=>1)
-required_successors(node::TEAM_ACTION{COLLECT})    	= Dict(TEAM_ACTION{CARRY}=>1)
-required_successors(node::TEAM_ACTION{CARRY})      	= Dict(TEAM_ACTION{DEPOSIT}=>1)
-required_successors(node::TEAM_ACTION{DEPOSIT})    	= Dict(GO=>length(node.instructions),Operation=>1)
-
 """
 	matches_template(template,node)
 
@@ -439,8 +511,8 @@ Identifies the resources reserved by a particular `node` for its duration.
 For example, `resources_reserved(node::COLLECT) = AbstractID[get_location_id(node)]`
 """
 resources_reserved(node)                = AbstractID[]
-resources_reserved(node::COLLECT)       = AbstractID[get_location_id(node)]
-resources_reserved(node::DEPOSIT)       = AbstractID[get_location_id(node)]
+resources_reserved(node::BOT_COLLECT)       = AbstractID[get_location_id(node)]
+resources_reserved(node::BOT_DEPOSIT)       = AbstractID[get_location_id(node)]
 resources_reserved(node::TEAM_ACTION)	= union(map(pred->resources_reserved(pred), node.instructions)...)
 
 is_valid(id::A) where {A<:AbstractID} = get_id(id) != -1

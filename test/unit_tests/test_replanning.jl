@@ -35,7 +35,6 @@ let
     base_env = replan!(planner,env,request)
 
     env, cost = solve!(planner.solver,PC_TAPF(base_env))
-# end
 
 end
 let

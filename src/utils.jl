@@ -25,17 +25,19 @@ to_symbol_dict(el) = el
 to_symbol_dict(dict::Dict) = Dict{Symbol,Any}(Symbol(k)=>to_symbol_dict(v) for (k,v) in dict)
 to_symbol_dict(v::Vector) = map(to_symbol_dict, v)
 
+
 export
     remap_object_id,
     remap_object_ids!
 
-# utilities for remappingg object ids
+# utilities for remapping object ids
 remap_object_id(x,args...) = x
 remap_object_id(id::ObjectID,max_obj_id)    = ObjectID(get_id(id) + max_obj_id)
 remap_object_id(spec::PathSpec,max_obj_id)  = PathSpec(spec,object_id=spec.object_id + max_obj_id)
 remap_object_id(node::OBJECT_AT,args...)    = OBJECT_AT(remap_object_id(get_object_id(node),args...), get_initial_location_id(node))
-remap_object_id(node::A,args...) where {A<:Union{CARRY,COLLECT,DEPOSIT}} = A(node,o=remap_object_id(get_object_id(node),args...))
-remap_object_id(node::TEAM_ACTION,args...) = TEAM_ACTION(node,instructions=map(i->remap_object_id(i,args...),node.instructions))
+remap_object_id(node::A,args...) where {A<:Union{COLLECT,DEPOSIT}} = A(o=remap_object_id(get_object_id(node),args...),r=get_robot_id(node),x=get_location_id(node))
+remap_object_id(node::A,args...) where {A<:CARRY} = A(o=remap_object_id(get_object_id(node),args...),r=node.r,x1=node.x1,x2=node.x2)
+remap_object_id(node::A,args...) where {A<:TEAM_ACTION} = A(instructions=map(i->remap_object_id(i,args...),node.instructions),shape=node.shape)
 function remap_object_ids!(node::Operation,args...)
     new_pre = Set([remap_object_id(o,args...) for o in node.pre])
     empty!(node.pre)
@@ -129,49 +131,7 @@ function robot_tip_map(sched::OperatingSchedule,vtxs=get_all_terminal_nodes(sche
     robot_tips
 end
 
-export
-    # validate,
-    cached_pickup_and_delivery_distances,
-    construct_task_graphs_problem
-
-
-"""
-    `cached_pickup_and_delivery_distances(r₀,oₒ,sₒ,dist=(x1,x2)->norm(x2-x1,1))`
-
-    Inputs:
-        `r₀` - vector of initial robot locations.
-        `sₒ` - vector of initial object locations.
-        `sₜ` - vector of station locations (object i must be brough to station i
-            from its initial location)
-
-    Outputs:
-        `Drs` - distance from initial robot locations (including dummies) to
-            object pickup locations
-        `Dss` - distance from pickup stations to delivery stations (only the
-            diagonal) is relevant for our problem
-"""
-function cached_pickup_and_delivery_distances(r₀,s₀,sₜ,dist=(x1,x2)->norm(x2-x1,1))
-    N = size(r₀,1)
-    M = size(s₀,1)
-    # augment r₀ to include "dummy" robots that appear after dropoff
-    r₀ = [r₀;sₜ]
-    # Construct distance matrix
-    Drs = zeros(N+M,M) # distance robot to pickup station
-    for i in 1:N+M
-        for j in 1:M
-            Drs[i,j] = dist(r₀[i],s₀[j])
-        end
-    end
-    Dss = zeros(M,M) # distance robot to delivery station
-    for i in 1:M
-        for j in 1:M
-            # distance from dummy robot to object + object to station
-            Dss[i,j] = dist(s₀[i],sₜ[j])
-        end
-    end
-    return Drs, Dss
-end
-
+export construct_task_graphs_problem
 """
     `construct_task_graphs_problem`
 """
@@ -505,7 +465,7 @@ title_string(a::COLLECT,verbose=true)   = verbose ? string("collect\n",get_id(ge
 title_string(a::CARRY,verbose=true)     = verbose ? string("carry\n",get_id(get_robot_id(a)),",",get_id(get_object_id(a)),",",get_id(get_destination_location_id(a))) : "carry";
 title_string(a::DEPOSIT,verbose=true)   = verbose ? string("deposit\n",get_id(get_robot_id(a)),",",get_id(get_object_id(a)),",",get_id(get_location_id(a))) : "deposit";
 title_string(op::Operation,verbose=true)= verbose ? string("op",get_id(get_operation_id(op))) : "op";
-title_string(a::TEAM_ACTION{A},verbose=true) where {A} = verbose ? string("team", A, "\n","r: (",map(i->string(get_id(get_robot_id(i)), ","), a.instructions)...,")") : string("team", A)
+title_string(a::TEAM_ACTION,verbose=true) where {R,A} = verbose ? string("team", team_action_type(a), "\n","r: (",map(i->string(get_id(get_robot_id(i)), ","), a.instructions)...,")") : string("team", A)
 
 Base.string(pred::OBJECT_AT) =  string("O(",get_id(get_object_id(pred)),",",get_id(get_location_id(pred)),")")
 Base.string(pred::ROBOT_AT)  =  string("R(",get_id(get_robot_id(pred)),",",get_id(get_location_id(pred)),")")
@@ -514,7 +474,7 @@ Base.string(a::COLLECT)   =  string("COLLECT(",get_id(get_robot_id(a)),",",get_i
 Base.string(a::CARRY)     =  string("CARRY(",get_id(get_robot_id(a)),",",get_id(get_object_id(a)),",",get_id(get_initial_location_id(a)),"->",get_id(get_destination_location_id(a)),")")
 Base.string(a::DEPOSIT)   =  string("DEPOSIT(",get_id(get_robot_id(a)),",",get_id(get_object_id(a)),",",get_id(get_location_id(a)),")")
 Base.string(op::Operation)=  string("OP(",get_id(get_operation_id(op)),")")
-Base.string(a::TEAM_ACTION{A}) where {A} =  string("TEAM_ACTION( ",map(i->string(string(i), ","), a.instructions)...," )")
+Base.string(a::TEAM_ACTION) =  string("TEAM_ACTION( ",map(i->string(string(i), ","), a.instructions)...," )")
 
 function get_display_metagraph(project_schedule::OperatingSchedule;
     verbose=true,
@@ -635,7 +595,7 @@ function get_object_paths(solution,schedule,cache)
     path_idxs = Int[]
     for v in vertices(schedule.graph)
         node = get_node_from_id(schedule,get_vtx_id(schedule,v))
-        if isa(node, Union{CARRY,TEAM_ACTION{CARRY}})
+        if isa(node, Union{CARRY,TEAM_CARRY})
             if isa(node, CARRY)
                 object_id = get_object_id(node)
                 agent_id_list = [get_id(get_robot_id(node))]

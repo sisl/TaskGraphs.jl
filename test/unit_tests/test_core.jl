@@ -111,7 +111,7 @@ let
             COLLECT(),
             CARRY(),
             DEPOSIT(),
-            TEAM_ACTION(instructions=[CARRY()])
+            TEAM_CARRY(instructions=[CARRY()])
             ]
         generate_path_spec(sched,pred)
     end
@@ -240,7 +240,7 @@ let
     add_to_schedule!(sched,OBJECT_AT(1,2),ObjectID(1))
     add_to_schedule!(sched,GO(1,1,2),ActionID(1))
     add_to_schedule!(sched,GO(2,2,3),ActionID(2))
-    add_to_schedule!(sched,TEAM_ACTION(instructions=[COLLECT(1,1,2),COLLECT(2,1,3),]),ActionID(3))
+    add_to_schedule!(sched,TEAM_COLLECT(instructions=[COLLECT(1,1,2),COLLECT(2,1,3),]),ActionID(3))
     add_edge!(sched,RobotID(1),ActionID(1))
     add_edge!(sched,RobotID(2),ActionID(2))
     add_edge!(sched,RobotID(2),ActionID(2))
@@ -257,7 +257,7 @@ let
         ([1],GO(1,1,2),ActionID(1)),
         ([-1],GO(-1,1,2),ActionID(2)),
         ([],OBJECT_AT(1,2),ObjectID(1)),
-        ([1,2],TEAM_ACTION{CARRY}(instructions=[CARRY(1,1,2,3),CARRY(2,1,3,4)]),ActionID(3))
+        ([1,2],TEAM_CARRY(instructions=[CARRY(1,1,2,3),CARRY(2,1,3,4)]),ActionID(3))
         ]
         add_to_schedule!(sched,node,node_id)
         @test get_robot_ids(sched,node_id) == map(i->RobotID(i),robot_ids)
