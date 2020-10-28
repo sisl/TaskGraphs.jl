@@ -943,7 +943,6 @@ function CRCBS.initialize_root_node(env::SearchEnv)
     ConstraintTreeNode(
         solution    = solution,
         constraints = Dict(
-            # i=>ConstraintTable{node_type(solution)}(agent_id=i) for i in 1:num_agents(env)
             i=>discrete_constraint_table(env,i) for i in 1:num_agents(env)
             ),
         id = 1)
