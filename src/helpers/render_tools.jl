@@ -271,7 +271,7 @@ function visualize_env(search_env::S,vtxs,pickup_vtxs,dropoff_vtxs,t=0;
         line_width=2pt) where {S<:SearchEnv}
 
     cache = search_env.cache
-    project_schedule = search_env.schedule
+    project_schedule = get_schedule(search_env)
 
     color_scale = Scale.color_discrete_hue()
     colors_vec = color_scale.f(n)
@@ -1049,7 +1049,7 @@ function render_factory_floor(env::GridFactoryEnvironment;
 end
 
 function get_node_shape(search_env::SearchEnv,graph,v,x,y,r)
-    project_schedule = search_env.schedule
+    project_schedule = get_schedule(search_env)
     cache = search_env.cache
     node_id = get_vtx_id(project_schedule,get_prop(graph,v,:vtx_id))
     if typeof(node_id) <: ActionID
@@ -1063,7 +1063,7 @@ function get_node_shape(search_env::SearchEnv,graph,v,x,y,r)
     end
 end
 function get_node_color(search_env::SearchEnv,graph,v,x,y,r)
-    project_schedule = search_env.schedule
+    project_schedule = get_schedule(search_env)
     cache = search_env.cache
     node_id = get_vtx_id(project_schedule,get_prop(graph,v,:vtx_id))
     if typeof(node_id) <: ActionID
@@ -1077,7 +1077,7 @@ function get_node_color(search_env::SearchEnv,graph,v,x,y,r)
     end
 end
 function get_node_text(search_env::SearchEnv,graph,v,x,y,r)
-    project_schedule = search_env.schedule
+    project_schedule = get_schedule(search_env)
     cache = search_env.cache
     v_ = get_prop(graph,v,:vtx_id)
     string(cache.t0[v_]," - ",cache.tF[v_],"\n",cache.local_slack[v_]," - ",cache.slack[v_])
@@ -1126,7 +1126,7 @@ function plot_project_schedule(
     # `inkscape -z project_schedule1.svg -e project_schedule1.png`
     # OR: `for f in *.svg; do inkscape -z $f -e $f.png; done`
 end
-plot_project_schedule(search_env::SearchEnv;kwargs...) = plot_project_schedule(search_env.schedule,search_env.cache;kwargs...)
+plot_project_schedule(search_env::SearchEnv;kwargs...) = plot_project_schedule(get_schedule(search_env),search_env.cache;kwargs...)
 function print_project_schedule(filename::String,args...;kwargs...)
     plot_project_schedule(args...;kwargs...) |> Compose.SVG(string(filename,".svg"))
 end

@@ -101,7 +101,7 @@ function add_headless_cleanup_task!(
 end
 
 function remove_robot!(env::SearchEnv,id::BotID,t::Int)
-    sched = env.schedule
+    sched = get_schedule(env)
     G = get_graph(sched)
     # schedule
     to_remove = Set{AbstractID}(id)

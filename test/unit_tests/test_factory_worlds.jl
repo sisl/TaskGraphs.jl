@@ -55,7 +55,7 @@ let
     get_pickup_vtxs(env)
     get_dropoff_vtxs(env)
     get_obstacle_vtxs(env)
-    GridFactoryEnvironment(env,env.graph)
+    GridFactoryEnvironment(env,get_graph(env))
     Base.zero(env)
     LightGraphs.edges(env)
     LightGraphs.edgetype(env)
@@ -77,8 +77,8 @@ let
     env2 = read_env(filename)
 
     @test get_vtxs(env) == get_vtxs(env2)
-    @test nv(env.graph) == nv(env2.graph)
-    @test ne(env.graph) == ne(env2.graph)
+    @test nv(get_graph(env)) == nv(get_graph(env2))
+    @test ne(get_graph(env)) == ne(get_graph(env2))
 
     construct_factory_env_from_vtx_grid(env.vtx_map)
     # construct_random_factory_world()

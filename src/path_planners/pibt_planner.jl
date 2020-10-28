@@ -23,7 +23,7 @@ function CRCBS.is_consistent(cache::PIBTCache,pc_mapf::PC_MAPF)
     #         n_jobless += 1
     #     end
     # end
-    if length(search_env.cache.closed_set) + n_jobless >= nv(search_env.schedule)
+    if length(search_env.cache.closed_set) + n_jobless >= nv(get_schedule(search_env))
         return true
     elseif !any(CRCBS.is_valid, map(e->CRCBS.get_goal(e),CRCBS.get_envs(cache)))
         # all robots are done with their jobs
@@ -36,9 +36,9 @@ function CRCBS.pibt_priority_law(solver,pc_mapf::PC_MAPF,cache,i)
     env = CRCBS.get_envs(cache)[i]
     return (
         ~CRCBS.is_valid(env,get_goal(env)),
-        ~isa(env.schedule_node,DEPOSIT),
-        ~isa(env.schedule_node,CARRY),
-        ~isa(env.schedule_node,COLLECT),
+        ~isa(get_schedule_node(env),DEPOSIT),
+        ~isa(get_schedule_node(env),CARRY),
+        ~isa(get_schedule_node(env),COLLECT),
         minimum(cache.solution.cache.slack[get_vtx(
             cache.solution.schedule,env.node_id)]),
         -CRCBS.get_timers(cache)[i],
@@ -58,7 +58,7 @@ Overridden to update the SearchEnv
 """
 function CRCBS.pibt_update_solution!(solver,solution::SearchEnv,cache)
     # update route plan
-    CRCBS.pibt_update_solution!(solver,solution.route_plan,cache)
+    CRCBS.pibt_update_solution!(solver,get_route_plan(solution),cache)
     # NOTE Update planning cache so that all goal times can be updated
     update_planning_cache!(solver,solution)
     solution
@@ -69,7 +69,7 @@ function pibt_info_string(cache,i,
         a=CRCBS.get_actions(cache)[i]
     )
     string("\t",i,": ", get_vtx(cache.solution.schedule,env.node_id)," ",
-        string(env.schedule_node)," s=",string(s),", a=",string(a),
+        string(get_schedule_node(env))," s=",string(s),", a=",string(a),
         ", goal=",string(env.goal),"\n")
 end
 function pibt_info_strings(cache)
@@ -80,7 +80,7 @@ function pibt_info_strings(cache)
         # env = CRCBS.get_envs(cache)[i]
         # env = cache.envs[i]
     # for (i,(s,env)) in enumerate(zip(cache.states,cache.envs))
-        # str = "\t$i : $(get_vtx(cache.solution.schedule,env.node_id)) $(string(env.schedule_node)), s=$(string(s)), a=$(string(a)), goal=$(string(env.goal))\n"
+        # str = "\t$i : $(get_vtx(cache.solution.schedule,env.node_id)) $(string(get_schedule_node(env))), s=$(string(s)), a=$(string(a)), goal=$(string(env.goal))\n"
         str = pibt_info_string(cache,i)
         push!(info_strings,str)
     end

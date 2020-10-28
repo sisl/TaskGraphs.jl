@@ -481,21 +481,21 @@ function profile_replanning(replan_model, fallback_model, solver, fallback_solve
     object_path_dict = Dict{Int,Vector{Vector{Int}}}()
     object_interval_dict = Dict{Int,Vector{Int}}()
 
-    # print_project_schedule(string("schedule",idx,"B"),base_search_env.schedule;mode=:leaf_aligned)
+    # print_project_schedule(string("schedule",idx,"B"),get_schedule(base_search_env);mode=:leaf_aligned)
     (solution, _, cost, search_env, optimality_gap), elapsed_time, byte_ct, gc_time, mem_ct = @timed high_level_search!(
         solver, base_search_env, Gurobi.Optimizer;primary_objective=primary_objective,kwargs...)
-    # print_project_schedule(string("schedule",idx,"C"),search_env.schedule;mode=:leaf_aligned)
+    # print_project_schedule(string("schedule",idx,"C"),get_schedule(search_env);mode=:leaf_aligned)
     local_results[idx] = compile_solver_results(solver, solution, cost, search_env, optimality_gap, elapsed_time, t_arrival)
     merge!(final_times[idx], Dict{AbstractID,Int}(OperationID(k)=>t_arrival for k in keys(get_operations(partial_schedule))))
     for i in 1:idx
         for node_id in keys(final_times[i])
-            v = get_vtx(search_env.schedule,node_id)
+            v = get_vtx(get_schedule(search_env),node_id)
             final_times[i][node_id] = max(final_times[i][node_id], get(search_env.cache.tF, v, -1))
         end
     end
 
     while idx < length(project_list)
-        project_schedule = search_env.schedule
+        project_schedule = get_schedule(search_env)
         cache = search_env.cache
         idx += 1
         t_request = arrival_interval * (idx - 1) # time when request reaches command center
@@ -557,7 +557,7 @@ function profile_replanning(replan_model, fallback_model, solver, fallback_solve
         merge!(final_times[idx], Dict{AbstractID,Int}(OperationID(k)=>t_arrival for k in keys(get_operations(next_schedule))))
         for i in 1:idx
             for node_id in keys(final_times[i])
-                v = get_vtx(search_env.schedule,node_id)
+                v = get_vtx(get_schedule(search_env),node_id)
                 final_times[i][node_id] = max(final_times[i][node_id], get(search_env.cache.tF, v, -1))
             end
         end
@@ -580,7 +580,7 @@ function profile_replanning(replan_model, fallback_model, solver, fallback_solve
 
     if cost[1] < Inf && get(problem_config, :save_paths, true)
         println("SAVING PATHS")
-        object_path_dict, object_interval_dict = fill_object_path_dicts!(solution,search_env.schedule,search_env.cache,object_path_dict,object_interval_dict)
+        object_path_dict, object_interval_dict = fill_object_path_dicts!(solution,get_schedule(search_env),search_env.cache,object_path_dict,object_interval_dict)
         object_paths, object_intervals = convert_to_path_vectors(object_path_dict, object_interval_dict)
 
         results_dict["robot_paths"]         = convert_to_vertex_lists(solution)

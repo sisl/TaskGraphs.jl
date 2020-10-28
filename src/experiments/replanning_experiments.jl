@@ -148,7 +148,7 @@ export compile_replanning_results!
 function compile_replanning_results!(
         cache::ReplanningProfilerCache,solver,env,
         timer_results,prob,stage,request)
-    push!(cache.schedules,deepcopy(env.schedule))
+    push!(cache.schedules,deepcopy(get_schedule(env)))
     # store project ids
     for v in vertices(request.schedule)
         id = get_vtx_id(request.schedule,v)
@@ -271,7 +271,7 @@ function profile_replanner!(solver,replan_model,prob::RepeatedAbstractPC_TAPF,
     env = prob.env
     for (stage,request) in enumerate(prob.requests)
         @log_info(1,solver,"REPLANNING: Stage ",stage)
-        remap_object_ids!(request.schedule,env.schedule)
+        remap_object_ids!(request.schedule,get_schedule(env))
         base_env = replan!(solver,replan_model,env,request)
         reset_solver!(solver)
         # env, cost = solve!(solver,base_env)
@@ -291,7 +291,7 @@ function profile_replanner!(planner::ReplannerWithBackup,prob::RepeatedAbstractP
     hard_reset_solver!(planner.backup_planner.solver)
     env = prob.env
     for (stage,request) in enumerate(prob.requests)
-        remap_object_ids!(request.schedule,env.schedule)
+        remap_object_ids!(request.schedule,get_schedule(env))
 
         base_envB = replan!(plannerB,env,request)
         envB, resultsB = profile_solver!(plannerB.solver,construct_routing_problem(prob,base_envB))

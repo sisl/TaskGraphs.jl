@@ -100,7 +100,7 @@ end
 #     env_id = 2
 #     env_filename = string(ENVIRONMENT_DIR,"/env_",env_id,".toml")
 #     factory_env = read_env(env_filename)
-#     env_graph = factory_env.graph
+#     env_graph = get_graph(factory_env)
 #     dist_matrix = get_dist_matrix(env_graph)
 #     logfile = "log.txt"
 #

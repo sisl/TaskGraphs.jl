@@ -149,7 +149,7 @@ function construct_cost_model(trait::SearchTrait,
         ;
         kwargs...)
     construct_cost_model(trait,solver,
-        env.schedule, env.cache, get_problem_spec(env), get_graph(env),
+        get_schedule(env), env.cache, get_problem_spec(env), get_graph(env),
         primary_objective;kwargs...)
 end
 function construct_cost_model(trait::Prioritized,args...;kwargs...)
@@ -178,7 +178,7 @@ export
     update_route_plan!()
 """
 function update_route_plan!(solver,pc_mapf::AbstractPC_MAPF,env,v,path,cost,schedule_node,
-    agent_id = get_id(get_path_spec(env.schedule, v).agent_id))
+    agent_id = get_id(get_path_spec(get_schedule(env), v).agent_id))
     # add to solution
     # @log_info(3,solver,string("agent_path = ", convert_to_vertex_lists(path)))
     # @log_info(3,solver,string("cost = ", get_cost(path)))
@@ -231,7 +231,7 @@ function plan_path!(solver::AStarSC, pc_mapf::AbstractPC_MAPF, env::SearchEnv, n
         kwargs...) where {N<:ConstraintTreeNode,T}
 
     cache = env.cache
-    node_id = get_vtx_id(env.schedule,v)
+    node_id = get_vtx_id(get_schedule(env),v)
 
     reset_solver!(solver)
     cbs_env = build_env(solver, pc_mapf, env, node, VtxID(v))#schedule_node, v)
@@ -259,7 +259,7 @@ function plan_path!(solver::AStarSC, pc_mapf::AbstractPC_MAPF, env::SearchEnv, n
     #####################
     @log_info(2,solver,string("A* iterations = ",iterations(solver)))
     # Make sure every robot sticks around for the entire time horizon
-    if is_terminal_node(get_graph(env.schedule),v)
+    if is_terminal_node(get_graph(get_schedule(env)),v)
         @log_info(2,solver,"ISPS: length(path) = ",length(path),
         ". Extending terminal node ", string(schedule_node),
         " to ",maximum(cache.tF))
@@ -331,9 +331,9 @@ function plan_next_path!(solver::ISPS, pc_mapf::AbstractPC_MAPF, env::SearchEnv,
     valid_flag = true
     if ~isempty(env.cache.node_queue)
         v,priority = dequeue_pair!(env.cache.node_queue)
-        node_id = get_vtx_id(env.schedule,v)
-        schedule_node = get_node_from_id(env.schedule,node_id)
-        if get_path_spec(env.schedule, v).plan_path == true
+        node_id = get_vtx_id(get_schedule(env),v)
+        schedule_node = get_node_from_id(get_schedule(env),node_id)
+        if get_path_spec(get_schedule(env), v).plan_path == true
             try
                 @log_info(2,solver,sprint(show,env))
                 @log_info(2,solver,
@@ -410,7 +410,7 @@ function CRCBS.low_level_search!(solver::ISPS, pc_mapf::AbstractPC_MAPF,
         # reset solution
         reset_cache!(
             search_env.cache,
-            search_env.schedule,
+            get_schedule(search_env),
             pc_mapf.env.cache.t0,
             pc_mapf.env.cache.tF)
         reset_route_plan!(node,
@@ -616,14 +616,14 @@ end
 
 function formulate_milp(milp_model::TaskGraphsMILP,env::SearchEnv;kwargs...)
     t0,tF = get_node_start_and_end_times(env)
-    formulate_milp(milp_model,env.schedule,get_problem_spec(env);
+    formulate_milp(milp_model,get_schedule(env),get_problem_spec(env);
         t0_=t0,
         tF_=tF,
         kwargs...
         )
 end
 function formulate_milp(model::AssignmentMILP,env::SearchEnv;kwargs...)
-    formulate_milp(model,env.schedule,get_problem_spec(env);kwargs...)
+    formulate_milp(model,get_schedule(env),get_problem_spec(env);kwargs...)
 end
 
 export
@@ -662,7 +662,7 @@ function solve_assignment_problem!(solver::TaskGraphsMILPSolver, model, prob)
     if termination_status(model) == MOI.OPTIMAL
         @assert lower_bound(solver) <= best_cost(solver) "lower_bound($(solver_type(solver))) = $(value(objective_bound(model))) -> $(lower_bound(solver)) but should be equal to best_cost($(solver_type(solver))) = $(value(objective_function(model))) -> $(best_cost(solver))"
     end
-    sched = deepcopy(prob.env.schedule)
+    sched = deepcopy(get_schedule(prob.env))
     update_project_schedule!(solver, model, sched, get_problem_spec(prob.env))
     sched, lower_bound(solver)
 end

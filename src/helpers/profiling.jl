@@ -38,8 +38,8 @@ extract_object_data(node::DEPOSIT,t0,tF) = Dict{Symbol,Union{Vector{Int},Int}}(
     )
 function get_object_path_summaries(env::SearchEnv)
     summaries = Dict{Int,Dict{Symbol,Union{Vector{Int},Int}}}()
-    for v in vertices(env.schedule)
-        node = get_node_from_vtx(env.schedule,v)
+    for v in vertices(get_schedule(env))
+        node = get_node_from_vtx(get_schedule(env),v)
         dict = extract_object_data(node,env.cache.t0[v],env.cache.tF[v])
         if haskey(dict,:object_id)
             object_id = dict[:object_id]

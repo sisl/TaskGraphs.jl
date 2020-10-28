@@ -96,7 +96,7 @@ function get_conflict_idx(envs,states,actions,i,ordering,idxs)
 end
 function update_envs!(solver,search_env,envs,paths)
     cache = search_env.cache
-    schedule = search_env.schedule
+    schedule = get_schedule(search_env)
     cbs_node = initialize_root_node(search_env)
     # update_planning_cache!(solver,search_env)        cache.tF[v] = get_final_state(path).t
 
@@ -110,7 +110,7 @@ function update_envs!(solver,search_env,envs,paths)
         t_arrival = max(cache.tF[v], s.t + get_distance(get_graph(search_env).dist_function,s.vtx,env.goal.vtx))
         if is_goal(envs[i],s)
             if t_arrival > cache.tF[v] && env.goal.vtx != -1
-                @log_info(-1,solver,"DFS update_envs!(): extending tF[v] from $(cache.tF[v]) to $t_arrival in ",string(env.schedule_node),", s = ",string(s))
+                @log_info(-1,solver,"DFS update_envs!(): extending tF[v] from $(cache.tF[v]) to $t_arrival in ",string(get_schedule_node(env)),", s = ",string(s))
                 cache.tF[v] = t_arrival
                 up_to_date = false
             end
@@ -176,7 +176,7 @@ function update_envs!(solver,search_env,envs,paths)
                 # i = 0
                 i -= 1
             else
-                node_string = string(get_node_from_id(search_env.schedule,node_id))
+                node_string = string(get_node_from_id(get_schedule(search_env),node_id))
                 @log_info(4,solver,"cannot update environment for agent $i because next node ",node_string," not in cache.active_set")
             end
         end
@@ -185,7 +185,7 @@ function update_envs!(solver,search_env,envs,paths)
     envs,paths
 end
 function select_ordering(solver,search_env,envs)
-    schedule = search_env.schedule
+    schedule = get_schedule(search_env)
     cache = search_env.cache
     ordering = sort(
         collect(1:search_env.num_agents),
@@ -223,7 +223,7 @@ function select_action_dfs!(solver,envs,states,actions,i,ordering,idxs,search_st
             c0 = get_transition_cost(env,s,a)
             if (i >= search_state.reset_i) || (i < search_state.pickup_i && a == ai) || ((c >= c0 || is_valid(env,a)) && a != ai)
                 actions[idx] = ai
-                @log_info(5,solver,"$(repeat(" ",i))i = $i, trying a=",string(ai)," from s = ",string(s),"for env ",string(env.schedule_node), " with env.goal = ",string(env.goal))
+                @log_info(5,solver,"$(repeat(" ",i))i = $i, trying a=",string(ai)," from s = ",string(s),"for env ",string(get_schedule_node(env)), " with env.goal = ",string(env.goal))
                 k = get_conflict_idx(envs,states,actions,i,ordering,idxs)
                 # @assert k < i "should only check for conflicts with 1:$i, but found conflict with $k"
                 if k <= 0
@@ -324,14 +324,14 @@ function CRCBS.solve!(
     envs = Vector{PCCBS.LowLevelEnv}([PCCBS.LowLevelEnv() for p in paths])
     cbs_node = initialize_root_node(search_env)
     for i in 1:search_env.num_agents
-        node_id = get_next_node_matching_agent_id(search_env.schedule,search_env.cache,i)
-        envs[i] = build_env(solver,search_env,cbs_node,get_vtx(search_env.schedule,node_id))
+        node_id = get_next_node_matching_agent_id(get_schedule(search_env),search_env.cache,i)
+        envs[i] = build_env(solver,search_env,cbs_node,get_vtx(get_schedule(search_env),node_id))
     end
 
     envs, paths, status = prioritized_dfs_search(solver,search_env,envs,paths;
         max_iters = solver.cbs_model.max_iters
     )
-    if validate(search_env.schedule,convert_to_vertex_lists(route_plan),search_env.cache.t0,search_env.cache.tF)
+    if validate(get_schedule(search_env),convert_to_vertex_lists(route_plan),search_env.cache.t0,search_env.cache.tF)
         @log_info(0,solver,"DFS: Succeeded in finding a valid route plan!")
     else
         # throw(SolverCBSMaxOutException("ERROR in DFS! Failed to find a valid route plan!"))
@@ -339,8 +339,8 @@ function CRCBS.solve!(
         filename = joinpath(DEBUG_PATH,string("DFS_demo",get_debug_file_id(),".jld2"))
         mkpath(DEBUG_PATH)
         for env in envs
-            v = get_vtx(search_env.schedule,env.node_id)
-            @log_info(-1,solver,"node ",string(env.schedule_node)," t0=$(search_env.cache.t0[v]), tF=$(search_env.cache.tF[v]), closed=$(v in search_env.cache.closed_set),")
+            v = get_vtx(get_schedule(search_env),env.node_id)
+            @log_info(-1,solver,"node ",string(get_schedule_node(env))," t0=$(search_env.cache.t0[v]), tF=$(search_env.cache.tF[v]), closed=$(v in search_env.cache.closed_set),")
         end
         robot_paths = convert_to_vertex_lists(route_plan)
         object_paths, object_intervals, object_ids, path_idxs = get_object_paths(route_plan,search_env)
