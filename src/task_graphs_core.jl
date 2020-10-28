@@ -418,7 +418,7 @@ Fields:
     fixed               ::Bool          = false
 end
 
-remap_object_id(spec::PathSpec,max_obj_id)  = PathSpec(spec,object_id=spec.object_id + max_obj_id)
+# remap_object_id(spec::PathSpec,max_obj_id)  = PathSpec(spec,object_id=spec.object_id + max_obj_id)
 
 export
     OperatingSchedule,
@@ -1139,7 +1139,7 @@ function construct_partial_project_schedule(
     set_leaf_operation_vtxs!(project_schedule)
     project_schedule
 end
-function construct_partial_project_schedule(spec::ProjectSpec,problem_spec::ProblemSpec,robot_ICs=Vector{R}()) where {R<:BOT_AT}
+function construct_partial_project_schedule(spec::ProjectSpec,problem_spec::ProblemSpec,robot_ICs=Vector{BOT_AT}())
     # @assert length(robot_ICs) == problem_spec.N "length(robot_ICs) == $(length(robot_ICs)), should be $(problem_spec.N)"
     construct_partial_project_schedule(
         spec.initial_conditions,

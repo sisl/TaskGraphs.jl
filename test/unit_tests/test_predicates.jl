@@ -3,9 +3,9 @@ let
     reset_operation_id_counter!()
     reset_task_id_counter!()
 
-    @test get_unique_task_id() == 1
-    @test get_unique_operation_id() == 1
-    @test get_unique_action_id() == 1
+    @test get_id(get_unique_task_id()) == 1
+    @test get_unique_operation_id() == OperationID(1)
+    @test get_unique_action_id() == ActionID(1)
 end
 let
     ObjectID()

@@ -114,7 +114,7 @@ function remove_robot!(env::SearchEnv,id::BotID,t::Int)
                 push!(to_remove,node_id)
             else
                 new_node = replace_robot_id(node,-1)
-                replace_in_schedule!(sched,env.problem_spec,new_node,node_id)
+                replace_in_schedule!(sched,get_problem_spec(env),new_node,node_id)
             end
         end
     end

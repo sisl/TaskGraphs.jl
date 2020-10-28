@@ -107,7 +107,7 @@ function update_envs!(solver,search_env,envs,paths)
         path = paths[i]
         v = get_vtx(schedule,env.node_id)
         s = get_final_state(path)
-        t_arrival = max(cache.tF[v], s.t + get_distance(search_env.env_graph.dist_function,s.vtx,env.goal.vtx))
+        t_arrival = max(cache.tF[v], s.t + get_distance(get_graph(search_env).dist_function,s.vtx,env.goal.vtx))
         if is_goal(envs[i],s)
             if t_arrival > cache.tF[v] && env.goal.vtx != -1
                 @log_info(-1,solver,"DFS update_envs!(): extending tF[v] from $(cache.tF[v]) to $t_arrival in ",string(env.schedule_node),", s = ",string(s))
@@ -318,7 +318,7 @@ function CRCBS.solve!(
     search_env = mapf.env
     update_planning_cache!(solver,search_env) # NOTE to get rid of all nodes that don't need planning but are in the active set
 
-    route_plan = deepcopy(search_env.route_plan)
+    route_plan = deepcopy(get_route_plan(search_env))
     paths = get_paths(route_plan)
     # initialize envs
     envs = Vector{PCCBS.LowLevelEnv}([PCCBS.LowLevelEnv() for p in paths])
@@ -349,7 +349,7 @@ function CRCBS.solve!(
 
         throw(AssertionError("ERROR in DFS! Failed to find a valid route plan!"))
     end
-    # for (path,base_path,env) in zip(paths,search_env.route_plan.paths,envs)
+    # for (path,base_path,env) in zip(paths,get_route_plan(search_env).paths,envs)
     #     c = base_path.cost
     #     for p in path.path_nodes[length(base_path)+1:end]
     #         c = accumulate_cost(env,c,get_transition_cost(env,p.s,p.a,p.sp))

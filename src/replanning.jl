@@ -65,7 +65,7 @@ export
 function get_env_snapshot(route_plan::S,t) where {S<:LowLevelSolution}
     Dict(RobotID(i)=>ROBOT_AT(i, get_sp(get_path_node(path,t)).vtx) for (i,path) in enumerate(get_paths(route_plan)))
 end
-get_env_snapshot(env::SearchEnv,args...) = get_env_snapshot(env.route_plan,args...)
+get_env_snapshot(env::SearchEnv,args...) = get_env_snapshot(get_route_plan(env),args...)
 
 """
     trim_route_plan(search_env, route_plan, T)
@@ -170,8 +170,8 @@ function fix_precutoff_nodes!(project_schedule::OperatingSchedule,problem_spec::
     @assert all(map(v->cache.tF[v] + minimum(cache.local_slack[v]), collect(active_vtxs)) .>= t)
     project_schedule, cache
 end
-function fix_precutoff_nodes!(env::SearchEnv,t=minimum(map(length, get_paths(env.route_plan))))
-    fix_precutoff_nodes!(env.schedule,env.problem_spec,env.cache,t)
+function fix_precutoff_nodes!(env::SearchEnv,t=minimum(map(length, get_paths(get_route_plan(env)))))
+    fix_precutoff_nodes!(env.schedule,get_problem_spec(env),env.cache,t)
     return env
 end
 
@@ -288,7 +288,7 @@ function prune_schedule(project_schedule::OperatingSchedule,problem_spec::Proble
 
     new_schedule, new_cache
 end
-prune_schedule(env::SearchEnv,args...) = prune_schedule(env.schedule,env.problem_spec,env.cache,args...)
+prune_schedule(env::SearchEnv,args...) = prune_schedule(env.schedule,get_problem_spec(env),env.cache,args...)
 
 """
     `prune_project_schedule`
@@ -601,9 +601,9 @@ function replan!(solver, replan_model, search_env, request;
         )
     project_schedule    = search_env.schedule
     cache               = search_env.cache
-    route_plan          = search_env.route_plan
-    problem_spec        = search_env.problem_spec
-    env_graph           = search_env.env_graph
+    route_plan          = get_route_plan(search_env)
+    problem_spec        = get_problem_spec(search_env)
+    env_graph           = get_graph(search_env)
     t_request           = request.t_request
     t_arrival           = request.t_arrival
     next_schedule       = request.schedule
@@ -611,7 +611,7 @@ function replan!(solver, replan_model, search_env, request;
     @assert sanity_check(project_schedule," in replan!()")
     # Freeze route_plan and schedule at t_commit
     t_commit = get_commit_time(replan_model, search_env, t_request, commit_threshold)
-    t_final = minimum(map(length, get_paths(search_env.route_plan)))
+    t_final = minimum(map(length, get_paths(get_route_plan(search_env))))
     t_split = min(t_commit,t_final)
     # t_split = t_commit
     reset_solver!(solver)

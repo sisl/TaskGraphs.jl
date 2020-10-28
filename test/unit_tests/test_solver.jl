@@ -68,7 +68,7 @@ let
         node = initialize_root_node(search_env)
         @test compute_route_plan!(path_planner,PC_MAPF(search_env),node)#,node)
         # @show convert_to_vertex_lists(node.solution)
-        # @show convert_to_vertex_lists(search_env.route_plan)
+        # @show convert_to_vertex_lists(get_route_plan(search_env))
     end
     let
         search_env = construct_search_env(solver,deepcopy(sched),base_env)
@@ -96,7 +96,7 @@ let
         # NOTE Freezing here
         path_planner = CBSSolver(ISPS())
         env, cost = plan_route!(path_planner,deepcopy(sched),pc_tapf)
-        # @show convert_to_vertex_lists(env.route_plan)
+        # @show convert_to_vertex_lists(get_route_plan(env))
     end
     # test NBS
     let
@@ -104,11 +104,11 @@ let
         # solver = NBSSolver(assignment_model = TaskGraphsMILPSolver())
         set_iteration_limit!(solver,3)
         env, cost = solve!(solver,base_env)
-        # @show convert_to_vertex_lists(env.route_plan)
+        # @show convert_to_vertex_lists(get_route_plan(env))
         # @show get_logger(solver)
         # @show optimality_gap(solver) > 0
         @test validate(env.schedule)
-        @test validate(env.schedule,convert_to_vertex_lists(env.route_plan), env.cache.t0, env.cache.tF)
+        @test validate(env.schedule,convert_to_vertex_lists(get_route_plan(env)), env.cache.t0, env.cache.tF)
     end
 end
 # test task assignment
@@ -172,14 +172,14 @@ let
                     set_iteration_limit!(route_planner(solver),100)
                     pc_tapf = f(solver;cost_function=cost_model,verbose=false);
                     env, cost = solve!(solver,pc_tapf)
-                    # @show convert_to_vertex_lists(env.route_plan)
+                    # @show convert_to_vertex_lists(get_route_plan(env))
                     if !isa(solver.assignment_model.milp,GreedyAssignment)
                         push!(costs, cost[1])
                     end
                     @test validate(env.schedule)
                     @test validate(
                         env.schedule,
-                        convert_to_vertex_lists(env.route_plan),
+                        convert_to_vertex_lists(get_route_plan(env)),
                         env.cache.t0,
                         env.cache.tF
                         )
@@ -275,7 +275,7 @@ let
                 Δt_op=Δt
                 );
             env, cost = solve!(solver,pc_tapf)
-            paths = convert_to_vertex_lists(env.route_plan)
+            paths = convert_to_vertex_lists(get_route_plan(env))
             # @show paths[1]
             # @show paths[2]
             @test paths[1][8+Δt] == 13
@@ -302,7 +302,7 @@ let
             Δt_deliver=[Δt_deliver_1,0,0]
             );
         env, cost = solve!(solver,pc_tapf)
-        paths = convert_to_vertex_lists(env.route_plan)
+        paths = convert_to_vertex_lists(get_route_plan(env))
         @test cost == true_cost
     end
 end
@@ -324,8 +324,8 @@ let
                 c_pc_tapf = C_PC_TAPF(pc_tapf.env)
                 # set_verbosity!(solver,4)
                 env, cost = solve!(solver,c_pc_tapf)
-                paths = convert_to_vertex_lists(env.route_plan)
-                @log_info(-1,solver,sprint_route_plan(env.route_plan))
+                paths = convert_to_vertex_lists(get_route_plan(env))
+                @log_info(-1,solver,sprint_route_plan(get_route_plan(env)))
                 # @show paths
                 @test cost == expected_cost
                 for (expected_path, path) in zip(expected_paths,paths)
@@ -343,7 +343,7 @@ let
     pc_tapf = pctapf_problem_12(solver)
     env, cost = solve!(solver,pc_tapf)
     cost
-    # @show env.route_plan
+    # @show get_route_plan(env)
 end
 # Collaborative gap repair problems
 let
@@ -352,5 +352,5 @@ let
     pc_tapf = C_PC_TAPF(pctapf_problem_13(solver).env)
     env, cost = solve!(solver,pc_tapf)
     cost
-    # @show env.route_plan
+    # @show get_route_plan(env)
 end

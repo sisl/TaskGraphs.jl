@@ -145,11 +145,11 @@ function construct_cost_model(trait::NonPrioritized,
 end
 function construct_cost_model(trait::SearchTrait,
         solver, env::SearchEnv,
-        primary_objective=env.problem_spec.cost_function
+        primary_objective=get_problem_spec(env).cost_function
         ;
         kwargs...)
     construct_cost_model(trait,solver,
-        env.schedule, env.cache, env.problem_spec, env.env_graph,
+        env.schedule, env.cache, get_problem_spec(env), get_graph(env),
         primary_objective;kwargs...)
 end
 function construct_cost_model(trait::Prioritized,args...;kwargs...)
@@ -245,7 +245,7 @@ function plan_path!(solver::AStarSC, pc_mapf::AbstractPC_MAPF, env::SearchEnv, n
             @log_info(-1,solver,"A*: replanning without conflict cost", string(schedule_node))
             reset_solver!(solver)
             cost_model, _ = construct_cost_model(solver, env;
-                primary_objective=env.problem_spec.cost_function)
+                primary_objective=get_problem_spec(env).cost_function)
             cbs_env = build_env(solver, pc_mapf, env, node, VtxID(v);cost_model=cost_model)
             base_path = get_base_path(solver,env,cbs_env)
             path, cost = path_finder(solver, cbs_env, base_path)
@@ -349,7 +349,7 @@ function plan_next_path!(solver::ISPS, pc_mapf::AbstractPC_MAPF, env::SearchEnv,
                     routes:
                 """,
                 sprint_indexed_list_array(
-                    convert_to_vertex_lists(env.route_plan);leftaligned=true),
+                    convert_to_vertex_lists(get_route_plan(env));leftaligned=true),
                 """
                     cache.tF: $(env.cache.tF)
                     cache.tF[v]: $(env.cache.tF[v])
@@ -414,7 +414,7 @@ function CRCBS.low_level_search!(solver::ISPS, pc_mapf::AbstractPC_MAPF,
             pc_mapf.env.cache.t0,
             pc_mapf.env.cache.tF)
         reset_route_plan!(node,
-            pc_mapf.env.route_plan)
+            get_route_plan(pc_mapf.env))
         valid_flag = compute_route_plan!(solver, pc_mapf, node)
         if valid_flag == false
             @log_info(0,solver,"ISPS: failed on ",i,"th repair iteration.")
@@ -610,20 +610,20 @@ function formulate_assignment_problem(solver,prob;
         kwargs...)
     # TODO needs to pass in base_env--not just the schedule
     formulate_milp(solver,prob.env;
-        cost_model=prob.env.problem_spec.cost_function,
+        cost_model=get_problem_spec(prob.env).cost_function,
         kwargs...)
 end
 
 function formulate_milp(milp_model::TaskGraphsMILP,env::SearchEnv;kwargs...)
     t0,tF = get_node_start_and_end_times(env)
-    formulate_milp(milp_model,env.schedule,env.problem_spec;
+    formulate_milp(milp_model,env.schedule,get_problem_spec(env);
         t0_=t0,
         tF_=tF,
         kwargs...
         )
 end
 function formulate_milp(model::AssignmentMILP,env::SearchEnv;kwargs...)
-    formulate_milp(model,env.schedule,env.problem_spec;kwargs...)
+    formulate_milp(model,env.schedule,get_problem_spec(env);kwargs...)
 end
 
 export
@@ -663,7 +663,7 @@ function solve_assignment_problem!(solver::TaskGraphsMILPSolver, model, prob)
         @assert lower_bound(solver) <= best_cost(solver) "lower_bound($(solver_type(solver))) = $(value(objective_bound(model))) -> $(lower_bound(solver)) but should be equal to best_cost($(solver_type(solver))) = $(value(objective_function(model))) -> $(best_cost(solver))"
     end
     sched = deepcopy(prob.env.schedule)
-    update_project_schedule!(solver, model, sched, prob.env.problem_spec)
+    update_project_schedule!(solver, model, sched, get_problem_spec(prob.env))
     sched, lower_bound(solver)
 end
 

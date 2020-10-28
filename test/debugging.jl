@@ -31,7 +31,7 @@ let
     loader = ReplanningProblemLoader()
     # add_env!(loader,"env_2",init_env_2())
     prob = pctapf_problem_1(solver)
-    add_env!(loader,"env_2",prob.env.env_graph)
+    add_env!(loader,"env_2",get_graph(prob.env))
 
     base_dir            = joinpath("/scratch/task_graphs_experiments","dummy")
     base_problem_dir    = joinpath(base_dir,"problem_instances")

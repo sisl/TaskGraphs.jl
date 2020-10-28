@@ -16,7 +16,7 @@ const Action = CRCBS.GraphAction
 # PCCBSEnv
 export PCCBSEnv
 
-@with_kw struct PCCBSEnv{E,N,I,T,C<:AbstractCostModel,H<:AbstractCostModel} <: GraphEnv{State,Action,C}
+@with_kw_noshow struct PCCBSEnv{E,N,I,T,C<:AbstractCostModel,H<:AbstractCostModel} <: GraphEnv{State,Action,C}
     search_env::E                   = nothing
     schedule_node::N                = nothing
     node_id::I                      = nothing
@@ -72,15 +72,21 @@ function CRCBS.get_possible_actions(env::MetaAgentCBS.TeamMetaEnv,s::MetaAgentCB
     meta_actions = Vector{MetaAgentCBS.Action{Action}}()
     for d in d_set
         meta_action = MetaAgentCBS.Action{Action}()
+        valid_action = true
         for (e,s) in zip(env.envs, s.states)
             vtx = get_graph(e).vtxs[s.vtx]
             next_vtx = (vtx[1] + d[1], vtx[2] + d[2])
-            push!(meta_action.actions, Action(e = Edge(
-                get_graph(e).vtx_map[vtx...],
-                get_graph(e).vtx_map[next_vtx...]))
-                )
+            edge = Edge(get_graph(e).vtx_map[vtx...],get_graph(e).vtx_map[next_vtx...])
+            if has_edge(get_graph(e),edge)
+                push!(meta_action.actions, Action(e = edge))
+            else
+                valid_action = false
+                break
+            end
         end
-        push!(meta_actions, meta_action)
+        if valid_action
+            push!(meta_actions, meta_action)
+        end
     end
     meta_actions
 end
