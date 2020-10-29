@@ -234,7 +234,7 @@ function plan_path!(solver::AStarSC, pc_mapf::AbstractPC_MAPF, env::SearchEnv, n
     node_id = get_vtx_id(get_schedule(env),v)
 
     reset_solver!(solver)
-    cbs_env = build_env(solver, pc_mapf, env, node, VtxID(v))#schedule_node, v)
+    cbs_env = build_env(solver, pc_mapf, env, node, VtxID(v)) #schedule_node, v)
     base_path = get_base_path(solver,env,cbs_env)
     ### PATH PLANNING ###
     # solver.DEBUG ? validate(base_path,v) : nothing

@@ -103,6 +103,27 @@ function reset_cache!(cache::PlanningCache,schedule::OperatingSchedule,t0=cache.
     cache
 end
 
+export
+    EnvGraphDict,
+    construct_env_graph_dict
+
+const EnvGraphDict = Dict{Symbol,GridFactoryEnvironment}
+function construct_env_graph_dict(sched::OperatingSchedule,env::GridFactoryEnvironment)
+    dict = EnvGraphDict()
+    dict[:Default] = env
+    for v in vertices(sched)
+        node = get_node_from_vtx(sched,v)
+        k = graph_key(node)
+        if !haskey(dict,k)
+            dict[k] = GridFactoryEnvironment(
+                env,
+                graph=deepcopy(env.graph),
+                dist_function=deepcopy(get_dist_matrix(env))
+            )
+        end
+    end
+    return dict
+end
 
 function initialize_route_plan end
 
@@ -114,10 +135,10 @@ export
     construct_search_env,
     update_env!
 
-@with_kw_noshow struct SearchEnv{G,C,H,S} <: GraphEnv{State,Action,C}
+@with_kw_noshow struct SearchEnv{C,H,S} <: GraphEnv{State,Action,C}
     schedule::OperatingSchedule     = OperatingSchedule()
     cache::PlanningCache            = PlanningCache()
-    graphs::Dict{Symbol,G}          = Dict{Symbol,GridFactoryEnvironment}(:Default=>GridFactoryEnvironment())
+    graphs::EnvGraphDict            = EnvGraphDict(:Default=>GridFactoryEnvironment())
     problem_specs::Dict{Symbol,ProblemSpec} = Dict{Symbol,ProblemSpec}()
     cost_model::C                   = C() #get_cost_model(env)
     heuristic_model::H              = H()
@@ -166,6 +187,7 @@ end
 function Base.show(io::IO,env::SearchEnv)
     sprint_search_env(io,env)
 end
+
 
 export get_node_start_and_end_times
 """
@@ -508,7 +530,7 @@ function construct_search_env(
         extra_T=400,
         kwargs...
     )
-    # N = problem_spec.N                                          # number of robots
+
     cost_model, heuristic_model = construct_cost_model(
         solver,
         schedule,
@@ -520,14 +542,15 @@ function construct_search_env(
         )
 
     route_plan = initialize_route_plan(schedule,cost_model)
-    # @assert N == length(get_paths(route_plan))
     N = length(get_paths(route_plan))
-
+    graphs=construct_env_graph_dict(schedule,env_graph)
+    problem_specs=Dict{Symbol,ProblemSpec}(
+        k=>ProblemSpec(problem_spec,D=G.dist_function) for (k,G) in graphs)
     search_env = SearchEnv(
         schedule=schedule,
         cache=cache,
-        graphs=Dict{Symbol,GridFactoryEnvironment}(:Default=>env_graph),
-        problem_specs=Dict{Symbol,ProblemSpec}(:Default=>problem_spec),
+        graphs=graphs,
+        problem_specs=problem_specs,
         cost_model=cost_model,
         heuristic_model=heuristic_model,
         num_agents=N,
@@ -546,10 +569,8 @@ function construct_search_env(
         solver,
         schedule::OperatingSchedule,
         env::SearchEnv,
-        # cache::PlanningCache=deepcopy(env.cache),
         cache::PlanningCache=initialize_planning_cache(schedule,
             deepcopy(env.cache.t0), deepcopy(env.cache.tF)),
-        # cache=env.cache,
         env_graph=get_graph(env),
         problem_spec = get_problem_spec(env),
         primary_objective = problem_spec.cost_function,
@@ -558,7 +579,6 @@ function construct_search_env(
         extra_T=400,
         kwargs...)
 
-    # N = problem_spec.N                                          # number of robots
     cost_model, heuristic_model = construct_cost_model(
         solver,
         schedule,
@@ -570,14 +590,14 @@ function construct_search_env(
         )
 
     route_plan = initialize_route_plan(env,cost_model)
-    # @assert N == length(get_paths(route_plan))
     N = length(get_paths(route_plan))
-
+    problem_specs=Dict{Symbol,ProblemSpec}(
+        k=>ProblemSpec(problem_spec,D=G.dist_function) for (k,G) in env.graphs)
     search_env = SearchEnv(
         schedule=schedule,
         cache=cache,
-        graphs=Dict{Symbol,GridFactoryEnvironment}(:Default=>env_graph),
-        problem_specs=Dict{Symbol,ProblemSpec}(:Default=>problem_spec),
+        graphs=env.graphs,
+        problem_specs=problem_specs,
         cost_model=cost_model,
         heuristic_model=heuristic_model,
         num_agents=N,

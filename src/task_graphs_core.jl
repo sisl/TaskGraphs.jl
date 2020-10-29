@@ -480,7 +480,7 @@ get_node_from_vtx(schedule::P,v::Int) where {P<:OperatingSchedule}= schedule.pla
 
 get_nodes_of_type(schedule::P,T) where {P<:OperatingSchedule} = Dict(get_id(id)=>get_node_from_id(schedule, id) for id in schedule.vtx_ids if typeof(id)<:T)
 get_object_ICs(schedule::P) where {P<:OperatingSchedule}  = get_nodes_of_type(schedule,ObjectID)
-get_robot_ICs(schedule::P) where {P<:OperatingSchedule}   = get_nodes_of_type(schedule,RobotID)
+get_robot_ICs(schedule::P) where {P<:OperatingSchedule}   = get_nodes_of_type(schedule,BotID)
 get_actions(schedule::P) where {P<:OperatingSchedule}     = get_nodes_of_type(schedule,ActionID)
 get_operations(schedule::P) where {P<:OperatingSchedule}  = get_nodes_of_type(schedule,OperationID)
 

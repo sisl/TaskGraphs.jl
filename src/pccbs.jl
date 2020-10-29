@@ -27,14 +27,13 @@ export PCCBSEnv
     cost_model::C                   = get_cost_model(search_env)
     heuristic::H                    = get_heuristic_model(search_env)
 end
-CRCBS.get_graph(env::PCCBSEnv)            = get_graph(env.search_env) #graph
 CRCBS.get_cost_model(env::PCCBSEnv)       = get_cost_model(env.search_env)
 CRCBS.get_agent_id(env::PCCBSEnv)         = env.agent_idx
 CRCBS.get_constraints(env::PCCBSEnv)      = env.constraints
 CRCBS.get_goal(env::PCCBSEnv)             = env.goal
 CRCBS.get_heuristic_model(env::PCCBSEnv)  = get_heuristic_model(env.search_env)
-
 get_schedule_node(env::PCCBSEnv)          = env.schedule_node
+CRCBS.get_graph(env::PCCBSEnv)            = get_graph(env.search_env,graph_key(get_schedule_node(env))) #graph
 
 function Base.show(io::IO, env::PCCBSEnv)
     print(io,"PCCBSEnv: \n",

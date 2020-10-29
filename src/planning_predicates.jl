@@ -169,10 +169,22 @@ get_id(op::Operation) = get_id(op.id)
 
 export
     AbstractRobotAction,
+	robot_type,
+	graph_key,
     GO,COLLECT,CARRY,DEPOSIT,
 	get_initial_location_id, get_destination_location_id
 
 abstract type AbstractRobotAction{R<:AbstractRobotType} <: AbstractPlanningPredicate end
+robot_type(a::AbstractRobotAction{R}) where {R} = R
+robot_type(a) = Nothing
+robot_type(a::BOT_AT{R}) where {R} = R
+function graph_key(a)
+	if robot_type(a) == Nothing
+		return :Default
+	else
+		return Symbol(robot_type(a))
+	end
+end
 
 export BOT_GO
 """
@@ -257,7 +269,7 @@ get_location_id(a::A) where {A<:Union{COLLECT,DEPOSIT}}             					= a.x
 get_initial_location_id(a::A) where {A<:Union{COLLECT,DEPOSIT,BOT_AT,OBJECT_AT}}     	= get_location_id(a)
 get_destination_location_id(a::A) where {A<:Union{COLLECT,DEPOSIT,BOT_AT,OBJECT_AT}} 	= get_location_id(a)
 get_object_id(a::A) where {A<:Union{CARRY,COLLECT,DEPOSIT}}         					= a.o
-get_robot_id(a::A) where {A<:AbstractRobotAction} = a.r
+get_robot_id(a::A) where {A<:AbstractRobotAction} 										= a.r
 
 export
 	replace_robot_id,

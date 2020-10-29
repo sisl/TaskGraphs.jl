@@ -75,12 +75,6 @@ end
 function pibt_info_strings(cache)
     info_strings = String[]
     for i in CRCBS.get_ordering(cache)
-        # s = CRCBS.get_states(cache)[i]
-        # a = CRCBS.get_actions(cache)[i]
-        # env = CRCBS.get_envs(cache)[i]
-        # env = cache.envs[i]
-    # for (i,(s,env)) in enumerate(zip(cache.states,cache.envs))
-        # str = "\t$i : $(get_vtx(cache.solution.schedule,env.node_id)) $(string(get_schedule_node(env))), s=$(string(s)), a=$(string(a)), goal=$(string(env.goal))\n"
         str = pibt_info_string(cache,i)
         push!(info_strings,str)
     end

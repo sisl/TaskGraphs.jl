@@ -81,6 +81,23 @@ function remove_disturbance!(env_graph::GridFactoryEnvironment,d::OilSpill)
     return env_graph
 end
 
+"""
+    regenerate_path_specs!(solver,env)
+
+Recompute all paths specs (to account for changes in the env_graphs that will
+be propagated to the ProblemSpec's distance function as well.)
+"""
+function regenerate_path_specs!(solver,env)
+    sched = get_schedule(env)
+    for v in vertices(sched)
+        node = get_node_from_vtx(sched,v)
+        prob_spec = get_problem_spec(env,graph_key(node))
+        set_path_spec!(sched,v,generate_path_spec(sched,prob_spec,node))
+    end
+    update_planning_cache!(solver,env)
+    return env
+end
+
 function add_headless_cleanup_task!(
         sched::OperatingSchedule,
         spec::ProblemSpec,

@@ -141,7 +141,7 @@ function pcta_problem(
     env = SearchEnv(
         schedule=project_schedule,
         cache=cache,
-        graphs=Dict{Symbol,GridFactoryEnvironment}(:Default=>env_graph),
+        graphs=construct_env_graph_dict(schedule,env_graph),
         problem_specs=Dict{Symbol,ProblemSpec}(:Default=>problem_spec),
         cost_model = typeof(primary_objective)(project_schedule,cache),
         heuristic_model = NullHeuristic()
