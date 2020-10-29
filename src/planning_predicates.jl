@@ -8,6 +8,7 @@ export
 
 abstract type AbstractRobotType end
 struct DeliveryBot <: AbstractRobotType end
+const DefaultRobotType = DeliveryBot
 
 export
     AbstractID,
@@ -178,9 +179,10 @@ abstract type AbstractRobotAction{R<:AbstractRobotType} <: AbstractPlanningPredi
 robot_type(a::AbstractRobotAction{R}) where {R} = R
 robot_type(a) = Nothing
 robot_type(a::BOT_AT{R}) where {R} = R
+graph_key() = Symbol(DefaultRobotType)
 function graph_key(a)
 	if robot_type(a) == Nothing
-		return :Default
+		return graph_key()
 	else
 		return Symbol(robot_type(a))
 	end

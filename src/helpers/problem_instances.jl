@@ -138,13 +138,25 @@ function pcta_problem(
         robot_ICs,
         )
     cache=initialize_planning_cache(project_schedule)
+    cost_model = typeof(primary_objective)(project_schedule,cache)
+    heuristic_model = NullHeuristic()
+    layers = Dict{Symbol,EnvironmentLayer{typeof(cost_model),typeof(heuristic_model)}}()
+    for k in  unique(map(graph_key, values(sched.planning_nodes)))
+        eg = GridFactoryEnvironment(env_graph,
+            graph=deepcopy(env_graph.graph),
+            dist_function=deepcopy(get_dist_matrix(env_graph))
+            )
+        ps = ProblemSpec(problem_spec,D=get_dist_matrix(eg))
+        layers[k] = EnvironmentLayer(eg,ps,cost_model,heuristic_model)
+    end
     env = SearchEnv(
         schedule=project_schedule,
         cache=cache,
-        graphs=construct_env_graph_dict(schedule,env_graph),
-        problem_specs=Dict{Symbol,ProblemSpec}(:Default=>problem_spec),
-        cost_model = typeof(primary_objective)(project_schedule,cache),
-        heuristic_model = NullHeuristic()
+        env_layers=layers,
+        # graphs=construct_env_graph_dict(schedule,env_graph),
+        # problem_specs=Dict{Symbol,ProblemSpec}(:Default=>problem_spec),
+        # cost_model = cost_model,
+        # heuristic_model = heuristic_model
         )
     PC_TA(env)
 end
