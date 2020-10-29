@@ -131,31 +131,80 @@ const State = CRCBS.GraphState
 const Action = CRCBS.GraphAction
 
 export
+    construct_cost_model,
+    construct_heuristic_model
+
+function construct_cost_model end
+function construct_heuristic_model end
+
+export
     EnvironmentLayer,
     SearchEnv,
     construct_search_env,
     update_env!
 
-@with_kw_noshow struct EnvironmentLayer{C,H}
+@with_kw_noshow struct EnvironmentLayer#{C,H}
     graph::GridFactoryEnvironment   = GridFactoryEnvironment()
     problem_spec::ProblemSpec       = ProblemSpec()
-    cost_model::C                   = C()
-    heuristic_model::H              = H()
+    # cost_model::C                   = C()
+    # heuristic_model::H              = H()
 end
 CRCBS.get_graph(layer::EnvironmentLayer)            = layer.graph
 get_problem_spec(layer::EnvironmentLayer)           = layer.problem_spec
 CRCBS.get_cost_model(layer::EnvironmentLayer)       = layer.cost_model
 CRCBS.get_heuristic_model(layer::EnvironmentLayer)  = layer.heuristic_model
 
+function construct_environment_layer(
+        # solver,
+        # schedule::OperatingSchedule,
+        # cache::PlanningCache,
+        env::GridFactoryEnvironment,
+        problem_spec::ProblemSpec,
+        # primary_objective;
+        # extra_T=extra_T
+    )
+    env_graph = GridFactoryEnvironment(env, graph=deepcopy(env.graph),
+        dist_function=deepcopy(get_dist_matrix(env))
+        )
+    prob_spec = ProblemSpec(problem_spec, D=get_dist_matrix(env_graph))
+    # cost_model, heuristic_model = construct_cost_model(
+    #     solver,
+    #     schedule,
+    #     cache,
+    #     prob_spec,
+    #     env_graph,
+    #     primary_objective;
+    #     extra_T=extra_T,
+    #     )
+    EnvironmentLayer(env_graph,prob_spec)#,cost_model,heuristic_model)
+end
+
+function construct_environment_layer_dict(
+        sched::OperatingSchedule,
+        env::GridFactoryEnvironment,
+        prob_spec::ProblemSpec,
+    )
+    layers = Dict{Symbol,EnvironmentLayer}()
+    gkeys = unique(map(graph_key, values(sched.planning_nodes)))
+    for k in gkeys
+        # dict[k] = construct_environment_layer(solver,sched,args...;kwargs...)
+        layers[k] = construct_environment_layer(env,prob_spec)
+    end
+    return layers
+end
+
 @with_kw_noshow struct SearchEnv{C,H,S} <: GraphEnv{State,Action,C}
     schedule::OperatingSchedule     = OperatingSchedule()
     cache::PlanningCache            = PlanningCache()
     # Each agent type needs its own set of these #
-    env_layers::Dict{Symbol,EnvironmentLayer{C,H}} = Dict{Symbol,EnvironmentLayer{C,H}}()
+    env_layers::Dict{Symbol,EnvironmentLayer} = Dict{Symbol,EnvironmentLayer}()
     # ###################################### #
+    cost_model::C                   = C()
+    heuristic_model::H              = H()
     num_agents::Int                 = length(get_robot_ICs(schedule))
     route_plan::S                   = initialize_route_plan(schedule,cost_model)
 end
+
 export
     get_schedule,
     get_cache,
@@ -164,8 +213,10 @@ export
 
 CRCBS.get_graph(env::SearchEnv,k=graph_key())          = get_graph(env.env_layers[k])
 get_problem_spec(env::SearchEnv,k=graph_key())         = get_problem_spec(env.env_layers[k])
-CRCBS.get_cost_model(env::SearchEnv,k=graph_key())     = get_cost_model(env.env_layers[k])
-CRCBS.get_heuristic_model(env::SearchEnv,k=graph_key())= get_heuristic_model(env.env_layers[k])
+# CRCBS.get_cost_model(env::SearchEnv,k=graph_key())     = get_cost_model(env.env_layers[k])
+# CRCBS.get_heuristic_model(env::SearchEnv,k=graph_key())= get_heuristic_model(env.env_layers[k])
+CRCBS.get_cost_model(env::SearchEnv)        = env.cost_model
+CRCBS.get_heuristic_model(env::SearchEnv)   = env.heuristic_model
 get_schedule(env::SearchEnv) = env.schedule
 get_cache(env::SearchEnv) = env.cache
 get_route_plan(env::SearchEnv) = env.route_plan
@@ -182,9 +233,9 @@ for op in [
     ]
     @eval CRCBS.$op(env::SearchEnv,args...) = $op(get_route_plan(env),args...)
 end
-GraphUtils.get_distance(env::SearchEnv,args...) = get_distance(get_problem_spec(env),args...)
-GraphUtils.get_distance(env::SearchEnv,s::State,args...) = get_distance(get_problem_spec(env),get_vtx(s),args...)
-GraphUtils.get_distance(env::SearchEnv,s::State,g::State) = get_distance(get_problem_spec(env),s,get_vtx(g))
+# GraphUtils.get_distance(env::SearchEnv,args...) = get_distance(get_graph(env),args...)
+# GraphUtils.get_distance(env::SearchEnv,s::State,args...) = get_distance(get_problem_spec(env),get_vtx(s),args...)
+# GraphUtils.get_distance(env::SearchEnv,s::Int,g::State) = get_distance(get_problem_spec(env),s,get_vtx(g))
 function sprint_search_env(io::IO,env::SearchEnv)
     # print(io,"schedule: ",get_schedule(env),"\n")
     print(io,"SearchEnv: \n")
@@ -460,7 +511,7 @@ function update_planning_cache!(solver,env)
             path = get_paths(env)[agent_id]
             s = get_final_state(path)
             t = get_t(s)
-            d = get_distance(env,s,path_spec.final_vtx)
+            d = get_distance(env,s,State(path_spec.final_vtx,-1))
             cache.tF[v] = max(cache.tF[v],t+d)
         end
     end
@@ -488,12 +539,6 @@ function CRCBS.MakeSpan(schedule::S,cache::C) where {S<:OperatingSchedule,C<:Pla
         cache.tF[schedule.terminal_vtxs])
 end
 
-export
-    construct_cost_model,
-    construct_heuristic_model
-
-function construct_cost_model end
-function construct_heuristic_model end
 
 function initialize_route_plan(schedule::OperatingSchedule,cost_model)
     starts = State[]
@@ -532,42 +577,6 @@ function initialize_route_plan(env::SearchEnv,cost_model)
         cost=aggregate_costs(cost_model, costs)
         )
 end
-function construct_environment_layer(solver,
-        schedule::OperatingSchedule,
-        cache::PlanningCache,
-        problem_spec::ProblemSpec,
-        env::GridFactoryEnvironment,
-        primary_objective;
-        extra_T=extra_T
-    )
-    env_graph = GridFactoryEnvironment(env, graph=deepcopy(env.graph),
-        dist_function=deepcopy(get_dist_matrix(env))
-        )
-    prob_spec = ProblemSpec(problem_spec, D=get_dist_matrix(env_graph))
-    cost_model, heuristic_model = construct_cost_model(
-        solver,
-        schedule,
-        cache,
-        prob_spec,
-        env_graph,
-        primary_objective;
-        extra_T=extra_T,
-        )
-    EnvironmentLayer(env_graph,prob_spec,cost_model,heuristic_model)
-end
-
-function fill_environment_layer_dict!(dict,
-        solver,
-        sched::OperatingSchedule,
-        args...;
-        kwargs...
-    )
-    gkeys = unique(map(graph_key, values(sched.planning_nodes)))
-    for k in gkeys
-        dict[k] = construct_environment_layer(solver,sched,args...;kwargs...)
-    end
-    return dict
-end
 function construct_search_env(
         solver,
         schedule::OperatingSchedule,
@@ -588,15 +597,16 @@ function construct_search_env(
         primary_objective;
         extra_T=extra_T,
         )
-    layers = Dict{Symbol,EnvironmentLayer{typeof(cost_model),typeof(heuristic_model)}}()
-    fill_environment_layer_dict!(layers,solver,schedule,cache,problem_spec,env_graph,
-            primary_objective;extra_T=extra_T)
+    # layers = Dict{Symbol,EnvironmentLayer}()
+    layers = construct_environment_layer_dict(schedule,env_graph,problem_spec)
     route_plan = initialize_route_plan(schedule,cost_model)
     N = length(get_paths(route_plan))
     search_env = SearchEnv(
         schedule=schedule,
         cache=cache,
         env_layers=layers,
+        cost_model=cost_model,
+        heuristic_model=heuristic_model,
         num_agents=N,
         route_plan=route_plan)
     return search_env
@@ -632,15 +642,18 @@ function construct_search_env(
         primary_objective;
         extra_T=extra_T,
         )
-    layers = Dict{Symbol,EnvironmentLayer{typeof(cost_model),typeof(heuristic_model)}}()
-    fill_environment_layer_dict!(layers,solver,schedule,cache,problem_spec,env_graph,
-            primary_objective;extra_T=extra_T)
+    # layers = Dict{Symbol,EnvironmentLayer{typeof(cost_model),typeof(heuristic_model)}}()
+    # fill_environment_layer_dict!(layers,solver,schedule,cache,problem_spec,env_graph,
+    #         primary_objective;extra_T=extra_T)
+    layers = construct_environment_layer_dict(schedule,env_graph,problem_spec)
     route_plan = initialize_route_plan(env,cost_model)
     N = length(get_paths(route_plan))
     search_env = SearchEnv(
         schedule=schedule,
         cache=cache,
         env_layers=layers,
+        cost_model=cost_model,
+        heuristic_model=heuristic_model,
         num_agents=N,
         route_plan=route_plan)
 end

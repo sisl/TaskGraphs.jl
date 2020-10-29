@@ -102,7 +102,8 @@ primary_cost(::PrioritizedAStarSC,cost::NTuple{5,Float64}) = cost[2]
 Construct the heuristic model to be used by solver.
 """
 function construct_heuristic_model(trait::NonPrioritized,solver,env_graph,
-        ph = PerfectHeuristic(get_dist_matrix(env_graph))
+        # ph = PerfectHeuristic(get_dist_matrix(env_graph))
+        ph = EnvDistanceHeuristic(),
         )
     construct_composite_heuristic(ph,NullHeuristic(),ph,ph,NullHeuristic())
 end
