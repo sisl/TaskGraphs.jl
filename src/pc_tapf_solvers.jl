@@ -149,7 +149,7 @@ function construct_cost_model(trait::SearchTrait,
         ;
         kwargs...)
     construct_cost_model(trait,solver,
-        get_schedule(env), env.cache, get_problem_spec(env), get_graph(env),
+        get_schedule(env), get_cache(env), get_problem_spec(env), get_graph(env),
         primary_objective;kwargs...)
 end
 function construct_cost_model(trait::Prioritized,args...;kwargs...)
@@ -230,7 +230,7 @@ function plan_path!(solver::AStarSC, pc_mapf::AbstractPC_MAPF, env::SearchEnv, n
         schedule_node::T, v::Int;
         kwargs...) where {N<:ConstraintTreeNode,T}
 
-    cache = env.cache
+    cache = get_cache(env)
     node_id = get_vtx_id(get_schedule(env),v)
 
     reset_solver!(solver)
@@ -329,8 +329,8 @@ function plan_next_path!(solver::ISPS, pc_mapf::AbstractPC_MAPF, env::SearchEnv,
         ) where {N<:ConstraintTreeNode}
 
     valid_flag = true
-    if ~isempty(env.cache.node_queue)
-        v,priority = dequeue_pair!(env.cache.node_queue)
+    if ~isempty(get_cache(env).node_queue)
+        v,priority = dequeue_pair!(get_cache(env).node_queue)
         node_id = get_vtx_id(get_schedule(env),v)
         schedule_node = get_node_from_id(get_schedule(env),node_id)
         if get_path_spec(get_schedule(env), v).plan_path == true
@@ -340,8 +340,8 @@ function plan_next_path!(solver::ISPS, pc_mapf::AbstractPC_MAPF, env::SearchEnv,
                 """
                 ISPS:
                     schedule_node: $(string(schedule_node))
-                    cache.tF[v]: $(env.cache.tF[v])
-                    maximum(env.cache.tF): $(maximum(env.cache.tF))
+                    cache.tF[v]: $(get_cache(env).tF[v])
+                    maximum(get_cache(env).tF): $(maximum(get_cache(env).tF))
                 """)
                 valid_flag = plan_path!(low_level(solver),pc_mapf,env,node,schedule_node,v)
                 @log_info(2,solver,"""
@@ -351,8 +351,8 @@ function plan_next_path!(solver::ISPS, pc_mapf::AbstractPC_MAPF, env::SearchEnv,
                 sprint_indexed_list_array(
                     convert_to_vertex_lists(get_route_plan(env));leftaligned=true),
                 """
-                    cache.tF: $(env.cache.tF)
-                    cache.tF[v]: $(env.cache.tF[v])
+                    cache.tF: $(get_cache(env).tF)
+                    cache.tF[v]: $(get_cache(env).tF[v])
                 """)
             catch e
                 if isa(e, SolverException)
@@ -382,7 +382,7 @@ function compute_route_plan!(solver::ISPS, pc_mapf::AbstractPC_MAPF, node::N, en
         kwargs...
         ) where {N<:ConstraintTreeNode}
 
-    while length(env.cache.node_queue) > 0
+    while length(get_cache(env).node_queue) > 0
         status = plan_next_path!(solver,pc_mapf,env,node)
         # @log_info(-1,solver,"ISPS status = ",status)
         # if status == false
@@ -409,10 +409,10 @@ function CRCBS.low_level_search!(solver::ISPS, pc_mapf::AbstractPC_MAPF,
         increment_iteration_count!(solver)
         # reset solution
         reset_cache!(
-            search_env.cache,
+            get_cache(search_env),
             get_schedule(search_env),
-            pc_mapf.env.cache.t0,
-            pc_mapf.env.cache.tF)
+            get_cache(pc_mapf.env).t0,
+            get_cache(pc_mapf.env).tF)
         reset_route_plan!(node,
             get_route_plan(pc_mapf.env))
         valid_flag = compute_route_plan!(solver, pc_mapf, node)

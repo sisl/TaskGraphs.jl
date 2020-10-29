@@ -52,7 +52,7 @@
 #     return delay_cut
 # end
 # function tighten_deadline!(solver,env,route_plan,v,dt=1)
-#     cache = env.cache
+#     cache = get_cache(env)
 #     schedule = get_schedule(env)
 #     active_set = cache.active_set
 #     closed_set = cache.closed_set

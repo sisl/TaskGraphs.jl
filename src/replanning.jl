@@ -171,7 +171,7 @@ function fix_precutoff_nodes!(project_schedule::OperatingSchedule,problem_spec::
     project_schedule, cache
 end
 function fix_precutoff_nodes!(env::SearchEnv,t=minimum(map(length, get_paths(get_route_plan(env)))))
-    fix_precutoff_nodes!(get_schedule(env),get_problem_spec(env),env.cache,t)
+    fix_precutoff_nodes!(get_schedule(env),get_problem_spec(env),get_cache(env),t)
     return env
 end
 
@@ -288,7 +288,7 @@ function prune_schedule(project_schedule::OperatingSchedule,problem_spec::Proble
 
     new_schedule, new_cache
 end
-prune_schedule(env::SearchEnv,args...) = prune_schedule(get_schedule(env),get_problem_spec(env),env.cache,args...)
+prune_schedule(env::SearchEnv,args...) = prune_schedule(get_schedule(env),get_problem_spec(env),get_cache(env),args...)
 
 """
     `prune_project_schedule`
@@ -528,15 +528,15 @@ function get_commit_time(replan_model, search_env, t_request, commit_threshold=g
     t_request + commit_threshold
 end
 get_commit_time(replan_model::Oracle, search_env, t_request, args...) = t_request
-get_commit_time(replan_model::DeferUntilCompletion, search_env, t_request, commit_threshold) = max(t_request + commit_threshold, maximum(search_env.cache.tF))
+get_commit_time(replan_model::DeferUntilCompletion, search_env, t_request, commit_threshold) = max(t_request + commit_threshold, maximum(get_cache(search_env).tF))
 get_commit_time(replan_model::NullReplanner,args...) = get_commit_time(DeferUntilCompletion(),args...)
 function get_commit_time(replan_model::ReassignFreeRobots, search_env, t_request, commit_threshold)
-    free_time = maximum(search_env.cache.tF)
+    free_time = maximum(get_cache(search_env).tF)
     for v in vertices(get_schedule(search_env))
         node = get_node_from_vtx(get_schedule(search_env),v)
         if isa(node,GO)
             if get_id(get_destination_location_id(node)) == -1
-                free_time = min(free_time, search_env.cache.t0[v])
+                free_time = min(free_time, get_cache(search_env).t0[v])
             end
         end
     end
@@ -600,7 +600,7 @@ function replan!(solver, replan_model, search_env, request;
         kwargs...
         )
     project_schedule    = get_schedule(search_env)
-    cache               = search_env.cache
+    cache               = get_cache(search_env)
     route_plan          = get_route_plan(search_env)
     problem_spec        = get_problem_spec(search_env)
     env_graph           = get_graph(search_env)

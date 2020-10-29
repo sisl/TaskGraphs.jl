@@ -95,7 +95,7 @@ function get_conflict_idx(envs,states,actions,i,ordering,idxs)
     return -1
 end
 function update_envs!(solver,search_env,envs,paths)
-    cache = search_env.cache
+    cache = get_cache(search_env)
     schedule = get_schedule(search_env)
     cbs_node = initialize_root_node(search_env)
     # update_planning_cache!(solver,search_env)        cache.tF[v] = get_final_state(path).t
@@ -186,7 +186,7 @@ function update_envs!(solver,search_env,envs,paths)
 end
 function select_ordering(solver,search_env,envs)
     schedule = get_schedule(search_env)
-    cache = search_env.cache
+    cache = get_cache(search_env)
     ordering = sort(
         collect(1:search_env.num_agents),
         by = i->(
@@ -265,7 +265,7 @@ function prioritized_dfs_search(solver,search_env,envs,paths;
          increment_iteration_count(solver)
          enforce_iteration_limit!(solver)
          update_envs!(solver,search_env,envs,paths)
-         if length(search_env.cache.active_set) == 0
+         if length(get_cache(search_env).active_set) == 0
              return envs, paths, true
          end
          @assert all(map(p->length(p) >= t,paths))
@@ -324,14 +324,14 @@ function CRCBS.solve!(
     envs = Vector{PCCBS.LowLevelEnv}([PCCBS.LowLevelEnv() for p in paths])
     cbs_node = initialize_root_node(search_env)
     for i in 1:search_env.num_agents
-        node_id = get_next_node_matching_agent_id(get_schedule(search_env),search_env.cache,i)
+        node_id = get_next_node_matching_agent_id(get_schedule(search_env),get_cache(search_env),i)
         envs[i] = build_env(solver,search_env,cbs_node,get_vtx(get_schedule(search_env),node_id))
     end
 
     envs, paths, status = prioritized_dfs_search(solver,search_env,envs,paths;
         max_iters = solver.cbs_model.max_iters
     )
-    if validate(get_schedule(search_env),convert_to_vertex_lists(route_plan),search_env.cache.t0,search_env.cache.tF)
+    if validate(get_schedule(search_env),convert_to_vertex_lists(route_plan),get_cache(search_env).t0,get_cache(search_env).tF)
         @log_info(0,solver,"DFS: Succeeded in finding a valid route plan!")
     else
         # throw(SolverCBSMaxOutException("ERROR in DFS! Failed to find a valid route plan!"))
@@ -340,7 +340,7 @@ function CRCBS.solve!(
         mkpath(DEBUG_PATH)
         for env in envs
             v = get_vtx(get_schedule(search_env),env.node_id)
-            @log_info(-1,solver,"node ",string(get_schedule_node(env))," t0=$(search_env.cache.t0[v]), tF=$(search_env.cache.tF[v]), closed=$(v in search_env.cache.closed_set),")
+            @log_info(-1,solver,"node ",string(get_schedule_node(env))," t0=$(get_cache(search_env).t0[v]), tF=$(get_cache(search_env).tF[v]), closed=$(v in get_cache(search_env).closed_set),")
         end
         robot_paths = convert_to_vertex_lists(route_plan)
         object_paths, object_intervals, object_ids, path_idxs = get_object_paths(route_plan,search_env)
@@ -358,7 +358,7 @@ function CRCBS.solve!(
     # end
     cost = aggregate_costs(get_cost_model(search_env),map(p->get_cost(p),paths))
 
-    return route_plan, search_env.cache, cost
+    return route_plan, get_cache(search_env), cost
 end
 
 # end

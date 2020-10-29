@@ -40,7 +40,7 @@ function get_object_path_summaries(env::SearchEnv)
     summaries = Dict{Int,Dict{Symbol,Union{Vector{Int},Int}}}()
     for v in vertices(get_schedule(env))
         node = get_node_from_vtx(get_schedule(env),v)
-        dict = extract_object_data(node,env.cache.t0[v],env.cache.tF[v])
+        dict = extract_object_data(node,get_cache(env).t0[v],get_cache(env).tF[v])
         if haskey(dict,:object_id)
             object_id = dict[:object_id]
             merge!(get!(summaries,object_id,valtype(summaries)()),dict)

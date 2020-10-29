@@ -625,7 +625,7 @@ function get_object_paths(solution,schedule,cache)
     object_paths, object_intervals, object_ids, path_idxs
 end
 function get_object_paths(solution,env)
-    get_object_paths(solution,get_schedule(env),env.cache)
+    get_object_paths(solution,get_schedule(env),get_cache(env))
 end
 
 export

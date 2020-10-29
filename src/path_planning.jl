@@ -181,7 +181,7 @@ function sprint_search_env(io::IO,env::SearchEnv)
     print(io,"SearchEnv: \n")
     print(io,"cache: ",sprint(sprint_cache,get_cache(env)))
     print(io,"active task nodes:","\n")
-    for v in env.cache.active_set
+    for v in get_cache(env).active_set
         print(io,"\t","v = ",
             sprint_padded(v)," => ",
             string(get_node_from_vtx(get_schedule(env),v)),"\n")
@@ -205,7 +205,7 @@ function get_node_start_and_end_times(sched::OperatingSchedule,cache::PlanningCa
     return t0,tF
 end
 function get_node_start_and_end_times(env::SearchEnv,args...)
-    get_node_start_and_end_times(get_schedule(env),env.cache,args...)
+    get_node_start_and_end_times(get_schedule(env),get_cache(env),args...)
 end
 
 export
@@ -288,7 +288,7 @@ end
 construct_routing_problem(prob::C_PC_TAPF,env) = C_PC_MAPF(env)
 
 
-initialize_planning_cache(env::SearchEnv) = initialize_planning_cache(get_schedule(env),deepcopy(env.cache.t0),deepcopy(env.cache.tF))
+initialize_planning_cache(env::SearchEnv) = initialize_planning_cache(get_schedule(env),deepcopy(get_cache(env).t0),deepcopy(get_cache(env).tF))
 
 """
     get_next_vtx_matching_agent_id(schedule,cache,agent_id)
@@ -297,7 +297,7 @@ Return the node_id of the active node assigned to an agent.
 """
 function get_next_vtx_matching_agent_id(env::SearchEnv,agent_id)
     @assert isa(agent_id,BotID)
-    for v in env.cache.active_set
+    for v in get_cache(env).active_set
         if agent_id == get_path_spec(get_schedule(env), v).agent_id
         # if agent_id == get_robot_id(get_node_from_vtx(get_schedule(env), v))
             return v
@@ -329,7 +329,7 @@ export
 """
 update_planning_cache!(solver,env::SearchEnv,v::Int,path::Path) = update_planning_cache!(solver,env,v,get_t(get_final_state(path)))
 function update_planning_cache!(solver,env::SearchEnv,v::Int,t::Int=-1)
-    cache = env.cache
+    cache = get_cache(env)
     schedule = get_schedule(env)
     active_set = cache.active_set
     closed_set = cache.closed_set
@@ -416,7 +416,7 @@ All active nodes that don't require planning will be automatically marked as
 complete.
 """
 function update_planning_cache!(solver,env)
-    cache = env.cache
+    cache = get_cache(env)
     schedule = get_schedule(env)
     node = initialize_root_node(env)
     # dummy_path = path_type(env)()
@@ -567,14 +567,14 @@ end
 Constructs a new search env by combining the new `schedule` with the pre-
 existing `get_route_plan(env)`. This involves constructing a new cost function that
 reflects the new schedule structure.
-TODO: Carry over information about `search_env.cache`
+TODO: Carry over information about `get_cache(search_env)`
 """
 function construct_search_env(
         solver,
         schedule::OperatingSchedule,
         env::SearchEnv,
         cache::PlanningCache=initialize_planning_cache(schedule,
-            deepcopy(env.cache.t0), deepcopy(env.cache.tF)),
+            deepcopy(get_cache(env).t0), deepcopy(get_cache(env).tF)),
         env_graph=get_graph(env),
         problem_spec = get_problem_spec(env),
         primary_objective = problem_spec.cost_function,
@@ -610,7 +610,7 @@ end
 
 update_cost_model!(model::C,env::S) where {C,S<:SearchEnv} = nothing
 function update_cost_model!(model::C,env::S) where {C<:MultiDeadlineCost,S<:SearchEnv}
-    model.tF .= env.cache.tF
+    model.tF .= get_cache(env).tF
 end
 function update_cost_model!(model::C,env::S) where {C<:CompositeCostModel,S<:SearchEnv}
     for m in model.cost_models
@@ -628,7 +628,7 @@ function update_env!(solver,env::SearchEnv,v::Int,path::P,
         agent_id::Int=get_id(get_path_spec(get_schedule(env),v).agent_id)
         ) where {P<:Path}
     route_plan = get_route_plan(env)
-    cache = env.cache
+    cache = get_cache(env)
     schedule = get_schedule(env)
     # UPDATE CACHE
     update_planning_cache!(solver,env,v,get_t(get_final_state(path)))
@@ -658,10 +658,10 @@ export evaluate_path_gap
     evaluate_path_gap(search_env::SearchEnv,path,v)
 
 Returns the gap between a path's length and it's expected length (based on times
-stored in `env.cache.t0`)
+stored in `get_cache(env).t0`)
 """
 function evaluate_path_gap(search_env::SearchEnv,path,v)
-    t0 = search_env.cache.t0[v]
+    t0 = get_cache(search_env).t0[v]
     gap = t0 - get_end_index(path)
     return gap
 end
@@ -676,7 +676,7 @@ function replan_path!(solver, pc_mapf::AbstractPC_MAPF, env::SearchEnv, node::Co
     path = get_base_path(solver,env,cbs_env)
     # @log_info(-1,solver,"old path cost: ",get_cost(path))
     # @log_info(3,low_level(solver),"old path: \n",convert_to_vertex_lists(path))
-    trim_path!(cbs_env,path,env.cache.t0[v])
+    trim_path!(cbs_env,path,get_cache(env).t0[v])
     # @log_info(3,low_level(solver),"trimmed path: \n",convert_to_vertex_lists(path))
     # @log_info(-1,solver,"trimmed path cost: ",get_cost(path))
     ### plan path with new goal time
@@ -689,26 +689,26 @@ export tighten_gaps!
 """
     tighten_gaps!(solver, pc_mapf, env::SearchEnv, node::ConstraintTreeNode)
 
-If any path ends before it should (based on times stored in `env.cache`),
+If any path ends before it should (based on times stored in `get_cache(env)`),
 recomputes the path segment for the final node in that line.
 """
 function tighten_gaps!(solver, pc_mapf::AbstractPC_MAPF, env::SearchEnv, node::ConstraintTreeNode)
     solver.tighten_paths ? nothing : return env
     sched = get_schedule(env)
-    active_nodes = robot_tip_map(sched,env.cache.active_set)
+    active_nodes = robot_tip_map(sched,get_cache(env).active_set)
     for (robot_id, node_id) in active_nodes
         path = get_paths(env)[get_id(robot_id)]
         v = get_vtx(sched,node_id)
         gap = evaluate_path_gap(env,path,v)
         if gap > 0
-            t0 = env.cache.t0[v]
+            t0 = get_cache(env).t0[v]
             @log_info(2, solver, "tighten_gaps!: base path for ",
                 string(get_node_from_vtx(sched,v)),
                 ", v = ",v," ends at t=",get_end_index(path),
                 " but should end at t=",t0," (gap = ", gap,").")
             vtxs = backtrack_node(sched,v)
             for vp in vtxs
-                if env.cache.tF[vp] < t0
+                if get_cache(env).tF[vp] < t0
                     @log_info(2,solver," Re-launching planner on ",string(get_node_from_vtx(sched,vp))," (v = ",v,")"," with extended horizon ",t0," ...")
                     if replan_path!(solver, pc_mapf, env, node, VtxID(vp),t0)
                         @log_info(2,solver,"tightening succeeded on ",string(get_node_from_vtx(sched,vp))," (v = ",v,")"," with extended horizon ",t0)
@@ -741,13 +741,13 @@ function CRCBS.build_env(
     ) where {T}
     agent_id = get_id(path_spec.agent_id)
     goal_vtx = path_spec.final_vtx
-    goal_time = env.cache.tF[v] # time after which goal can be satisfied
-    # deadline = env.cache.tF[v] .+ min.(env.cache.max_deadline[v],env.cache.slack[v]) # NOTE iterative deadline tightening was causing problems with slack running out before the goal time, so this line has been replaced by the original
-    # deadline = env.cache.tF[v] .+ min.(max.(env.cache.local_slack[v], env.cache.max_deadline[v]),env.cache.slack[v]) # This is a potential fix that would allow iterative tightening to keep working
-    deadline = env.cache.tF[v] .+ env.cache.slack[v]         # deadline for DeadlineCost
+    goal_time = get_cache(env).tF[v] # time after which goal can be satisfied
+    # deadline = get_cache(env).tF[v] .+ min.(get_cache(env).max_deadline[v],get_cache(env).slack[v]) # NOTE iterative deadline tightening was causing problems with slack running out before the goal time, so this line has been replaced by the original
+    # deadline = get_cache(env).tF[v] .+ min.(max.(get_cache(env).local_slack[v], get_cache(env).max_deadline[v]),get_cache(env).slack[v]) # This is a potential fix that would allow iterative tightening to keep working
+    deadline = get_cache(env).tF[v] .+ get_cache(env).slack[v]         # deadline for DeadlineCost
     # Adjust deadlines if necessary:
     if path_spec.tight == true
-        goal_time += minimum(env.cache.local_slack[v])
+        goal_time += minimum(get_cache(env).local_slack[v])
     end
     for v_next in outneighbors(get_graph(get_schedule(env)),v)
         if get_path_spec(get_schedule(env), v_next).static == true
@@ -765,7 +765,7 @@ function CRCBS.build_env(
         end
     end
     if (path_spec.free == true) && is_terminal_node(get_graph(get_schedule(env)),v)
-        goal_time = maximum(env.cache.tF)
+        goal_time = maximum(get_cache(env).tF)
         goal_vtx = -1
         # deadline = Inf # already taken care of, perhaps?
         @log_info(3,solver,string("BUILD ENV: ",string(schedule_node),
@@ -889,14 +889,14 @@ function CRCBS.initialize_root_node(env::SearchEnv)
             ),
         id = 1)
 end
-function CRCBS.discrete_constraint_table(env::SearchEnv,agent_id=-1,tf=2*maximum(env.cache.tF)+100*num_agents(env))
+function CRCBS.discrete_constraint_table(env::SearchEnv,agent_id=-1,tf=2*maximum(get_cache(env).tF)+100*num_agents(env))
     discrete_constraint_table(num_states(env),num_actions(env),agent_id,tf)
 end
 CRCBS.initialize_root_node(solver,pc_mapf::AbstractPC_MAPF) = initialize_root_node(pc_mapf.env)
 function Base.copy(env::SearchEnv)
     SearchEnv(
         env,
-        cache=deepcopy(env.cache),
+        cache=deepcopy(get_cache(env)),
         route_plan=deepcopy(get_route_plan(env))
         )
 end
@@ -909,7 +909,7 @@ CRCBS.default_solution(pc_mapf::M) where {M<:AbstractPC_MAPF} = default_solution
 function CRCBS.cbs_update_conflict_table!(solver,mapf::AbstractPC_MAPF,node,constraint)
     search_env = node.solution
     idxs = collect(1:num_agents(search_env))
-    t0 = max(minimum(search_env.cache.t0), 1) # This is particularly relevant for replanning, where we don't care to look for conflicts way back in the past.
+    t0 = max(minimum(get_cache(search_env).t0), 1) # This is particularly relevant for replanning, where we don't care to look for conflicts way back in the past.
     detect_conflicts!(node.conflict_table,get_route_plan(search_env),idxs,t0)
 end
 CRCBS.detect_conflicts!(table,env::SearchEnv,args...) = detect_conflicts!(table,get_route_plan(env),args...)

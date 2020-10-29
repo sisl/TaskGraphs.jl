@@ -490,13 +490,13 @@ function profile_replanning(replan_model, fallback_model, solver, fallback_solve
     for i in 1:idx
         for node_id in keys(final_times[i])
             v = get_vtx(get_schedule(search_env),node_id)
-            final_times[i][node_id] = max(final_times[i][node_id], get(search_env.cache.tF, v, -1))
+            final_times[i][node_id] = max(final_times[i][node_id], get(get_cache(search_env).tF, v, -1))
         end
     end
 
     while idx < length(project_list)
         project_schedule = get_schedule(search_env)
-        cache = search_env.cache
+        cache = get_cache(search_env)
         idx += 1
         t_request = arrival_interval * (idx - 1) # time when request reaches command center
         t_arrival = t_request + warning_time # time when objects become available
@@ -558,7 +558,7 @@ function profile_replanning(replan_model, fallback_model, solver, fallback_solve
         for i in 1:idx
             for node_id in keys(final_times[i])
                 v = get_vtx(get_schedule(search_env),node_id)
-                final_times[i][node_id] = max(final_times[i][node_id], get(search_env.cache.tF, v, -1))
+                final_times[i][node_id] = max(final_times[i][node_id], get(get_cache(search_env).tF, v, -1))
             end
         end
     end
@@ -580,7 +580,7 @@ function profile_replanning(replan_model, fallback_model, solver, fallback_solve
 
     if cost[1] < Inf && get(problem_config, :save_paths, true)
         println("SAVING PATHS")
-        object_path_dict, object_interval_dict = fill_object_path_dicts!(solution,get_schedule(search_env),search_env.cache,object_path_dict,object_interval_dict)
+        object_path_dict, object_interval_dict = fill_object_path_dicts!(solution,get_schedule(search_env),get_cache(search_env),object_path_dict,object_interval_dict)
         object_paths, object_intervals = convert_to_path_vectors(object_path_dict, object_interval_dict)
 
         results_dict["robot_paths"]         = convert_to_vertex_lists(solution)

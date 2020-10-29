@@ -23,7 +23,7 @@ function CRCBS.is_consistent(cache::PIBTCache,pc_mapf::PC_MAPF)
     #         n_jobless += 1
     #     end
     # end
-    if length(search_env.cache.closed_set) + n_jobless >= nv(get_schedule(search_env))
+    if length(get_cache(search_env).closed_set) + n_jobless >= nv(get_schedule(search_env))
         return true
     elseif !any(CRCBS.is_valid, map(e->CRCBS.get_goal(e),CRCBS.get_envs(cache)))
         # all robots are done with their jobs
