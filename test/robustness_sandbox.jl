@@ -57,7 +57,6 @@ v = get_vtx(sched,id1)
 cbs_env = build_env(solver, pcmapf, search_env, node, VtxID(v))
 remove_edges!(get_graph(cbs_env),Set([Edge(1,2)]))
 TaskGraphs.regenerate_path_specs!(solver,search_env)
-# TODO update_cost_model
 @show get_path_spec(sched, v).min_path_duration
 
 set_verbosity!(solver,6)
