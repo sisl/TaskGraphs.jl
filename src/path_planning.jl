@@ -138,25 +138,29 @@ export
 @with_kw_noshow struct SearchEnv{C,H,S} <: GraphEnv{State,Action,C}
     schedule::OperatingSchedule     = OperatingSchedule()
     cache::PlanningCache            = PlanningCache()
+    # Each agent type needs its own set of these #
     graphs::EnvGraphDict            = EnvGraphDict(:Default=>GridFactoryEnvironment())
     problem_specs::Dict{Symbol,ProblemSpec} = Dict{Symbol,ProblemSpec}()
-    cost_model::C                   = C() #get_cost_model(env)
+    cost_model::C                   = C()
     heuristic_model::H              = H()
+    # ###################################### #
     num_agents::Int                 = length(get_robot_ICs(schedule))
     route_plan::S                   = initialize_route_plan(schedule,cost_model)
 end
 export
     get_schedule,
+    get_cache,
     get_problem_spec,
     get_route_plan
 
-CRCBS.get_graph(env::SearchEnv,k=:Default) = env.graphs[k]
 get_schedule(env::SearchEnv) = env.schedule
+get_cache(env::SearchEnv) = env.cache
+CRCBS.get_graph(env::SearchEnv,k=:Default) = env.graphs[k]
 get_problem_spec(env::SearchEnv,k=:Default) = env.problem_specs[k]
 get_route_plan(env::SearchEnv) = env.route_plan
 function CRCBS.get_start(env::SearchEnv,v::Int)
     start_vtx   = get_path_spec(get_schedule(env),v).start_vtx
-    start_time  = env.cache.t0[v]
+    start_time  = get_cache(env).t0[v]
     State(start_vtx,start_time)
 end
 CRCBS.get_cost_model(env::SearchEnv) = env.cost_model
@@ -175,7 +179,7 @@ GraphUtils.get_distance(env::SearchEnv,s::State,g::State) = get_distance(get_pro
 function sprint_search_env(io::IO,env::SearchEnv)
     # print(io,"schedule: ",get_schedule(env),"\n")
     print(io,"SearchEnv: \n")
-    print(io,"cache: ",sprint(sprint_cache,env.cache))
+    print(io,"cache: ",sprint(sprint_cache,get_cache(env)))
     print(io,"active task nodes:","\n")
     for v in env.cache.active_set
         print(io,"\t","v = ",
