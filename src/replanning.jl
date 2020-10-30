@@ -174,6 +174,8 @@ function get_active_and_fixed_vtxs(project_schedule::OperatingSchedule,cache::Pl
     @assert all(map(v->cache.tF[v] + minimum(cache.local_slack[v]), collect(active_vtxs)) .>= t)
     active_vtxs, fixed_vtxs
 end
+get_active_vtxs(sched,cache,t) = get_active_and_fixed_vtxs(sched,cache,t)[1]
+get_fixed_vtxs(sched,cache,t) = get_active_and_fixed_vtxs(sched,cache,t)[2]
 
 """
     split_active_vtxs!(project_schedule::OperatingSchedule,
@@ -291,7 +293,11 @@ end
 
     remove nodes that don't need to be kept around any longer
 """
-function prune_schedule(project_schedule::OperatingSchedule,problem_spec::ProblemSpec,cache::PlanningCache,t)
+function prune_schedule(project_schedule::OperatingSchedule,
+        problem_spec::ProblemSpec,
+        cache::PlanningCache,
+        t,
+        )
     G = get_graph(project_schedule)
 
     # identify nodes "cut" by timestep

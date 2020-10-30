@@ -463,7 +463,7 @@ LightGraphs.edges(schedule::OperatingSchedule) = edges(schedule.graph)
 LightGraphs.is_directed(schedule::OperatingSchedule) = true
 for op in [
     :edgetype,:has_edge,:has_vertex,:inneighbors,:ne,:nv,:outneighbors,
-    :vertices,:indegree,:outdegree
+    :vertices,#:indegree,:outdegree
     ]
     @eval LightGraphs.$op(sched::OperatingSchedule,args...) = $op(sched.graph,args...)
 end

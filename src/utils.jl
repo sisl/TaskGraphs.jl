@@ -84,8 +84,8 @@ export get_robot_ids
 Returns vector of all robot ids associated with the schedule node referenced by
 node_id.
 """
-function get_robot_ids(sched::OperatingSchedule,node_id::A,v=get_vtx(sched,node_id)) where {A<:Union{ActionID,RobotID}}
-    ids = Vector{RobotID}()
+function get_robot_ids(sched::OperatingSchedule,node_id::A,v=get_vtx(sched,node_id)) where {A<:Union{ActionID,BotID}}
+    ids = Vector{BotID}()
     robot_id = get_path_spec(sched,v).agent_id
     node = get_node_from_id(sched,node_id)
     if isa(node,TEAM_ACTION)
@@ -101,10 +101,10 @@ function get_robot_ids(sched::OperatingSchedule,node_id::A,v=get_vtx(sched,node_
     return ids
 end
 function get_robot_ids(sched::OperatingSchedule,node_id::A,v=get_vtx(sched,node_id)) where {A<:Union{ObjectID,OperationID}}
-    return Vector{RobotID}()
+    return Vector{BotID}()
 end
 get_robot_ids(s::OperatingSchedule,v::Int) = get_robot_ids(s,get_vtx_id(s,v),v)
-get_robot_ids(node) = RobotID[]
+get_robot_ids(node) = BotID[]
 get_robot_ids(node::AbstractRobotAction) = [get_robot_id(node)]
 get_robot_ids(node::TEAM_ACTION) = map(n->get_robot_id(n),node.instructions)
 
@@ -117,7 +117,7 @@ Returns a `Dict{RobotID,AbstractID}` mapping `RobotID` to the terminal node of
 the `sched` corresponding to the robot's last assigned task.
 """
 function robot_tip_map(sched::OperatingSchedule,vtxs=get_all_terminal_nodes(sched))
-    robot_tips = Dict{RobotID,AbstractID}()
+    robot_tips = Dict{BotID,AbstractID}()
     for v in vtxs
         node_id = get_vtx_id(sched,v)
         for robot_id in get_robot_ids(sched,node_id,v)
@@ -459,11 +459,11 @@ export
     get_display_metagraph
 
 title_string(pred::OBJECT_AT,verbose=true) = verbose ? string("O",get_id(get_object_id(pred)),"-",get_id(get_location_id(pred))) : string("O",get_id(get_object_id(pred)));
-title_string(pred::ROBOT_AT,verbose=true)  = verbose ? string("R",get_id(get_robot_id(pred)),"-",get_id(get_location_id(pred))) : string("R",get_id(get_robot_id(pred)));
-title_string(a::GO,verbose=true)        = verbose ? string("go\n",get_id(get_robot_id(a)),",",get_id(get_initial_location_id(a)),",",get_id(get_destination_location_id(a))) : "go";
-title_string(a::COLLECT,verbose=true)   = verbose ? string("collect\n",get_id(get_robot_id(a)),",",get_id(get_object_id(a)),",",get_id(get_location_id(a))) : "collect";
-title_string(a::CARRY,verbose=true)     = verbose ? string("carry\n",get_id(get_robot_id(a)),",",get_id(get_object_id(a)),",",get_id(get_destination_location_id(a))) : "carry";
-title_string(a::DEPOSIT,verbose=true)   = verbose ? string("deposit\n",get_id(get_robot_id(a)),",",get_id(get_object_id(a)),",",get_id(get_location_id(a))) : "deposit";
+title_string(pred::BOT_AT,verbose=true)  = verbose ? string("R",get_id(get_robot_id(pred)),"-",get_id(get_location_id(pred))) : string("R",get_id(get_robot_id(pred)));
+title_string(a::BOT_GO,verbose=true)        = verbose ? string("go\n",get_id(get_robot_id(a)),",",get_id(get_initial_location_id(a)),",",get_id(get_destination_location_id(a))) : "go";
+title_string(a::BOT_COLLECT,verbose=true)   = verbose ? string("collect\n",get_id(get_robot_id(a)),",",get_id(get_object_id(a)),",",get_id(get_location_id(a))) : "collect";
+title_string(a::BOT_CARRY,verbose=true)     = verbose ? string("carry\n",get_id(get_robot_id(a)),",",get_id(get_object_id(a)),",",get_id(get_destination_location_id(a))) : "carry";
+title_string(a::BOT_DEPOSIT,verbose=true)   = verbose ? string("deposit\n",get_id(get_robot_id(a)),",",get_id(get_object_id(a)),",",get_id(get_location_id(a))) : "deposit";
 title_string(op::Operation,verbose=true)= verbose ? string("op",get_id(get_operation_id(op))) : "op";
 title_string(a::TEAM_ACTION,verbose=true) where {R,A} = verbose ? string("team", team_action_type(a), "\n","r: (",map(i->string(get_id(get_robot_id(i)), ","), a.instructions)...,")") : string("team", A)
 
@@ -473,6 +473,7 @@ function get_display_metagraph(project_schedule::OperatingSchedule;
     f=(v,p)->title_string(p,verbose),
     object_color="orange",
     robot_color="lime",
+    clean_up_bot_color="yellow",
     action_color="cyan",
     operation_color="red",
     remove_leaf_robots=false
@@ -503,7 +504,11 @@ function get_display_metagraph(project_schedule::OperatingSchedule;
         v = get_vtx(project_schedule, get_robot_id(pred))
         set_prop!(graph, v, :vtype, :robot_ic)
         set_prop!(graph, v, :text, f(v,pred))
-        set_prop!(graph, v, :color, robot_color)
+        if isa(id,CleanUpBotID)
+            set_prop!(graph, v, :color, clean_up_bot_color)
+        else
+            set_prop!(graph, v, :color, robot_color)
+        end
         set_prop!(graph, v, :vtx_id, v)
     end
     if remove_leaf_robots == true

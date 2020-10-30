@@ -561,18 +561,18 @@ how e.g., robot ids are propagated through an existing operating schedule
 after assignments (or re-assignments) have been made.
 """
 align_with_predecessor(node,pred) 						= node
-align_with_predecessor(node::GO,pred::ROBOT_AT) 		= GO(first_valid(node.r,pred.r), first_valid(node.x1,pred.x), node.x2)
-align_with_predecessor(node::GO,pred::GO) 				= GO(first_valid(node.r,pred.r), first_valid(node.x1,pred.x2), node.x2)
-align_with_predecessor(node::GO,pred::DEPOSIT) 			= GO(first_valid(node.r,pred.r), first_valid(node.x1,pred.x), node.x2)
-align_with_predecessor(node::COLLECT,pred::OBJECT_AT) 	= COLLECT(node.r, first_valid(node.o,pred.o), node.x) # NOTE: Because the object could occupy multiple vertices, we do not want to dispatch first_valid between COLLECT.x and OBJECT_AT.x
-align_with_predecessor(node::COLLECT,pred::GO) 			= COLLECT(first_valid(node.r,pred.r), node.o, first_valid(node.x,pred.x2))
-align_with_predecessor(node::CARRY,pred::COLLECT) 		= CARRY(first_valid(node.r,pred.r), first_valid(node.o,pred.o), first_valid(node.x1,pred.x), node.x2)
-align_with_predecessor(node::CARRY,pred::CARRY) 		= CARRY(first_valid(node.r,pred.r), first_valid(node.o,pred.o), first_valid(node.x1,pred.x2), node.x2)
-align_with_predecessor(node::DEPOSIT,pred::CARRY)		= DEPOSIT(first_valid(node.r,pred.r), first_valid(node.o,pred.o), first_valid(node.x,pred.x2))
+align_with_predecessor(node::BOT_GO,pred::BOT_AT) 		= BOT_GO(first_valid(node.r,pred.r), first_valid(node.x1,pred.x), node.x2)
+align_with_predecessor(node::BOT_GO,pred::BOT_GO) 				= BOT_GO(first_valid(node.r,pred.r), first_valid(node.x1,pred.x2), node.x2)
+align_with_predecessor(node::BOT_GO,pred::BOT_DEPOSIT) 			= BOT_GO(first_valid(node.r,pred.r), first_valid(node.x1,pred.x), node.x2)
+align_with_predecessor(node::BOT_COLLECT,pred::OBJECT_AT) 	= BOT_COLLECT(node.r, first_valid(node.o,pred.o), node.x) # NOTE: Because the object could occupy multiple vertices, we do not want to dispatch first_valid between BOT_COLLECT.x and OBJECT_AT.x
+align_with_predecessor(node::BOT_COLLECT,pred::BOT_GO) 			= BOT_COLLECT(first_valid(node.r,pred.r), node.o, first_valid(node.x,pred.x2))
+align_with_predecessor(node::BOT_CARRY,pred::BOT_COLLECT) 		= BOT_CARRY(first_valid(node.r,pred.r), first_valid(node.o,pred.o), first_valid(node.x1,pred.x), node.x2)
+align_with_predecessor(node::BOT_CARRY,pred::BOT_CARRY) 		= BOT_CARRY(first_valid(node.r,pred.r), first_valid(node.o,pred.o), first_valid(node.x1,pred.x2), node.x2)
+align_with_predecessor(node::BOT_DEPOSIT,pred::BOT_CARRY)		= BOT_DEPOSIT(first_valid(node.r,pred.r), first_valid(node.o,pred.o), first_valid(node.x,pred.x2))
 
-# NOTE job shop constraints were wreaking havoc with id propagation between COLLECT nodes and DEPOSIT nodes! Hence the alignment functions have been removed
-# align_with_predecessor(node::COLLECT,pred::COLLECT) 	= COLLECT(node.r, node.o, first_valid(node.x,pred.x))
-# align_with_predecessor(node::DEPOSIT,pred::DEPOSIT) 	= DEPOSIT(node.r, node.o, first_valid(node.x,pred.x))
+# NOTE job shop constraints were wreaking havoc with id propagation between BOT_COLLECT nodes and BOT_DEPOSIT nodes! Hence the alignment functions have been removed
+# align_with_predecessor(node::BOT_COLLECT,pred::BOT_COLLECT) 	= BOT_COLLECT(node.r, node.o, first_valid(node.x,pred.x))
+# align_with_predecessor(node::BOT_DEPOSIT,pred::BOT_DEPOSIT) 	= BOT_DEPOSIT(node.r, node.o, first_valid(node.x,pred.x))
 
 function align_with_predecessor(node::TEAM_ACTION,pred)
 	for i in 1:length(node.instructions)
@@ -613,8 +613,8 @@ how e.g., robot ids are propagated through an existing operating schedule
 after assignments (or re-assignments) have been made.
 """
 align_with_successor(node,pred) 						= node
-align_with_successor(node::GO,succ::COLLECT) 			= GO(first_valid(node.r,succ.r), node.x1, first_valid(node.x2,succ.x))
-align_with_successor(node::GO,succ::GO) 				= GO(first_valid(node.r,succ.r), node.x1, first_valid(node.x2,succ.x1))
+align_with_successor(node::BOT_GO,succ::BOT_COLLECT) 			= BOT_GO(first_valid(node.r,succ.r), node.x1, first_valid(node.x2,succ.x))
+align_with_successor(node::BOT_GO,succ::BOT_GO) 				= BOT_GO(first_valid(node.r,succ.r), node.x1, first_valid(node.x2,succ.x1))
 
 
 export
@@ -626,30 +626,30 @@ export
 For an edge (n1) --> (n2), checks whether the edge is legal and the nodes
 "agree". For example,
 
-`validate_edge(n1::ROBOT_AT, n2::GO) = (n1.x == n2.x1) && (n1.r == n2.r)`
+`validate_edge(n1::BOT_AT, n2::BOT_GO) = (n1.x == n2.x1) && (n1.r == n2.r)`
 
 meaning that the robot ids and the initial initial locations must match.
 """
 validate_edge(n1,n2) = true
-validate_edge(n1::N1,n2::N2) where {N1<:Union{ROBOT_AT,OBJECT_AT},N2<:Union{ROBOT_AT,OBJECT_AT}} = false
-validate_edge(n1::ROBOT_AT,		n2::GO			) = (n1.x 	== n2.x1) && (n1.r == n2.r)
-validate_edge(n1::GO,			n2::GO			) = (n1.x2 	== n2.x1) && (n1.r == n2.r)
-validate_edge(n1::GO,			n2::COLLECT		) = (n1.x2 	== n2.x ) && (n1.r == n2.r)
-validate_edge(n1::COLLECT,		n2::CARRY		) = (n1.x 	== n2.x1) && (n1.o == n2.o)
-validate_edge(n1::CARRY,		n2::COLLECT		) = false
-validate_edge(n1::CARRY,		n2::DEPOSIT		) = (n1.x2 	== n2.x) && (n1.o == n2.o)
-validate_edge(n1::DEPOSIT,		n2::CARRY		) = false
-validate_edge(n1::DEPOSIT,		n2::GO			) = (n1.x 	== n2.x1)
-validate_edge(n1::N,n2::N) where {N<:Union{COLLECT,DEPOSIT}} = (n1.x == n2.x) # job shop edges are valid
+validate_edge(n1::N1,n2::N2) where {N1<:Union{BOT_AT,OBJECT_AT},N2<:Union{BOT_AT,OBJECT_AT}} = false
+validate_edge(n1::BOT_AT,		n2::BOT_GO			) = (n1.x 	== n2.x1) && (n1.r == n2.r)
+validate_edge(n1::BOT_GO,			n2::BOT_GO			) = (n1.x2 	== n2.x1) && (n1.r == n2.r)
+validate_edge(n1::BOT_GO,			n2::BOT_COLLECT		) = (n1.x2 	== n2.x ) && (n1.r == n2.r)
+validate_edge(n1::BOT_COLLECT,		n2::BOT_CARRY		) = (n1.x 	== n2.x1) && (n1.o == n2.o)
+validate_edge(n1::BOT_CARRY,		n2::BOT_COLLECT		) = false
+validate_edge(n1::BOT_CARRY,		n2::BOT_DEPOSIT		) = (n1.x2 	== n2.x) && (n1.o == n2.o)
+validate_edge(n1::BOT_DEPOSIT,		n2::BOT_CARRY		) = false
+validate_edge(n1::BOT_DEPOSIT,		n2::BOT_GO			) = (n1.x 	== n2.x1)
+validate_edge(n1::N,n2::N) where {N<:Union{BOT_COLLECT,BOT_DEPOSIT}} = (n1.x == n2.x) # job shop edges are valid
 
 
-Base.string(pred::OBJECT_AT) =  string("O(",get_id(get_object_id(pred)),",",get_id(get_location_id(pred)),")")
-Base.string(pred::BOT_AT)  =  string("R(",get_id(get_robot_id(pred)),",",get_id(get_location_id(pred)),")")
-Base.string(a::BOT_GO)        =  string("GO(",get_id(get_robot_id(a)),",",get_id(get_initial_location_id(a)),"->",get_id(get_destination_location_id(a)),")")
-Base.string(a::BOT_COLLECT)   =  string("COLLECT(",get_id(get_robot_id(a)),",",get_id(get_object_id(a)),",",get_id(get_location_id(a)),")")
-Base.string(a::BOT_CARRY)     =  string("CARRY(",get_id(get_robot_id(a)),",",get_id(get_object_id(a)),",",get_id(get_initial_location_id(a)),"->",get_id(get_destination_location_id(a)),")")
-Base.string(a::BOT_DEPOSIT)   =  string("DEPOSIT(",get_id(get_robot_id(a)),",",get_id(get_object_id(a)),",",get_id(get_location_id(a)),")")
-Base.string(op::Operation)=  string("OP(",get_id(get_operation_id(op)),")")
-Base.string(a::TEAM_ACTION) =  string("TEAM_ACTION( ",map(i->string(string(i), ","), a.instructions)...," )")
+Base.string(pred::OBJECT_AT)	=  string("O(",get_id(get_object_id(pred)),",",get_id(get_location_id(pred)),")")
+Base.string(pred::BOT_AT)  		=  string("R(",get_id(get_robot_id(pred)),",",get_id(get_location_id(pred)),")")
+Base.string(a::BOT_GO)        	=  string("GO(",get_id(get_robot_id(a)),",",get_id(get_initial_location_id(a)),"->",get_id(get_destination_location_id(a)),")")
+Base.string(a::BOT_COLLECT)   	=  string("COLLECT(",get_id(get_robot_id(a)),",",get_id(get_object_id(a)),",",get_id(get_location_id(a)),")")
+Base.string(a::BOT_CARRY)     	=  string("CARRY(",get_id(get_robot_id(a)),",",get_id(get_object_id(a)),",",get_id(get_initial_location_id(a)),"->",get_id(get_destination_location_id(a)),")")
+Base.string(a::BOT_DEPOSIT)   	=  string("DEPOSIT(",get_id(get_robot_id(a)),",",get_id(get_object_id(a)),",",get_id(get_location_id(a)),")")
+Base.string(op::Operation)    	=  string("OP(",get_id(get_operation_id(op)),")")
+Base.string(a::TEAM_ACTION)   	=  string("TEAM_ACTION( ",map(i->string(string(i), ","), a.instructions)...," )")
 
 end # module PlanningPredicates

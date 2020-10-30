@@ -12,6 +12,7 @@ using PGFPlots
 using Printf
 using Parameters
 using Measures
+using MetaGraphs
 
 ROBOT_COLOR = RGB(0.1,0.5,0.9)
 
@@ -1068,7 +1069,9 @@ function get_node_color(search_env::SearchEnv,graph,v,x,y,r)
     node_id = get_vtx_id(project_schedule,get_prop(graph,v,:vtx_id))
     if typeof(node_id) <: ActionID
         return "cyan"
-    elseif typeof(node_id) <: RobotID
+    elseif typeof(node_id) <: CleanUpBotID
+        return "purple"
+    elseif typeof(node_id) <: BotID
         return "lime"
     elseif typeof(node_id) <: ObjectID
         return "orange"
