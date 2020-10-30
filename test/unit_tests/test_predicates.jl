@@ -38,6 +38,8 @@ let
 end
 let
     op = Operation()
+    push!(op.pre,OBJECT_AT(1,2))
+    @test TaskGraphs.get_dropoff(op,ObjectID(1)) == LocationID(2)
     get_location_id(op)
     get_operation_id(op)
     get_input_ids(op)

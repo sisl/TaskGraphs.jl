@@ -115,6 +115,9 @@ end
 
 export handle_disturbance!
 
+function remove_vtxs(sched,cache,remove_set::Set{A}) where {A<:AbstractID}
+    remove_vtxs(sched,cache,Set{Int}(get_vtx(sched,id) for id in remove_set))
+end
 function remove_vtxs(sched,cache,remove_set)
     # Construct new graph
     new_sched = OperatingSchedule()
@@ -124,40 +127,17 @@ function remove_vtxs(sched,cache,remove_set)
         node_id = get_vtx_id(sched,v)
         node = get_node_from_id(sched, node_id)
         path_spec = get_path_spec(sched,v)
-        # @log_info(-1,0,"adding ",string(node)," back in")
         add_to_schedule!(new_sched,path_spec,node,node_id)
     end
     # add all edges between nodes that still exist
     for e in edges(get_graph(sched))
         add_edge!(new_sched, get_vtx_id(sched, e.src), get_vtx_id(sched, e.dst))
     end
+    set_leaf_operation_vtxs!(new_sched)
     G = get_graph(new_sched)
+    # init planning cache with the existing solution
     t0 = map(v->get(cache.t0, get_vtx(sched, get_vtx_id(new_sched, v)), 0.0), vertices(G))
     tF = map(v->get(cache.tF, get_vtx(sched, get_vtx_id(new_sched, v)), 0.0), vertices(G))
-    # draw new ROBOT_AT -> GO edges where necessary
-    # for v in vertices(new_sched)
-    #     node_id = get_vtx_id(new_sched,v)
-    #     node = get_node_from_id(new_sched, node_id)
-    #     if isa(node,BOT_GO) && indegree(new_sched,v) == 0
-    #         robot_id = get_robot_id(node)
-    #         replace_in_schedule!(new_sched, BOT_AT(robot_id, node.x1), robot_id)
-    #         t0[get_vtx(new_sched,robot_id)] = t0[v]
-    #         add_edge!(new_sched, robot_id, node_id)
-    #     end
-    #     if isa(node,Operation) && indegree(new_sched,v) < num_required_predecessors(node)
-    #         input_ids = Set(map(v2->get_object_id(get_node_from_vtx(new_sched,v2)), inneighbors(G,v)))
-    #         for o in node.pre
-    #             if !(get_object_id(o) in input_ids)
-    #                 add_to_schedule!(new_sched,o,get_object_id(o))
-    #                 push!(t0,t0[v])
-    #                 push!(tF,t0[v])
-    #                 add_edge!(new_sched, get_object_id(o), node_id)
-    #             end
-    #         end
-    #     end
-    # end
-    set_leaf_operation_vtxs!(new_sched)
-    # init planning cache with the existing solution
     new_cache = initialize_planning_cache(new_sched,t0,tF)
     # @assert sanity_check(new_sched)
     new_sched, new_cache
@@ -174,18 +154,13 @@ function handle_disturbance!(solver,prob,env::SearchEnv,d::DroppedObject,t,
     vtxs = collect(capture_connected_nodes(get_graph(sched),v,
         v->check_object_id(get_node_from_vtx(sched,v),o)))
     setdiff!(vtxs,v)
-    # node_ids = map(v->get_vtx_id(sched,v),vtxs)
-    # for id in node_ids
-    #     node = get_node_from_id(sched,id)
-    #     println("removing ",string(node))
-    # end
-    # v_collect = filter(v->isa(get_node_from_vtx(sched,v),BOT_COLLECT),vtxs)[1]
-    # collect_node = get_node_from_vtx(sched,v_deposit)
-    v_deposit = filter(v->isa(get_node_from_vtx(sched,v),BOT_DEPOSIT),vtxs)[1]
-    deposit_node = get_node_from_vtx(sched,v_deposit)
-    v_op = filter(v->isa(get_node_from_vtx(sched,v),Operation),
-        outneighbors(sched,v_deposit))[1]
-    op_id = get_vtx_id(sched,v_op)
+    node_ids = Set{AbstractID}(get_vtx_id(sched,v) for v in vtxs)
+    # identify deposit and operation nodes (will need new edges)
+    # v_deposit = filter(v->isa(get_node_from_vtx(sched,v),BOT_DEPOSIT),vtxs)[1]
+    # deposit_node = get_node_from_vtx(sched,v_deposit)
+    # v_op = filter(v->isa(get_node_from_vtx(sched,v),Operation),
+    #     outneighbors(sched,v_deposit))[1]
+    # op_id = get_vtx_id(sched,v_op)
     # incoming and outgoing robot nodes -- for single and team robot tasks
     in_vtxs = setdiff(map(e->e.dst,collect(edge_cover(sched,vtxs,:in))),vtxs)
     in_ids = filter(id->isa(id,ActionID),
@@ -193,6 +168,9 @@ function handle_disturbance!(solver,prob,env::SearchEnv,d::DroppedObject,t,
     out_vtxs = setdiff(map(e->e.src,collect(edge_cover(sched,vtxs,:out))),vtxs)
     out_ids = filter(id->isa(id,ActionID),
         map(v->get_vtx_id(sched,v),collect(out_vtxs)))
+    op_id = filter(v->isa(get_node_from_vtx(sched,v),Operation),
+        map(v->get_vtx_id(sched,v),collect(out_vtxs)))[1]
+    # op_id = get_vtx_id(sched,v_op)
     # Add GO->GO edges for affected robot(s), as if they were never assigned
     for id1 in in_ids
         node1 = get_node_from_id(sched,id1)
@@ -206,10 +184,8 @@ function handle_disturbance!(solver,prob,env::SearchEnv,d::DroppedObject,t,
                 n1 = BOT_GO(r,get_initial_location_id(node1),x)
                 n2 = BOT_GO(r,x,get_destination_location_id(node2))
                 @log_info(-1,0,"connecting ",string(n1)," → ",string(n2))
-                replace_in_schedule!(sched,
-                    BOT_GO(r,get_initial_location_id(node1),x),id1)
-                replace_in_schedule!(sched,
-                    BOT_GO(r,x,get_destination_location_id(node2)),id2)
+                replace_in_schedule!(sched,n1,id1)
+                replace_in_schedule!(sched,n2,id2)
                 deleteat!(out_ids,i)
                 break
             end
@@ -219,17 +195,17 @@ function handle_disturbance!(solver,prob,env::SearchEnv,d::DroppedObject,t,
     # remove old nodes
     new_sched, new_cache = remove_vtxs(sched,get_cache(env),vtxs)
     # add new CleanUpBot task nodes
-    r = get_robot_id(deposit_node)
-    x1 = get_location_id(robot_position(env_state,r))
-    @assert x1 == get_location_id(object_position(env_state,o))
-    x2 = get_destination_location_id(deposit_node)
-    # add_to_schedule!(sched,OBJECT_AT(o,x1),o)
-    replace_in_schedule!(new_sched,OBJECT_AT(o,x1),o)
+    # r = get_robot_id(deposit_node)
+    # x1 = get_location_id(robot_position(env_state,r))
+    # @assert x1 == get_location_id(object_position(env_state,o))
+    x = get_location_id(object_position(env_state,o))
+    # x2 = get_destination_location_id(deposit_node)
+    replace_in_schedule!(new_sched,OBJECT_AT(o,x1),x)
     add_headless_delivery_task!(
-        new_sched,get_problem_spec(env,:CleanUpBot),o,op_id,x1,x2,CleanUpBotID(-1)
+        new_sched,get_problem_spec(env,:CleanUpBot),o,op_id,CleanUpBotID#,x1,x2
     )
-    t0 = map(v->get(new_cache.t0, v, 0), vertices(get_graph(new_sched)))
-    tF = map(v->get(new_cache.tF, v, 0), vertices(get_graph(new_sched)))
+    t0 = map(v->get(new_cache.t0, v, t), vertices(get_graph(new_sched)))
+    tF = map(v->get(new_cache.tF, v, t), vertices(get_graph(new_sched)))
     construct_search_env(
         solver,
         new_sched,

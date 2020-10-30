@@ -177,7 +177,7 @@ function construct_task_graphs_problem(
     # set initial conditions
     to0_ = Dict{Int,Float64}(v=>0.0 for v in get_all_root_nodes(G))
     tr0_ = Dict{Int,Float64}(i=>0.0 for i in 1:N)
-    root_node_groups = map(v->Set(get_input_ids(new_project_spec.operations[v])),collect(new_project_spec.terminal_vtxs))
+    root_node_groups = map(v->Set(get_id(id) for id in get_input_ids(new_project_spec.operations[v])),collect(new_project_spec.terminal_vtxs))
     problem_spec = ProblemSpec(graph=G,D=dist_matrix,
         Δt=Δt,tr0_=tr0_,to0_=to0_,terminal_vtxs=root_node_groups,
         cost_function=cost_function,

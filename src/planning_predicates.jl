@@ -149,6 +149,8 @@ export
     postconditions,
     add_conditions,
     delete_conditions,
+	get_dropoff,
+	get_dropoffs,
     duration
 
 @with_kw struct Operation <: AbstractPlanningPredicate
@@ -160,14 +162,32 @@ export
 end
 get_location_id(op::Operation) = op.station_id
 get_operation_id(op::Operation) = op.id
-get_input_ids(op::Operation) = sort([get_id(get_object_id(p)) for p in op.pre])
-get_output_ids(op::Operation) = sort([get_id(get_object_id(p)) for p in op.post])
 duration(op::Operation) = op.Δt
 preconditions(op::Operation) = op.pre
 postconditions(op::Operation) = op.post
+get_input_ids(op::Operation) = sort([get_object_id(p) for p in preconditions(op)])
+get_output_ids(op::Operation) = sort([get_object_id(p) for p in postconditions(op)])
 add_conditions(op::Operation) = op.post
 delete_conditions(op::Operation) = op.pre
 get_id(op::Operation) = get_id(op.id)
+function get_dropoff(op::Operation,o::ObjectID)
+	for pred in preconditions(op)
+		if get_object_id(pred) == o
+			return get_location_id(pred)
+		end
+	end
+	throw(AssertionError("Cannot find dropoff point for object $(get_id(o)) because it is not an input to operation $(get_id(op))"))
+	return LocationID()
+end
+function get_dropoffs(op::Operation,o::ObjectID)
+	for pred in preconditions(op)
+		if get_object_id(pred) == o
+			return get_location_ids(pred)
+		end
+	end
+	throw(AssertionError("Cannot find dropoff point for object $(get_id(o)) because it is not an input to operation $(get_id(op))"))
+	return [LocationID()]
+end
 
 export
     AbstractRobotAction,

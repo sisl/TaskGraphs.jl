@@ -26,6 +26,9 @@ function reset_debug_file_id!()
     global DEBUG_ID_COUNTER = 0
 end
 
+export validate
+function validate end
+
 export
     ProblemSpec
 
@@ -128,7 +131,7 @@ function get_duration_vector(spec::P) where {P<:ProjectSpec}
     Δt = zeros(get_num_delivery_tasks(spec))
     for op in spec.operations
         for id in get_output_ids(op)
-            Δt[id] = duration(op)
+            Δt[get_id(id)] = duration(op)
         end
     end
     Δt
@@ -142,7 +145,7 @@ function add_post_dep!(spec::ProjectSpec, object_id::Int, op_id::Int)
     push!(get!(spec.post_deps, object_id, Set{Int}()),op_id)
 end
 function set_condition!(spec,object_id,pred,array)
-    idx = get!(spec.object_id_to_idx,object_id,length(spec.object_id_to_idx)+1)
+    idx = get!(spec.object_id_to_idx,get_id(object_id),length(spec.object_id_to_idx)+1)
     @assert haskey(spec.object_id_to_idx, object_id)
     while idx > length(array)
         push!(array,OBJECT_AT(-1,-1))
@@ -153,13 +156,15 @@ function set_condition!(spec,object_id,pred,array)
 end
 set_initial_condition!(spec,object_id,pred) = set_condition!(spec,object_id,pred,spec.initial_conditions)
 set_final_condition!(spec,object_id,pred) = set_condition!(spec,object_id,pred,spec.final_conditions)
-get_condition(spec,object_id,array) = get(array,get(spec.object_id_to_idx,object_id,-1),OBJECT_AT(object_id,-1))
+get_condition(spec,object_id,array) = get(array,get(spec.object_id_to_idx,get_id(object_id),-1),OBJECT_AT(object_id,-1))
 get_initial_condition(spec,object_id) = get_condition(spec,object_id,spec.initial_conditions)
 get_final_condition(spec,object_id) = get_condition(spec,object_id,spec.final_conditions)
 function construct_operation(spec::ProjectSpec, station_id, input_ids, output_ids, Δt, id=get_unique_operation_id())
-    Operation(
-        pre = Set{OBJECT_AT}(map(id->get(spec.final_conditions, spec.object_id_to_idx[id], OBJECT_AT(id,station_id)), input_ids)),
-        post = Set{OBJECT_AT}(map(id->get(spec.initial_conditions, spec.object_id_to_idx[id], OBJECT_AT(id,station_id)), output_ids)),
+    op = Operation(
+        # pre = Set{OBJECT_AT}(map(id->get(spec.final_conditions, spec.object_id_to_idx[id], OBJECT_AT(id,station_id)), input_ids)),
+        # post = Set{OBJECT_AT}(map(id->get(spec.initial_conditions, spec.object_id_to_idx[id], OBJECT_AT(id,station_id)), output_ids)),
+        pre = Set{OBJECT_AT}(map(id->spec.final_conditions[spec.object_id_to_idx[id]], input_ids)),
+        post = Set{OBJECT_AT}(map(id->spec.initial_conditions[spec.object_id_to_idx[id]], output_ids)),
         Δt = Δt,
         station_id = LocationID(station_id),
         id = id
@@ -197,6 +202,7 @@ function add_operation!(spec::ProjectSpec, op::Operation)
     # set spec.terminal_vtxs = get_all_terminal_nodes(spec.graph)
     union!(spec.terminal_vtxs, get_all_terminal_nodes(spec.graph))
     intersect!(spec.terminal_vtxs, get_all_terminal_nodes(spec.graph))
+    validate(spec,op)
     spec
 end
 
@@ -365,7 +371,7 @@ function construct_delivery_graph(project_spec::ProjectSpec,M::Int)
             post = get_final_condition(project_spec,id)
             push!(delivery_graph.tasks,DeliveryTask(id,get_id(get_location_id(pre)),get_id(get_location_id(post))))
             for j in get_output_ids(op)
-                idx2 = project_spec.object_id_to_idx[j]
+                idx2 = project_spec.object_id_to_idx[get_id(j)]
                 add_edge!(delivery_graph.graph, idx, idx2)
             end
         end
@@ -817,6 +823,16 @@ function sanity_check(project_schedule::OperatingSchedule,append_string="")
     end
     return true
 end
+function validate(spec::ProjectSpec,op)
+    # for op in spec.operations
+    for pred in preconditions(op)
+        @assert get_final_condition(spec,get_object_id(pred)) == pred
+    end
+    for pred in postconditions(op)
+        @assert get_initial_condition(spec,get_object_id(pred)) == pred
+    end
+    # end
+end
 function validate(project_schedule::OperatingSchedule)
     G = get_graph(project_schedule)
     try
@@ -936,132 +952,97 @@ function add_single_robot_delivery_task!(
     action_id
 end
 function add_headless_delivery_task!(
-        schedule::OperatingSchedule,
+        sched::OperatingSchedule,
         problem_spec::ProblemSpec,
         object_id::ObjectID,
-        operation_id::OperationID,
-        pickup_station_id::LocationID,
-        dropoff_station_id::LocationID,
-        robot_id::BotID{R}=RobotID(-1)
-        ) where {R}
+        op_id::OperationID,
+        robot_type::Type{R}=DeliveryBot,
+        pickup_station_id::LocationID=get_location_id(get_node_from_id(sched,object_id)),
+        dropoff_station_id::LocationID=get_dropoff(get_node_from_id(sched,op_id),object_id),
+        # robot_id::BotID{R}=RobotID(-1)
+    ) where {R<:AbstractRobotType}
 
-    # robot_id = RobotID(-1)
+    robot_id = BotID{R}(-1)
     action_id = get_unique_action_id()
-    add_to_schedule!(schedule, problem_spec, BOT_COLLECT(robot_id, object_id, pickup_station_id), action_id)
-    add_edge!(schedule, object_id, action_id)
-
-    prev_action_id = action_id
-    action_id = get_unique_action_id()
-    add_to_schedule!(schedule, problem_spec, BOT_CARRY(robot_id, object_id, pickup_station_id, dropoff_station_id), action_id)
-    add_edge!(schedule, prev_action_id, action_id)
+    add_to_schedule!(sched, problem_spec, BOT_COLLECT(robot_id, object_id, pickup_station_id), action_id)
+    add_edge!(sched, object_id, action_id)
 
     prev_action_id = action_id
     action_id = get_unique_action_id()
-    add_to_schedule!(schedule, problem_spec, BOT_DEPOSIT(robot_id, object_id, dropoff_station_id), action_id)
-    add_edge!(schedule, action_id, operation_id)
-    add_edge!(schedule, prev_action_id, action_id)
+    add_to_schedule!(sched, problem_spec, BOT_CARRY(robot_id, object_id, pickup_station_id, dropoff_station_id), action_id)
+    add_edge!(sched, prev_action_id, action_id)
 
     prev_action_id = action_id
     action_id = get_unique_action_id()
-    add_to_schedule!(schedule, problem_spec, BOT_GO(robot_id, dropoff_station_id,LocationID(-1)), action_id)
-    add_edge!(schedule, prev_action_id, action_id)
+    add_to_schedule!(sched, problem_spec, BOT_DEPOSIT(robot_id, object_id, dropoff_station_id), action_id)
+    add_edge!(sched, action_id, op_id)
+    add_edge!(sched, prev_action_id, action_id)
+
+    prev_action_id = action_id
+    action_id = get_unique_action_id()
+    add_to_schedule!(sched, problem_spec, BOT_GO(robot_id, dropoff_station_id,LocationID(-1)), action_id)
+    add_edge!(sched, prev_action_id, action_id)
 
     return
 end
-function add_headless_delivery_task!(
-        schedule::S,
-        problem_spec::T,
+function add_headless_team_delivery_task!(
+        sched::OperatingSchedule,
+        problem_spec::ProblemSpec,
         object_id::ObjectID,
-        operation_id::OperationID,
-        pickup_station_ids::Vector{LocationID},
-        dropoff_station_ids::Vector{LocationID}
-        ) where {S<:OperatingSchedule,T<:ProblemSpec}
+        op_id::OperationID,
+        robot_type::Type{R}=DeliveryBot,
+        pickup_station_ids::Vector{LocationID}=get_location_ids(get_node_from_id(sched,object_id)),
+        dropoff_station_ids::Vector{LocationID}=get_dropoffs(get_node_from_id(sched,op_id),object_id)
+        ) where {R<:AbstractRobotType}
 
-    robot_id = RobotID(-1)
+    robot_id = BotID{R}(-1)
     @assert length(pickup_station_ids) == length(dropoff_station_ids)
     n = length(pickup_station_ids)
 
-    object_node = get_node_from_id(schedule,object_id)
+    object_node = get_node_from_id(sched,object_id)
     shape = object_node.shape
     # COLLABORATIVE COLLECT
     team_action_id = get_unique_action_id()
     team_action = TEAM_COLLECT(
-        # n = n,
-        instructions = map(x->COLLECT(robot_id, object_id, x), pickup_station_ids),
+        instructions = map(x->BOT_COLLECT(robot_id, object_id, x), pickup_station_ids),
         shape=shape
         )
-    add_to_schedule!(schedule, problem_spec, team_action, team_action_id)
+    add_to_schedule!(sched, problem_spec, team_action, team_action_id)
     # Add Edge from object
-    add_edge!(schedule,object_id,team_action_id)
+    add_edge!(sched,object_id,team_action_id)
     # Add GO inputs to TEAM_COLLECT
     for x in pickup_station_ids
         action_id = get_unique_action_id()
-        add_to_schedule!(schedule,problem_spec,GO(robot_id,x,x),action_id)
-        add_edge!(schedule,action_id,team_action_id)
+        add_to_schedule!(sched,problem_spec,BOT_GO(robot_id,x,x),action_id)
+        add_edge!(sched,action_id,team_action_id)
     end
     # Add TEAM_CARRY
     prev_team_action_id = team_action_id
     team_action_id = get_unique_action_id()
     team_action = TEAM_CARRY(
-        # n = n,
-        instructions = [CARRY(robot_id, object_id, x1, x2) for (x1,x2) in zip(pickup_station_ids,dropoff_station_ids)],
+        instructions = [BOT_CARRY(robot_id, object_id, x1, x2) for (x1,x2) in zip(pickup_station_ids,dropoff_station_ids)],
         shape = shape
         )
-    add_to_schedule!(schedule, problem_spec, team_action, team_action_id)
-    add_edge!(schedule,prev_team_action_id,team_action_id)
+    add_to_schedule!(sched, problem_spec, team_action, team_action_id)
+    add_edge!(sched,prev_team_action_id,team_action_id)
     # TEAM_DEPOSIT
     prev_team_action_id = team_action_id
     team_action_id = get_unique_action_id()
     team_action = TEAM_DEPOSIT(
-        # n = n,
-        instructions = map(x->DEPOSIT(robot_id, object_id, x), dropoff_station_ids),
+        instructions = map(x->BOT_DEPOSIT(robot_id, object_id, x), dropoff_station_ids),
         shape=shape
         )
-    add_to_schedule!(schedule, problem_spec, team_action, team_action_id)
-    add_edge!(schedule,prev_team_action_id,team_action_id)
+    add_to_schedule!(sched, problem_spec, team_action, team_action_id)
+    add_edge!(sched,prev_team_action_id,team_action_id)
     # Edge to Operation
-    add_edge!(schedule,team_action_id,operation_id)
+    add_edge!(sched,team_action_id,op_id)
     # Individual GO nodes
     for x in dropoff_station_ids
         action_id = get_unique_action_id()
-        add_to_schedule!(schedule,problem_spec,GO(robot_id,x,-1),action_id)
-        add_edge!(schedule, team_action_id, action_id)
+        add_to_schedule!(sched,problem_spec,BOT_GO(robot_id,x,-1),action_id)
+        add_edge!(sched, team_action_id, action_id)
     end
     return
-end
-function add_headless_delivery_task!(
-        schedule::OperatingSchedule,
-        problem_spec::ProblemSpec,
-        object_id::Int,
-        operation_id::Int,
-        pickup_station_ids::Vector{Int},
-        dropoff_station_ids::Vector{Int}
-        )
-    add_headless_delivery_task!(
-        schedule,
-        problem_spec,
-        ObjectID(object_id),
-        OperationID(operation_id),
-        map(id->LocationID(id), pickup_station_ids),
-        map(id->LocationID(id), dropoff_station_ids)
-        )
-end
-function add_headless_delivery_task!(
-        schedule::OperatingSchedule,
-        problem_spec::ProblemSpec,
-        object_id::Int,
-        operation_id::Int,
-        pickup_station_id::Int,
-        dropoff_station_id::Int
-        )
-    add_headless_delivery_task!(
-        schedule,
-        problem_spec,
-        ObjectID(object_id),
-        OperationID(operation_id),
-        LocationID(pickup_station_id),
-        LocationID(dropoff_station_id)
-        )
 end
 
 export
@@ -1092,64 +1073,56 @@ function construct_partial_project_schedule(
     ) where {R<:BOT_AT}
 
     # Construct Partial Project Schedule
-    project_schedule = OperatingSchedule()
+    sched = OperatingSchedule()
     for op in operations
-        add_to_schedule!(project_schedule, problem_spec, op, get_operation_id(op))
+        add_to_schedule!(sched, problem_spec, op, get_operation_id(op))
     end
     for pred in object_ICs
-        add_to_schedule!(project_schedule, problem_spec, pred, get_object_id(pred))
+        add_to_schedule!(sched, problem_spec, pred, get_object_id(pred))
     end
     for pred in robot_ICs
-        add_new_robot_to_schedule!(project_schedule,pred,problem_spec)
-        # robot_id = get_robot_id(pred)
-        # add_to_schedule!(project_schedule, problem_spec, pred, robot_id)
-        # action_id = get_unique_action_id()
-        # action = BOT_GO(r=robot_id,x1=get_location_id(pred))
-        # add_to_schedule!(project_schedule, problem_spec, action, action_id)
-        # add_edge!(project_schedule, robot_id, action_id)
+        add_new_robot_to_schedule!(sched,pred,problem_spec)
     end
     # add root nodes
-    for operation_id in root_ops
-        v = get_vtx(project_schedule, operation_id)
-        push!(project_schedule.terminal_vtxs, v)
-        project_schedule.weights[v] = 1.0
+    for op_id in root_ops
+        v = get_vtx(sched, op_id)
+        push!(sched.terminal_vtxs, v)
+        sched.weights[v] = 1.0
     end
     # Fill in gaps in project schedule (except for GO assignments)
     for op in operations
-        operation_id = get_operation_id(op)
+        op_id = get_operation_id(op)
         for object_id in get_input_ids(op)
             # add action sequence
-            object_ic           = get_node_from_id(project_schedule, ObjectID(object_id))
-            pickup_station_ids  = get_location_ids(object_ic)
-            object_fc           = object_FCs[object_id]
-            dropoff_station_ids = get_location_ids(object_fc)
-            # TODO Handle collaborative tasks
-            if length(pickup_station_ids) > 1 # COLLABORATIVE TRANSPORT
-                # println("FORMULATING COLLABORATIVE TRANSPORT TASK")
-                add_headless_delivery_task!(project_schedule,problem_spec,
-                    ObjectID(object_id),operation_id,pickup_station_ids,dropoff_station_ids)
+            object_ic           = get_node_from_id(sched, object_id)
+            # pickup_station_ids  = get_location_ids(object_ic)
+            # object_fc           = object_FCs[get_id(object_id)]
+            # dropoff_station_ids = get_location_ids(object_fc)
+            # @assert dropoff_station_ids == get_dropoffs(op,object_id)
+            if length(get_location_ids(object_ic)) > 1 # COLLABORATIVE TRANSPORT
+                add_headless_team_delivery_task!(sched,problem_spec,
+                    ObjectID(object_id),op_id) #,pickup_station_ids,dropoff_station_ids)
             else # SINGLE AGENT TRANSPORT
-                # println("FORMULATING NON-COLLABORATIVE TRANSPORT TASK")
-                add_headless_delivery_task!(project_schedule,problem_spec,
-                    ObjectID(object_id),operation_id,pickup_station_ids[1],dropoff_station_ids[1])
+                add_headless_delivery_task!(sched,problem_spec,
+                    ObjectID(object_id),op_id)#,pickup_station_ids[1],dropoff_station_ids[1])
             end
         end
         for object_id in get_output_ids(op)
-            add_edge!(project_schedule, operation_id, ObjectID(object_id))
+            add_edge!(sched, op_id, object_id)
         end
     end
     # NOTE: A hack to get speed up on SparseAdjacencyMILP. Not sure if it will work
-    for (id, pred) in get_object_ICs(project_schedule)
-        v = get_vtx(project_schedule, ObjectID(id))
-        if indegree(get_graph(project_schedule),v) == 0
+    for (id, pred) in get_object_ICs(sched)
+        v = get_vtx(sched, ObjectID(id))
+        if indegree(get_graph(sched),v) == 0
             op_id = get_unique_operation_id()
             op = Operation(post=Set{OBJECT_AT}([pred]),id=op_id)
-            add_to_schedule!(project_schedule,op,op_id)
-            add_edge!(project_schedule,op_id,ObjectID(id))
+            add_to_schedule!(sched,op,op_id)
+            add_edge!(sched,op_id,ObjectID(id))
         end
     end
-    set_leaf_operation_vtxs!(project_schedule)
-    project_schedule
+    set_leaf_operation_vtxs!(sched)
+    sched
 end
 function construct_partial_project_schedule(spec::ProjectSpec,problem_spec::ProblemSpec,robot_ICs=Vector{BOT_AT}())
     # @assert length(robot_ICs) == problem_spec.N "length(robot_ICs) == $(length(robot_ICs)), should be $(problem_spec.N)"
@@ -1162,7 +1135,6 @@ function construct_partial_project_schedule(spec::ProjectSpec,problem_spec::Prob
         problem_spec,
     )
 end
-
 
 function construct_partial_project_schedule(robot_ICs::Vector{R},prob_spec=
         ProblemSpec(N=length(robot_ICs))
