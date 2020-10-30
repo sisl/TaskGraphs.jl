@@ -65,3 +65,31 @@ let
     end
 
 end
+# test get_env_state
+let
+    expected_paths = [
+        [1,2,6,10,14,13,9],
+        [4,3,7,11,15],
+        [15,11,10,9,5,1],
+    ]
+    solver = NBSSolver(assignment_model = TaskGraphsMILPSolver(SparseAdjacencyMILP()))
+    pc_tapf = pctapf_problem_11(solver;cost_function=MakeSpan());
+    c_pc_tapf = C_PC_TAPF(pc_tapf.env)
+    # set_verbosity!(solver,4)
+    env, cost = solve!(solver,c_pc_tapf)
+    paths = convert_to_vertex_lists(get_route_plan(env))
+
+    for (t,(preds)) in [
+            (0,[OBJECT_AT(1,[2,3]),OBJECT_AT(2,11)]),
+            (1,[OBJECT_AT(1,[2,3]),OBJECT_AT(2,11)]),
+            (2,[OBJECT_AT(1,[6,7]),OBJECT_AT(2,10)]),
+            (3,[OBJECT_AT(1,[10,11]),OBJECT_AT(2,9)]),
+            (4,[OBJECT_AT(1,[14,15]),OBJECT_AT(2,5)]),
+            (5,[OBJECT_AT(1,[14,15]),OBJECT_AT(2,1)]),
+        ]
+        s = get_env_state(env,t)
+        for p in preds
+            @test object_positions(s)[get_object_id(p)] == p
+        end
+    end
+end

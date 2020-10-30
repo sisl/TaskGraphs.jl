@@ -191,23 +191,10 @@ end
 
 export
     AbstractRobotAction,
-	robot_type,
-	graph_key,
-    GO,COLLECT,CARRY,DEPOSIT,
-	get_initial_location_id, get_destination_location_id
+    GO,COLLECT,CARRY,DEPOSIT
 
 abstract type AbstractRobotAction{R<:AbstractRobotType} <: AbstractPlanningPredicate end
-robot_type(a::AbstractRobotAction{R}) where {R} = R
-robot_type(a::BOT_AT{R}) where {R} = R
-robot_type(a) = Nothing
-graph_key() = Symbol(DefaultRobotType)
-function graph_key(a)
-	if robot_type(a) == Nothing
-		return graph_key()
-	else
-		return Symbol(robot_type(a))
-	end
-end
+
 
 export BOT_GO
 """
@@ -307,6 +294,67 @@ Encodes the task of collecting, carrying, and depositing a dead robot
 	x2::LocationID			= LocationID()
 end
 
+export
+	TEAM_ACTION,
+	sub_nodes,
+	team_configuration,
+	robot_type,
+	team_action_type
+
+"""
+	TEAM_ACTION{R<:AbstractRobotType,A<:AbstractRobotAction{R}}
+
+For collaborative tasks.
+
+[GO, ...] -> TEAM_COLLECT -> TEAM_CARRY -> TEAM_DEPOSIT -> [GO, ...]
+- there should be a way to prove that the milp assignment (if each robot is actually
+    assigned to a particular spot in the configuration) can be realized if all conflicts
+    (except between collaborating team members) are ignored for a TEAM_GO task. This is
+    because of the "push-and-rotate" thing once they reach the goal vertices.
+"""
+@with_kw struct TEAM_ACTION{R,A<:AbstractRobotAction{R}} <: AbstractRobotAction{R}
+    instructions::Vector{A} = Vector{A}()
+	shape::Tuple{Int,Int} 	= (1,1)
+    n::Int 					= length(instructions) # number of robots
+    # config::Matrix{Int} = ones(n) # defines configuration of agents relative to each other during collaborative task
+end
+sub_nodes(n) = [n]
+sub_nodes(n::TEAM_ACTION) = n.instructions
+team_configuration(n) = (1,1)
+team_configuration(n::TEAM_ACTION) = n.shape
+team_action_type(n::TEAM_ACTION{R,A}) where {R,A} = A
+
+export
+	TEAM_GO,
+	TEAM_COLLECT,
+	TEAM_CARRY,
+	TEAM_DEPOSIT
+
+const TEAM_GO= TEAM_ACTION{DeliveryBot,GO}
+const TEAM_COLLECT= TEAM_ACTION{DeliveryBot,COLLECT}
+const TEAM_CARRY= TEAM_ACTION{DeliveryBot,CARRY}
+const TEAM_DEPOSIT= TEAM_ACTION{DeliveryBot,DEPOSIT}
+
+export
+	robot_type,
+	graph_key
+
+robot_type(a::AbstractRobotAction{R}) where {R} = R
+# robot_type(n::TEAM_ACTION{R,A}) where {R,A} = R
+robot_type(a::BOT_AT{R}) where {R} = R
+robot_type(a) = Nothing
+graph_key() = Symbol(DefaultRobotType)
+function graph_key(a)
+	if robot_type(a) == Nothing
+		return graph_key()
+	else
+		return Symbol(robot_type(a))
+	end
+end
+
+export
+	get_initial_location_id,
+	get_destination_location_id
 
 get_initial_location_id(a::A) where {A<:Union{BOT_GO,BOT_CARRY}}        					= a.x1
 get_destination_location_id(a::A) where {A<:Union{BOT_GO,BOT_CARRY}}    					= a.x2
@@ -319,6 +367,7 @@ get_robot_id(a::A) where {A<:AbstractRobotAction} 										= a.r
 export has_object_id
 has_object_id(a) = false
 has_object_id(a::Union{OBJECT_AT,BOT_COLLECT,BOT_CARRY,BOT_DEPOSIT}) = true
+has_object_id(a::TEAM_ACTION{R,A} where {R,A<:Union{BOT_COLLECT,BOT_CARRY,BOT_DEPOSIT}}) = true
 
 export check_object_id
 """
@@ -370,47 +419,8 @@ split_node(node::BOT_CARRY,x::LocationID) = BOT_CARRY(node, x2=x), BOT_CARRY(nod
 split_node(node::BOT_COLLECT,x::LocationID) = BOT_COLLECT(node, x=x), BOT_COLLECT(node, x=x)
 split_node(node::BOT_DEPOSIT,x::LocationID) = BOT_DEPOSIT(node, x=x), BOT_DEPOSIT(node, x=x)
 
-export
-	TEAM_ACTION,
-	sub_nodes,
-	team_configuration,
-	robot_type,
-	team_action_type
 
-"""
-	TEAM_ACTION{R<:AbstractRobotType,A<:AbstractRobotAction{R}}
-
-For collaborative tasks.
-
-[GO, ...] -> TEAM_COLLECT -> TEAM_CARRY -> TEAM_DEPOSIT -> [GO, ...]
-- there should be a way to prove that the milp assignment (if each robot is actually
-    assigned to a particular spot in the configuration) can be realized if all conflicts
-    (except between collaborating team members) are ignored for a TEAM_GO task. This is
-    because of the "push-and-rotate" thing once they reach the goal vertices.
-"""
-@with_kw struct TEAM_ACTION{R,A<:AbstractRobotAction{R}} <: AbstractRobotAction{R}
-    instructions::Vector{A} = Vector{A}()
-	shape::Tuple{Int,Int} 	= (1,1)
-    n::Int 					= length(instructions) # number of robots
-    # config::Matrix{Int} = ones(n) # defines configuration of agents relative to each other during collaborative task
-end
-sub_nodes(n) = [n]
-sub_nodes(n::TEAM_ACTION) = n.instructions
-team_configuration(n) = (1,1)
-team_configuration(n::TEAM_ACTION) = n.shape
-robot_type(n::TEAM_ACTION{R,A}) where {R,A} = R
-team_action_type(n::TEAM_ACTION{R,A}) where {R,A} = A
-
-export
-	TEAM_GO,
-	TEAM_COLLECT,
-	TEAM_CARRY,
-	TEAM_DEPOSIT
-
-const TEAM_GO 	 	= TEAM_ACTION{DeliveryBot,GO}
-const TEAM_COLLECT 	= TEAM_ACTION{DeliveryBot,COLLECT}
-const TEAM_CARRY 	= TEAM_ACTION{DeliveryBot,CARRY}
-const TEAM_DEPOSIT 	= TEAM_ACTION{DeliveryBot,DEPOSIT}
+get_object_id(a::TEAM_ACTION) = get_object_id(get(sub_nodes(a),1,OBJECT_AT(-1,-1)))
 
 export
 	required_predecessors,
@@ -663,7 +673,7 @@ validate_edge(n1::BOT_DEPOSIT,		n2::BOT_GO			) = (n1.x 	== n2.x1)
 validate_edge(n1::N,n2::N) where {N<:Union{BOT_COLLECT,BOT_DEPOSIT}} = (n1.x == n2.x) # job shop edges are valid
 
 
-Base.string(pred::OBJECT_AT)	=  string("O(",get_id(get_object_id(pred)),",",get_id(get_location_id(pred)),")")
+Base.string(pred::OBJECT_AT)	=  string("O(",get_id(get_object_id(pred)),",",map(x->get_id(x), get_location_ids(pred)),")")
 Base.string(pred::BOT_AT)  		=  string("R(",get_id(get_robot_id(pred)),",",get_id(get_location_id(pred)),")")
 Base.string(a::BOT_GO)        	=  string("GO(",get_id(get_robot_id(a)),",",get_id(get_initial_location_id(a)),"->",get_id(get_destination_location_id(a)),")")
 Base.string(a::BOT_COLLECT)   	=  string("COLLECT(",get_id(get_robot_id(a)),",",get_id(get_object_id(a)),",",get_id(get_location_id(a)),")")

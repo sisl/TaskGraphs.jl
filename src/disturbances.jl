@@ -155,12 +155,6 @@ function handle_disturbance!(solver,prob,env::SearchEnv,d::DroppedObject,t,
         v->check_object_id(get_node_from_vtx(sched,v),o)))
     setdiff!(vtxs,v)
     node_ids = Set{AbstractID}(get_vtx_id(sched,v) for v in vtxs)
-    # identify deposit and operation nodes (will need new edges)
-    # v_deposit = filter(v->isa(get_node_from_vtx(sched,v),BOT_DEPOSIT),vtxs)[1]
-    # deposit_node = get_node_from_vtx(sched,v_deposit)
-    # v_op = filter(v->isa(get_node_from_vtx(sched,v),Operation),
-    #     outneighbors(sched,v_deposit))[1]
-    # op_id = get_vtx_id(sched,v_op)
     # incoming and outgoing robot nodes -- for single and team robot tasks
     in_vtxs = setdiff(map(e->e.dst,collect(edge_cover(sched,vtxs,:in))),vtxs)
     in_ids = filter(id->isa(id,ActionID),
@@ -168,9 +162,9 @@ function handle_disturbance!(solver,prob,env::SearchEnv,d::DroppedObject,t,
     out_vtxs = setdiff(map(e->e.src,collect(edge_cover(sched,vtxs,:out))),vtxs)
     out_ids = filter(id->isa(id,ActionID),
         map(v->get_vtx_id(sched,v),collect(out_vtxs)))
-    op_id = filter(v->isa(get_node_from_vtx(sched,v),Operation),
+    # id of target operation node -- needed to add new delivery task
+    op_id = filter(id->isa(id,OperationID),
         map(v->get_vtx_id(sched,v),collect(out_vtxs)))[1]
-    # op_id = get_vtx_id(sched,v_op)
     # Add GO->GO edges for affected robot(s), as if they were never assigned
     for id1 in in_ids
         node1 = get_node_from_id(sched,id1)
@@ -179,7 +173,7 @@ function handle_disturbance!(solver,prob,env::SearchEnv,d::DroppedObject,t,
             id2 = out_ids[i]
             node2 = get_node_from_id(sched,id2)
             if get_robot_id(node2) == r
-                x = get_location_id(env_state.robot_positions[r])
+                x = get_location_id(robot_positions(env_state)[r])
                 add_edge!(sched,id1,id2)
                 n1 = BOT_GO(r,get_initial_location_id(node1),x)
                 n2 = BOT_GO(r,x,get_destination_location_id(node2))
@@ -195,14 +189,10 @@ function handle_disturbance!(solver,prob,env::SearchEnv,d::DroppedObject,t,
     # remove old nodes
     new_sched, new_cache = remove_vtxs(sched,get_cache(env),vtxs)
     # add new CleanUpBot task nodes
-    # r = get_robot_id(deposit_node)
-    # x1 = get_location_id(robot_position(env_state,r))
-    # @assert x1 == get_location_id(object_position(env_state,o))
-    x = get_location_id(object_position(env_state,o))
-    # x2 = get_destination_location_id(deposit_node)
-    replace_in_schedule!(new_sched,OBJECT_AT(o,x1),x)
+    x = get_location_ids(object_position(env_state,o))
+    replace_in_schedule!(new_sched,OBJECT_AT(o,x),o)
     add_headless_delivery_task!(
-        new_sched,get_problem_spec(env,:CleanUpBot),o,op_id,CleanUpBotID#,x1,x2
+        new_sched,get_problem_spec(env,:CleanUpBot),o,op_id,CleanUpBot
     )
     t0 = map(v->get(new_cache.t0, v, t), vertices(get_graph(new_sched)))
     tF = map(v->get(new_cache.tF, v, t), vertices(get_graph(new_sched)))

@@ -245,6 +245,91 @@ function Base.show(io::IO,env::SearchEnv)
     sprint_search_env(io,env)
 end
 
+export
+    get_env_snapshot,
+    trim_route_plan
+
+"""
+    get_env_snapshot(route_plan::S,t)
+"""
+function get_env_snapshot(route_plan::S,t) where {S<:LowLevelSolution}
+    Dict(RobotID(i)=>ROBOT_AT(i, get_sp(get_path_node(path,t)).vtx) for (i,path) in enumerate(get_paths(route_plan)))
+end
+get_env_snapshot(env::SearchEnv,args...) = get_env_snapshot(get_route_plan(env),args...)
+
+export
+    EnvState,
+    get_env_state
+
+"""
+    EnvState
+Reflects the state of the SearchEnv environment at a given time step.
+"""
+@with_kw_noshow struct EnvState
+    robot_positions::Dict{BotID,BOT_AT} = Dict{BotID,BOT_AT}()
+    object_positions::Dict{ObjectID,OBJECT_AT} = Dict{ObjectID,OBJECT_AT}()
+end
+
+export
+    robot_positions,
+    object_positions,
+    object_position,
+    robot_position
+
+robot_positions(s::EnvState) = s.robot_positions
+object_positions(s::EnvState) = s.object_positions
+object_position(s::EnvState,k) = object_positions(s)[k]
+robot_position(s::EnvState,k) = robot_positions(s)[k]
+
+function Base.show(io::IO,s::EnvState)
+    print(io,"EnvState","\n")
+    print(io,"\t","robot_positions : ")
+    for k in sort(collect(keys(robot_positions(s))))
+        n = robot_positions(s)[k]
+        print(io,string(n),", ")
+    end
+    print(io,"\n\t","object_positions: ")
+    for k in sort(collect(keys(object_positions(s))))
+        n = object_positions(s)[k]
+        print(io,string(n),", ")
+    end
+end
+function get_env_state(env,t)
+    sched = get_schedule(env)
+    cache = get_cache(env)
+    robot_positions = get_env_snapshot(env,t)
+    object_positions = Dict{ObjectID,OBJECT_AT}()
+    for (o,o_node) in get_object_ICs(sched)
+        v = get_vtx(sched,o)
+        if t <= cache.t0[v]
+            object_positions[o] = o_node
+        else
+            vtxs = capture_connected_nodes(
+                sched,v,v->check_object_id(get_node_from_vtx(sched,v),o)
+                )
+            node_ids = map(v->get_vtx_id(sched,v),collect(vtxs))
+            @show node_ids
+            v_deposit = filter(v->isa(get_node_from_vtx(sched,v),
+            Union{BOT_DEPOSIT,TEAM_DEPOSIT}),
+                collect(vtxs))[1]
+            node = get_node_from_vtx(sched,v_deposit)
+            if cache.t0[v_deposit] <= t
+                object_positions[o] = OBJECT_AT(o,
+                    map(n->get_location_id(n),sub_nodes(node))
+                    )
+            else
+                r_ids = get_robot_ids(node)
+                object_positions[o] = OBJECT_AT(o,
+                    map(r->get_location_id(robot_positions[r]),r_ids)
+                    )
+            end
+        end
+    end
+    EnvState(
+        robot_positions = robot_positions,
+        object_positions = object_positions
+    )
+end
 
 export get_node_start_and_end_times
 """
