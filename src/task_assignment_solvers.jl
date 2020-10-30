@@ -264,7 +264,7 @@ Keyword Args:
 Outputs:
     `model` - the optimization model
 """
-function formulate_optimization_problem(N,M,G,D,Δt,Δt_collect,Δt_deliver,to0_,tr0_,terminal_vtxs,weights,r0,s0,sF,nR,optimizer;
+function formulate_optimization_problem(N,M,G,D,Δt,Δt_collect,Δt_deliver,to0_,tr0_,terminal_vtxs,weights,r0,s0,sF,optimizer;
     TimeLimit=100,
     OutputFlag=0,
     Presolve = -1, # automatic setting (-1), off (0), conservative (1), or aggressive (2)
@@ -295,7 +295,7 @@ function formulate_optimization_problem(N,M,G,D,Δt,Δt_collect,Δt_deliver,to0_
     # Assignment matrix x
     @variable(model, X[1:N+M,1:M], binary = true) # X[i,j] ∈ {0,1}
     @constraint(model, X * ones(M) .<= 1)         # each robot may have no more than 1 task
-    @constraint(model, X' * ones(N+M) .== nR)     # each task must have exactly 1 assignment
+    @constraint(model, X' * ones(N+M) .== 1)     # each task must have exactly 1 assignment
     for (i,t) in tr0_
         # start time for robot i
         @constraint(model, tr0[i] == t)
@@ -396,8 +396,8 @@ function formulate_optimization_problem(spec::T,optimizer;
     kwargs...
     ) where {T<:ProblemSpec}
     formulate_optimization_problem(
-        spec.N,
-        spec.M,
+        length(spec.r0),
+        length(spec.s0),
         spec.graph,
         spec.D,
         spec.Δt,
@@ -410,7 +410,6 @@ function formulate_optimization_problem(spec::T,optimizer;
         spec.r0,
         spec.s0,
         spec.sF,
-        spec.nR,
         optimizer;
         # cost_model=spec.cost_function,
         kwargs...

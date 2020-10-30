@@ -62,13 +62,13 @@ Elements:
     r0::Vector{Int}         = Int[]
     s0::Vector{Int}         = Int[] # pickup stations for each task
     sF::Vector{Int}         = Int[] # delivery station for each task
-    nR::Vector{Int}         = map(o->1,s0) # num robots required for each task (>1 => collaborative task)
-    N::Int                  = length(r0) # num robots
-    M::Int                  = length(s0) # num tasks
-    Δt_collect::Vector{Float64} = zeros(M) # duration of COLLECT operations
-    Δt_deliver::Vector{Float64} = zeros(M) # duration of DELIVER operations
-    @assert length(r0) == N
-    @assert length(s0) == length(sF) == length(nR) == length(Δt_collect) == length(Δt_deliver) == M
+    # nR::Vector{Int}         = map(o->1,s0) # num robots required for each task (>1 => collaborative task)
+    # N::Int                  = length(r0) # num robots
+    # M::Int                  = length(s0) # num tasks
+    Δt_collect::Vector{Float64} = zeros(length(s0)) # duration of COLLECT operations
+    Δt_deliver::Vector{Float64} = zeros(length(s0)) # duration of DELIVER operations
+    # @assert length(r0) == N
+    @assert length(s0) == length(sF) == length(Δt_collect) == length(Δt_deliver) # == M
 end
 TaskGraphs.get_distance(spec::ProblemSpec,args...) = get_distance(spec.D,args...)
 

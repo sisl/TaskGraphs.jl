@@ -29,7 +29,6 @@ let
                     project_spec,
                     problem_spec,
                     robot_ICs
-                    # map(i -> robot_ICs[i], 1:problem_spec.N),
                 )
                 model = formulate_milp(
                     solver,

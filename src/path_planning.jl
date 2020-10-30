@@ -76,6 +76,21 @@ function initialize_planning_cache(schedule::OperatingSchedule,t0_=zeros(nv(sche
     # TODO skip over all nodes for which path_spec.plan_path == false
     cache
 end
+function reinitialize_planning_cache!(sched,cache,
+        t0_ = vcat(cache.t0,zeros(nv(sched)-length(cache.t0))),
+        tF_ = vcat(cache.tF,zeros(nv(sched)-length(cache.tF)))
+        )
+    t0,tF,slack,local_slack = process_schedule(sched,t0_,tF_)
+    empty!(cache.t0)
+    empty!(cache.tF)
+    empty!(cache.slack)
+    empty!(cache.local_slack)
+    append!(cache.t0,t0)
+    append!(cache.tF,tF)
+    append!(cache.slack,slack)
+    append!(cache.local_slack,local_slack)
+    cache
+end
 
 """
     `reset_cache!(cache,schedule)`
@@ -160,15 +175,20 @@ function construct_environment_layer(env::GridFactoryEnvironment,problem_spec::P
     EnvironmentLayer(env_graph,prob_spec)
 end
 
-function construct_environment_layer_dict(
+function populate_environment_layer_dict!(layers,
         sched::OperatingSchedule,
         env::GridFactoryEnvironment,
         prob_spec::ProblemSpec,
     )
     gkeys = unique(map(graph_key, values(sched.planning_nodes)))
-    layers = Dict{Symbol,EnvironmentLayer}(
-        k => construct_environment_layer(env,prob_spec) for k in gkeys
-    )
+    for k in gkeys
+        layers[k] = construct_environment_layer(env,prob_spec)
+    end
+    return layers
+end
+function construct_environment_layer_dict(args...)
+    layers = Dict{Symbol,EnvironmentLayer}()
+    populate_environment_layer_dict!(layers,args...)
 end
 
 @with_kw_noshow struct SearchEnv{C,H,S} <: GraphEnv{State,Action,C}
@@ -320,6 +340,9 @@ struct C_PC_TAPF{E<:SearchEnv} <: AbstractPC_TAPF
 end
 construct_routing_problem(prob::C_PC_TAPF,env) = C_PC_MAPF(env)
 
+for T in [:PC_TAPF,:PC_MAPF,:PC_TA]
+    @eval $T(prob::$T,env::SearchEnv) = $T(env)
+end
 
 
 initialize_planning_cache(env::SearchEnv) = initialize_planning_cache(get_schedule(env),deepcopy(get_cache(env).t0),deepcopy(get_cache(env).tF))

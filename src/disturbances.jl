@@ -1,8 +1,15 @@
 export
-    AbstractDisturbance
+    AbstractDisturbance,
+    DisturbanceSequence
 
 abstract type AbstractDisturbance end
+const DisturbanceSequence = Vector{Pair{Int,AbstractDisturbance}}
 
+
+export
+    StochasticProblem,
+    stochastic_problem
+    
 """
     StochasticProblem{P<:AbstractPC_TAPF}
 
@@ -11,81 +18,31 @@ cause unexpected problems in the factory.
 """
 struct StochasticProblem{P<:AbstractPC_TAPF}
     prob::P
-    disturbances::Vector{AbstractDisturbance}
+    disturbances::DisturbanceSequence
 end
 CRCBS.get_env(spc_tapf::StochasticProblem) = get_env(spc_tapf.prob)
 
-# function spctapf_problem(env_graph,r0,cr0,s0,sF,ops)
-#     tasks = config.tasks
-#     ops = config.ops
-#     s0 = map(t->t.first,tasks)
-#     sF = map(t->t.second,tasks)
-#     project_spec, _ = pctapf_problem(r0,s0,sF)
-#     for op in ops
-#         add_operation!(project_spec,construct_operation(project_spec,-1,
-#             op.inputs,op.outputs,Δt_op))
-#     end
-#     def = SimpleProblemDef(project_spec,r0,s0,sF,config.shapes)
-# end
-#
-function stochastic_problem(prob::P,args...) where {P<:AbstractPC_MAPF}
-    stochastic_problem!(deepcopy(prob),args...)
-end
-function stochastic_problem!(prob::P,clean_up_bot_ICS,disturbances) where {P<:AbstractPC_MAPF}
-    env = get_env(prob)
+function stochastic_problem(ptype::Type{P},solver,prob,clean_up_bot_ICS,disturbances) where {P<:AbstractPC_MAPF}
+    env = get_env(deepcopy(prob))
+    env_graph = get_graph(env)
     sched = get_schedule(env)
-    for pred in robot_ICs
-        add_new_robot_to_schedule!(sched,pred,get_problem_spec(get_env(prob)))
+    cache = get_cache(env)
+    for pred in clean_up_bot_ICS
+        add_new_robot_to_schedule!(sched,pred,get_problem_spec(env))
     end
-    # cache = initialize_planning
-    sched = splice_schedules!()
-end
-function stochastic_problem(solver,env_graph,r0,cr0,s0,sF,ops,disturbances)
-    object_ICs = [OBJECT_AT(o,x) for (o,x) in enumerate(s0)] # initial_conditions
-    object_FCs = [OBJECT_AT(o,x) for (o,x) in enumerate(sF)] # final conditions
-    robot_ICs = vcat(
-        [ROBOT_AT(r,x) for (r,x) in enumerate(r0)],
-        [CUB_AT(r,x) for (r,x) in enumerate(cr0)]
-        )
-    proj_spec = ProjectSpec(object_ICs,object_FCs)
-    for op in ops
-        add_operation!(proj_spec,construct_operation(proj_spec,-1,
-            op.inputs,op.outputs,op.dt))
-    end
+    reinitialize_planning_cache!(sched,cache,
+        vcat(cache.t0,zeros(nv(sched)-length(cache.t0))),
+        vcat(cache.tF,zeros(nv(sched)-length(cache.tF)))
+    )
+    robot_ICs = get_robot_ICs(sched)
     prob_spec = ProblemSpec(
-        graph=construct_delivery_graph(proj_spec,length(s0)),
-        D=get_dist_matrix(env_graph),
-        Δt=map(op->op.dt,ops),
-        r0=map(node->get_id(get_initial_location_id(node)),robot_ICs),
-        s0=s0,
-        sF=sF,
+        get_problem_spec(env),
+        r0=[get_id(get_location_id(robot_ICs[k])) for k in sort(collect(keys(robot_ICs)))],
         )
-    sched = construct_partial_project_schedule(proj_spec,prob_spec,robot_ICs)
-    env = construct_search_env(solver,sched,prob_spec,env_graph)
-    StochasticProblem{PC_TAPF}(env)
+    # populate_environment_dict_layers!(env.env_layers,sched,env_graph,prob_spec)
+    new_prob = P(prob,construct_search_env(solver,sched,prob_spec,env_graph,cache))
+    StochasticProblem(new_prob,disturbances)
 end
-#
-# function spctapf_problem(
-#         solver,
-#         project_spec::ProjectSpec,
-#         problem_spec::ProblemSpec,
-#         robot_ICs,
-#         env_graph,
-#         args...
-#     )
-#     project_schedule = construct_partial_project_schedule(
-#         project_spec,
-#         problem_spec,
-#         robot_ICs,
-#         )
-#     env = construct_search_env(
-#         solver,
-#         project_schedule,
-#         problem_spec,
-#         env_graph
-#         )
-#     PC_TAPF(env)
-# end
 
 export OilSpill
 """

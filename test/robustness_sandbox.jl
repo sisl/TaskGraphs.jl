@@ -15,7 +15,15 @@ env_graph = construct_factory_env_from_vtx_grid(vtx_grid)
 
 solver = NBSSolver()
 prob = pctapf_problem_1(solver)
+s_prob = TaskGraphs.stochastic_problem(
+    PC_TAPF,
+    solver,
+    prob,
+    [CUB_AT(3,6)],
+    DisturbanceSequence([2=>DroppedObject(1)])
+)
 env,cost = solve!(solver,prob)
+
 
 handle_disturbance!(solver,prob,env,DroppedObject(1),2)
 

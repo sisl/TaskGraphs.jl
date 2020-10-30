@@ -53,6 +53,10 @@ struct RepeatedC_PC_TAPF{S<:SearchEnv} <: RepeatedAbstractPC_TAPF
 end
 RepeatedC_PC_TAPF(env::SearchEnv) = RepeatedC_PC_TAPF(env,Vector{ProjectRequest}())
 
+for T in [:RepeatedPC_TAPF,:RepeatedC_PC_TAPF]
+    @eval $T(prob::$T,env::SearchEnv) = $T(env,prob.requests)
+end
+
 construct_routing_problem(prob::RepeatedPC_TAPF,env) = PC_TAPF(env)
 construct_routing_problem(prob::RepeatedC_PC_TAPF,env) = C_PC_TAPF(env)
 
