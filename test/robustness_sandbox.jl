@@ -14,6 +14,10 @@ env_graph = construct_factory_env_from_vtx_grid(vtx_grid)
 # TaskGraphs.remove_disturbance!(env_graph,d)
 
 solver = NBSSolver()
+prob = pctapf_problem_1(solver)
+env,cost = solve!(solver,prob)
+
+handle_disturbance!(solver,prob,env,DroppedObject(1),2)
 
 sched = OperatingSchedule()
 add_to_schedule!(sched,ROBOT_AT(1,1),RobotID(1))

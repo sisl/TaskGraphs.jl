@@ -178,7 +178,7 @@ function construct_task_graphs_problem(
     to0_ = Dict{Int,Float64}(v=>0.0 for v in get_all_root_nodes(G))
     tr0_ = Dict{Int,Float64}(i=>0.0 for i in 1:N)
     root_node_groups = map(v->Set(get_input_ids(new_project_spec.operations[v])),collect(new_project_spec.terminal_vtxs))
-    problem_spec = ProblemSpec(N=N,M=M,graph=G,D=dist_matrix,
+    problem_spec = ProblemSpec(graph=G,D=dist_matrix,
         Δt=Δt,tr0_=tr0_,to0_=to0_,terminal_vtxs=root_node_groups,
         cost_function=cost_function,
         Δt_collect=Δt_collect,Δt_deliver=Δt_deliver,r0=r0,s0=s0,sF=sF)
@@ -467,14 +467,6 @@ title_string(a::DEPOSIT,verbose=true)   = verbose ? string("deposit\n",get_id(ge
 title_string(op::Operation,verbose=true)= verbose ? string("op",get_id(get_operation_id(op))) : "op";
 title_string(a::TEAM_ACTION,verbose=true) where {R,A} = verbose ? string("team", team_action_type(a), "\n","r: (",map(i->string(get_id(get_robot_id(i)), ","), a.instructions)...,")") : string("team", A)
 
-Base.string(pred::OBJECT_AT) =  string("O(",get_id(get_object_id(pred)),",",get_id(get_location_id(pred)),")")
-Base.string(pred::ROBOT_AT)  =  string("R(",get_id(get_robot_id(pred)),",",get_id(get_location_id(pred)),")")
-Base.string(a::GO)        =  string("GO(",get_id(get_robot_id(a)),",",get_id(get_initial_location_id(a)),"->",get_id(get_destination_location_id(a)),")")
-Base.string(a::COLLECT)   =  string("COLLECT(",get_id(get_robot_id(a)),",",get_id(get_object_id(a)),",",get_id(get_location_id(a)),")")
-Base.string(a::CARRY)     =  string("CARRY(",get_id(get_robot_id(a)),",",get_id(get_object_id(a)),",",get_id(get_initial_location_id(a)),"->",get_id(get_destination_location_id(a)),")")
-Base.string(a::DEPOSIT)   =  string("DEPOSIT(",get_id(get_robot_id(a)),",",get_id(get_object_id(a)),",",get_id(get_location_id(a)),")")
-Base.string(op::Operation)=  string("OP(",get_id(get_operation_id(op)),")")
-Base.string(a::TEAM_ACTION) =  string("TEAM_ACTION( ",map(i->string(string(i), ","), a.instructions)...," )")
 
 function get_display_metagraph(project_schedule::OperatingSchedule;
     verbose=true,

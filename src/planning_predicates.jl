@@ -89,6 +89,7 @@ Base.:-(id::A,i::Int) where {A<:AbstractID} = A(get_id(id)-i)
 Base.:-(id::A,i::A) where {A<:AbstractID} = A(get_id(id)-get_id(i))
 Base.:(<)(id1::AbstractID,id2::AbstractID) = get_id(id1) < get_id(id2)
 Base.:(>)(id1::AbstractID,id2::AbstractID) = get_id(id1) > get_id(id2)
+Base.isless(id1::AbstractID,id2::AbstractID) = id1 < id2
 Base.convert(::Type{ID},i::Int) where {ID<:AbstractID} = ID(i)
 
 export
@@ -177,8 +178,8 @@ export
 
 abstract type AbstractRobotAction{R<:AbstractRobotType} <: AbstractPlanningPredicate end
 robot_type(a::AbstractRobotAction{R}) where {R} = R
-robot_type(a) = Nothing
 robot_type(a::BOT_AT{R}) where {R} = R
+robot_type(a) = Nothing
 graph_key() = Symbol(DefaultRobotType)
 function graph_key(a)
 	if robot_type(a) == Nothing
@@ -250,10 +251,19 @@ export
 
 struct CleanUpBot <: AbstractRobotType end
 const CleanUpBotID = BotID{CleanUpBot}
-export CUB_AT
+export
+	CUB_AT,
+	CUB_GO,
+	CUB_COLLECT,
+	CUB_CARRY,
+	CUB_DEPOSIT
+
 const CUB_AT = BOT_AT{CleanUpBot}
-export CUB_GO
 const CUB_GO = BOT_GO{CleanUpBot}
+# For handling dropped objects
+const CUB_COLLECT = BOT_COLLECT{CleanUpBot}
+const CUB_CARRY = BOT_CARRY{CleanUpBot}
+const CUB_DEPOSIT = BOT_DEPOSIT{CleanUpBot}
 
 """
 	CLEAN_UP <: AbstractRobotAction
@@ -265,13 +275,46 @@ Encodes the event "robot `r` cleans up locations vtxs`
 	vtxs::Vector{LocationID} = Vector{LocationID}()
 end
 
-get_initial_location_id(a::A) where {A<:Union{BOT_GO,CARRY}}        					= a.x1
-get_destination_location_id(a::A) where {A<:Union{BOT_GO,CARRY}}    					= a.x2
-get_location_id(a::A) where {A<:Union{COLLECT,DEPOSIT}}             					= a.x
-get_initial_location_id(a::A) where {A<:Union{COLLECT,DEPOSIT,BOT_AT,OBJECT_AT}}     	= get_location_id(a)
-get_destination_location_id(a::A) where {A<:Union{COLLECT,DEPOSIT,BOT_AT,OBJECT_AT}} 	= get_location_id(a)
-get_object_id(a::A) where {A<:Union{CARRY,COLLECT,DEPOSIT}}         					= a.o
+"""
+	UNDERTAKE <: AbstractRobotAction{CleanUpBot}
+
+Encodes the task of collecting, carrying, and depositing a dead robot
+"""
+@with_kw struct UNDERTAKE <: AbstractRobotAction{CleanUpBot}
+	r::BotID{CleanUpBot}	= BotID{CleanUpBot}()
+	dr::BotID 				= RobotID()
+	x1::LocationID 			= LocationID()
+	x2::LocationID			= LocationID()
+end
+
+
+get_initial_location_id(a::A) where {A<:Union{BOT_GO,BOT_CARRY}}        					= a.x1
+get_destination_location_id(a::A) where {A<:Union{BOT_GO,BOT_CARRY}}    					= a.x2
+get_location_id(a::A) where {A<:Union{BOT_COLLECT,BOT_DEPOSIT}}             					= a.x
+get_initial_location_id(a::A) where {A<:Union{BOT_COLLECT,BOT_DEPOSIT,BOT_AT,OBJECT_AT}}     	= get_location_id(a)
+get_destination_location_id(a::A) where {A<:Union{BOT_COLLECT,BOT_DEPOSIT,BOT_AT,OBJECT_AT}} 	= get_location_id(a)
+get_object_id(a::A) where {A<:Union{BOT_CARRY,BOT_COLLECT,BOT_DEPOSIT}}         					= a.o
 get_robot_id(a::A) where {A<:AbstractRobotAction} 										= a.r
+
+export has_object_id
+has_object_id(a) = false
+has_object_id(a::Union{OBJECT_AT,BOT_COLLECT,BOT_CARRY,BOT_DEPOSIT}) = true
+
+export check_object_id
+"""
+    Check if a node is associated with objectid
+"""
+function check_object_id(node,o)
+    if has_object_id(node)
+        if get_object_id(node) == o
+            return true
+        end
+    end
+    return false
+end
+
+export has_robot_id
+has_robot_id(a) = robot_type(a) == Nothing ? false : true
 
 export
 	replace_robot_id,
@@ -599,5 +642,14 @@ validate_edge(n1::DEPOSIT,		n2::CARRY		) = false
 validate_edge(n1::DEPOSIT,		n2::GO			) = (n1.x 	== n2.x1)
 validate_edge(n1::N,n2::N) where {N<:Union{COLLECT,DEPOSIT}} = (n1.x == n2.x) # job shop edges are valid
 
+
+Base.string(pred::OBJECT_AT) =  string("O(",get_id(get_object_id(pred)),",",get_id(get_location_id(pred)),")")
+Base.string(pred::BOT_AT)  =  string("R(",get_id(get_robot_id(pred)),",",get_id(get_location_id(pred)),")")
+Base.string(a::BOT_GO)        =  string("GO(",get_id(get_robot_id(a)),",",get_id(get_initial_location_id(a)),"->",get_id(get_destination_location_id(a)),")")
+Base.string(a::BOT_COLLECT)   =  string("COLLECT(",get_id(get_robot_id(a)),",",get_id(get_object_id(a)),",",get_id(get_location_id(a)),")")
+Base.string(a::BOT_CARRY)     =  string("CARRY(",get_id(get_robot_id(a)),",",get_id(get_object_id(a)),",",get_id(get_initial_location_id(a)),"->",get_id(get_destination_location_id(a)),")")
+Base.string(a::BOT_DEPOSIT)   =  string("DEPOSIT(",get_id(get_robot_id(a)),",",get_id(get_object_id(a)),",",get_id(get_location_id(a)),")")
+Base.string(op::Operation)=  string("OP(",get_id(get_operation_id(op)),")")
+Base.string(a::TEAM_ACTION) =  string("TEAM_ACTION( ",map(i->string(string(i), ","), a.instructions)...," )")
 
 end # module PlanningPredicates

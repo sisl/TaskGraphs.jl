@@ -196,16 +196,6 @@ function pctapf_problem_1(;cost_function=SumOfMakeSpans(),verbose=false)
     def = SimpleProblemDef(project_spec,r0,s0,sF)
     project_spec, problem_spec, _, _, robot_ICs = construct_task_graphs_problem(
         def,env_graph;cost_function=cost_function)
-    # if verbose
-    #     problem_description = """
-    #     #### TOY PROBLEM 1 ####
-    #     r0 = [1,4]
-    #     s0 = [5,8,14]
-    #     sF = [13,12,15]
-    #     assignment_dict = Dict(1=>[1,3],2=>[2])
-    #     """
-    #     print_toy_problem_specs(problem_description,vtx_grid,r0,s0,sF,project_spec)
-    # end
     return project_spec, problem_spec, robot_ICs, env_graph, assignment_dict
 end
 
@@ -1028,6 +1018,37 @@ function random_pctapf_def(env::GridFactoryEnvironment,
     problem_def = SimpleProblemDef(project_spec,r0,s0,sF,shapes)
 end
 
+## Stochastic PCTAPF problems
+# """
+#     pctapf_problem_1
+#
+# Optimal MakeSpan = 5
+# Optimal SumOfMakeSpans = 5
+# """
+# function spctapf_problem_1(;cost_function=SumOfMakeSpans(),verbose=false)
+#     vtx_grid = initialize_dense_vtx_grid(4,4)
+#     env_graph = construct_factory_env_from_vtx_grid(vtx_grid)
+#     #  1   2   3   4
+#     #  5   6   7   8
+#     #  9  10  11  12
+#     # 13  14  15  16
+#     config = (
+#         delivery_bots = [1],
+#         cleanup_bots = [13],
+#         tasks=[1=>4,8=>16],
+#         ops=[ (inputs=[1],outputs=[]), (inputs=[2],outputs=[]) ] )
+#     )
+#     project_spec, robot_ICs = pctapf_problem(r0,s0,sF)
+#
+#     add_operation!(project_spec,construct_operation(project_spec,-1,[1,2],[3],0))
+#     add_operation!(project_spec,construct_operation(project_spec,-1,[3],  [], 0))
+#     assignment_dict = Dict(1=>[1,3],2=>[2])
+#
+#     def = SimpleProblemDef(project_spec,r0,s0,sF)
+#     project_spec, problem_spec, _, _, robot_ICs = construct_task_graphs_problem(
+#         def,env_graph;cost_function=cost_function)
+#     return project_spec, problem_spec, robot_ICs, env_graph, assignment_dict
+# end
 
 
 

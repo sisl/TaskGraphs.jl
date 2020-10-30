@@ -366,7 +366,7 @@ function profile_low_level_search(solver, project_spec, problem_spec, robot_ICs,
             primary_objective=primary_objective); # TODO pass in t0_ here (maybe get it straight from model?)
         pc_mapf = PC_MAPF(env);
         node = initialize_root_node(pc_mapf)
-        valid_flag, elapsed_time, byte_ct, gc_time, mem_ct = @timed compute_route_plan!(solver, pc_mapf.env, node)
+        valid_flag, elapsed_time, byte_ct, gc_time, mem_ct = @timed compute_route_plan!(solver, get_env(pc_mapf), node)
 
         cost = collect(get_cost(node.solution))
         if cost[1] == Inf

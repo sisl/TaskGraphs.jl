@@ -268,7 +268,7 @@ end
 function profile_replanner!(solver,replan_model,prob::RepeatedAbstractPC_TAPF,
         cache = ReplanningProfilerCache()
     )
-    env = prob.env
+    env = get_env(prob)
     for (stage,request) in enumerate(prob.requests)
         @log_info(1,solver,"REPLANNING: Stage ",stage)
         remap_object_ids!(request.schedule,get_schedule(env))
@@ -289,7 +289,7 @@ function profile_replanner!(planner::ReplannerWithBackup,prob::RepeatedAbstractP
     plannerB = planner.backup_planner
     hard_reset_solver!(planner.primary_planner.solver)
     hard_reset_solver!(planner.backup_planner.solver)
-    env = prob.env
+    env = get_env(prob)
     for (stage,request) in enumerate(prob.requests)
         remap_object_ids!(request.schedule,get_schedule(env))
 

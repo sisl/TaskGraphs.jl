@@ -205,7 +205,7 @@ function update_route_plan!(solver,pc_mapf::C_PC_MAPF,env,v,meta_path,meta_cost,
         #     # path.cost = accumulate_cost(cbs_env, get_cost(path), get_transition_cost(cbs_env, p.s, p.a, p.sp))
         # end
         # set_cost!(path,get_cost(new_path))
-        update_route_plan!(solver,PC_MAPF(pc_mapf.env),env,v,path,get_cost(path),sub_node,agent_id)
+        update_route_plan!(solver,PC_MAPF(get_env(pc_mapf)),env,v,path,get_cost(path),sub_node,agent_id)
         # update_env!(solver,env,route_plan,v,path,agent_id)
         # Print for debugging
         # @show agent_id
@@ -412,10 +412,10 @@ function CRCBS.low_level_search!(solver::ISPS, pc_mapf::AbstractPC_MAPF,
         reset_cache!(
             get_cache(search_env),
             get_schedule(search_env),
-            get_cache(pc_mapf.env).t0,
-            get_cache(pc_mapf.env).tF)
+            get_cache(get_env(pc_mapf)).t0,
+            get_cache(get_env(pc_mapf)).tF)
         reset_route_plan!(node,
-            get_route_plan(pc_mapf.env))
+            get_route_plan(get_env(pc_mapf)))
         valid_flag = compute_route_plan!(solver, pc_mapf, node)
         if valid_flag == false
             @log_info(0,solver,"ISPS: failed on ",i,"th repair iteration.")
@@ -543,7 +543,7 @@ Outputs:
 - cost : the cost of the solution encoded by `best_env`
 """
 function CRCBS.solve!(solver::NBSSolver, prob::E;kwargs...) where {E<:AbstractPC_TAPF}
-    best_env = SearchEnv(prob.env,route_plan=initialize_route_plan(prob.env))
+    best_env = SearchEnv(get_env(prob),route_plan=initialize_route_plan(get_env(prob)))
     set_cost!(best_env,get_infeasible_cost(best_env))
     set_best_cost!(solver, primary_cost(solver, get_cost(best_env)))
     assignment_problem = formulate_assignment_problem(assignment_solver(solver),
@@ -610,8 +610,8 @@ to being resolved.
 function formulate_assignment_problem(solver,prob;
         kwargs...)
     # TODO needs to pass in base_env--not just the schedule
-    formulate_milp(solver,prob.env;
-        cost_model=get_problem_spec(prob.env).cost_function,
+    formulate_milp(solver,get_env(prob);
+        cost_model=get_problem_spec(get_env(prob)).cost_function,
         kwargs...)
 end
 
@@ -663,8 +663,8 @@ function solve_assignment_problem!(solver::TaskGraphsMILPSolver, model, prob)
     if termination_status(model) == MOI.OPTIMAL
         @assert lower_bound(solver) <= best_cost(solver) "lower_bound($(solver_type(solver))) = $(value(objective_bound(model))) -> $(lower_bound(solver)) but should be equal to best_cost($(solver_type(solver))) = $(value(objective_function(model))) -> $(best_cost(solver))"
     end
-    sched = deepcopy(get_schedule(prob.env))
-    update_project_schedule!(solver, model, sched, get_problem_spec(prob.env))
+    sched = deepcopy(get_schedule(get_env(prob)))
+    update_project_schedule!(solver, model, sched, get_problem_spec(get_env(prob)))
     sched, lower_bound(solver)
 end
 
@@ -694,7 +694,7 @@ function plan_route!(
         prob;
         kwargs...)
 
-    env = construct_search_env(solver, schedule, prob.env;kwargs...)
+    env = construct_search_env(solver, schedule, get_env(prob);kwargs...)
     pc_mapf = construct_routing_problem(prob,env)
     solution, cost = solve!(solver, pc_mapf)
     solution, primary_cost(solver,get_cost(solution))

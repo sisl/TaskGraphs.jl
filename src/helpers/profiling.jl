@@ -97,7 +97,7 @@ function add_env!(loader::TaskGraphsProblemLoader,env_id::String,
     if haskey(loader.envs,env_id)
     else
         loader.envs[env_id] = env
-        loader.prob_specs[env_id] = ProblemSpec(graph=env)
+        loader.prob_specs[env_id] = ProblemSpec(D=get_dist_matrix(env))
     end
     loader
 end

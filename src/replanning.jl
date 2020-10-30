@@ -33,6 +33,7 @@ export
     RepeatedC_PC_TAPF
 
 abstract type RepeatedAbstractPC_TAPF end
+CRCBS.get_env(prob::RepeatedAbstractPC_TAPF) = prob.env
 
 """
     RepeatedPC_TAPF{S<:SearchEnv} <: RepeatedAbstractPC_TAPF
@@ -66,6 +67,70 @@ function get_env_snapshot(route_plan::S,t) where {S<:LowLevelSolution}
     Dict(RobotID(i)=>ROBOT_AT(i, get_sp(get_path_node(path,t)).vtx) for (i,path) in enumerate(get_paths(route_plan)))
 end
 get_env_snapshot(env::SearchEnv,args...) = get_env_snapshot(get_route_plan(env),args...)
+
+export
+    EnvState,
+    get_env_state
+
+@with_kw_noshow struct EnvState
+    robot_positions::Dict{BotID,BOT_AT} = Dict{BotID,BOT_AT}()
+    object_positions::Dict{ObjectID,OBJECT_AT} = Dict{ObjectID,OBJECT_AT}()
+end
+function Base.show(io::IO,s::EnvState)
+    print(io,"EnvState","\n")
+    print(io,"\t","robot_positions : ")
+    for k in sort(collect(keys(s.robot_positions)))
+        n = s.robot_positions[k]
+        print(io,string(n),", ")
+    end
+    print(io,"\n\t","object_positions: ")
+    for k in sort(collect(keys(s.object_positions)))
+        n = s.object_positions[k]
+        print(io,string(n),", ")
+    end
+end
+is_active(cache::PlanningCache,t::Int,v::Int) = cache.t0[v] <= t < cache.tF[v]
+function get_env_state(env,t)
+    sched = get_schedule(env)
+    cache = get_cache(env)
+    robot_positions = get_env_snapshot(env,t)
+    object_positions = Dict{ObjectID,OBJECT_AT}()
+    for (o,o_node) in get_object_ICs(sched)
+        v = get_vtx(sched,o)
+        if t <= cache.t0[v]
+            object_positions[o] = o_node
+        else
+            vtxs = capture_connected_nodes(
+                sched,v,v->check_object_id(get_node_from_vtx(sched,v),o)
+                )
+            v_deposit = filter(v->isa(get_node_from_vtx(sched,v),BOT_DEPOSIT),
+                collect(vtxs))[1]
+            node = get_node_from_vtx(sched,v_deposit)
+            if cache.t0[v_deposit] <= t
+                object_positions[o] = OBJECT_AT(o,get_location_id(node))
+            else
+                r = get_robot_id(node)
+                object_positions[o] = OBJECT_AT(o,
+                    get_location_id(robot_positions[r])
+                    )
+            end
+        end
+    end
+    EnvState(
+        robot_positions = robot_positions,
+        object_positions = object_positions
+    )
+end
+export
+    robot_positions,
+    object_positions,
+    object_position,
+    robot_position
+
+robot_positions(s::EnvState) = s.robot_positions
+object_positions(s::EnvState) = s.object_positions
+object_position(s::EnvState,k) = object_positions(s)[k]
+robot_position(s::EnvState,k) = robot_positions(s)[k]
 
 """
     trim_route_plan(search_env, route_plan, T)
@@ -175,6 +240,28 @@ function fix_precutoff_nodes!(env::SearchEnv,t=minimum(map(length, get_paths(get
     return env
 end
 
+function break_assignments!(sched::OperatingSchedule,problem_spec,v)
+    G = get_graph(sched)
+    node_id = get_vtx_id(sched,v)
+    node = get_node_from_id(sched,node_id)
+    if isa(node, AbstractRobotAction)
+        new_node = replace_robot_id(node,RobotID(-1))
+        if isa(node,BOT_GO)
+            new_node = replace_destination(new_node,LocationID(-1))
+            for v2 in outneighbors(G,v)
+                rem_edge!(G,v,v2)
+            end
+        end
+        replace_in_schedule!(sched,problem_spec,new_node,node_id)
+    elseif isa(node,TEAM_ACTION)
+        for i in 1:length(node.instructions)
+            n = node.instructions[i]
+            node.instructions[i] = replace_robot_id(node,RobotID(-1))
+        end
+    end
+    return sched
+end
+
 """
     break_assignments!(project_schedule::OperatingSchedule,problem_spec::ProblemSpec)
 
@@ -187,23 +274,7 @@ function break_assignments!(project_schedule::OperatingSchedule,problem_spec::Pr
         if path_spec.fixed == true
             continue
         end
-        node_id = get_vtx_id(project_schedule,v)
-        node = get_node_from_id(project_schedule,node_id)
-        if isa(node, AbstractRobotAction)
-            new_node = replace_robot_id(node,RobotID(-1))
-            if isa(node,BOT_GO)
-                new_node = replace_destination(new_node,LocationID(-1))
-                for v2 in outneighbors(G,v)
-                    rem_edge!(G,v,v2)
-                end
-            end
-            replace_in_schedule!(project_schedule,problem_spec,new_node,node_id)
-        elseif isa(node,TEAM_ACTION)
-            for i in 1:length(node.instructions)
-                n = node.instructions[i]
-                node.instructions[i] = replace_robot_id(node,RobotID(-1))
-            end
-        end
+        break_assignments!(project_schedule,problem_spec,v)
     end
     propagate_valid_ids!(project_schedule,problem_spec)
 

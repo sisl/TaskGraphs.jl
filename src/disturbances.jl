@@ -3,6 +3,90 @@ export
 
 abstract type AbstractDisturbance end
 
+"""
+    StochasticProblem{P<:AbstractPC_TAPF}
+
+Defines a stochastic version of PC_TAPF, wherein different disturbances can
+cause unexpected problems in the factory.
+"""
+struct StochasticProblem{P<:AbstractPC_TAPF}
+    prob::P
+    disturbances::Vector{AbstractDisturbance}
+end
+CRCBS.get_env(spc_tapf::StochasticProblem) = get_env(spc_tapf.prob)
+
+# function spctapf_problem(env_graph,r0,cr0,s0,sF,ops)
+#     tasks = config.tasks
+#     ops = config.ops
+#     s0 = map(t->t.first,tasks)
+#     sF = map(t->t.second,tasks)
+#     project_spec, _ = pctapf_problem(r0,s0,sF)
+#     for op in ops
+#         add_operation!(project_spec,construct_operation(project_spec,-1,
+#             op.inputs,op.outputs,Δt_op))
+#     end
+#     def = SimpleProblemDef(project_spec,r0,s0,sF,config.shapes)
+# end
+#
+function stochastic_problem(prob::P,args...) where {P<:AbstractPC_MAPF}
+    stochastic_problem!(deepcopy(prob),args...)
+end
+function stochastic_problem!(prob::P,clean_up_bot_ICS,disturbances) where {P<:AbstractPC_MAPF}
+    env = get_env(prob)
+    sched = get_schedule(env)
+    for pred in robot_ICs
+        add_new_robot_to_schedule!(sched,pred,get_problem_spec(get_env(prob)))
+    end
+    # cache = initialize_planning
+    sched = splice_schedules!()
+end
+function stochastic_problem(solver,env_graph,r0,cr0,s0,sF,ops,disturbances)
+    object_ICs = [OBJECT_AT(o,x) for (o,x) in enumerate(s0)] # initial_conditions
+    object_FCs = [OBJECT_AT(o,x) for (o,x) in enumerate(sF)] # final conditions
+    robot_ICs = vcat(
+        [ROBOT_AT(r,x) for (r,x) in enumerate(r0)],
+        [CUB_AT(r,x) for (r,x) in enumerate(cr0)]
+        )
+    proj_spec = ProjectSpec(object_ICs,object_FCs)
+    for op in ops
+        add_operation!(proj_spec,construct_operation(proj_spec,-1,
+            op.inputs,op.outputs,op.dt))
+    end
+    prob_spec = ProblemSpec(
+        graph=construct_delivery_graph(proj_spec,length(s0)),
+        D=get_dist_matrix(env_graph),
+        Δt=map(op->op.dt,ops),
+        r0=map(node->get_id(get_initial_location_id(node)),robot_ICs),
+        s0=s0,
+        sF=sF,
+        )
+    sched = construct_partial_project_schedule(proj_spec,prob_spec,robot_ICs)
+    env = construct_search_env(solver,sched,prob_spec,env_graph)
+    StochasticProblem{PC_TAPF}(env)
+end
+#
+# function spctapf_problem(
+#         solver,
+#         project_spec::ProjectSpec,
+#         problem_spec::ProblemSpec,
+#         robot_ICs,
+#         env_graph,
+#         args...
+#     )
+#     project_schedule = construct_partial_project_schedule(
+#         project_spec,
+#         problem_spec,
+#         robot_ICs,
+#         )
+#     env = construct_search_env(
+#         solver,
+#         project_schedule,
+#         problem_spec,
+#         env_graph
+#         )
+#     PC_TAPF(env)
+# end
+
 export OilSpill
 """
     OilSpill
@@ -69,6 +153,67 @@ Object `id` dropped.
 """
 struct DroppedObject <: AbstractDisturbance
     id::Int
+end
+
+export handle_disturbance!
+
+function handle_disturbance!(solver,prob,env::SearchEnv,d::DroppedObject,t,
+        env_state = get_env_state(env,t),
+        )
+    # Schedule surgery
+    # - remove Delivery Task: OBJECT_AT(o,old_x) -> COLLECT -> CARRY -> DEPOSIT
+    # - replace with equivalent CleanUpBot Delivery Task: OBJECT_AT(o,new_x) -> BOT_COLLECT{CleanUpBot} -> CARRY -> DEPOSIT
+    sched = get_schedule(env)
+    o = ObjectID(d.id)
+    v = get_vtx(sched,o)
+    vtxs = collect(capture_connected_nodes(get_graph(sched),v,
+        v->check_object_id(get_node_from_vtx(sched,v),o)))
+    node_ids = map(v->get_vtx_id(sched,v),vtxs)
+    # nodes = map(id->get_node_from_id(sched,id),node_ids)
+    # v_collect = filter(v->isa(get_node_from_vtx(sched,v),BOT_COLLECT),vtxs)[1]
+    # collect_node = get_node_from_vtx(sched,v_deposit)
+    v_deposit = filter(v->isa(get_node_from_vtx(sched,v),BOT_DEPOSIT),vtxs)[1]
+    deposit_node = get_node_from_vtx(sched,v_deposit)
+    v_op = filter(v->isa(get_node_from_vtx(sched,v),Operation),
+        outneighbors(sched,v_deposit))[1]
+    op_id = get_vtx_id(sched,v_op)
+    # incoming and outgoing robot nodes -- for single and team robot tasks
+    in_vtxs = setdiff(map(e->e.dst,collect(edge_cover(sched,vtxs,:in))),vtxs)
+    in_ids = filter(id->isa(id,ActionID),
+        map(v->get_vtx_id(sched,v),collect(in_vtxs)))
+    out_vtxs = setdiff(map(e->e.dst,collect(edge_cover(sched,vtxs,:out))),vtxs)
+    out_ids = filter(id->isa(id,ActionID),
+        map(v->get_vtx_id(sched,v),collect(out_vtxs)))
+    @show in_ids, out_ids
+    # remove old nodes
+    for id in node_ids
+        delete_node!(sched,id)
+    end
+    # Add GO->GO edges for affected robot(s), as if they were never assigned
+    for id1 in in_ids
+        @show node1 = get_node_from_id(sched,id1)
+        r = get_robot_id(node1)
+        for i in 1:length(out_ids)
+            id2 = out_ids[i]
+            @show node2 = get_node_from_id(sched,id2)
+            if get_robot_id(node2) == r
+                add_edge!(sched,id1,id2)
+                deleteat!(out_ids,i)
+                break
+            end
+        end
+    end
+    @assert length(out_ids) == 0
+    # add new CleanUpBot task nodes
+    r = get_robot_id(deposit_node)
+    x1 = get_location_id(robot_position(env_state,r))
+    @assert x1 == get_location_id(object_position(env_state,o))
+    x2 = get_destination_location_id(deposit_node)
+    add_to_schedule!(sched,OBJECT_AT(o,x1),o)
+    add_headless_delivery_task!(
+        sched,get_problem_spec(env,:CleanUpBot),o,op_id,x1,x2,CleanUpBotID(-1)
+    )
+    env
 end
 
 

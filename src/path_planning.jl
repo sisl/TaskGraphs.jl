@@ -321,6 +321,7 @@ end
 construct_routing_problem(prob::C_PC_TAPF,env) = C_PC_MAPF(env)
 
 
+
 initialize_planning_cache(env::SearchEnv) = initialize_planning_cache(get_schedule(env),deepcopy(get_cache(env).t0),deepcopy(get_cache(env).tF))
 
 """
@@ -858,7 +859,7 @@ function CRCBS.build_env(
     for (i, sub_node) in enumerate(sub_nodes(schedule_node))
         ph = PerfectHeuristic(get_team_config_dist_function(get_graph(env),team_configuration(schedule_node),i))
         heuristic = construct_heuristic_model(solver,get_graph(env),ph)
-        cbs_env = build_env(solver,PC_MAPF(pc_mapf.env),env,node,VtxID(v),sub_node,generate_path_spec(get_schedule(env),get_problem_spec(env),sub_node);
+        cbs_env = build_env(solver,PC_MAPF(get_env(pc_mapf)),env,node,VtxID(v),sub_node,generate_path_spec(get_schedule(env),get_problem_spec(env),sub_node);
             heuristic=heuristic,
             kwargs...
         )
@@ -892,9 +893,9 @@ end
 ############################## CBS Wrapper Stuff ###############################
 ################################################################################
 
-CRCBS.build_env(solver, pc_mapf::AbstractPC_MAPF, args...) = build_env(solver,pc_mapf,pc_mapf.env,args...)
-CRCBS.build_env(prob::Union{PC_TAPF,PC_MAPF}) = build_env(prob.env)
-CRCBS.get_initial_solution(pc_mapf::PC_MAPF) = pc_mapf.env
+CRCBS.build_env(solver, pc_mapf::AbstractPC_MAPF, args...) = build_env(solver,pc_mapf,get_env(pc_mapf),args...)
+CRCBS.build_env(prob::Union{PC_TAPF,PC_MAPF}) = build_env(get_env(prob))
+CRCBS.get_initial_solution(pc_mapf::PC_MAPF) = get_env(pc_mapf)
 function CRCBS.initialize_root_node(env::SearchEnv)
     solution = SearchEnv(
         env,
@@ -911,7 +912,7 @@ end
 function CRCBS.discrete_constraint_table(env::SearchEnv,agent_id=-1,tf=2*maximum(get_cache(env).tF)+100*num_agents(env))
     discrete_constraint_table(num_states(env),num_actions(env),agent_id,tf)
 end
-CRCBS.initialize_root_node(solver,pc_mapf::AbstractPC_MAPF) = initialize_root_node(pc_mapf.env)
+CRCBS.initialize_root_node(solver,pc_mapf::AbstractPC_MAPF) = initialize_root_node(get_env(pc_mapf))
 function Base.copy(env::SearchEnv)
     SearchEnv(
         env,
@@ -924,7 +925,7 @@ function CRCBS.default_solution(env::SearchEnv)
     set_cost!(get_route_plan(solution),get_infeasible_cost(get_route_plan(solution)))
     solution, get_cost(solution)
 end
-CRCBS.default_solution(pc_mapf::M) where {M<:AbstractPC_MAPF} = default_solution(pc_mapf.env)
+CRCBS.default_solution(pc_mapf::M) where {M<:AbstractPC_MAPF} = default_solution(get_env(pc_mapf))
 function CRCBS.cbs_update_conflict_table!(solver,mapf::AbstractPC_MAPF,node,constraint)
     search_env = node.solution
     idxs = collect(1:num_agents(search_env))
@@ -933,16 +934,16 @@ function CRCBS.cbs_update_conflict_table!(solver,mapf::AbstractPC_MAPF,node,cons
 end
 CRCBS.detect_conflicts!(table,env::SearchEnv,args...) = detect_conflicts!(table,get_route_plan(env),args...)
 
-# CRCBS.serialize(pc_mapf::PC_MAPF,args...) = serialize(pc_mapf.env,args...)
-# CRCBS.deserialize(pc_mapf::PC_MAPF,args...) = serialize(pc_mapf.env,args...)
+# CRCBS.serialize(pc_mapf::PC_MAPF,args...) = serialize(get_env(pc_mapf),args...)
+# CRCBS.deserialize(pc_mapf::PC_MAPF,args...) = serialize(get_env(pc_mapf),args...)
 CRCBS.get_env(pc_mapf::AbstractPC_MAPF)             = pc_mapf.env
 for op in [
     :cost_type,:state_type,:action_type,:path_type,:num_states,:num_actions,
     :num_agents,:serialize,:deserialize,
     :discrete_constraint_table,
     ]
-    @eval CRCBS.$op(prob::AbstractPC_MAPF,args...) = $op(prob.env,args...)
-    # @eval CRCBS.$op(prob::AbstractPC_MAPF,args...) = $op(prob.env,args...)
+    @eval CRCBS.$op(prob::AbstractPC_MAPF,args...) = $op(get_env(prob),args...)
+    # @eval CRCBS.$op(prob::AbstractPC_MAPF,args...) = $op(get_env(prob),args...)
 end
 CRCBS.base_env_type(pc_mapf::AbstractPC_MAPF)               = PCCBSEnv
 CRCBS.base_env_type(pc_mapf::Union{C_PC_MAPF,C_PC_TAPF})    = MetaAgentCBS.TeamMetaEnv

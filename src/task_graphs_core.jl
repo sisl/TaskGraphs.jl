@@ -51,24 +51,24 @@ Elements:
 - nR::Vector{Int} - num robots required for each task (>1 => collaborative task)
 """
 @with_kw struct ProblemSpec{G,F,T}
-    N::Int                  = 0 # num robots
-    M::Int                  = 0 # num tasks
     graph::G                = DiGraph() # delivery graph
-    D::T                    = get_dist_matrix(graph) # full distance matrix
+    D::T                    = zeros(0,0) # full distance matrix
     Δt::Vector{Float64}     = Vector{Float64}() # durations of operations
-    Δt_collect::Vector{Float64} = zeros(M) # duration of COLLECT operations
-    Δt_deliver::Vector{Float64} = zeros(M) # duration of DELIVER operations
     tr0_::Dict{Int,Float64} = Dict{Int,Float64}() # robot start times
     to0_::Dict{Int,Float64} = Dict{Int,Float64}() # object start times
     terminal_vtxs::Vector{Set{Int}} = [get_all_terminal_nodes(graph)]
     weights::Dict{Int,Float64} = Dict{Int,Float64}(v=>1.0 for v in 1:length(terminal_vtxs))
     cost_function::F        = SumOfMakeSpans()
-    r0::Vector{Int}         = zeros(N)
-    s0::Vector{Int}         = zeros(M) # pickup stations for each task
-    sF::Vector{Int}         = zeros(M) # delivery station for each task
-    nR::Vector{Int}         = ones(M) # num robots required for each task (>1 => collaborative task)
+    r0::Vector{Int}         = Int[]
+    s0::Vector{Int}         = Int[] # pickup stations for each task
+    sF::Vector{Int}         = Int[] # delivery station for each task
+    nR::Vector{Int}         = map(o->1,s0) # num robots required for each task (>1 => collaborative task)
+    N::Int                  = length(r0) # num robots
+    M::Int                  = length(s0) # num tasks
+    Δt_collect::Vector{Float64} = zeros(M) # duration of COLLECT operations
+    Δt_deliver::Vector{Float64} = zeros(M) # duration of DELIVER operations
     @assert length(r0) == N
-    @assert length(s0) == length(sF) == M
+    @assert length(s0) == length(sF) == length(nR) == length(Δt_collect) == length(Δt_deliver) == M
 end
 TaskGraphs.get_distance(spec::ProblemSpec,args...) = get_distance(spec.D,args...)
 
@@ -478,7 +478,7 @@ CRCBS.get_vtx(schedule::P,id::A) where {P<:OperatingSchedule,A<:AbstractID} = ge
 get_vtx_id(schedule::P,v::Int) where {P<:OperatingSchedule}                   = schedule.vtx_ids[v]
 get_node_from_vtx(schedule::P,v::Int) where {P<:OperatingSchedule}= schedule.planning_nodes[schedule.vtx_ids[v]]
 
-get_nodes_of_type(schedule::P,T) where {P<:OperatingSchedule} = Dict(get_id(id)=>get_node_from_id(schedule, id) for id in schedule.vtx_ids if typeof(id)<:T)
+get_nodes_of_type(schedule::P,T) where {P<:OperatingSchedule} = Dict(id=>get_node_from_id(schedule, id) for id in schedule.vtx_ids if typeof(id)<:T)
 get_object_ICs(schedule::P) where {P<:OperatingSchedule}  = get_nodes_of_type(schedule,ObjectID)
 get_robot_ICs(schedule::P) where {P<:OperatingSchedule}   = get_nodes_of_type(schedule,BotID)
 get_actions(schedule::P) where {P<:OperatingSchedule}     = get_nodes_of_type(schedule,ActionID)
@@ -554,7 +554,7 @@ function generate_path_spec(schedule::P,spec::T,a::BOT_GO) where {P<:OperatingSc
         free = (s==-1) # if destination is -1, there is no goal location
         )
 end
-function generate_path_spec(schedule::P,spec::T,a::CARRY) where {P<:OperatingSchedule,T<:ProblemSpec}
+function generate_path_spec(schedule::P,spec::T,a::BOT_CARRY) where {P<:OperatingSchedule,T<:ProblemSpec}
     s0 = get_id(get_initial_location_id(a))
     s = get_id(get_destination_location_id(a))
     r = get_robot_id(a)
@@ -568,7 +568,7 @@ function generate_path_spec(schedule::P,spec::T,a::CARRY) where {P<:OperatingSch
         object_id = o
         )
 end
-function generate_path_spec(schedule::P,spec::T,a::COLLECT) where {P<:OperatingSchedule,T<:ProblemSpec}
+function generate_path_spec(schedule::P,spec::T,a::BOT_COLLECT) where {P<:OperatingSchedule,T<:ProblemSpec}
     s0 = get_id(get_initial_location_id(a))
     s = get_id(get_destination_location_id(a))
     r = get_robot_id(a)
@@ -583,7 +583,7 @@ function generate_path_spec(schedule::P,spec::T,a::COLLECT) where {P<:OperatingS
         static=true
         )
 end
-function generate_path_spec(schedule::P,spec::T,a::DEPOSIT) where {P<:OperatingSchedule,T<:ProblemSpec}
+function generate_path_spec(schedule::P,spec::T,a::BOT_DEPOSIT) where {P<:OperatingSchedule,T<:ProblemSpec}
     s0 = get_id(get_initial_location_id(a))
     s = get_id(get_destination_location_id(a))
     r = get_robot_id(a)
@@ -941,28 +941,29 @@ function add_headless_delivery_task!(
         object_id::ObjectID,
         operation_id::OperationID,
         pickup_station_id::LocationID,
-        dropoff_station_id::LocationID
-        )
+        dropoff_station_id::LocationID,
+        robot_id::BotID{R}=RobotID(-1)
+        ) where {R}
 
-    robot_id = RobotID(-1)
+    # robot_id = RobotID(-1)
     action_id = get_unique_action_id()
-    add_to_schedule!(schedule, problem_spec, COLLECT(robot_id, object_id, pickup_station_id), action_id)
+    add_to_schedule!(schedule, problem_spec, BOT_COLLECT(robot_id, object_id, pickup_station_id), action_id)
     add_edge!(schedule, object_id, action_id)
 
     prev_action_id = action_id
     action_id = get_unique_action_id()
-    add_to_schedule!(schedule, problem_spec, CARRY(robot_id, object_id, pickup_station_id, dropoff_station_id), action_id)
+    add_to_schedule!(schedule, problem_spec, BOT_CARRY(robot_id, object_id, pickup_station_id, dropoff_station_id), action_id)
     add_edge!(schedule, prev_action_id, action_id)
 
     prev_action_id = action_id
     action_id = get_unique_action_id()
-    add_to_schedule!(schedule, problem_spec, DEPOSIT(robot_id, object_id, dropoff_station_id), action_id)
+    add_to_schedule!(schedule, problem_spec, BOT_DEPOSIT(robot_id, object_id, dropoff_station_id), action_id)
     add_edge!(schedule, action_id, operation_id)
     add_edge!(schedule, prev_action_id, action_id)
 
     prev_action_id = action_id
     action_id = get_unique_action_id()
-    add_to_schedule!(schedule, problem_spec, GO(robot_id, dropoff_station_id,LocationID(-1)), action_id)
+    add_to_schedule!(schedule, problem_spec, BOT_GO(robot_id, dropoff_station_id,LocationID(-1)), action_id)
     add_edge!(schedule, prev_action_id, action_id)
 
     return
@@ -1066,6 +1067,16 @@ end
 export
     construct_partial_project_schedule
 
+function add_new_robot_to_schedule!(sched,pred::BOT_AT,problem_spec=ProblemSpec())
+    robot_id = get_robot_id(pred)
+    add_to_schedule!(sched, problem_spec, pred, robot_id)
+    action_id = get_unique_action_id()
+    action = BOT_GO(r=robot_id,x1=get_location_id(pred))
+    add_to_schedule!(sched, problem_spec, action, action_id)
+    add_edge!(sched, robot_id, action_id)
+    return sched
+end
+
 """
     construct_partial_project_schedule
 
@@ -1089,12 +1100,13 @@ function construct_partial_project_schedule(
         add_to_schedule!(project_schedule, problem_spec, pred, get_object_id(pred))
     end
     for pred in robot_ICs
-        robot_id = get_robot_id(pred)
-        add_to_schedule!(project_schedule, problem_spec, pred, robot_id)
-        action_id = get_unique_action_id()
-        action = BOT_GO(r=robot_id,x1=get_location_id(pred))
-        add_to_schedule!(project_schedule, problem_spec, action, action_id)
-        add_edge!(project_schedule, robot_id, action_id)
+        add_new_robot_to_schedule!(project_schedule,pred,problem_spec)
+        # robot_id = get_robot_id(pred)
+        # add_to_schedule!(project_schedule, problem_spec, pred, robot_id)
+        # action_id = get_unique_action_id()
+        # action = BOT_GO(r=robot_id,x1=get_location_id(pred))
+        # add_to_schedule!(project_schedule, problem_spec, action, action_id)
+        # add_edge!(project_schedule, robot_id, action_id)
     end
     # add root nodes
     for operation_id in root_ops
