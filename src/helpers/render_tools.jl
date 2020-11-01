@@ -633,17 +633,115 @@ function robots_vs_task_vs_time_box_plot(df;
     )
 end
 
-
+# function get_box_plot_group_plot_normal(df;
+#         obj=:time,
+#         outer_key=:M,
+#         inner_key=:N,
+#         outer_range=10:10:60,
+#         inner_range=10:10:40,
+#         xmin=0,
+#         xmax=length(inner_range)+1,
+#         ymin=0.007,
+#         ymax=120,
+#         xtick=[10,20,30,40],
+#         xticklabels=[10,20,30,40],
+#         tickpos="left",
+#         ytick=[0.1,1,10,100],
+#         ylabel_shift="0pt",
+#         title="",
+#         title_shift=[3.3,2.55],
+#         inner_sym="n",
+#         outer_sym="m",
+#         xlabels=map(m->string(outer_sym," = ",m), outer_range),
+#         ylabels=map(n->string(inner_sym," = ",n), inner_range),
+#         ylabel="time (s)",
+#         draw_labels=true,
+#         ymode="log",
+#         width="3.25cm",
+#         height="6cm",
+#         legend_draw="black",
+#         legend_fill="white",
+#         legend_x_shift="2pt",
+#         vertical_sep = "0pt",
+#         horizontal_sep = "0pt",
+#         mark="*",
+#     )
+#     group_style = [
+#         "group name"=>"myPlots",
+#         "group size"=>"$(length(outer_range)) by 1",
+#         "xlabels at"=>"edge bottom",
+#         "xticklabels at"=>"edge bottom",
+#         "vertical sep"=>"0pt",
+#         "horizontal sep"=>"2pt"
+#     ]
+#     gstyle=prod(map(p->string(p.first,"=",p.second,","),group_style))
+#     gp = PGFPlots.GroupPlot(groupStyle=gstyle,
+#             # "boxplot"
+#             # "boxplot/draw direction = y",
+#             # ymode=ymode,
+#             # "\footnotesize",
+#             # width=width,
+#             # height=height,
+#             # xmin=xmin,
+#             # xmax=xmax,
+#             # ymin=ymin,
+#             # ymax=ymax,
+#             # xtick=xtick,
+#             # xticklabels=xtick,
+#             # tickpos=tickpos,
+#             # ytick=ytick,
+#             # yticklabels=[],
+#             # "ylabel shift=$(ylabel_shift)",
+#             # "ytick align=outside",
+#             # "xtick align=outside",
+#     )
+#     # pushPGFPlotsOptions("boxplot")
+#
+#     # for (i,m) in enumerate(outer_range)
+#     #     if i == 1 && draw_labels
+#     #         push!(gp,
+#     #             xlabel="\$$(xlabels[i])\$",
+#     #             ylabel=ylabel,
+#     #             yticklabels=ytick,
+#     #             "legend style=[draw=$legend_draw,
+#     #                 fill=$legend_fill,
+#     #                 xshift=$legend_x_shift,
+#     #                 yshift=0pt],
+#     #                 legend pos=north west
+#     #             ],"
+#     #             map(j->LegendEntry({},@sprintf("\$%s\$",ylabels[j]),false),1:length(inner_range))...,
+#     #             """
+#     #             \\addlegendimage{no markers,blue}
+#     #             \\addlegendimage{no markers,red}
+#     #             \\addlegendimage{no markers,brown}
+#     #             \\addlegendimage{no markers,black}
+#     #             """,
+#     #             map(n->PGFPlotsX.PlotInc({boxplot,mark=mark},Table(
+#     #                         {"y index"=0},
+#     #                         [:data=>df[(df[:,outer_key] .== m) .& (df[:,inner_key] .== n),obj]])),inner_range)...)
+#     #     else
+#     #         push!(gp, {
+#     #                 xlabel=@sprintf("\$%s\$",xlabels[i]),
+#     #                 ymajorticks="false",
+#     #                 yminorticks="false"
+#     #             },
+#     #             map(n->PGFPlotsX.PlotInc({boxplot,mark=mark},Table(
+#     #                         {"y index"=0},
+#     #                         [:data=>df[(df[:,outer_key] .== m) .& (df[:,inner_key] .== n),obj]])),inner_range)...)
+#     #     end
+#     # end;
+#     gp
+# end
 function get_box_plot_group_plot(df;
         obj=:time,
         outer_key=:M,
         inner_key=:N,
-        outer_range=10:10:60,
-        inner_range=10:10:40,
+        outer_range=sort(unique(df[!,outer_key])),
+        inner_range=sort(unique(df[!,inner_key])),
         xmin=0,
         xmax=length(inner_range)+1,
         ymin=0.007,
-        ymax=120,
+        ymax=maximum(df[!,obj]),
         xtick=[10,20,30,40],
         xticklabels=[10,20,30,40],
         tickpos="left",
@@ -665,7 +763,7 @@ function get_box_plot_group_plot(df;
         legend_x_shift="2pt",
         mark="*",
     )
-    @pgf gp = GroupPlot({group_style = {
+    @pgf gp = PGFPlotsX.GroupPlot({group_style = {
                 "group name"="myPlots",
                 "group size"=string(length(outer_range)," by 1"),
                 "xlabels at"="edge bottom",
@@ -726,14 +824,14 @@ function get_box_plot_group_plot(df;
                     yshift="0pt"},
                 "legend pos"="north west"
                 },
-                map(j->LegendEntry({},@sprintf("\$%s\$",ylabels[j]),false),1:length(inner_range))...,
+                map(j->PGFPlotsX.LegendEntry({},@sprintf("\$%s\$",ylabels[j]),false),1:length(inner_range))...,
                 """
                 \\addlegendimage{no markers,blue}
                 \\addlegendimage{no markers,red}
                 \\addlegendimage{no markers,brown}
                 \\addlegendimage{no markers,black}
                 """,
-                map(n->PGFPlotsX.PlotInc({boxplot,mark=mark},Table(
+                map(n->PGFPlotsX.PlotInc({boxplot,mark=mark},PGFPlotsX.Table(
                             {"y index"=0},
                             [:data=>df[(df[:,outer_key] .== m) .& (df[:,inner_key] .== n),obj]])),inner_range)...)
         else
@@ -742,7 +840,7 @@ function get_box_plot_group_plot(df;
                     ymajorticks="false",
                     yminorticks="false"
                 },
-                map(n->PGFPlotsX.PlotInc({boxplot,mark=mark},Table(
+                map(n->PGFPlotsX.PlotInc({boxplot,mark=mark},PGFPlotsX.Table(
                             {"y index"=0},
                             [:data=>df[(df[:,outer_key] .== m) .& (df[:,inner_key] .== n),obj]])),inner_range)...)
         end
@@ -920,11 +1018,11 @@ function plot_histories_pgf(df_list::Vector,ax=PGFPlots.Axis();
         include_keys=[],
         exclude_keys=[],
         opt_key=:backup_flags,
-        # ymin=minimum(df[y_key]),
-        # ymax=maximum(df[y_key]),
+        use_y_lims=false,
+        y_min=minimum(map(df->minimum(map(minimum,df[!,y_key])),df_list)),
+        y_max=maximum(map(df->maximum(map(maximum,df[!,y_key])),df_list)),
         xlabel=string("\$",string(m_key)," = ",m_vals...,"\$"),
         ylabel=string("\$",string(n_key)," = ",n_vals...,"\$"),
-        # ylabel=string("M = ",m_vals...),
         colors=["red","blue","black","brown"],
         ytick_show=false,
         ymode="log",
@@ -934,6 +1032,10 @@ function plot_histories_pgf(df_list::Vector,ax=PGFPlots.Axis();
     ax.ymode    =   ymode
     ax.xlabel   =   xlabel
     ax.ylabel   =   ytick_show ? ylabel : ""
+    if use_y_lims
+        ax.ymin = y_min
+        ax.ymax = y_max
+    end
 
     for (i,m_val) in enumerate(m_vals)
         for (j,n_val) in enumerate(n_vals)
@@ -972,7 +1074,12 @@ function plot_histories_pgf(df_list::Vector,ax=PGFPlots.Axis();
                     if 0 < idx < length(y_arr)
                         # End points
                         push!(ax,
-                            Plots.Linear([x_arr[idx]], [y_arr[idx]], mark="o", style=style, onlyMarks=true, )
+                            Plots.Linear(
+                                [x_arr[idx]],
+                                [y_arr[idx]],
+                                mark="o",
+                                style=style,
+                                onlyMarks=true, )
                         )
                         idx -= 1 # decrement so that the final point is not covered twice
                     end
@@ -980,7 +1087,13 @@ function plot_histories_pgf(df_list::Vector,ax=PGFPlots.Axis();
                     tmidxs=findall(.~opt_vals[1:idx])
                     if length(tmidxs) > 0
                         push!(ax,
-                            Plots.Linear(x_arr[tmidxs], y_arr[tmidxs], style=style, onlyMarks=true, mark="x")
+                            Plots.Linear(
+                                x_arr[tmidxs],
+                                y_arr[tmidxs],
+                                style=style,
+                                onlyMarks=true,
+                                mark="x"
+                                )
                         )
                     end
                 end
@@ -990,11 +1103,133 @@ function plot_histories_pgf(df_list::Vector,ax=PGFPlots.Axis();
     return ax
 end
 
+"""
+    ResultsTable
+
+A simple Table data structure for compiling tabular results.
+"""
+struct ResultsTable
+    xkeys::Vector{Dict{Any,Any}}
+    ykeys::Vector{Dict{Any,Any}}
+    data::Matrix{Any}
+end
+get_data(tab::ResultsTable) = tab.data
+get_data(tab) = tab
+get_xkeys(tab::ResultsTable) = tab.xkeys
+get_ykeys(tab::ResultsTable) = tab.ykeys
+Base.size(tab::ResultsTable) = size(get_data(tab))
+Base.size(tab::ResultsTable,dim) = size(get_data(tab),dim)
+Base.transpose(tab::ResultsTable) = ResultsTable(get_ykeys(tab),get_xkeys(tab),transpose(get_data(tab)))
+
+"""
+    build_table
+
+Takes in a dataframe, builds a table of `obj` values along axes `xkey` and
+`ykey`, where the `obj` values are aggregated via the function `f`.
+"""
+function build_table(df;
+    obj=:tasks_per_second,
+    xkey=:M,
+    ykey = :arrival_interval,
+    xvals = sort(unique(df[!,xkey])),
+    yvals = sort(unique(df[!,ykey])),
+    aggregator = vals -> sum(vals)/length(vals),
+    )
+
+    tab = zeros(length(xvals),length(yvals))
+    for (i,x) in enumerate(xvals)
+        for (j,y) in enumerate(yvals)
+            idxs = .&((df[!,xkey] .== x),(df[!,ykey] .== y))
+            vals = df[idxs,obj]
+            tab[i,j] = aggregator(vals)
+        end
+    end
+    xkeys = map(x->Dict(xkey=>x), xvals)
+    ykeys = map(y->Dict(ykey=>y), yvals)
+    return ResultsTable(xkeys, ykeys, tab)
+end
+function table_product(tables,mode=:horizontal)
+    @assert length(unique(size.(tables))) == 1 "All tables must have same dimensions"
+    if mode == :horizontal
+        data = collect(zip(map(get_data, tables)...))
+        xkeys = map(tup->merge(tup...), collect(zip(map(get_xkeys, tables)...)))
+        ykeys = map(tup->merge(tup...), collect(zip(map(get_ykeys, tables)...)))
+        return ResultsTable(xkeys,ykeys,data)
+    else
+        return transpose(table_product(map(transpose,tables),:horizontal))
+    end
+end
+""" utility for printing real-valued elements of a table """
+function print_real(io,v;precision=3)
+    if isa(v,Int)
+        print(io,v)
+    else
+        print(io,round(v;digits=precision))
+    end
+end
+""" """
+function print_multi_value_real(io,vals;delim=" & ",stopchar="",kwargs...)
+    for (i,v) in enumerate(vals)
+        print_real(io,v;kwargs...)
+        if i < length(vals)
+            print(io,delim)
+        else
+            print(io,stopchar)
+        end
+    end
+end
+function print_latex_header(io,tab;span=4,delim=" & ",newline=" \\\\\n",start_char="& ")
+    print(io,start_char)
+    for (j,ykeys) in enumerate(get_ykeys(tab))
+        print(io,"\\multicolumn{$span}[c]{",
+            ["\$$(k)=$(v)\$" for (k,v) in ykeys]...,"}")
+        if j < size(tab,2)
+            print(io,delim)
+        else
+            print(io,newline)
+        end
+    end
+end
+function print_latex_row_start(io,tab,i;span=4,delim=" & ")
+    xkeys = get_xkeys(tab)[i]
+    print(io,["\$$(k)=$(v)\$" for (k,v) in xkeys]...)
+    print(io,delim)
+end
+function write_tex_table(io,tab;
+        delim = " & ",
+        newline = " \\\\\n",
+        print_func = (io,v) -> print_real(io,v),
+        header_printer = print_latex_header,
+        row_start_printer = print_latex_row_start,
+        kwargs...,
+    )
+    header_printer(io,tab)
+    for (i,xkeys) in enumerate(get_xkeys(tab))
+        row_start_printer(io,tab,i)
+        for (j,ykeys) in enumerate(get_ykeys(tab))
+            print_func(io,get_data(tab)[i,j])
+            if j < size(tab,2)
+                print(io,delim)
+            else
+                print(io,newline)
+            end
+        end
+    end
+end
+function write_tex_table(fname::String,args...;kwargs...)
+    open(fname,"w") do io
+        write_tex_table(io,args...;kwargs...)
+    end
+end
+
 function group_history_plot(df_list::Vector;
     m_key=:M,
     m_vals=sort(intersect([unique(df[m_key]) for df in df_list]...)),
     n_key=:arrival_interval,
     n_vals=sort(intersect([unique(df[n_key]) for df in df_list]...)),
+    y_key=:makespans,
+    y_min=minimum(map(df->minimum(map(minimum,df[!,y_key])),df_list)),
+    y_max=maximum(map(df->maximum(map(maximum,df[!,y_key])),df_list)),
     kwargs...
     )
     g = PGFPlots.GroupPlot(length(m_vals),length(n_vals))
@@ -1002,11 +1237,14 @@ function group_history_plot(df_list::Vector;
         ytick_show = (i == 1)
         for (j,n_val) in enumerate(n_vals)
             plt = plot_histories_pgf(df_list;
+                y_key=y_key,
                 m_key=m_key,
                 m_vals=[m_val,],
                 n_key=n_key,
                 n_vals=[n_val,],
                 ytick_show = ytick_show,
+                y_min=y_min,
+                y_max=y_max,
                 kwargs...)
             push!(g,plt)
         end

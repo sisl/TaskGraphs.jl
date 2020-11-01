@@ -40,32 +40,6 @@ export
     run_replanner_profiling
 
 
-function read_assignment(toml_dict::Dict)
-    assignment = toml_dict["assignment"]
-end
-function read_assignment(io)
-    read_assignment(TOML.parsefile(io))
-end
-function TOML.parse(mat::SparseMatrixCSC{Int64,Int64})
-    toml_dict = Dict(
-        "edge_list" => map(idx->[idx[1],idx[2]], findall(!iszero, mat)),
-        "size_i" => size(mat,1),
-        "size_j" => size(mat,2)
-        )
-end
-function read_sparse_matrix(toml_dict::Dict)
-    edge_list   = toml_dict["edge_list"]
-    size_i      = toml_dict["size_i"]
-    size_j      = toml_dict["size_j"]
-    mat = sparse(zeros(size_i,size_j))
-    for e in edge_list
-        mat[e[1],e[2]] = 1
-    end
-    mat
-end
-function read_sparse_matrix(io)
-    read_sparse_matrix(TOML.parsefile(io))
-end
 
 function init_data_frame(;
         mode = :nothing,

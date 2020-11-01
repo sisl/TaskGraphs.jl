@@ -15,6 +15,8 @@
 # using ..TaskGraphsCore
 
 
+
+
 export to_string_dict
 
 to_string_dict(dict::Dict) = Dict{String,Any}(string(k)=>v for (k,v) in dict)
@@ -25,6 +27,32 @@ to_symbol_dict(el) = el
 to_symbol_dict(dict::Dict) = Dict{Symbol,Any}(Symbol(k)=>to_symbol_dict(v) for (k,v) in dict)
 to_symbol_dict(v::Vector) = map(to_symbol_dict, v)
 
+read_assignment(toml_dict::Dict) = toml_dict["assignment"]
+read_assignment(io) = read_assignment(TOML.parsefile(io))
+
+function TOML.parse(mat::SparseMatrixCSC{T,Int64}) where {T}
+    I,J,_ = findnz(mat)
+    return Dict("edge_list" => map(idx->[idx...], zip(I,J)),
+        "size_i" => size(mat,1),
+        "size_j" => size(mat,2)
+        )
+    # toml_dict = Dict(
+    #     "edge_list" => map(idx->[idx[1],idx[2]], findall(!iszero, mat)),
+    #     "size_i" => size(mat,1),
+    #     "size_j" => size(mat,2)
+    #     )
+end
+function read_sparse_matrix(toml_dict::Dict)
+    edge_list   = toml_dict["edge_list"]
+    size_i      = toml_dict["size_i"]
+    size_j      = toml_dict["size_j"]
+    mat = spzeros(Int,size_i,size_j)
+    for e in edge_list
+        mat[e[1],e[2]] = 1
+    end
+    mat
+end
+read_sparse_matrix(io) = read_sparse_matrix(TOML.parsefile(io))
 
 export
     remap_object_id,

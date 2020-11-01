@@ -577,6 +577,7 @@ function post_process_replanning_results!(results,config)
     results[:runtime_gaps] = runtime_gaps
     results[:primary_runtimes] = primary_runtimes
     results[:backup_runtimes] = backup_runtimes
+    results[:completion_times] = arrival_times .+ makespans
     return results
 end
 

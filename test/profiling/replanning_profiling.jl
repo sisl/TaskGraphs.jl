@@ -68,30 +68,31 @@ for (primary_replanner, backup_replanner) in [
     push!(planner_configs,planner_config)
 end
 
-for planner_config in planner_configs
-    # warm up to precompile replanning code
-    warmup(planner_config.planner,loader)
-    # profile
-    profile_replanner!(loader,
-        planner_config.planner,
-        base_problem_dir,
-        planner_config.results_path)
-end
+# for planner_config in planner_configs
+#     # warm up to precompile replanning code
+#     warmup(planner_config.planner,loader)
+#     # profile
+#     profile_replanner!(loader,
+#         planner_config.planner,
+#         base_problem_dir,
+#         planner_config.results_path)
+# end
 
 # if results show ''"CRCBS.Feature" = val', use the following line to convert:
 # sed -i 's/\"CRCBS\.\([A-Za-z]*\)\"/\1/g' **/**/*.toml
 
-include(joinpath(pathof(TaskGraphs),"..","helpers/render_tools.jl"))
+Revise.includet(joinpath(pathof(TaskGraphs),"..","helpers/render_tools.jl"))
 
 # # plotting results
 
-df_list = Vector{DataFrame}()
+df_dict = Dict{String,DataFrame}()
 for planner_config in planner_configs
     config_df = construct_config_dataframe(loader,base_problem_dir,problem_configs[1])
     plotting_config = (
         feats = Dict(
                 :makespans => Int[],
                 :arrival_times => Int[],
+                :completion_times => Int[],
                 :backup_flags => Bool[],
                 :runtime_gaps => Float64[],
                 :primary_runtimes => Float64[],
@@ -102,7 +103,40 @@ for planner_config in planner_configs
     )
     results_df = TaskGraphs.construct_replanning_results_dataframe(loader,plotting_config,plotting_config.feats)
     df = innerjoin(config_df,results_df;on=:problem_name)
-    push!(df_list,df)
+    df.projects_per_second = df.num_projects ./ map(maximum,df.completion_times)
+    df.backlog_factor = (df.num_projects .+ 1) .* df.arrival_interval ./ df.projects_per_second
+    df.tasks_per_second = df.projects_per_second .* df.M
+    df_dict[planner_config.planner_name] = df
+end
+df_list = Vector{DataFrame}([df_dict[config.planner_name] for config in planner_configs])
+for (k,df) in df_dict
+    df.backlog_factor = map(maximum, df.completion_times) ./ ((df.num_projects .+ 1) .* df.arrival_interval)
+    df.avg_makespan = map(sum, df.makespans) ./ df.num_projects
+end
+
+# table of rates
+# tab = build_table(df_dict["MergeAndBalance"])
+# table_product([build_table(df_dict["MergeAndBalance"]),build_table(df_dict["DeferUntilCompletion"])])
+xkey = :M
+ykey = :arrival_interval
+f = vals -> sum(vals)/length(vals)
+table_base_dir = joinpath(pwd(),"tables")
+mkpath(table_base_dir)
+for obj in [:tasks_per_second,:backlog_factor,:avg_makespan]
+    tables = []
+    for k in ["MergeAndBalance","ReassignFreeRobots","DeferUntilCompletion","NullReplanner"]
+        df = df_dict[k]
+        tab = build_table(df;obj=obj,xkey=xkey,ykey=ykey,aggregator=f)
+        push!(tables,tab)
+        # write_tex_table(joinpath(table_base_dir,"$(string(obj))_$(k).tex"),tab)
+    end
+    composite_table = table_product(tables)
+    write_tex_table(joinpath(table_base_dir,"$(string(obj))_composite.tex"),
+        composite_table;
+        print_func=print_multi_value_real,
+        header_printer=print_my_latex_header,
+        row_start_printer=print_my_latex_row_start,
+        )
 end
 
 plot_histories_pgf(df_list;
@@ -133,6 +167,7 @@ for (n_vals, m_vals) in [
         m_vals = m_vals,
         ymode="log",
         lines=false,
+        use_y_lims=true
     )
     append!(plt.axes,gp.axes)
 end

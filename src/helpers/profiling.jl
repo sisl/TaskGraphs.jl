@@ -73,6 +73,17 @@ function reconstruct_object_paths(robot_paths,object_path_summaries)
     return object_paths, object_intervals
 end
 
+export SolutionAdjacencyMatrix 
+struct SolutionAdjacencyMatrix <: FeatureExtractor{Dict{String,Any}} end
+function CRCBS.extract_feature(solver,::SolutionAdjacencyMatrix,pc_tapf,env,timer_results)
+    mat = adjacency_matrix(get_graph(get_schedule(env)))
+    I,J,_ = findnz(mat)
+    return Dict("edge_list" => map(idx->[idx...], zip(I,J)),
+        "size_i" => size(mat,1),
+        "size_j" => size(mat,2)
+        )
+end
+
 export
     TaskGraphsProblemLoader,
     add_env!,

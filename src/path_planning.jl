@@ -214,6 +214,7 @@ get_problem_spec(env::SearchEnv,k=graph_key())         = get_problem_spec(env.en
 CRCBS.get_cost_model(env::SearchEnv)        = env.cost_model
 CRCBS.get_heuristic_model(env::SearchEnv)   = env.heuristic_model
 get_schedule(env::SearchEnv) = env.schedule
+get_schedule(sched::OperatingSchedule) = sched 
 get_cache(env::SearchEnv) = env.cache
 get_route_plan(env::SearchEnv) = env.route_plan
 function CRCBS.get_start(env::SearchEnv,v::Int)
