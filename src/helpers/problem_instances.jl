@@ -173,7 +173,7 @@ end
 Optimal MakeSpan = 5
 Optimal SumOfMakeSpans = 5
 """
-function pctapf_problem_1(;cost_function=SumOfMakeSpans(),verbose=false)
+function pctapf_problem_1(;cost_function=SumOfMakeSpans(),verbose=false,Δt_op=0,Δt_collect=[0,0,0],Δt_deliver=[0,0,0])
     N = 2                  # num robots
     M = 3                  # num delivery tasks
     vtx_grid = initialize_dense_vtx_grid(4,4)
@@ -189,13 +189,13 @@ function pctapf_problem_1(;cost_function=SumOfMakeSpans(),verbose=false)
     )
     project_spec, robot_ICs = pctapf_problem(r0,s0,sF)
 
-    add_operation!(project_spec,construct_operation(project_spec,-1,[1,2],[3],0))
-    add_operation!(project_spec,construct_operation(project_spec,-1,[3],  [], 0))
+    add_operation!(project_spec,construct_operation(project_spec,-1,[1,2],[3],Δt_op))
+    add_operation!(project_spec,construct_operation(project_spec,-1,[3],  [], Δt_op))
     assignment_dict = Dict(1=>[1,3],2=>[2])
 
     def = SimpleProblemDef(project_spec,r0,s0,sF)
     project_spec, problem_spec, _, _, robot_ICs = construct_task_graphs_problem(
-        def,env_graph;cost_function=cost_function)
+        def,env_graph;cost_function=cost_function,Δt_collect=Δt_collect,Δt_deliver=Δt_deliver)
     return project_spec, problem_spec, robot_ICs, env_graph, assignment_dict
 end
 

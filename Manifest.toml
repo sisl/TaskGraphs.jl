@@ -218,14 +218,6 @@ version = "0.10.12"
 deps = ["Random"]
 uuid = "9fa8497b-333b-5362-9e8d-4d0656e87820"
 
-[[GraphPlottingBFS]]
-deps = ["Colors", "Compose", "LightGraphs", "Logging", "MetaGraphs", "Parameters", "Test"]
-git-tree-sha1 = "363bd38c15059d0af1315b6b978bc2dfd6d6e87b"
-repo-rev = "master"
-repo-url = "git@github.com:kylejbrown17/GraphPlottingBFS.jl.git"
-uuid = "277fd268-772f-11e9-01e2-fbbcabd1ad4a"
-version = "0.1.0"
-
 [[GraphUtils]]
 deps = ["Documenter", "ImageFiltering", "LightGraphs", "LinearAlgebra", "Logging", "MetaGraphs", "Parameters", "Printf", "Random", "Reexport", "SortingAlgorithms", "SparseArrays", "TOML", "Test"]
 path = "/home/kylebrown/.julia/dev/GraphUtils"

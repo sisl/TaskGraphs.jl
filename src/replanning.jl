@@ -72,6 +72,8 @@ end
 
 export
     get_active_and_fixed_vtxs,
+    get_active_vtxs,
+    get_fixed_vtxs,
     split_active_vtxs!,
     fix_precutoff_nodes!,
     break_assignments!,

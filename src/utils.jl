@@ -483,7 +483,7 @@ end
 ################################################################################
 
 export
-    title_string,
+    # title_string,
     get_display_metagraph
 
 title_string(pred::OBJECT_AT,verbose=true) = verbose ? string("O",get_id(get_object_id(pred)),"-",get_id(get_location_id(pred))) : string("O",get_id(get_object_id(pred)));

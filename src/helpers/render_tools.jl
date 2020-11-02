@@ -89,6 +89,25 @@ end
     object_paths::Dict{Int,Vector{Int}} = Dict{Int,Vector{Int}}()
     object_intervals::Dict{Int,Tuple{Int,Int}} = Dict{Int,Tuple{Int,Int}}()
 end
+function SolutionSummary(env::SearchEnv)
+    t0 = 0
+    tf = maximum(map(length,get_paths(get_route_plan(env))))
+    history = map(t->get_env_state(env,t),t0:tf)
+    robot_ids = sort(collect(keys(get_robot_ICs(get_schedule(env)))))
+    object_ids = sort(collect(keys(get_object_ICs(get_schedule(env)))))
+    robot_paths = map(
+        id->map(s->get_id(get_location_id(s.robot_positions[id])),history),
+        robot_ids)
+    object_paths = Dict(
+        get_id(id)=>map(s->get_id(get_location_id(s.object_positions[id])),
+        history) for id in object_ids)
+    # TODO implement correctly
+    objects_active = Dict(
+        get_id(id)=>map(s->s.objects_active[id],history) for id in object_ids)
+    object_intervals = Dict(
+        k=>(findfirst(v),findlast(v)) for (k,v) in objects_active)
+    SolutionSummary(robot_paths,object_paths,object_intervals)
+end
 
 abstract type RenderModel end
 struct RenderStack{T}
@@ -1357,17 +1376,40 @@ function plot_project_schedule(
         shape_function=shape_function,
         color_function=color_function,
         text_function=text_function
-        # shape_function = (G,v,x,y,r)->Compose.circle(x,y,r),
-        # color_function = (G,v,x,y,r)->get_prop(G,v,:color),
-        # text_function = (G,v,x,y,r)->string(
-        #     title_string(get_node_from_id(project_schedule, get_vtx_id(project_schedule, v)),verbose),
-        #     "\n",show_times(cache,v)
-        #     )
     )
     # `inkscape -z project_schedule1.svg -e project_schedule1.png`
     # OR: `for f in *.svg; do inkscape -z $f -e $f.png; done`
 end
 plot_project_schedule(search_env::SearchEnv;kwargs...) = plot_project_schedule(get_schedule(search_env),get_cache(search_env);kwargs...)
+
 function print_project_schedule(filename::String,args...;kwargs...)
     plot_project_schedule(args...;kwargs...) |> Compose.SVG(string(filename,".svg"))
+end
+
+function snapshot_color_func(env,t)
+    sched = get_schedule(env)
+    cache = get_cache(env)
+    active, fixed = get_active_and_fixed_vtxs(sched,cache,t)
+    return (G,v,x,y,r)-> v in active ? get_prop(G,v,:color) : "gray"
+end
+function snapshot_text_func(env,t)
+    sched = get_schedule(env)
+    cache = get_cache(env)
+    active, fixed = get_active_and_fixed_vtxs(sched,cache,t)
+    (G,v,x,y,r)->string(
+    title_string(get_node_from_id(sched,get_vtx_id(sched, v)),v in active),
+    # "\n",show_times(cache,v)
+    )
+end
+function plot_schedule_snapshot(env,t;
+    mode=:leaf_aligned,
+    color_function=snapshot_color_func(env,t),
+    text_function=snapshot_text_func(env,t),
+    kwargs...
+    )
+    plot_project_schedule(env;
+        mode=:leaf_aligned,
+        color_function=color_function,
+        text_function=text_function,
+        )
 end

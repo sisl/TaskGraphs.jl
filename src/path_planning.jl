@@ -214,7 +214,7 @@ get_problem_spec(env::SearchEnv,k=graph_key())         = get_problem_spec(env.en
 CRCBS.get_cost_model(env::SearchEnv)        = env.cost_model
 CRCBS.get_heuristic_model(env::SearchEnv)   = env.heuristic_model
 get_schedule(env::SearchEnv) = env.schedule
-get_schedule(sched::OperatingSchedule) = sched 
+get_schedule(sched::OperatingSchedule) = sched
 get_cache(env::SearchEnv) = env.cache
 get_route_plan(env::SearchEnv) = env.route_plan
 function CRCBS.get_start(env::SearchEnv,v::Int)
@@ -269,6 +269,7 @@ Reflects the state of the SearchEnv environment at a given time step.
 @with_kw_noshow struct EnvState
     robot_positions::Dict{BotID,BOT_AT} = Dict{BotID,BOT_AT}()
     object_positions::Dict{ObjectID,OBJECT_AT} = Dict{ObjectID,OBJECT_AT}()
+    objects_active::Dict{ObjectID,Bool} = Dict{ObjectID,Bool}()
 end
 
 export
@@ -300,7 +301,9 @@ function get_env_state(env,t)
     cache = get_cache(env)
     robot_positions = get_env_snapshot(env,t)
     object_positions = Dict{ObjectID,OBJECT_AT}()
+    objects_active = Dict{ObjectID,Bool}()
     for (o,o_node) in get_object_ICs(sched)
+        objects_active[o] = false
         v = get_vtx(sched,o)
         if t <= cache.t0[v]
             object_positions[o] = o_node
@@ -309,10 +312,12 @@ function get_env_state(env,t)
                 sched,v,v->check_object_id(get_node_from_vtx(sched,v),o)
                 )
             node_ids = map(v->get_vtx_id(sched,v),collect(vtxs))
-            @show node_ids
+            # @show node_ids
             v_deposit = filter(v->isa(get_node_from_vtx(sched,v),
             Union{BOT_DEPOSIT,TEAM_DEPOSIT}),
                 collect(vtxs))[1]
+
+            objects_active[o] = (cache.tF[v_deposit] > t)
             node = get_node_from_vtx(sched,v_deposit)
             if cache.t0[v_deposit] <= t
                 object_positions[o] = OBJECT_AT(o,
@@ -328,7 +333,8 @@ function get_env_state(env,t)
     end
     EnvState(
         robot_positions = robot_positions,
-        object_positions = object_positions
+        object_positions = object_positions,
+        objects_active = objects_active
     )
 end
 
