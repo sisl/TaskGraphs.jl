@@ -12,6 +12,7 @@ using PGFPlots
 using Printf
 using Parameters
 using Measures
+using LightGraphs
 using MetaGraphs
 
 ROBOT_COLOR = RGB(0.1,0.5,0.9)
@@ -51,7 +52,9 @@ function gen_object_colors(n)
   convert(Vector{Color}, cs)
 end
 
-function record_video(outfile_name,render_function;
+function record_video(outfile_name,render_function,
+        save_function = (t,path,s)-> render_function(t) |> PNG(path,s[1],s[2])
+    ;
         t0 = 0,
         tf = 10,
         dt = 0.25,
@@ -59,12 +62,13 @@ function record_video(outfile_name,render_function;
         fps = 10,
         ext = "png",
         s = (4inch, 4inch),
-        res = "1080x1080"
+        res = "1080x1080",
     )
     tmpdir = mktempdir()
     for (i,t) in enumerate(t_history)
         filename = joinpath(tmpdir,string(i,".",ext))
-        render_function(t) |> PNG(filename, s[1], s[2])
+        # render_function(t) |> PNG(filename, s[1], s[2])
+        save_function(t,filename,s)# |> PNG(filename, s[1], s[2])
     end
     outfile = outfile_name
     run(pipeline(`ffmpeg -y -r $fps -f image2 -i $tmpdir/%d.$ext -crf 20 $outfile`, stdout=devnull, stderr=devnull))
@@ -101,11 +105,10 @@ function SolutionSummary(env::SearchEnv)
     object_paths = Dict(
         get_id(id)=>map(s->get_id(get_location_id(s.object_positions[id])),
         history) for id in object_ids)
-    # TODO implement correctly
     objects_active = Dict(
         get_id(id)=>map(s->s.objects_active[id],history) for id in object_ids)
     object_intervals = Dict(
-        k=>(findfirst(v),findlast(v)) for (k,v) in objects_active)
+        k=>(findfirst(v)-1,findlast(v)-1) for (k,v) in objects_active)
     SolutionSummary(robot_paths,object_paths,object_intervals)
 end
 
@@ -132,12 +135,14 @@ end
     inactive_object_colors  ::Vector{Color} = Color[]
     completed_object_colors ::Vector{Color} = Color[]
     active_object_colors    ::Vector{Color} = Color[]
+    object_sizes            ::Vector{Tuple{Int,Int}} = Tuple{Int,Int}[]
 end
 function ObjectPositions(n::Int)
     ObjectPositions(
         active_object_colors = map(i->colorant"Black",1:n),
         inactive_object_colors = map(i->colorant"Gray",1:n),
         completed_object_colors = map(i->colorant"Gray",1:n),
+        object_sizes            = map(i->(1,1),1:n)
     )
 end
 @with_kw mutable struct Floor <: RenderModel
@@ -203,20 +208,49 @@ function render_layer(model::ObjectPositions,env::GridFactoryEnvironment,summary
             if (interval[1] <= t) #|| model.show_inactive_objects
                 x,y = interp_position(p,get_vtxs(env),t)
                 label = model.label_objects ? string("O",k) : ""
-                push!(object_layers,
-                    layer(
-                        x=[x],
-                        y=[y],
-                        label=[label],
+                if model.object_sizes[i] == (1,1)
+                    push!(object_layers,layer(
+                            x=[x],
+                            y=[y],
+                            label=[label],
+                            Geom.label(position=:centered,hide_overlaps=false),
+                            Geom.point,
+                            size=[model.osize],
+                            Theme(theme,default_color=object_color,)
+                            ))
+                else
+                    x = [x]
+                    y = [y]
+                    s = model.object_sizes[i]
+                    if s == (2,1)
+                        push!(x,x[1] + env.cell_width)
+                        push!(y,y[1])
+                    elseif s == (1,2)
+                        push!(x,x[1])
+                        push!(y,y[1] + env.cell_width)
+                    elseif s == (2,2)
+                        append!(x,[
+                            x[1] + env.cell_width,
+                            x[1] + env.cell_width,
+                            x[1],
+                            x[1],
+                            ])
+                        append!(y,[
+                            y[1],
+                            y[1] + env.cell_width,
+                            y[1] + env.cell_width,
+                            y[1],
+                            ])
+                    end
+                    push!(object_layers,layer(x=x,y=y,
+                        label=[label,map(j->"",prod(s)-1)],
                         Geom.label(position=:centered,hide_overlaps=false),
-                        Geom.point,
-                        size=[model.osize],
-                        Theme(
-                            theme,
+                            Geom.path,Geom.point,size=[model.osize],
+                            Theme(theme,
                             default_color=object_color,
-                            )
-                        )
-                )
+                            line_width=model.osize)
+                            ))
+                end
             end
         end
     end
@@ -588,7 +622,6 @@ render_env(t) = visualize_env(factory_env,t;robot_vtxs=r0,object_vtxs=s0,paths=p
 render_paths(t,factory_env,robot_paths,object_paths=[];kwargs...) = visualize_env(factory_env,t;robot_paths=robot_paths,object_paths=object_paths,kwargs...)
 render_both(t,paths1,paths2) = hstack(render_paths(t,paths1),render_paths(t,paths2))
 render_search(t_start,factory_env;kwargs...) = visualize_env(factory_env,t_start;show_search_paths=true,kwargs...)
-
 
 
 # Plotting results
@@ -1389,22 +1422,28 @@ end
 function snapshot_color_func(env,t)
     sched = get_schedule(env)
     cache = get_cache(env)
-    active, fixed = get_active_and_fixed_vtxs(sched,cache,t)
+    active = Set(filter(v->cache.t0[v] <= t < cache.tF[v] + maximum(cache.local_slack[v]),vertices(sched)))
+    for v in collect(active)
+        setdiff!(active,outneighbors(get_graph(sched),v))
+    end
+    # active = Set(filter(v->cache.t0[v] <= t <= cache.tF[v]))
+    # active, fixed = get_active_and_fixed_vtxs(sched,cache,t)
     return (G,v,x,y,r)-> v in active ? get_prop(G,v,:color) : "gray"
 end
-function snapshot_text_func(env,t)
+function snapshot_text_func(env,t;verbose = true)
     sched = get_schedule(env)
     cache = get_cache(env)
     active, fixed = get_active_and_fixed_vtxs(sched,cache,t)
     (G,v,x,y,r)->string(
-    title_string(get_node_from_id(sched,get_vtx_id(sched, v)),v in active),
+    title_string(get_node_from_id(sched,get_vtx_id(sched, v)),verbose && (v in active)),
     # "\n",show_times(cache,v)
     )
 end
 function plot_schedule_snapshot(env,t;
     mode=:leaf_aligned,
+    verbose=true,
     color_function=snapshot_color_func(env,t),
-    text_function=snapshot_text_func(env,t),
+    text_function=snapshot_text_func(env,t;verbose=verbose),
     kwargs...
     )
     plot_project_schedule(env;
@@ -1412,4 +1451,69 @@ function plot_schedule_snapshot(env,t;
         color_function=color_function,
         text_function=text_function,
         )
+end
+
+function convert_svg_file_to_png(path,outpath=string(splitext(path)[1],".png");
+    width = 512,
+    )
+    run(`inkscape -z -w $width $(path) -e $(outpath)`)
+end
+function concat_image_files(path1,path2,outpath)
+    run(`convert $(path1) $(path2) -append $(outpath)`)
+end
+
+
+"""
+    get_graphic_dims
+
+Return `width`, `height` to plot a graphic of size `dx × dy` at scale `scale`,
+such that the aspect_ratio falls within appropriate bounds.
+"""
+function get_graphic_dims(dx,dy;
+        scale = 1,
+        desired_aspect = 0.7,
+        aspect_bounds = [0.5,0.8],
+    )
+    aspect_ratio = min(max(desired_aspect, aspect_bounds[1]),aspect_bounds[2])
+    gw = dx*scale
+    gh = dy*scale
+    if gh > gw*aspect_ratio
+        gw = gh/aspect_ratio
+    else
+        gh = gw*aspect_ratio
+    end
+    gw,gh
+end
+
+"""
+    render_env_and_schedule
+
+Saves a ".png" file that shows the env state at time `t` as well as the schedule
+state (i.e., the active nodes) at time `t`.
+"""
+function render_env_and_schedule(outpath,rstack,env::SearchEnv,t;
+        pix_width = 512,
+        env_scale = 1cm,
+        min_env_aspect = 0.3,
+        max_aspect = 0.5,
+        base_dir = tempdir(),
+        kwargs...
+    )
+    env_summary = SolutionSummary(env)
+    sched_plot = plot_schedule_snapshot(env,t;kwargs...)
+    dx,dy = Compose.default_graphic_width, Compose.default_graphic_height
+    sched_plot |> SVG(joinpath(base_dir,"plot2.svg"),dx,dy)
+
+    gw, gh = get_graphic_dims(get_graph(env).x_dim,get_graph(env).y_dim;
+        scale=1cm,
+        desired_aspect=max_aspect - dy/dx,
+        aspect_bounds=[min_env_aspect,max_aspect]
+    )
+    Compose.set_default_graphic_size(gw,gh)
+    env_plot = render_env(rstack,get_graph(env),env_summary,t)
+    env_plot |> SVG(joinpath(base_dir,"plot1.svg"),gw,gh)
+
+    convert_svg_file_to_png(joinpath(base_dir,"plot1.svg");width=pix_width)
+    convert_svg_file_to_png(joinpath(base_dir,"plot2.svg");width=pix_width)
+    concat_image_files(joinpath(base_dir,"plot1.png"),joinpath(base_dir,"plot2.png"),outpath)
 end

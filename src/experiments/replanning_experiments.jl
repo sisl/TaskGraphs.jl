@@ -96,7 +96,7 @@ end
 function RepeatedPC_TAPF(simple_def::SimpleRepeatedProblemDef,solver,loader::ReplanningProblemLoader)
     env         = loader.envs[simple_def.env_id]
     prob_spec   = ProblemSpec(loader.prob_specs[simple_def.env_id],
-        r0=simple_def.r0,N=length(simple_def.r0))
+        r0=simple_def.r0) #,N=length(simple_def.r0))
     sched = construct_partial_project_schedule(
         [ROBOT_AT(r,x) for (r,x) in enumerate(simple_def.r0)],prob_spec)
     search_env = construct_search_env(solver,sched,prob_spec,env)

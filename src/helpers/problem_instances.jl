@@ -141,21 +141,10 @@ function pcta_problem(
     cost_model = typeof(primary_objective)(project_schedule,cache)
     heuristic_model = NullHeuristic()
     layers = construct_environment_layer_dict(project_schedule,env_graph,problem_spec)
-    # layers = Dict{Symbol,EnvironmentLayer{typeof(cost_model),typeof(heuristic_model)}}()
-    # for k in  unique(map(graph_key, values(sched.planning_nodes)))
-    #     eg = GridFactoryEnvironment(env_graph,
-    #         graph=deepcopy(env_graph.graph),
-    #         dist_function=deepcopy(get_dist_matrix(env_graph))
-    #         )
-    #     ps = ProblemSpec(problem_spec,D=get_dist_matrix(eg))
-    #     layers[k] = EnvironmentLayer(eg,ps,cost_model,heuristic_model)
-    # end
     env = SearchEnv(
         schedule=project_schedule,
         cache=cache,
         env_layers=layers,
-        # graphs=construct_env_graph_dict(schedule,env_graph),
-        # problem_specs=Dict{Symbol,ProblemSpec}(:Default=>problem_spec),
         cost_model = cost_model,
         heuristic_model = heuristic_model
         )
@@ -663,6 +652,9 @@ export pctapf_problem_11
 function pctapf_problem_11(;
         cost_function = SumOfMakeSpans(),
         verbose = false,
+        Δt_op=0,
+        Δt_collect=[0,0,0],
+        Δt_deliver=[0,0,0],
     )
     N = 3                  # num robots
     M = 3                  # num delivery tasks
@@ -682,17 +674,17 @@ function pctapf_problem_11(;
     project_spec, robot_ICs = pctapf_problem(r0, s0, sF)
     add_operation!(
         project_spec,
-        construct_operation(project_spec, -1, [1, 2], [3], 0),
+        construct_operation(project_spec, -1, [1, 2], [3], Δt_op),
     )
     add_operation!(
         project_spec,
-        construct_operation(project_spec, -1, [3], [], 0),
+        construct_operation(project_spec, -1, [3], [], Δt_op),
     )
     assignment_dict = Dict(1 => [1,3], 2 => [1], 3 => [2])
 
     def = SimpleProblemDef(project_spec,r0,s0,sF,shapes)
     project_spec, problem_spec, _, _, robot_ICs = construct_task_graphs_problem(
-        def,env_graph;cost_function=cost_function)
+        def,env_graph;cost_function=cost_function,Δt_collect=Δt_collect,Δt_deliver=Δt_deliver)
 
     return project_spec, problem_spec, robot_ICs, env_graph, assignment_dict
 end

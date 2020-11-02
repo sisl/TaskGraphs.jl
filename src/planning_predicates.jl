@@ -692,6 +692,6 @@ title_string(a::BOT_COLLECT,verbose=true)   = verbose ? string("collect\n",get_i
 title_string(a::BOT_CARRY,verbose=true)     = verbose ? string("carry\n",get_id(get_robot_id(a)),",",get_id(get_object_id(a)),",",get_id(get_destination_location_id(a))) : "carry";
 title_string(a::BOT_DEPOSIT,verbose=true)   = verbose ? string("deposit\n",get_id(get_robot_id(a)),",",get_id(get_object_id(a)),",",get_id(get_location_id(a))) : "deposit";
 title_string(op::Operation,verbose=true)= verbose ? string("op",get_id(get_operation_id(op))) : "op";
-title_string(a::TEAM_ACTION,verbose=true) where {R,A} = verbose ? string("team", team_action_type(a), "\n","r: (",map(i->string(get_id(get_robot_id(i)), ","), a.instructions)...,")") : string("team", A)
+title_string(a::TEAM_ACTION,verbose=true) where {R,A} = verbose ? string("T-", team_action_type(a), "\n","r: (",map(i->string(get_id(get_robot_id(i)), ","), a.instructions)...,")") : string("TEAM","\n",title_string(team_action_type(a)(),verbose)) #string("TEAM\n", string(team_action_type(a)))
 
 end # module PlanningPredicates

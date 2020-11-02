@@ -253,10 +253,16 @@ export
 """
     get_env_snapshot(route_plan::S,t)
 """
-function get_env_snapshot(route_plan::S,t) where {S<:LowLevelSolution}
-    Dict(RobotID(i)=>ROBOT_AT(i, get_sp(get_path_node(path,t)).vtx) for (i,path) in enumerate(get_paths(route_plan)))
+# function get_env_snapshot(route_plan::S,t) where {S<:LowLevelSolution}
+#     Dict(RobotID(i)=>ROBOT_AT(i, get_sp(get_path_node(path,t)).vtx) for (i,path) in enumerate(get_paths(route_plan)))
+# end
+function get_env_snapshot(env::SearchEnv,t)
+    sched = get_schedule(env)
+    route_plan = get_route_plan(env)
+    Dict(id=>BOT_AT(id,
+        LocationID(get_sp(get_path_node(get_paths(route_plan)[get_id(id)],t)).vtx)
+        ) for (id,r) in get_robot_ICs(sched))
 end
-get_env_snapshot(env::SearchEnv,args...) = get_env_snapshot(get_route_plan(env),args...)
 
 export
     EnvState,
@@ -275,25 +281,30 @@ end
 export
     robot_positions,
     object_positions,
+    objects_active,
     object_position,
+    object_active,
     robot_position
 
 robot_positions(s::EnvState) = s.robot_positions
 object_positions(s::EnvState) = s.object_positions
+objects_active(s::EnvState) = s.objects_active
 object_position(s::EnvState,k) = object_positions(s)[k]
 robot_position(s::EnvState,k) = robot_positions(s)[k]
+object_active(s::EnvState,k) = objects_active(s)[k]
 
 function Base.show(io::IO,s::EnvState)
-    print(io,"EnvState","\n")
-    print(io,"\t","robot_positions : ")
-    for k in sort(collect(keys(robot_positions(s))))
-        n = robot_positions(s)[k]
-        print(io,string(n),", ")
-    end
-    print(io,"\n\t","object_positions: ")
-    for k in sort(collect(keys(object_positions(s))))
-        n = object_positions(s)[k]
-        print(io,string(n),", ")
+    print(io,"EnvState")
+    for (n,dict) in [
+        ("robot_positions",robot_positions(s)),
+        ("object_positions",object_positions(s)),
+        ("objects_active",objects_active(s)),
+        ]
+        print(io,"\n\t",n," : ")
+        for k in sort(collect(keys(dict)))
+            val = dict[k]
+            print(io,string(val),", ")
+        end
     end
 end
 function get_env_state(env,t)
@@ -303,11 +314,12 @@ function get_env_state(env,t)
     object_positions = Dict{ObjectID,OBJECT_AT}()
     objects_active = Dict{ObjectID,Bool}()
     for (o,o_node) in get_object_ICs(sched)
-        objects_active[o] = false
         v = get_vtx(sched,o)
         if t <= cache.t0[v]
             object_positions[o] = o_node
+            objects_active[o] = t >= cache.t0[v]
         else
+            object_positions[o] = o_node
             vtxs = capture_connected_nodes(
                 sched,v,v->check_object_id(get_node_from_vtx(sched,v),o)
                 )
@@ -316,19 +328,27 @@ function get_env_state(env,t)
             v_deposit = filter(v->isa(get_node_from_vtx(sched,v),
             Union{BOT_DEPOSIT,TEAM_DEPOSIT}),
                 collect(vtxs))[1]
+            v_collect = filter(v->isa(get_node_from_vtx(sched,v),
+            Union{BOT_COLLECT,TEAM_COLLECT}),
+                collect(vtxs))[1]
 
-            objects_active[o] = (cache.tF[v_deposit] > t)
             node = get_node_from_vtx(sched,v_deposit)
-            if cache.t0[v_deposit] <= t
+            if t >= cache.t0[v_deposit]
                 object_positions[o] = OBJECT_AT(o,
                     map(n->get_location_id(n),sub_nodes(node))
                     )
-            else
+            elseif t >= cache.t0[v_collect]
                 r_ids = get_robot_ids(node)
                 object_positions[o] = OBJECT_AT(o,
                     map(r->get_location_id(robot_positions[r]),r_ids)
                     )
+            # else
+            #     r_ids = get_robot_ids(node)
+            #     @show object_positions[o] = OBJECT_AT(o,
+            #         map(r->get_location_id(robot_positions[r]),r_ids)
+            #         )
             end
+            objects_active[o] = (t <= cache.tF[v_deposit])
         end
     end
     EnvState(
@@ -430,6 +450,7 @@ Defines an instance of a Collaborative Precedence-Constrained Multi-Agent Task
 struct C_PC_TAPF{E<:SearchEnv} <: AbstractPC_TAPF
     env::E
 end
+C_PC_TAPF(p::PC_TAPF) = C_PC_TAPF(p.env)
 construct_routing_problem(prob::C_PC_TAPF,env) = C_PC_MAPF(env)
 
 for T in [:PC_TAPF,:PC_MAPF,:PC_TA]
