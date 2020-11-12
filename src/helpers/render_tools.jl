@@ -103,10 +103,10 @@ function SolutionSummary(env::SearchEnv)
         id->map(s->get_id(get_location_id(s.robot_positions[id])),history),
         robot_ids)
     object_paths = Dict(
-        get_id(id)=>map(s->get_id(get_location_id(s.object_positions[id])),
+        get_id(id)=>map(s->get_id(get_location_id(get(object_positions(s),id,OBJECT_AT(id,-1)))),
         history) for id in object_ids)
     objects_active = Dict(
-        get_id(id)=>map(s->s.objects_active[id],history) for id in object_ids)
+        get_id(id)=>map(s->get(objects_active(s),id,false),history) for id in object_ids)
     object_intervals = Dict(
         k=>(findfirst(v)-1,findlast(v)-1) for (k,v) in objects_active)
     SolutionSummary(robot_paths,object_paths,object_intervals)
@@ -1060,13 +1060,22 @@ function plot_collab_counts(df;
     )
 end
 
+function plot_histories_pgf(df_dict::Dict,
+    key_list=sort(string.(collect(keys(df_dict)))),args...;
+    legend_entries = key_list,
+    kwargs...)
+    plot_histories_pgf([df_dict[k] for k in key_list],args...;
+        legend_entries = legend_entries,
+        kwargs...
+    )
+end
 function plot_histories_pgf(df_list::Vector,ax=PGFPlots.Axis();
         y_key=:makespans,
         x_key=:arrival_times,
         m_key=:M,
-        m_vals=sort(intersect([unique(df[m_key]) for df in df_list]...)),
+        m_vals=sort(intersect([unique(df[!,m_key]) for df in df_list]...)),
         n_key=:arrival_interval,
-        n_vals=sort(intersect([unique(df[n_key]) for df in df_list]...)),
+        n_vals=sort(intersect([unique(df[!,n_key]) for df in df_list]...)),
         include_keys=[],
         exclude_keys=[],
         opt_key=:backup_flags,
@@ -1076,22 +1085,31 @@ function plot_histories_pgf(df_list::Vector,ax=PGFPlots.Axis();
         xlabel=string("\$",string(m_key)," = ",m_vals...,"\$"),
         ylabel=string("\$",string(n_key)," = ",n_vals...,"\$"),
         colors=["red","blue","black","brown"],
+        legend_entries = ["" for c in colors],
         ytick_show=false,
         ymode="log",
+        legend_pos = "outer north east",
         lines=true,
     )
 
     ax.ymode    =   ymode
-    ax.xlabel   =   xlabel
-    ax.ylabel   =   ytick_show ? ylabel : ""
+    if length(xlabel) > 0
+        ax.xlabel = xlabel
+    end
+    if ytick_show
+        ax.ylabel = ylabel
+    end
     if use_y_lims
         ax.ymin = y_min
         ax.ymax = y_max
     end
-
+    if length(legend_pos) > 0
+        ax.legendPos = legend_pos
+    end
+    counters = zeros(length(df_list))
     for (i,m_val) in enumerate(m_vals)
         for (j,n_val) in enumerate(n_vals)
-            for (df,color) in zip(df_list,colors)
+            for (df_idx,(df,color,l_entry)) in enumerate(zip(df_list,colors,legend_entries))
                 idxs = .&(
                     (df[!,m_key] .== m_val),
                     (df[!,n_key] .== n_val),
@@ -1107,15 +1125,9 @@ function plot_histories_pgf(df_list::Vector,ax=PGFPlots.Axis();
                 for k in 1:nrow(df_cut)
                     y_arr = df_cut[y_key][k]
                     x_arr = x_key == :none ? collect(1:length(y_arr)) : df_cut[x_key][k]
-                    # x_arr = df_cut[x_key][k]
                     opt_vals = df_cut[opt_key][k] # tracks whether the fall back was employed
 
-                    # idx = findfirst(y_arr .< 0)
-                    # idx = idx == nothing ? length(y_arr) : idx-1
                     idx = minimum([length(x_arr),length(y_arr),length(opt_vals)])
-                    # x_arr = x_arr[1:idx]
-                    # y_arr = y_arr[1:idx]
-                    # @show x_arr, y_arr, opt_vals
                     # Overall trend
                     if lines
                         push!(ax,
@@ -1138,21 +1150,43 @@ function plot_histories_pgf(df_list::Vector,ax=PGFPlots.Axis();
 
                     tmidxs=findall(.~opt_vals[1:idx])
                     if length(tmidxs) > 0
-                        push!(ax,
-                            Plots.Linear(
-                                x_arr[tmidxs],
-                                y_arr[tmidxs],
-                                style=style,
-                                onlyMarks=true,
-                                mark="x"
-                                )
-                        )
+                        p = Plots.Linear(
+                                    x_arr[tmidxs],
+                                    y_arr[tmidxs],
+                                    style=style,
+                                    onlyMarks=true,
+                                    mark="x"
+                                    )
+                        if counters[df_idx] == 0 && length(l_entry) > 0
+                            p.legendentry = l_entry
+                            counters[df_idx] += 1
+                            insert!(ax.plots,1,p)
+                        else
+                            push!(ax,p)
+                        end
                     end
                 end
             end
         end
     end
     return ax
+end
+
+function plot_history_layers(df,keylist,ax=PGFPlots.Axis();
+        legend_entries = map(string,keylist),
+        colors = ["red","blue","black","brown"],
+        kwargs...
+    )
+    plt = ax
+    for (i,k) in enumerate(keylist)
+        plt = plot_histories_pgf([df],plt;
+            y_key = k,
+            legend_entries=[legend_entries[i]],
+            colors = [colors[i]],
+            kwargs...,
+            )
+    end
+    return plt
 end
 
 """
@@ -1212,7 +1246,9 @@ function table_product(tables,mode=:horizontal)
     end
 end
 """ utility for printing real-valued elements of a table """
-function print_real(io,v;precision=3)
+function print_real(io,v;
+        precision=3,
+        )
     if isa(v,Int)
         print(io,v)
     else
@@ -1220,9 +1256,20 @@ function print_real(io,v;precision=3)
     end
 end
 """ """
-function print_multi_value_real(io,vals;delim=" & ",stopchar="",kwargs...)
+function print_multi_value_real(io,vals;
+        delim=" & ",
+        surround=["",""],
+        stopchar="",
+        comp_func=vals->-1,
+        kwargs...)
+    best_idx = comp_func(vals)
+    best_idxs = findall(vals .== vals[best_idx])
     for (i,v) in enumerate(vals)
+        print(io,surround[1])
+        i in best_idxs ? print(io,"\\textbf{") : nothing
         print_real(io,v;kwargs...)
+        i in best_idxs ? print(io,"}") : nothing
+        print(io,surround[2])
         if i < length(vals)
             print(io,delim)
         else
@@ -1231,9 +1278,10 @@ function print_multi_value_real(io,vals;delim=" & ",stopchar="",kwargs...)
     end
 end
 function print_latex_header(io,tab;span=4,delim=" & ",newline=" \\\\\n",start_char="& ")
+    print(io,"\\begin{tabular}{",map(i->"l ",1:size(tab,2)*span+1)...,"}","\n")
     print(io,start_char)
     for (j,ykeys) in enumerate(get_ykeys(tab))
-        print(io,"\\multicolumn{$span}[c]{",
+        print(io,"\\multicolumn{$span}{c}{",
             ["\$$(k)=$(v)\$" for (k,v) in ykeys]...,"}")
         if j < size(tab,2)
             print(io,delim)
@@ -1259,7 +1307,7 @@ function write_tex_table(io,tab;
     for (i,xkeys) in enumerate(get_xkeys(tab))
         row_start_printer(io,tab,i)
         for (j,ykeys) in enumerate(get_ykeys(tab))
-            print_func(io,get_data(tab)[i,j])
+            print_func(io,get_data(tab)[i,j];kwargs...)
             if j < size(tab,2)
                 print(io,delim)
             else
@@ -1267,6 +1315,7 @@ function write_tex_table(io,tab;
             end
         end
     end
+    print(io,"\\end{tabular}")
 end
 function write_tex_table(fname::String,args...;kwargs...)
     open(fname,"w") do io

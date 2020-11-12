@@ -4,7 +4,8 @@ using TaskGraphs, CRCBS, TOML
 base_dir = joinpath("/scratch/task_graphs_experiments","replanning3")
 base_problem_dir    = joinpath(base_dir,"problem_instances")
 # base_results_dir    = joinpath(base_dir,"results")
-base_results_dir    = joinpath(base_dir,"results_no_fail")
+# base_results_dir    = joinpath(base_dir,"results_no_fail")
+base_results_dir    = joinpath(base_dir,"results_hard_timer")
 
 loader = ReplanningProblemLoader()
 add_env!(loader,"env_2",init_env_2())
@@ -68,15 +69,15 @@ for (primary_replanner, backup_replanner) in [
     push!(planner_configs,planner_config)
 end
 
-# for planner_config in planner_configs
-#     # warm up to precompile replanning code
-#     warmup(planner_config.planner,loader)
-#     # profile
-#     profile_replanner!(loader,
-#         planner_config.planner,
-#         base_problem_dir,
-#         planner_config.results_path)
-# end
+for planner_config in planner_configs
+    # warm up to precompile replanning code
+    warmup(planner_config.planner,loader)
+    # profile
+    profile_replanner!(loader,
+        planner_config.planner,
+        base_problem_dir,
+        planner_config.results_path)
+end
 
 # if results show ''"CRCBS.Feature" = val', use the following line to convert:
 # sed -i 's/\"CRCBS\.\([A-Za-z]*\)\"/\1/g' **/**/*.toml
@@ -110,8 +111,12 @@ for planner_config in planner_configs
 end
 df_list = Vector{DataFrame}([df_dict[config.planner_name] for config in planner_configs])
 for (k,df) in df_dict
-    df.backlog_factor = map(maximum, df.completion_times) ./ ((df.num_projects .+ 1) .* df.arrival_interval)
+    # df.backlog_factor = map(maximum, df.completion_times) ./ ((df.num_projects .+ 1) .* df.arrival_interval) # .+ map(minimum, df.makespans))
+    df.backlog_factor = map(maximum, df.completion_times) ./ ((df.num_projects .+ 0) .* df.arrival_interval .+ map(minimum, df.makespans))
     df.avg_makespan = map(sum, df.makespans) ./ df.num_projects
+    df.tasks_per_minute = 60.0*df.tasks_per_second
+    df.fallback_count = map(sum, df.backup_flags)
+    df.fallback_rate = df.fallback_count ./ df.num_projects
 end
 
 # table of rates
@@ -122,7 +127,12 @@ ykey = :arrival_interval
 f = vals -> sum(vals)/length(vals)
 table_base_dir = joinpath(pwd(),"tables")
 mkpath(table_base_dir)
-for obj in [:tasks_per_second,:backlog_factor,:avg_makespan]
+for (obj,prec,comp_func) in [
+    (:tasks_per_minute,1,argmax),
+    (:backlog_factor,2,argmin),
+    (:avg_makespan,0,argmin),
+    (:fallback_rate,2,argmin),
+    ]
     tables = []
     for k in ["MergeAndBalance","ReassignFreeRobots","DeferUntilCompletion","NullReplanner"]
         df = df_dict[k]
@@ -133,13 +143,13 @@ for obj in [:tasks_per_second,:backlog_factor,:avg_makespan]
     composite_table = table_product(tables)
     write_tex_table(joinpath(table_base_dir,"$(string(obj))_composite.tex"),
         composite_table;
-        print_func=print_multi_value_real,
-        header_printer=print_my_latex_header,
-        row_start_printer=print_my_latex_row_start,
+        print_func=(io,vals)->print_multi_value_real(io,vals;precision=prec,comp_func=comp_func),
+        header_printer=print_latex_header,
+        row_start_printer=print_latex_row_start,
         )
 end
 
-plot_histories_pgf(df_list;
+plt = plot_histories_pgf(df_dict;
     y_key=:makespans,
     x_key=:none,
     include_keys = [:num_projects=>30,:M=>10,:arrival_interval=>40],
@@ -147,8 +157,11 @@ plot_histories_pgf(df_list;
     ylabel = "makespans",
     ytick_show = true,
     ymode="linear",
+    colors = ["red","blue","black","brown"],
     lines=false
 )
+save("makespans.tex",plt)
+save("makespans.pdf",plt)
 
 plt = PGFPlots.GroupPlot(3,5)
 for (n_vals, m_vals) in [
@@ -160,18 +173,35 @@ for (n_vals, m_vals) in [
     ]
     gp = group_history_plot(df_list;
         y_key = :makespans,
+        use_y_lims=true,
+        y_min=0,
+        y_max=2500,
+        ymode="linear",
         x_key=:none,
         n_key = :M,
         n_vals = n_vals,
         m_key = :arrival_interval,
         m_vals = m_vals,
-        ymode="log",
         lines=false,
-        use_y_lims=true
     )
     append!(plt.axes,gp.axes)
 end
 display(plt)
+
+plt = plot_history_layers(df_dict["MergeAndBalance"],[:primary_runtimes,:backup_runtimes];
+    legend_entries=["primary","backup"],
+    x_key=:none,
+    n_key = :M,
+    n_vals = [30,],
+    m_key = :arrival_interval,
+    m_vals = [60,],
+    xlabel="",
+    ylabel="",
+    ymode="linear",
+    lines=false,
+)
+plt.legendPos = "north east"
+plt
 
 for (df,planner_config) in zip(df_list,planner_configs)
     plt = PGFPlots.GroupPlot(3,5)

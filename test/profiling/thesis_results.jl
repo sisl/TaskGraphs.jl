@@ -333,8 +333,8 @@ prob_file = "/scratch/task_graphs_experiments/replanning3/problem_instances/prob
 simple_prob_def = read_simple_repeated_problem_def(prob_file)
 prob = RepeatedPC_TAPF(simple_prob_def,planner.primary_planner.solver,loader)
 
-deleteat!(prob.requests,4:30)
-dt = 20
+deleteat!(prob.requests,5:30)
+dt = 16
 global t = 10
 for i in 1:length(prob.requests)
     prob.requests[i] = ProjectRequest(prob.requests[i],t_request=t,t_arrival=t)
