@@ -5,7 +5,6 @@ base_dir = joinpath("/scratch/task_graphs_experiments","replanning3")
 base_problem_dir    = joinpath(base_dir,"problem_instances")
 # base_results_dir    = joinpath(base_dir,"results")
 # base_results_dir    = joinpath(base_dir,"results_no_fail")
-base_results_dir    = joinpath(base_dir,"results_hard_timer")
 
 loader = ReplanningProblemLoader()
 add_env!(loader,"env_2",init_env_2())
@@ -69,15 +68,15 @@ for (primary_replanner, backup_replanner) in [
     push!(planner_configs,planner_config)
 end
 
-for planner_config in planner_configs
-    # warm up to precompile replanning code
-    warmup(planner_config.planner,loader)
-    # profile
-    profile_replanner!(loader,
-        planner_config.planner,
-        base_problem_dir,
-        planner_config.results_path)
-end
+# for planner_config in planner_configs
+#     # warm up to precompile replanning code
+#     warmup(planner_config.planner,loader)
+#     # profile
+#     profile_replanner!(loader,
+#         planner_config.planner,
+#         base_problem_dir,
+#         planner_config.results_path)
+# end
 
 # if results show ''"CRCBS.Feature" = val', use the following line to convert:
 # sed -i 's/\"CRCBS\.\([A-Za-z]*\)\"/\1/g' **/**/*.toml
@@ -118,6 +117,9 @@ for (k,df) in df_dict
     df.fallback_count = map(sum, df.backup_flags)
     df.fallback_rate = df.fallback_count ./ df.num_projects
 end
+planner_ordering = ["MergeAndBalance","ReassignFreeRobots","DeferUntilCompletion","NullReplanner"]
+legend_entries=["\\mergeAndBalance","\\reassignFree","\\deferUntilCompletion","\\backupOnly"]
+colors=["red","blue","black","brown"]
 
 # table of rates
 # tab = build_table(df_dict["MergeAndBalance"])
@@ -134,7 +136,7 @@ for (obj,prec,comp_func) in [
     (:fallback_rate,2,argmin),
     ]
     tables = []
-    for k in ["MergeAndBalance","ReassignFreeRobots","DeferUntilCompletion","NullReplanner"]
+    for k in planner_ordering
         df = df_dict[k]
         tab = build_table(df;obj=obj,xkey=xkey,ykey=ykey,aggregator=f)
         push!(tables,tab)
@@ -148,20 +150,28 @@ for (obj,prec,comp_func) in [
         row_start_printer=print_latex_row_start,
         )
 end
-
-plt = plot_histories_pgf(df_dict;
-    y_key=:makespans,
-    x_key=:none,
-    include_keys = [:num_projects=>30,:M=>10,:arrival_interval=>40],
-    xlabel = "time",
-    ylabel = "makespans",
-    ytick_show = true,
-    ymode="linear",
-    colors = ["red","blue","black","brown"],
-    lines=false
-)
-save("makespans.tex",plt)
-save("makespans.pdf",plt)
+for (include_keys, filename) in [
+    ([:num_projects=>30,:M=>10,:arrival_interval=>40],"makespans-10-40.tex"),
+    ([:num_projects=>30,:M=>30,:arrival_interval=>80],"makespans-30-80.tex"),
+    ]
+    plt = plot_histories_pgf(df_dict,planner_ordering;
+        legend_entries=legend_entries,
+        y_key=:makespans,
+        x_key=:none,
+        include_keys = include_keys,
+        xlabel = "stage",
+        ylabel = "makespans",
+        ytick_show = true,
+        ymode="linear",
+        colors = colors,
+        lines=false,
+        opt_mark="x",
+        non_opt_mark="x"
+    )
+    plt.legendPos="north west"
+    # display(plt)
+    save(filename,plt)
+end
 
 plt = PGFPlots.GroupPlot(3,5)
 for (n_vals, m_vals) in [
@@ -171,11 +181,12 @@ for (n_vals, m_vals) in [
     ([25,],[50,60,70,]),
     ([30,],[60,70,80,]),
     ]
-    gp = group_history_plot(df_list;
+    gp = group_history_plot(df_dict,planner_ordering;
         y_key = :makespans,
         use_y_lims=true,
-        y_min=0,
-        y_max=2500,
+        # y_min=0,
+        # y_max=2500,
+        include_keys = [:num_projects=>30],
         ymode="linear",
         x_key=:none,
         n_key = :M,
@@ -183,6 +194,7 @@ for (n_vals, m_vals) in [
         m_key = :arrival_interval,
         m_vals = m_vals,
         lines=false,
+        colors=colors,
     )
     append!(plt.axes,gp.axes)
 end
@@ -195,13 +207,14 @@ plt = plot_history_layers(df_dict["MergeAndBalance"],[:primary_runtimes,:backup_
     n_vals = [30,],
     m_key = :arrival_interval,
     m_vals = [60,],
+    include_keys = [:num_projects=>30],
     xlabel="",
     ylabel="",
     ymode="linear",
     lines=false,
 )
 plt.legendPos = "north east"
-plt
+save("planner_runtimes-30-60.tex",plt)
 
 for (df,planner_config) in zip(df_list,planner_configs)
     plt = PGFPlots.GroupPlot(3,5)

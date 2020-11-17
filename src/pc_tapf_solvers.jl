@@ -549,8 +549,8 @@ function CRCBS.solve!(solver::NBSSolver, prob::E;kwargs...) where {E<:AbstractPC
     set_best_cost!(solver, primary_cost(solver, get_cost(best_env)))
     assignment_problem = formulate_assignment_problem(assignment_solver(solver),
         prob;kwargs...)
-    while optimality_gap(solver) > 0
-        try
+    try
+        while optimality_gap(solver) > 0
             enforce_time_limit!(solver)
             update_assignment_problem!(assignment_solver(solver),
                 assignment_problem, prob)
@@ -568,20 +568,14 @@ function CRCBS.solve!(solver::NBSSolver, prob::E;kwargs...) where {E<:AbstractPC
                 end
             end
             increment_iteration_count!(solver)
-            # enforce_time_limit!(solver)
             if check_iterations(solver)
                 @log_info(1,solver,
                     "NBS: Reached $(iteration_limit(solver))-iteration limit.")
                 break
             end
-        catch e
-            if isa(e, SolverException)
-                handle_solver_exception(solver,e)
-                break
-            else
-                rethrow(e)
-            end
         end
+    catch e
+        isa(e, SolverException) ? handle_solver_exception(solver,e) : rethrow(e)
     end
     return best_env, best_cost(solver)
 end

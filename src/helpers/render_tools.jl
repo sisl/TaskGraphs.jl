@@ -1089,7 +1089,10 @@ function plot_histories_pgf(df_list::Vector,ax=PGFPlots.Axis();
         ytick_show=false,
         ymode="log",
         legend_pos = "outer north east",
+        legend_font = "footnotesize",
         lines=true,
+        opt_mark="x",
+        non_opt_mark="o",
     )
 
     ax.ymode    =   ymode
@@ -1106,6 +1109,7 @@ function plot_histories_pgf(df_list::Vector,ax=PGFPlots.Axis();
     if length(legend_pos) > 0
         ax.legendPos = legend_pos
     end
+    ax.legendStyle = "font=\\$(legend_font)"
     counters = zeros(length(df_list))
     for (i,m_val) in enumerate(m_vals)
         for (j,n_val) in enumerate(n_vals)
@@ -1123,11 +1127,12 @@ function plot_histories_pgf(df_list::Vector,ax=PGFPlots.Axis();
                 df_cut = df[idxs,:]
                 style=string(color,",solid, mark options={solid,fill=",color,"}")
                 for k in 1:nrow(df_cut)
-                    y_arr = df_cut[y_key][k]
+                    y_arr = df_cut[!,y_key][k]
                     x_arr = x_key == :none ? collect(1:length(y_arr)) : df_cut[x_key][k]
-                    opt_vals = df_cut[opt_key][k] # tracks whether the fall back was employed
+                    opt_vals = df_cut[!,opt_key][k] # tracks whether the fall back was employed
 
                     idx = minimum([length(x_arr),length(y_arr),length(opt_vals)])
+                    # idx = minimum([length(x_arr),length(y_arr)])
                     # Overall trend
                     if lines
                         push!(ax,
@@ -1148,21 +1153,27 @@ function plot_histories_pgf(df_list::Vector,ax=PGFPlots.Axis();
                         idx -= 1 # decrement so that the final point is not covered twice
                     end
 
-                    tmidxs=findall(.~opt_vals[1:idx])
-                    if length(tmidxs) > 0
-                        p = Plots.Linear(
-                                    x_arr[tmidxs],
-                                    y_arr[tmidxs],
-                                    style=style,
-                                    onlyMarks=true,
-                                    mark="x"
-                                    )
-                        if counters[df_idx] == 0 && length(l_entry) > 0
-                            p.legendentry = l_entry
-                            counters[df_idx] += 1
-                            insert!(ax.plots,1,p)
-                        else
-                            push!(ax,p)
+                    # tmidxs=findall(.~opt_vals[1:idx])
+                    # tmidxs=1:idx
+                    for (tmidxs, mark) in [
+                        (findall(.!opt_vals[1:idx]),opt_mark),
+                        (findall(opt_vals[1:idx]),non_opt_mark),
+                        ]
+                        if length(tmidxs) > 0
+                            p = Plots.Linear(
+                                        x_arr[tmidxs],
+                                        y_arr[tmidxs],
+                                        style=style,
+                                        onlyMarks=true,
+                                        mark=mark,
+                                        )
+                            if counters[df_idx] == 0 && length(l_entry) > 0
+                                p.legendentry = l_entry
+                                counters[df_idx] += 1
+                                insert!(ax.plots,1,p)
+                            else
+                                push!(ax,p)
+                            end
                         end
                     end
                 end
@@ -1187,6 +1198,43 @@ function plot_history_layers(df,keylist,ax=PGFPlots.Axis();
             )
     end
     return plt
+end
+
+function group_history_plot(df_dict::Dict,
+    key_list=sort(string.(collect(keys(df_dict))));
+    kwargs...)
+    group_history_plot([df_dict[k] for k in key_list];
+        kwargs...
+    )
+end
+function group_history_plot(df_list::Vector;
+    m_key=:M,
+    m_vals=sort(intersect([unique(df[m_key]) for df in df_list]...)),
+    n_key=:arrival_interval,
+    n_vals=sort(intersect([unique(df[n_key]) for df in df_list]...)),
+    y_key=:makespans,
+    y_min=minimum(map(df->minimum(map(minimum,df[!,y_key])),df_list)),
+    y_max=maximum(map(df->maximum(map(maximum,df[!,y_key])),df_list)),
+    kwargs...
+    )
+    g = PGFPlots.GroupPlot(length(m_vals),length(n_vals))
+    for (i,m_val) in enumerate(m_vals)
+        ytick_show = (i == 1)
+        for (j,n_val) in enumerate(n_vals)
+            plt = plot_histories_pgf(df_list;
+                y_key=y_key,
+                m_key=m_key,
+                m_vals=[m_val,],
+                n_key=n_key,
+                n_vals=[n_val,],
+                ytick_show = ytick_show,
+                y_min=y_min,
+                y_max=y_max,
+                kwargs...)
+            push!(g,plt)
+        end
+    end
+    return g
 end
 
 """
@@ -1321,36 +1369,6 @@ function write_tex_table(fname::String,args...;kwargs...)
     open(fname,"w") do io
         write_tex_table(io,args...;kwargs...)
     end
-end
-
-function group_history_plot(df_list::Vector;
-    m_key=:M,
-    m_vals=sort(intersect([unique(df[m_key]) for df in df_list]...)),
-    n_key=:arrival_interval,
-    n_vals=sort(intersect([unique(df[n_key]) for df in df_list]...)),
-    y_key=:makespans,
-    y_min=minimum(map(df->minimum(map(minimum,df[!,y_key])),df_list)),
-    y_max=maximum(map(df->maximum(map(maximum,df[!,y_key])),df_list)),
-    kwargs...
-    )
-    g = PGFPlots.GroupPlot(length(m_vals),length(n_vals))
-    for (i,m_val) in enumerate(m_vals)
-        ytick_show = (i == 1)
-        for (j,n_val) in enumerate(n_vals)
-            plt = plot_histories_pgf(df_list;
-                y_key=y_key,
-                m_key=m_key,
-                m_vals=[m_val,],
-                n_key=n_key,
-                n_vals=[n_val,],
-                ytick_show = ytick_show,
-                y_min=y_min,
-                y_max=y_max,
-                kwargs...)
-            push!(g,plt)
-        end
-    end
-    return g
 end
 
 # For rendering the factory floor as a custom ImageAppearance in Webots

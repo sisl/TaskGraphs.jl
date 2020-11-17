@@ -1172,21 +1172,19 @@ end
 
 function construct_schedule_distance_matrix(project_schedule,problem_spec)
     G = get_graph(project_schedule);
-    (missing_successors, missing_predecessors, n_eligible_successors, n_eligible_predecessors,
-        n_required_successors, n_required_predecessors, upstream_vertices, non_upstream_vertices) = preprocess_project_schedule(project_schedule)
+    cache = preprocess_project_schedule(project_schedule,true)
     D = Inf * ones(nv(G),nv(G))
     for v in vertices(G)
-        if outdegree(G,v) < n_eligible_successors[v]
+        if outdegree(G,v) < cache.n_eligible_successors[v]
             node = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v))
-            # for v2 in vertices(G)
-            for v2 in non_upstream_vertices[v]
-                if indegree(G,v2) < n_eligible_predecessors[v2]
+            for v2 in cache.non_upstream_vertices[v]
+                if indegree(G,v2) < cache.n_eligible_predecessors[v2]
                     node2 = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v2))
-                    for (template, val) in missing_successors[v]
+                    for (template, val) in cache.missing_successors[v]
                         if !matches_template(template, typeof(node2)) # possible to add an edge
                             continue
                         end
-                        for (template2, val2) in missing_predecessors[v2]
+                        for (template2, val2) in cache.missing_predecessors[v2]
                             if !matches_template(template2, typeof(node)) # possible to add an edge
                                 continue
                             end
@@ -1203,42 +1201,36 @@ function construct_schedule_distance_matrix(project_schedule,problem_spec)
     D
 end
 
-function update_greedy_sets!(model,G,C,Ai,Ao,v,n_required_predecessors,n_eligible_successors)
-    if indegree(G,v) >= n_required_predecessors[v]
-        push!(C,v)
-        for v2 in inneighbors(G,v)
-            if !(v2 in C)
-                setdiff!(C,v)
+function update_greedy_sets!(model,G,C,Ai,Ao,n_required_predecessors,n_eligible_successors,frontier=get_all_root_nodes(G))
+    while !isempty(frontier)
+        v = pop!(frontier)
+        if issubset(inneighbors(G,v),C)
+            if indegree(G,v) >= n_required_predecessors[v]
+                push!(C,v)
+                union!(frontier,outneighbors(G,v))
+            else
+                push!(Ai,v)
             end
         end
-    else
-        push!(Ai,v)
-        for v2 in inneighbors(G,v)
-            if !(v2 in C)
-                setdiff!(Ai,v)
-            end
+        if (outdegree(G,v) < n_eligible_successors[v]) && (v in C)
+            push!(Ao,v)
         end
-    end
-    if (outdegree(G,v) < n_eligible_successors[v]) && (v in C)
-        push!(Ao,v)
     end
 end
 
 """
-Identifies the nodes `v1 ∈ Ai` and `v2 ∈ Ao` with the shortest distance
-`D[v1,v2]`.
+Identifies the nodes `v ∈ Ai` and `v2 ∈ Ao` with the shortest distance
+`D[v,v2]`.
 """
 function select_next_edges(model,D,Ao,Ai)
     c = Inf
     a = -1
     b = -2
-    for v in sort(collect(Ao))
-        for v2 in sort(collect(Ai))
-            if D[v,v2] < c
-                c = D[v,v2]
-                a = v
-                b = v2
-            end
+    for (v,v2) in Base.Iterators.product(sort(collect(Ao)),sort(collect(Ai)))
+        if D[v,v2] < c
+            c = D[v,v2]
+            a = v
+            b = v2
         end
     end
     if a < 0 || b < 0
@@ -1271,28 +1263,24 @@ already be in `C`. In order for `v` to be added to `Ao`, `v` must have less than
 the allowable number of outgoing edges, and must be in `C`.
 """
 function JuMP.optimize!(model::GreedyAssignment)
-
     project_schedule    = model.schedule
     problem_spec        = model.problem_spec
     G                   = get_graph(project_schedule);
-    (_, _, n_eligible_successors, _, _, n_required_predecessors, _, _) = preprocess_project_schedule(project_schedule)
-    D = construct_schedule_distance_matrix(project_schedule,problem_spec)
-
+    cache = preprocess_project_schedule(project_schedule,true)
     C = Set{Int}() # Closed set (these nodes have enough predecessors)
     Ai = Set{Int}() # Nodes that don't have enough incoming edges
     Ao = Set{Int}() # Nodes that can have more outgoing edges
-    for v in topological_sort(G)
-        update_greedy_sets!(model,G,C,Ai,Ao,v,n_required_predecessors,n_eligible_successors)
-    end
+    update_greedy_sets!(model,G,C,Ai,Ao,
+        cache.n_required_predecessors,cache.n_eligible_successors)
+    D = construct_schedule_distance_matrix(project_schedule,problem_spec)
     while length(Ai) > 0
         for (v,v2) in select_next_edges(model,D,Ao,Ai)
             setdiff!(Ao,v)
             setdiff!(Ai,v2)
             add_edge!(G,v,v2)
         end
-        for v in topological_sort(G)
-            update_greedy_sets!(model,G,C,Ai,Ao,v,n_required_predecessors,n_eligible_successors)
-        end
+        update_greedy_sets!(model,G,C,Ai,Ao,
+            cache.n_required_predecessors,cache.n_eligible_successors)
     end
     set_leaf_operation_vtxs!(project_schedule)
     propagate_valid_ids!(project_schedule,problem_spec)
