@@ -30,8 +30,10 @@ project_spec, problem_spec, _, _, robot_ICs = construct_task_graphs_problem(
     def,env_graph)
 solver = NBSSolver()
 prob = pctapf_problem(solver,project_spec,problem_spec,robot_ICs,env_graph)
+
+prob = pctapf_problem_2(solver)
 model = Model(with_optimizer(Gurobi.Optimizer))
-milp_model = TaskGraphs.formulate_big_milp(prob,4,model)
+milp_model = TaskGraphs.formulate_big_milp(prob,8,model)
 optimize!(model)
 robot_paths = TaskGraphs.extract_robot_paths(prob,milp_model)
 object_paths = TaskGraphs.extract_object_paths(prob,milp_model)
