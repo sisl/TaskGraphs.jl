@@ -174,7 +174,7 @@ end
 function add_precedence_constraints!(model,source_map,inflow,outflow,goal,start,Δt=0)
     for t in 0:size(source_map,2)-Δt
         vtx1 = source_map[goal][t]
-        vtx2 = source_map[start][t+Δt]
+        vtx2 = source_map[start][t+1+Δt]
         # if flow1 is not at vtx1, flow2 must still be at vtx2
         @constraint(model,outflow[vtx2] + inflow[vtx1] >= 1)
     end
@@ -197,6 +197,8 @@ struct PCTAPF_MILP
     object_flows::Dict{ObjectID,Vector{VariableRef}}
 end
 JuMP.optimize!(m::PCTAPF_MILP) = JuMP.optimize!(m.model)
+extract_robot_flow(m::PCTAPF_MILP) = Int.(round.(value.(m.robot_flow)))
+extract_object_flows(m::PCTAPF_MILP) = Dict(id=>Int.(round.(value.(var))) for (id,var) in m.object_flows)
 function extract_flow_path(m::PCTAPF_MILP,flow,v0,t0)
     vtx = m.source_map[v0][0]
     path = Int[vtx]
@@ -281,7 +283,6 @@ function formulate_big_milp(prob::PC_TAPF,T_MAX,model = JuMP.Model())
         v0 = get_id(get_initial_location_id(pred))
         t0 = get_t0(get_env(prob),id)
         add_point_constraint!(model,source_map,object_flow,v0,t0)
-        # final location
         add_continuity_constraints!(model,G,object_flow)
         add_carrying_constraints!(model,G,robot_flow,object_flow)
     end
@@ -295,9 +296,6 @@ function formulate_big_milp(prob::PC_TAPF,T_MAX,model = JuMP.Model())
             @assert get_id(get_destination_location_id(object_ICs[id2])) == start
             for o1 in preconditions(op)
                 # makespans
-                vF = get_id(get_destination_location_id(o1))
-                add_point_constraint!(model,source_map,object_flow,vF,T_MAX)
-                add_makespan_constraint!(model,T,object_flow,source_map,vF)
                 id1 = get_object_id(o1)
                 inflow = object_flows[id1]
                 goal = get_id(get_destination_location_id(o1))
@@ -312,9 +310,10 @@ function formulate_big_milp(prob::PC_TAPF,T_MAX,model = JuMP.Model())
             # makespans
             id = get_object_id(o)
             object_flow = object_flows[id]
-            @show vF = get_id(get_destination_location_id(o))
-            add_point_constraint!(model,source_map,object_flow,vF,T_MAX)
-            add_makespan_constraint!(model,T,object_flow,source_map,vF)
+            goal = get_id(get_destination_location_id(o))
+            @show o, goal
+            add_point_constraint!(model,source_map,object_flow,goal,T_MAX)
+            add_makespan_constraint!(model,T,object_flow,source_map,goal)
         end
     end
     @objective(model,Min,T)
