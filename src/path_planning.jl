@@ -247,6 +247,16 @@ function Base.show(io::IO,env::SearchEnv)
 end
 
 export
+    get_t0,
+    get_tF
+    
+get_t0(env::SearchEnv,v::Int) = get_cache(env).t0[v]
+get_tF(env::SearchEnv,v::Int) = get_cache(env).tF[v]
+for op in [:get_t0,:get_tF]
+    @eval $op(env::SearchEnv,id::AbstractID) = $op(env,get_vtx(get_schedule(env),id))
+end
+
+export
     get_env_snapshot,
     trim_route_plan
 

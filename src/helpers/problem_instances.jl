@@ -177,7 +177,6 @@ function pctapf_problem_1(;cost_function=SumOfMakeSpans(),verbose=false,Δt_op=0
         vtx_grid;
     )
     project_spec, robot_ICs = pctapf_problem(r0,s0,sF)
-
     add_operation!(project_spec,construct_operation(project_spec,-1,[1,2],[3],Δt_op))
     add_operation!(project_spec,construct_operation(project_spec,-1,[3],  [], Δt_op))
     assignment_dict = Dict(1=>[1,3],2=>[2])
