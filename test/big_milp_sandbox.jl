@@ -33,6 +33,19 @@ prob = pctapf_problem(solver,project_spec,problem_spec,robot_ICs,env_graph)
 model = Model(with_optimizer(Gurobi.Optimizer))
 milp_model = TaskGraphs.formulate_big_milp(prob,3,model)
 optimize!(model)
-plot_graph_bfs(milp_model.G.G)
-paths = TaskGraphs.extract_robot_paths(prob,milp_model)
-paths[RobotID(1)]
+robot_paths = TaskGraphs.extract_robot_paths(prob,milp_model)
+object_paths = TaskGraphs.extract_object_paths(prob,milp_model)
+robot_path_vtxs = Set(union(values(robot_paths)...))
+object_path_vtxs = Set(union(values(object_paths)...))
+
+plot_graph_bfs(milp_model.G.G;
+    color_function = (G,v,x,y,r)-> begin
+        if v in object_path_vtxs
+            return "orange"
+        elseif v in robot_path_vtxs
+            return "cyan"
+        else
+            return gray
+        end
+    end
+    )

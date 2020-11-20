@@ -151,7 +151,8 @@ function add_continuity_constraints!(model,G,flow)
             @constraint(model,
                 flow[v] <= sum(map(vp->flow[vp],outneighbors(G,v)))
                 )
-        elseif indegree(G,v) > 0
+        end
+        if indegree(G,v) > 0
             @constraint(model,
                 flow[v] <= sum(map(vp->flow[vp],inneighbors(G,v)))
                 )
@@ -217,12 +218,24 @@ end
 function extract_robot_paths(prob::PC_TAPF,m::PCTAPF_MILP)
     sched = get_schedule(get_env(prob))
     robot_ICs = get_robot_ICs(sched)
-    robot_flow = Int.(round.(value.(m.robot_flow)))
+    flow = Int.(round.(value.(m.robot_flow)))
     paths = Dict{RobotID,Vector{Int}}()
     for (id,pred) in robot_ICs
         v0 = get_id(get_initial_location_id(pred))
         t0 = get_t0(get_env(prob),id)
-        paths[id] = extract_flow_path(m,robot_flow,v0,t0)
+        paths[id] = extract_flow_path(m,flow,v0,t0)
+    end
+    return paths
+end
+function extract_object_paths(prob::PC_TAPF,m::PCTAPF_MILP)
+    sched = get_schedule(get_env(prob))
+    object_ICs = get_object_ICs(sched)
+    paths = Dict{ObjectID,Vector{Int}}()
+    for (id,pred) in object_ICs
+        flow = Int.(round.(value.(m.object_flows[id])))
+        v0 = get_id(get_initial_location_id(pred))
+        t0 = get_t0(get_env(prob),id)
+        paths[id] = extract_flow_path(m,flow,v0,t0)
     end
     return paths
 end
@@ -242,7 +255,7 @@ function formulate_big_milp(prob::PC_TAPF,T_MAX,model = JuMP.Model())
     # Robot flows
     @variable(model,robot_flow[1:nv(G)], binary=true)
     # Object flows
-    object_flows = Dict(id=>@variable(model,[1:nv(G)]) for (id,pred) in object_ICs)
+    object_flows = Dict(id=>@variable(model,[1:nv(G)], binary=true) for (id,pred) in object_ICs)
     # Flow constraints
     add_continuity_constraints!(model,G,robot_flow)
     # initial constraints
