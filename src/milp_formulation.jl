@@ -99,11 +99,11 @@ function add_gadget_layer!(G::GadgetGraph,edge_list,t,vtx_map=Dict{Int,Int}())
                 e = reverse(e)
             end
             # Gadget
-            add_vertex!(G,t)
+            add_movement_vtx!(G,t)
             v1 = nv(G)
             add_edge!(G,vtx_map[e.src],v1)
             if haskey(vtx_map,e.dst)
-                add_vertex!(G,t)
+                add_movement_vtx!(G,t)
                 v2 = nv(G)
                 add_edge!(G,vtx_map[e.dst],v2)
             end
@@ -112,12 +112,12 @@ function add_gadget_layer!(G::GadgetGraph,edge_list,t,vtx_map=Dict{Int,Int}())
             add_edge!(G,v1,v3)
             if haskey(vtx_map,e.dst)
                 add_edge!(G,v2,v3)
-                add_vertex!(G,t)
+                add_movement_vtx!(G,t)
                 v4 = nv(G)
                 add_edge!(G,v3,v4)
                 push!(get!(outgoing,e.src,Int[]),v4)
             end
-            add_vertex!(G,t)
+            add_movement_vtx!(G,t)
             v5 = nv(G)
             add_edge!(G,v3,v5)
             push!(get!(outgoing,e.dst,Int[]),v5)
@@ -228,7 +228,8 @@ function extract_robot_paths(prob::PC_TAPF,m::PCTAPF_MILP)
     for (id,pred) in robot_ICs
         v0 = get_id(get_initial_location_id(pred))
         t0 = get_t0(get_env(prob),id)
-        paths[id] = extract_flow_path(m,flow,v0,t0)
+        flow_path = extract_flow_path(m,flow,v0,t0)
+        paths[id] = extract_true_path(m,flow_path)
     end
     return paths
 end
@@ -240,7 +241,8 @@ function extract_object_paths(prob::PC_TAPF,m::PCTAPF_MILP)
         flow = Int.(round.(value.(m.object_flows[id])))
         v0 = get_id(get_initial_location_id(pred))
         t0 = get_t0(get_env(prob),id)
-        paths[id] = extract_flow_path(m,flow,v0,t0)
+        flow_path = extract_flow_path(m,flow,v0,t0)
+        paths[id] = extract_true_path(m,flow_path)
     end
     return paths
 end
