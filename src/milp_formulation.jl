@@ -147,6 +147,8 @@ function add_point_constraint!(model,source_map,flow,v,t=0)
 end
 function add_continuity_constraints!(model,G,flow)
     for v in vertices(G)
+        @constraint(model,1 >= sum(map(vp->flow[vp],outneighbors(G,v))))
+        @constraint(model,1 >= sum(map(vp->flow[vp],inneighbors(G,v))))
         if outdegree(G,v) > 0
             @constraint(model,
                 flow[v] <= sum(map(vp->flow[vp],outneighbors(G,v)))
@@ -182,6 +184,9 @@ function add_makespan_constraint!(model,T,flow,source_map,goal)
         @constraint(model,T >= t*(1-flow[v]))
     end
     return model
+end
+function add_total_flow_constraint!(model,source_map,flow,n,t=0)
+    @constraint(model,sum(map(d->flow[d[t]],source_map)) == n)
 end
 
 struct PCTAPF_MILP
@@ -264,20 +269,19 @@ function formulate_big_milp(prob::PC_TAPF,T_MAX,model = JuMP.Model())
         t0 = get_t0(get_env(prob),id)
         add_point_constraint!(model,source_map,robot_flow,v0,t0)
     end
+    add_total_flow_constraint!(model,source_map,robot_flow,length(robot_ICs))
     # makespan
     @variable(model,T >= 0)
     for (id,pred) in object_ICs
         object_flow = object_flows[id]
+        add_total_flow_constraint!(model,source_map,object_flow,1)
         # initial location
         v0 = get_id(get_initial_location_id(pred))
         t0 = get_t0(get_env(prob),id)
         add_point_constraint!(model,source_map,object_flow,v0,t0)
         # final location
-        vF = get_id(get_destination_location_id(pred))
-        add_point_constraint!(model,source_map,object_flow,vF,T_MAX)
         add_continuity_constraints!(model,G,object_flow)
         add_carrying_constraints!(model,G,robot_flow,object_flow)
-        add_makespan_constraint!(model,T,object_flow,source_map,vF)
     end
     # precedence constraints
     for op in values(get_operations(sched))
@@ -288,6 +292,10 @@ function formulate_big_milp(prob::PC_TAPF,T_MAX,model = JuMP.Model())
             start = get_id(get_initial_location_id(o2))
             @assert get_id(get_destination_location_id(object_ICs[id2])) == start
             for o1 in preconditions(op)
+                # makespans
+                vF = get_id(get_destination_location_id(o1))
+                add_point_constraint!(model,source_map,object_flow,vF,T_MAX)
+                add_makespan_constraint!(model,T,object_flow,source_map,vF)
                 id1 = get_object_id(o1)
                 inflow = object_flows[id1]
                 goal = get_id(get_destination_location_id(o1))
@@ -297,6 +305,16 @@ function formulate_big_milp(prob::PC_TAPF,T_MAX,model = JuMP.Model())
         end
     end
     # Objective
+    for op in values(get_operations(sched))
+        for o in preconditions(op)
+            # makespans
+            id = get_object_id(o)
+            object_flow = object_flows[id]
+            @show vF = get_id(get_destination_location_id(o))
+            add_point_constraint!(model,source_map,object_flow,vF,T_MAX)
+            add_makespan_constraint!(model,T,object_flow,source_map,vF)
+        end
+    end
     @objective(model,Min,T)
     return PCTAPF_MILP(model, G, source_map, robot_flow, object_flows)
 end

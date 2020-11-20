@@ -37,15 +37,20 @@ robot_paths = TaskGraphs.extract_robot_paths(prob,milp_model)
 object_paths = TaskGraphs.extract_object_paths(prob,milp_model)
 robot_path_vtxs = Set(union(values(robot_paths)...))
 object_path_vtxs = Set(union(values(object_paths)...))
+object_path_vtxs = Set(findall(Bool.(round.(value.(milp_model.object_flows[ObjectID(1)])))))
 
 plot_graph_bfs(milp_model.G.G;
     color_function = (G,v,x,y,r)-> begin
         if v in object_path_vtxs
-            return "orange"
+            if v in robot_path_vtxs
+                return "red"
+            else
+                return "orange"
+            end
         elseif v in robot_path_vtxs
             return "cyan"
         else
-            return gray
+            return "gray"
         end
     end
     )
