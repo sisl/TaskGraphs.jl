@@ -591,7 +591,7 @@ how e.g., robot ids are propagated through an existing operating schedule
 after assignments (or re-assignments) have been made.
 """
 align_with_predecessor(node,pred) 						= node
-align_with_predecessor(node::BOT_GO,pred::BOT_AT) 		= BOT_GO(first_valid(node.r,pred.r), first_valid(node.x1,pred.x), node.x2)
+align_with_predecessor(node::BOT_GO,pred::BOT_AT) 				= BOT_GO(first_valid(node.r,pred.r), first_valid(node.x1,pred.x), node.x2)
 align_with_predecessor(node::BOT_GO,pred::BOT_GO) 				= BOT_GO(first_valid(node.r,pred.r), first_valid(node.x1,pred.x2), node.x2)
 align_with_predecessor(node::BOT_GO,pred::BOT_DEPOSIT) 			= BOT_GO(first_valid(node.r,pred.r), first_valid(node.x1,pred.x), node.x2)
 align_with_predecessor(node::BOT_COLLECT,pred::OBJECT_AT) 	= BOT_COLLECT(node.r, first_valid(node.o,pred.o), node.x) # NOTE: Because the object could occupy multiple vertices, we do not want to dispatch first_valid between BOT_COLLECT.x and OBJECT_AT.x

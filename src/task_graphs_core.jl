@@ -689,7 +689,7 @@ function add_to_schedule!(schedule::P,pred,id::ID) where {P<:OperatingSchedule,I
     add_to_schedule!(schedule,ProblemSpec(),pred,id)
 end
 
-function LightGraphs.has_edge(s::OperatingSchedule,i::AbstractID,j::AbstractID) 
+function LightGraphs.has_edge(s::OperatingSchedule,i::AbstractID,j::AbstractID)
     has_edge(get_graph(s), get_vtx(s,i), get_vtx(s,j))
 end
 function LightGraphs.add_edge!(schedule::P,id1::A,id2::B) where {P<:OperatingSchedule,A<:AbstractID,B<:AbstractID}
@@ -869,7 +869,7 @@ function validate(project_schedule::OperatingSchedule)
         if typeof(e) <: AssertionError
             print(e.msg)
         else
-            throw(e)
+            rethrow(e)
         end
         return false
     end
@@ -914,46 +914,49 @@ end
 export
     add_single_robot_delivery_task!
 
-function add_single_robot_delivery_task!(
-        schedule::S,
-        problem_spec::T,
-        pred_id::AbstractID,
-        robot_id::RobotID,
-        object_id::ObjectID,
-        pickup_station_id::LocationID,
-        dropoff_station_id::LocationID
-        ) where {S<:OperatingSchedule,T<:ProblemSpec}
-
-    if robot_id != -1
-        robot_pred = get_node_from_id(schedule,RobotID(robot_id))
-        robot_start_station_id = get_initial_location_id(get_node_from_id(schedule, pred_id))
-    else
-        robot_start_station_id = LocationID(-1)
-    end
-
-    # THIS NODE IS DETERMINED BY THE TASK ASSIGNMENT.
-    action_id = get_unique_action_id()
-    add_to_schedule!(schedule, problem_spec, GO(robot_id, robot_start_station_id, pickup_station_id), action_id)
-    add_edge!(schedule, pred_id, action_id)
-
-    prev_action_id = action_id
-    action_id = get_unique_action_id()
-    add_to_schedule!(schedule, problem_spec, COLLECT(robot_id, object_id, pickup_station_id), action_id)
-    add_edge!(schedule, prev_action_id, action_id)
-    add_edge!(schedule, ObjectID(object_id), action_id)
-
-    prev_action_id = action_id
-    action_id = get_unique_action_id()
-    add_to_schedule!(schedule, problem_spec, CARRY(robot_id, object_id, pickup_station_id, dropoff_station_id), action_id)
-    add_edge!(schedule, prev_action_id, action_id)
-
-    prev_action_id = action_id
-    action_id = get_unique_action_id()
-    add_to_schedule!(schedule, problem_spec, DEPOSIT(robot_id, object_id, dropoff_station_id), action_id)
-    add_edge!(schedule, prev_action_id, action_id)
-
-    action_id
-end
+# function add_single_robot_delivery_task!(sched::OperatingSchedule,spec::ProblemSpec,id::AbstractID,r::Int,o::Int,x1::Int,x2::Int)
+#     add_single_robot_delivery_task!(sched,spec,id,RobotID(r),ObjectID(o),LocationID(x1),LocationID(x2))
+# end
+# function add_single_robot_delivery_task!(
+#         schedule::S,
+#         problem_spec::T,
+#         pred_id::AbstractID,
+#         robot_id::RobotID,
+#         object_id::ObjectID,
+#         pickup_station_id::LocationID,
+#         dropoff_station_id::LocationID
+#         ) where {S<:OperatingSchedule,T<:ProblemSpec}
+#
+#     if robot_id != -1
+#         robot_pred = get_node_from_id(schedule,robot_id)
+#         robot_start_station_id = get_initial_location_id(get_node_from_id(schedule, pred_id))
+#     else
+#         robot_start_station_id = LocationID(-1)
+#     end
+#
+#     # THIS NODE IS DETERMINED BY THE TASK ASSIGNMENT.
+#     action_id = get_unique_action_id()
+#     add_to_schedule!(schedule, problem_spec, GO(robot_id, robot_start_station_id, pickup_station_id), action_id)
+#     add_edge!(schedule, pred_id, action_id)
+#
+#     prev_action_id = action_id
+#     action_id = get_unique_action_id()
+#     add_to_schedule!(schedule, problem_spec, COLLECT(robot_id, object_id, pickup_station_id), action_id)
+#     add_edge!(schedule, prev_action_id, action_id)
+#     add_edge!(schedule, ObjectID(object_id), action_id)
+#
+#     prev_action_id = action_id
+#     action_id = get_unique_action_id()
+#     add_to_schedule!(schedule, problem_spec, CARRY(robot_id, object_id, pickup_station_id, dropoff_station_id), action_id)
+#     add_edge!(schedule, prev_action_id, action_id)
+#
+#     prev_action_id = action_id
+#     action_id = get_unique_action_id()
+#     add_to_schedule!(schedule, problem_spec, DEPOSIT(robot_id, object_id, dropoff_station_id), action_id)
+#     add_edge!(schedule, prev_action_id, action_id)
+#
+#     action_id
+# end
 function add_headless_delivery_task!(
         sched::OperatingSchedule,
         problem_spec::ProblemSpec,
@@ -1046,6 +1049,31 @@ function add_headless_team_delivery_task!(
         add_edge!(sched, team_action_id, action_id)
     end
     return
+end
+function add_single_robot_delivery_task!(
+        sched::OperatingSchedule,
+        spec::ProblemSpec,
+        robot_id::BotID{R},
+        object_id::ObjectID,
+        op_id::OperationID,
+        go_id::ActionID,
+        x1::LocationID=get_location_id(get_node_from_id(sched,object_id)),
+        x2::LocationID=get_dropoff(get_node_from_id(sched,op_id),object_id),
+        args...
+        # robot_id::BotID{R}=RobotID(-1)
+    ) where {R<:AbstractRobotType}
+    add_headless_delivery_task!(sched,spec,object_id,op_id,R,x1,x2)
+
+    # if !is_valid(pred_id)
+    #     pred = get_node_from_id(sched,pred_id)
+    #     action_id = get_unique_action_id()
+    #     add_to_schedule!(sched,BOT_GO(robot_id,get_destination_location_id(pred),x1),action_id)
+    #     add_edge!(sched,pred_id,action_id)
+    #     pred_id = action_id
+    # end
+    collect_id = get_vtx_id(sched,outneighbors(sched,get_vtx(sched,object_id))[1])
+    add_edge!(sched,go_id,collect_id)
+    propagate_valid_ids!(sched,spec)
 end
 
 export

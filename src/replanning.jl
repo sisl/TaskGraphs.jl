@@ -178,7 +178,7 @@ function break_assignments!(sched::OperatingSchedule,problem_spec,v)
     node_id = get_vtx_id(sched,v)
     node = get_node_from_id(sched,node_id)
     if isa(node, AbstractRobotAction)
-        new_node = replace_robot_id(node,RobotID(-1))
+        new_node = replace_robot_id(node,RobotID(-1)) # TODO Why is this line here? I don't think the robot id should be replaced in this node--just it's successors
         if isa(node,BOT_GO)
             new_node = replace_destination(new_node,LocationID(-1))
             for v2 in outneighbors(G,v)

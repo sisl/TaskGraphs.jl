@@ -188,8 +188,8 @@ function pctapf_problem_1(;cost_function=SumOfMakeSpans(),verbose=false,Δt_op=0
 end
 
 """
-    In this problem robot 1 will first do [1-5-9], then [9-13-17]
-    robot 2 will do [4-8-32]. The key thing is that robot 1 will need to wait
+    In this problem robot 1 will first do [1-9-17], then [17-21-35]
+    robot 2 will do [4-12-32]. The key thing is that robot 1 will need to wait
     until robot 2 is finished before robot 1 can do its second task.
 
     Optimal paths:
@@ -209,8 +209,8 @@ function pctapf_problem_2(;cost_function=SumOfMakeSpans(),verbose=false)
     # 25  26  27  28
     # 29  30  31  32
     r0 = [1,4]
-    s0 = [5,8,13]
-    sF = [9,32,17]
+    s0 = [9,12,21]
+    sF = [17,32,25]
     env_graph = construct_factory_env_from_vtx_grid(
         vtx_grid;
     )

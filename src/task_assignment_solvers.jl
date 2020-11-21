@@ -1182,7 +1182,7 @@ function construct_schedule_distance_matrix(project_schedule,problem_spec)
                     node2 = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v2))
                     if has_robot_id(node) && has_robot_id(node2)
                         if get_id(get_robot_id(node)) != -1 && get_id(get_robot_id(node2)) != -1
-                            get_robot_id(node) != get_robot_id(node2) ? continue : nothing
+                            get_robot_id(node) == get_robot_id(node2) ? continue : nothing
                         end
                     end
                     for (template, val) in cache.missing_successors[v]

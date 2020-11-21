@@ -1,60 +1,79 @@
-using TaskGraphs
-using CRCBS
-using LightGraphs, MetaGraphs, GraphUtils
-using ImageFiltering
-using Gurobi
-using JuMP, MathOptInterface
-using TOML
-# using JLD2, FileIO
-using Random
-using Test
-using GraphPlottingBFS
-using Compose
-# load rendering tools
-include(joinpath(pathof(TaskGraphs),"..","helpers/render_tools.jl"))
-# for f in *.svg; do inkscape -z $f -e $f.png; done
+using TaskGraphs, CRCBS, GraphUtils, LightGraphs, JuMP, Gurobi
+Revise.includet(joinpath(pathof(TaskGraphs),"..","helpers/render_tools.jl"))
 
-# Visualizing A star
+# debugging replanning
 let
-    env_id = 2
-    env_filename = string(ENVIRONMENT_DIR,"/env_",env_id,".toml")
-    factory_env = read_env(env_filename)
+    solver = NBSSolver()
+    prob = pctapf_problem_2(solver)
+    spec = get_problem_spec(get_env(prob))
+    graph = get_graph(get_env(prob))
+    sched = OperatingSchedule()
+    reset_action_id_counter!()
+    add_to_schedule!(sched,spec,ROBOT_AT(1,1),RobotID(1))
+    add_to_schedule!(sched,spec,ROBOT_AT(2,2),RobotID(2))
+    add_to_schedule!(sched,spec,OBJECT_AT(1,13),ObjectID(1))
+    add_to_schedule!(sched,spec,OBJECT_AT(2,14),ObjectID(2))
+    op = Operation(pre=Set([OBJECT_AT(1,1),OBJECT_AT(2,2)]))
+    op_id = get_operation_id(op)
+    add_to_schedule!(sched,spec,op,op_id)
 
-    validate_edge_cache(factory_env,factory_env.vtxs,factory_env.edge_cache)
+    action_id = get_unique_action_id()
+    add_to_schedule!(sched,spec,GO(1,1,-1),action_id)
+    add_edge!(sched,RobotID(1),action_id)
+    add_single_robot_delivery_task!(sched,spec,RobotID(1),ObjectID(1),op_id,action_id)
 
-    file_name = joinpath(DEBUG_PATH,"A_star_dump_54.jld2")
-    dict = load(file_name)
-    agent_id = dict["agent_id"]
-    history = dict["history"]
-    start   = dict["start"]
-    goal    = dict["goal"]
-    robot_paths = map(p->p.nzval, dict["paths"])
-    state_constraints = dict["state_constraints"]
-    action_constraints = dict["action_constraints"]
+    action_id = get_unique_action_id()
+    add_to_schedule!(sched,spec,GO(2,2,-1),action_id)
+    add_edge!(sched,RobotID(2),action_id)
+    add_single_robot_delivery_task!(sched,spec,RobotID(2),ObjectID(2),op_id,action_id)
 
-    # findall(map(p->p[212],robot_paths) .== 550)
-    # robot_paths[24][170:end]
+    plot_project_schedule(sched,initialize_planning_cache(sched);verbose=false)
 
-    t0 = start[2]
-    history = history[1:400]
-    empty!(robot_paths[agent_id])
-    start,goal
+    search_env = construct_search_env(solver,sched,spec,graph)
 
-    # Render video clip
-    set_default_plot_size(24cm,24cm)
-    record_video(joinpath(VIDEO_DIR,string("A_star_debug.webm")),
-        k->render_search(history[k][2],factory_env;
-            robot_paths=robot_paths,
-            search_patterns=[history],
-            goals=[goal[1]],
-            search_idx=k,
-            show_search_paths=true,
-            # search_size=1.0pt,
-            # goal_size=1.0pt,
-            colors_vec=map(i->LCHab(60,80,200),1:length(robot_paths)),
-            show_paths=false,
-            );
-            t_history=1:length(history)
-            )
+    t_commit = 3
+    t_split = t_commit
+    replan_model = MergeAndBalance()
+    new_sched, new_cache = prune_schedule(replan_model,search_env,t_commit)
+    plot_project_schedule(new_sched,new_cache;verbose=false)
+
+
+    robot_positions=get_env_snapshot(search_env,t_split)
+    @test sanity_check(new_sched)
+    new_sched, new_cache = split_active_vtxs!(replan_model,,problem_spec,new_cache,t_split;robot_positions=robot_positions)
+
+end
+let
+    solver = NBSSolver()
+    prob = pctapf_problem_2(solver)
+    #  1   2   3   4
+    #  5   6   7   8
+    #  9  10  11  12
+    # 13  14  15  16
+    search_env, cost = solve!(solver,prob)
+    sched               = get_schedule(search_env)
+    cache               = get_cache(search_env)
+    route_plan          = get_route_plan(search_env)
+    problem_spec        = get_problem_spec(search_env)
+    env_graph           = get_graph(search_env)
+
+    t_request = 0
+    next_sched = OperatingSchedule()
+
+    replan_model = MergeAndBalance()
+    set_commit_threshold!(replan_model,1)
+    commit_threshold=get_commit_threshold(replan_model)
+
+    @test sanity_check(sched)
+
+    t_commit = get_commit_time(replan_model, search_env, t_request, commit_threshold)
+    t_final = minimum(map(length, get_paths(get_route_plan(search_env))))
+    t_split = min(t_commit,t_final)
+    robot_positions=get_env_snapshot(search_env,t_split)
+    reset_solver!(solver)
+    # TaskGraphs.set_time_limits!(replan_model,solver,t_request,t_commit)
+    # Update operating schedule
+    new_sched, new_cache = prune_schedule(replan_model,search_env,t_split)
+
 
 end
