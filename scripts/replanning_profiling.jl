@@ -1,21 +1,35 @@
-using TaskGraphs, CRCBS, TOML
+using TaskGraphs, CRCBS, TOML, Random
 
 # initialize loader
-base_dir = joinpath("/scratch/task_graphs_experiments","replanning3")
-base_problem_dir    = joinpath(base_dir,"problem_instances")
-# base_results_dir    = joinpath(base_dir,"results")
-# base_results_dir    = joinpath(base_dir,"results_no_fail")
-
 loader = ReplanningProblemLoader()
 add_env!(loader,"env_2",init_env_2())
 
+# base_dir = joinpath("/scratch/task_graphs_experiments","replanning3")
+# base_problem_dir    = joinpath(base_dir,"problem_instances")
+# base_results_dir    = joinpath(base_dir,"results_no_fail")
+# problem_configs = replanning_config_3()
+# MAX_TIME_LIMIT = 50
+# COMMIT_THRESHOLD = 10
+# ASTAR_ITERATION_LIMIT = 5000
+# PIBT_ITERATION_LIMIT = 5000
+# CBS_ITERATION_LIMIT = 1000
+
+# New experiments to stress the planner
+base_dir = joinpath("/scratch/task_graphs_experiments","replanning4")
+base_problem_dir    = joinpath(base_dir,"problem_instances")
+base_results_dir    = joinpath(base_dir,"results_extended")
+problem_configs = replanning_config_4()
+MAX_TIME_LIMIT = 50
+COMMIT_THRESHOLD = 10
+ASTAR_ITERATION_LIMIT = 5000
+PIBT_ITERATION_LIMIT = 5000
+CBS_ITERATION_LIMIT = 1000
+
 reset_task_id_counter!()
 reset_operation_id_counter!()
-# get probem config
-problem_configs = replanning_config_3()
 # # write problems
-# Random.seed!(0)
-# write_problems!(loader,problem_configs,base_problem_dir)
+Random.seed!(0)
+write_problems!(loader,problem_configs,base_problem_dir)
 
 feats = [
     RunTime(),IterationCount(),LowLevelIterationCount(),
@@ -33,16 +47,16 @@ for (primary_replanner, backup_replanner) in [
     ]
     # Primary planner
     path_finder = DefaultAStarSC()
-    set_iteration_limit!(path_finder,5000)
+    set_iteration_limit!(path_finder,ASTAR_ITERATION_LIMIT)
     primary_route_planner = CBSSolver(ISPS(path_finder))
-    set_iteration_limit!(primary_route_planner,1000)
+    set_iteration_limit!(primary_route_planner,CBS_ITERATION_LIMIT)
     primary_planner = FullReplanner(
         solver = NBSSolver(path_planner=primary_route_planner),
         replanner = primary_replanner,
         cache = ReplanningProfilerCache(features=feats,final_features=final_feats)
         )
-    set_max_time_limit!(primary_planner,50)
-    set_commit_threshold!(primary_planner,10)
+    set_max_time_limit!(primary_planner,MAX_TIME_LIMIT)
+    set_commit_threshold!(primary_planner,COMMIT_THRESHOLD)
     # Backup planner
     backup_planner = FullReplanner(
         solver = NBSSolver(
@@ -53,8 +67,8 @@ for (primary_replanner, backup_replanner) in [
         cache = ReplanningProfilerCache(features=feats,final_features=final_feats)
         )
     set_iteration_limit!(backup_planner,1)
-    set_iteration_limit!(route_planner(backup_planner.solver),5000)
-    set_commit_threshold!(backup_planner,10)
+    set_iteration_limit!(route_planner(backup_planner.solver),PIBT_ITERATION_LIMIT)
+    set_commit_threshold!(backup_planner,COMMIT_THRESHOLD)
     set_debug!(backup_planner,true)
     # set_debug!(route_planner(backup_planner.solver),true)
     # Full solver
