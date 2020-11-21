@@ -867,6 +867,8 @@ function validate(project_schedule::OperatingSchedule)
         end
     catch e
         if typeof(e) <: AssertionError
+            bt = catch_backtrace()
+            showerror(stdout,e,bt)
             print(e.msg)
         else
             rethrow(e)

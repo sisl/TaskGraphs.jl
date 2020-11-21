@@ -312,6 +312,7 @@ function profile_replanner!(planner::ReplannerWithBackup,prob::RepeatedAbstractP
             @log_info(-1,0,"REPLANNING: ",
             "Primary planner failed at stage $stage. Proceeding with backup plan.")
             env = envB
+            validate(get_schedule(envB))
         else
             @log_info(-1,0,"REPLANNING:",
                 "Both primary and backup planners failed at stage $stage.",
