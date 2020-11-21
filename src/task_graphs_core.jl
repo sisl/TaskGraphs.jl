@@ -689,6 +689,9 @@ function add_to_schedule!(schedule::P,pred,id::ID) where {P<:OperatingSchedule,I
     add_to_schedule!(schedule,ProblemSpec(),pred,id)
 end
 
+function LightGraphs.has_edge(s::OperatingSchedule,i::AbstractID,j::AbstractID) 
+    has_edge(get_graph(s), get_vtx(s,i), get_vtx(s,j))
+end
 function LightGraphs.add_edge!(schedule::P,id1::A,id2::B) where {P<:OperatingSchedule,A<:AbstractID,B<:AbstractID}
     success = add_edge!(get_graph(schedule), get_vtx(schedule,id1), get_vtx(schedule,id2))
     schedule
