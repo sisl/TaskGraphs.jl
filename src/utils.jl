@@ -54,6 +54,28 @@ function read_sparse_matrix(toml_dict::Dict)
 end
 read_sparse_matrix(io) = read_sparse_matrix(TOML.parsefile(io))
 
+export read_abstract_id
+
+parse_abstract_id(id::A,dict=Dict{String,Any}()) where {A<:AbstractID} = merge!(dict,Dict("type"=>string(A),"id"=>get_id(id)))
+TOML.parse(id::A) where {A<:AbstractID} = parse_abstract_id(id)
+function read_abstract_id(dict)
+    type_string = dict["type"]
+    for t in [ActionID(),ObjectID(),BotID{DeliveryBot}(),BotID{CleanUpBot}()]
+        if type_string == string(typeof(t))
+            return typeof(t)(dict["id"])
+        end
+    end
+    return nothing
+end
+# function TOML.parse(a::A) where {A<:AbstractPlanningPredicate)
+#     dict = Dict{String,Any}()
+#     dict["type"] = string(A)
+#     dict["id"] = TOML.parse()
+# end
+# function TOML.parse(sched::OperatingSchedule)
+#
+# end
+
 export
     remap_object_id,
     remap_object_ids!

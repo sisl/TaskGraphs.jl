@@ -249,7 +249,7 @@ end
 export
     get_t0,
     get_tF
-    
+
 get_t0(env::SearchEnv,v::Int) = get_cache(env).t0[v]
 get_tF(env::SearchEnv,v::Int) = get_cache(env).tF[v]
 for op in [:get_t0,:get_tF]
@@ -1094,6 +1094,6 @@ end
 CRCBS.base_env_type(pc_mapf::AbstractPC_MAPF)               = PCCBSEnv
 CRCBS.base_env_type(pc_mapf::Union{C_PC_MAPF,C_PC_TAPF})    = MetaAgentCBS.TeamMetaEnv
 
-include("legacy/pc_tapf_solver.jl")
+# include("legacy/pc_tapf_solver.jl")
 
 # end # PathPlanning module

@@ -211,9 +211,15 @@ export
     read_project_spec
 
 # Some tools for writing and reading project specs
-function TOML.parse(pred::OBJECT_AT)
-    [get_id(get_object_id(pred)),get_id(get_location_id(pred))]
-end
+# function TOML.parse(pred::OBJECT_AT)
+#     [get_id(get_object_id(pred)),get_id(get_location_id(pred))]
+# end
+# parse_object(arr,dict=Dict{String,Any}()) = merge!(dict,Dict("type"=>"OBJECT_AT","data"=>[arr[1],arr[2]]))
+# read_object(arr) = OBJECT_AT(arr[1],arr[2])
+
+parse_object(pred::OBJECT_AT,dict=Dict{String,Any}()) = merge!(dict,Dict("type"=>"OBJECT_AT","data"=>[get_id(get_object_id(pred)),get_id(get_location_id(pred))]))
+TOML.parse(pred::OBJECT_AT) = parse_object(pred)
+read_object(dict) = OBJECT_AT(dict["data"]...)
 function TOML.parse(op::Operation)
     toml_dict = Dict()
     toml_dict["pre"] = map(pred->TOML.parse(pred), collect(op.pre))
@@ -229,8 +235,8 @@ function read_operation(toml_dict::Dict,keep_id=false)
         op_id = get_unique_operation_id()
     end
     op = Operation(
-        pre     = Set{OBJECT_AT}(map(arr->OBJECT_AT(arr[1],arr[2]),toml_dict["pre"])),
-        post    = Set{OBJECT_AT}(map(arr->OBJECT_AT(arr[1],arr[2]),toml_dict["post"])),
+        pre     = Set{OBJECT_AT}(map(arr->read_object(arr),toml_dict["pre"])),
+        post    = Set{OBJECT_AT}(map(arr->read_object(arr),toml_dict["post"])),
         Δt      = get(toml_dict,"dt",get(toml_dict,"Δt",0.0)),
         station_id = LocationID(get(toml_dict,"station_id",-1)),
         id = op_id
@@ -247,44 +253,19 @@ function TOML.parse(project_spec::ProjectSpec)
 end
 function read_project_spec(toml_dict::Dict)
     project_spec = ProjectSpec()
-    if typeof(toml_dict["initial_conditions"]) <: Dict
-        object_ids = Int[]
-        for (i,arr) in toml_dict["initial_conditions"]
-            object_id = arr[1]
-            push!(object_ids, object_id)
-            station_id = arr[2]
-            push!(project_spec.initial_conditions, OBJECT_AT(object_id, station_id))
-        end
-        sort!(object_ids)
-        for (i, object_id) in enumerate(object_ids)
-            project_spec.object_id_to_idx[object_id] = i
-        end
-    elseif typeof(toml_dict["initial_conditions"]) <: AbstractArray
-        object_ids = Int[]
-        for (i,arr) in enumerate(toml_dict["initial_conditions"])
-            object_id = arr[1]
-            push!(object_ids, object_id)
-            station_id = arr[2]
-            push!(project_spec.initial_conditions, OBJECT_AT(object_id, station_id))
-            # project_spec.object_id_to_idx[object_id] = i
-        end
-        sort!(object_ids)
-        for (i, object_id) in enumerate(object_ids)
-            project_spec.object_id_to_idx[object_id] = i
-        end
+    ics = toml_dict["initial_conditions"]
+    fcs = toml_dict["final_conditions"]
+    ics = isa(ics,Dict) ? collect(values(ics)) : ics
+    fcs = isa(fcs,Dict) ? collect(values(fcs)) : fcs
+    for arr in ics
+        push!(project_spec.initial_conditions, read_object(arr))
     end
-    if typeof(toml_dict["final_conditions"]) <: Dict
-        for (k,arr) in toml_dict["final_conditions"]
-            object_id = arr[1]
-            station_id = arr[2]
-            push!(project_spec.final_conditions, OBJECT_AT(object_id, station_id))
-        end
-    elseif typeof(toml_dict["final_conditions"]) <: AbstractArray
-        for (i,arr) in enumerate(toml_dict["final_conditions"])
-            object_id = arr[1]
-            station_id = arr[2]
-            push!(project_spec.final_conditions, OBJECT_AT(object_id, station_id))
-        end
+    object_ids = map(get_object_id, project_spec.initial_conditions)
+    for (i, object_id) in enumerate(sort(object_ids))
+        project_spec.object_id_to_idx[get_id(object_id)] = i
+    end
+    for arr in fcs
+        push!(project_spec.final_conditions, read_object(arr))
     end
     for op_dict in toml_dict["operations"]
         op = read_operation(op_dict)
@@ -777,6 +758,10 @@ end
 export
     validate,
     sanity_check
+
+# function dump_schedule(sched,path="tmp.schedule")
+#
+# end
 
 function validate(path::Path, msg::String)
     @assert( !any(convert_to_vertex_lists(path) .== -1), msg )
