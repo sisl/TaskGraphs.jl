@@ -220,6 +220,7 @@ export
 parse_object(pred::OBJECT_AT,dict=Dict{String,Any}()) = merge!(dict,Dict("type"=>"OBJECT_AT","data"=>[get_id(get_object_id(pred)),get_id(get_location_id(pred))]))
 TOML.parse(pred::OBJECT_AT) = parse_object(pred)
 read_object(dict) = OBJECT_AT(dict["data"]...)
+read_object(arr::Vector) = OBJECT_AT(arr...)
 function TOML.parse(op::Operation)
     toml_dict = Dict()
     toml_dict["pre"] = map(pred->TOML.parse(pred), collect(op.pre))

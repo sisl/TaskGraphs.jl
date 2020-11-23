@@ -477,7 +477,7 @@ Example:
 function eligible_successors end
 
 required_predecessors(node::BOT_GO{R}) where {R} 		= Dict((BOT_GO{R},BOT_AT{R},BOT_DEPOSIT{R},TEAM_ACTION{R,BOT_DEPOSIT{R}})=>1)
-required_successors(node::BOT_GO) where {R}       		= Dict()
+required_successors(node::BOT_GO{R}) where {R}       	= Dict()
 required_predecessors(node::BOT_COLLECT{R}) where {R} 	= Dict(OBJECT_AT=>1,BOT_GO{R}=>1)
 required_successors(node::BOT_COLLECT{R}) where {R} 	= Dict(BOT_CARRY{R}=>1)
 required_predecessors(node::BOT_CARRY{R}) where {R} 	= Dict(BOT_COLLECT{R}=>1)
@@ -556,6 +556,23 @@ function num_eligible_successors(node)
 		n += val
 	end
 	n
+end
+
+export robot_ids_match
+
+"""
+	robot_ids_match(node,node2)
+
+Checks if robot_ids match between the nodes
+"""
+function robot_ids_match(node,node2)
+	if has_robot_id(node) && has_robot_id(node2)
+		if get_id(get_robot_id(node)) != -1 && get_id(get_robot_id(node2)) != -1
+			status = (get_robot_id(node) == get_robot_id(node2)) ? true : false
+			return status
+		end
+	end
+	return true
 end
 
 """

@@ -28,8 +28,8 @@ CBS_ITERATION_LIMIT = 1000
 reset_task_id_counter!()
 reset_operation_id_counter!()
 # # write problems
-Random.seed!(0)
-write_problems!(loader,problem_configs,base_problem_dir)
+# Random.seed!(0)
+# write_problems!(loader,problem_configs,base_problem_dir)
 
 feats = [
     RunTime(),IterationCount(),LowLevelIterationCount(),
@@ -82,20 +82,26 @@ for (primary_replanner, backup_replanner) in [
     push!(planner_configs,planner_config)
 end
 
-# for planner_config in planner_configs
-#     # warm up to precompile replanning code
-#     warmup(planner_config.planner,loader)
-#     # profile
-#     profile_replanner!(loader,
-#         planner_config.planner,
-#         base_problem_dir,
-#         planner_config.results_path)
-# end
+for planner_config in planner_configs
+    # warm up to precompile replanning code
+    warmup(planner_config.planner,loader)
+    # profile
+    profile_replanner!(loader,
+        planner_config.planner,
+        base_problem_dir,
+        planner_config.results_path)
+end
 
 # if results show ''"CRCBS.Feature" = val', use the following line to convert:
 # sed -i 's/\"CRCBS\.\([A-Za-z]*\)\"/\1/g' **/**/*.toml
 
 Revise.includet(joinpath(pathof(TaskGraphs),"..","helpers/render_tools.jl"))
+
+# Debugging MergeAndBalance
+planner = planner_configs[2].planner
+set_commit_threshold(planner.primary_planner,5)
+warmup(planner,loader)
+profile_replanner!(loader,planner,base_problem_dir,joinpath(pwd(),"results.toml"))
 
 # # plotting results
 

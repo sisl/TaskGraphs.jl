@@ -556,7 +556,7 @@ function preprocess_project_schedule(project_schedule,flag)
 end
 
 
-function formulate_schedule_milp(project_schedule::OperatingSchedule,problem_spec::ProblemSpec;
+function formulate_schedule_milp(sched::OperatingSchedule,problem_spec::ProblemSpec;
         optimizer = Gurobi.Optimizer,
         TimeLimit=100,
         OutputFlag=0,
@@ -566,9 +566,9 @@ function formulate_schedule_milp(project_schedule::OperatingSchedule,problem_spe
         Mm = 10000, # for big M constraints
         cost_model = SumOfMakeSpans(),
     )
-    G = get_graph(project_schedule);
+    G = get_graph(sched);
     assignments = [];
-    Δt = map(v->get_path_spec(project_schedule, v).min_path_duration, vertices(G))
+    Δt = map(v->get_path_spec(sched, v).min_path_duration, vertices(G))
 
     model = Model(with_optimizer(optimizer,
         TimeLimit=TimeLimit,
@@ -583,11 +583,11 @@ function formulate_schedule_milp(project_schedule::OperatingSchedule,problem_spe
     @constraint(model, Xa .+ Xa' .<= 1) # no bidirectional or self edges
     # set all initial times that are provided
     for (id,t) in t0_
-        v = get_vtx(project_schedule, id)
+        v = get_vtx(sched, id)
         @constraint(model, t0[v] >= t)
     end
     for (id,t) in tF_
-        v = get_vtx(project_schedule, id)
+        v = get_vtx(sched, id)
         @constraint(model, tF[v] >= t)
     end
     # Precedence constraints and duration constraints for existing nodes and edges
@@ -606,7 +606,7 @@ function formulate_schedule_milp(project_schedule::OperatingSchedule,problem_spe
     n_required_successors   = zeros(Int,nv(G))
     n_required_predecessors = zeros(Int,nv(G))
     for v in vertices(G)
-        node = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v))
+        node = get_node_from_id(sched, get_vtx_id(sched, v))
         for (key,val) in required_successors(node)
             n_required_successors[v] += val
         end
@@ -621,8 +621,8 @@ function formulate_schedule_milp(project_schedule::OperatingSchedule,problem_spe
         end
         missing_successors[v] = eligible_successors(node)
         for v2 in outneighbors(G,v)
-            id2 = get_vtx_id(project_schedule, v2)
-            node2 = get_node_from_id(project_schedule, id2)
+            id2 = get_vtx_id(sched, v2)
+            node2 = get_node_from_id(sched, id2)
             for key in collect(keys(missing_successors[v]))
                 if matches_template(key,typeof(node2))
                     missing_successors[v][key] -= 1
@@ -632,8 +632,8 @@ function formulate_schedule_milp(project_schedule::OperatingSchedule,problem_spe
         end
         missing_predecessors[v] = eligible_predecessors(node)
         for v2 in inneighbors(G,v)
-            id2 = get_vtx_id(project_schedule, v2)
-            node2 = get_node_from_id(project_schedule, id2)
+            id2 = get_vtx_id(sched, v2)
+            node2 = get_node_from_id(sched, id2)
             for key in collect(keys(missing_predecessors[v]))
                 if matches_template(key,typeof(node2))
                     missing_predecessors[v][key] -= 1
@@ -658,9 +658,9 @@ function formulate_schedule_milp(project_schedule::OperatingSchedule,problem_spe
     non_upstream_vertices = map(v->collect(setdiff(collect(vertices(G)),upstream_vertices[v])), vertices(G))
     # Big M constraints
     for v in vertices(G)
-        node = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v))
+        node = get_node_from_id(sched, get_vtx_id(sched, v))
         for v2 in non_upstream_vertices[v] # for v2 in vertices(G)
-            node2 = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v2))
+            node2 = get_node_from_id(sched, get_vtx_id(sched, v2))
             potential_match = false
             for (template, val) in missing_successors[v]
                 if !matches_template(template, typeof(node2)) # possible to add an edge
@@ -673,7 +673,7 @@ function formulate_schedule_milp(project_schedule::OperatingSchedule,problem_spe
                     potential_match = true # TODO: investigate why the solver fails when this is moved inside the following if statement
                     if (val > 0 && val2 > 0)
                         new_node = align_with_successor(node,node2)
-                        dt_min = generate_path_spec(project_schedule,problem_spec,new_node).min_path_duration
+                        dt_min = generate_path_spec(sched,problem_spec,new_node).min_path_duration
                         @constraint(model, tF[v] - (t0[v] + dt_min) >= -Mm*(1 - Xa[v,v2]))
                         @constraint(model, t0[v2] - tF[v] >= -Mm*(1 - Xa[v,v2]))
                         break
@@ -698,9 +698,9 @@ function formulate_schedule_milp(project_schedule::OperatingSchedule,problem_spe
     @variable(model, Xj[1:nv(G),1:nv(G)], binary = true); # job shop adjacency matrix
     @constraint(model, Xj .+ Xj' .<= 1) # no bidirectional or self edges
     for v in 1:nv(G)
-        node = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v))
+        node = get_node_from_id(sched, get_vtx_id(sched, v))
         for v2 in v+1:nv(G)
-            node2 = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v2))
+            node2 = get_node_from_id(sched, get_vtx_id(sched, v2))
             common_resources = intersect(resources_reserved(node),resources_reserved(node2))
             if length(common_resources) > 0
                 # @show common_resources
@@ -740,14 +740,14 @@ function formulate_schedule_milp(project_schedule::OperatingSchedule,problem_spe
 
     # Formulate Objective
     # if cost_model <: SumOfMakeSpans
-    #     terminal_vtxs = project_schedule.terminal_vtxs
+    #     terminal_vtxs = sched.terminal_vtxs
     #     @variable(model, T[1:length(terminal_vtxs)])
     #     for (i,project_head) in enumerate(terminal_vtxs)
     #         for v in project_head
     #             @constraint(model, T[i] >= tF[v])
     #         end
     #     end
-    #     cost1 = @expression(model, sum(map(v->tF[v]*get(project_schedule.weights,v,0.0), terminal_vtxs)))
+    #     cost1 = @expression(model, sum(map(v->tF[v]*get(sched.weights,v,0.0), terminal_vtxs)))
     # elseif cost_model <: MakeSpan
     #     @variable(model, T)
     #     @constraint(model, T .>= tF)
@@ -757,16 +757,16 @@ function formulate_schedule_milp(project_schedule::OperatingSchedule,problem_spe
     sparsity_cost = @expression(model, (0.5/(nv(G)^2))*sum(X)) # cost term to encourage sparse X. Otherwise the solver may add pointless edges
     # @objective(model, Min, cost1 )
     milp = AdjacencyMILP(model=model) #, job_shop_variables
-    cost1 = get_objective_expr(milp,cost_model,milp.model,project_schedule,tF)
+    cost1 = get_objective_expr(milp,cost_model,milp.model,sched,tF)
     @objective(milp.model, Min, cost1 + sparsity_cost)
     milp
 end
-function formulate_milp(milp_model::AdjacencyMILP,project_schedule::OperatingSchedule,problem_spec::ProblemSpec;
+function formulate_milp(milp_model::AdjacencyMILP,sched::OperatingSchedule,problem_spec::ProblemSpec;
     optimizer=Gurobi.Optimizer,
     kwargs...)
-    formulate_schedule_milp(project_schedule,problem_spec;optimizer=optimizer,kwargs...)
+    formulate_schedule_milp(sched,problem_spec;optimizer=optimizer,kwargs...)
 end
-function formulate_milp(milp_model::SparseAdjacencyMILP,project_schedule::OperatingSchedule,problem_spec::ProblemSpec;
+function formulate_milp(milp_model::SparseAdjacencyMILP,sched::OperatingSchedule,problem_spec::ProblemSpec;
         optimizer = Gurobi.Optimizer,
         TimeLimit=100,
         OutputFlag=0,
@@ -786,12 +786,12 @@ function formulate_milp(milp_model::SparseAdjacencyMILP,project_schedule::Operat
         Presolve=Presolve
         ));
 
-    G = get_graph(project_schedule);
+    G = get_graph(sched);
     (missing_successors, missing_predecessors, n_eligible_successors,
         n_eligible_predecessors, n_required_successors, n_required_predecessors,
         upstream_vertices, non_upstream_vertices
-        ) = preprocess_project_schedule(project_schedule)
-    Δt = map(v->get_path_spec(project_schedule, v).min_path_duration, vertices(G))
+        ) = preprocess_project_schedule(sched)
+    Δt = map(v->get_path_spec(sched, v).min_path_duration, vertices(G))
 
     @variable(model, t0[1:nv(G)] >= 0.0); # initial times for all nodes
     @variable(model, tF[1:nv(G)] >= 0.0); # final times for all nodes
@@ -800,11 +800,11 @@ function formulate_milp(milp_model::SparseAdjacencyMILP,project_schedule::Operat
     Xa = SparseMatrixCSC{VariableRef,Int}(nv(G),nv(G),ones(Int,nv(G)+1),Int[],VariableRef[])
     # set all initial times that are provided
     for (id,t) in t0_
-        v = get_vtx(project_schedule, id)
+        v = get_vtx(sched, id)
         @constraint(model, t0[v] >= t)
     end
     for (id,t) in tF_
-        v = get_vtx(project_schedule, id)
+        v = get_vtx(sched, id)
         @constraint(model, tF[v] >= t)
     end
     # Precedence constraints and duration constraints for existing nodes and edges
@@ -819,12 +819,12 @@ function formulate_milp(milp_model::SparseAdjacencyMILP,project_schedule::Operat
 
     # Big M constraints
     for v in vertices(G)
-        node = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v))
+        node = get_node_from_id(sched, get_vtx_id(sched, v))
         potential_match = false
         if outdegree(G,v) < n_eligible_successors[v] # NOTE: Trying this out to save time on formulation
             for v2 in non_upstream_vertices[v] # for v2 in vertices(G)
                 if indegree(G,v2) < n_eligible_predecessors[v2]
-                    node2 = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v2))
+                    node2 = get_node_from_id(sched, get_vtx_id(sched, v2))
                     for (template, val) in missing_successors[v]
                         if !matches_template(template, typeof(node2)) # possible to add an edge
                             continue
@@ -836,7 +836,15 @@ function formulate_milp(milp_model::SparseAdjacencyMILP,project_schedule::Operat
                             if (val > 0 && val2 > 0)
                                 potential_match = true
                                 new_node = align_with_successor(node,node2)
-                                dt_min = generate_path_spec(project_schedule,problem_spec,new_node).min_path_duration
+                                if !robot_ids_match(node,node2)
+                                    @log_info(-1,0,"Edge $(string(node)) --> $(string(node2)) should be illegal, but is being allowed by SparseAdjacencyMILP")
+                                    @log_info(-1,0,"inneighbors(sched,$(string(node))):   ",  map(vp->string(string(get_node_from_vtx(sched,vp)),", "), inneighbors(sched,v))...)
+                                    @log_info(-1,0,"outneighbors(sched,$(string(node))):  ", map(vp->string(string(get_node_from_vtx(sched,vp)),", "), outneighbors(sched,v))...)
+                                    @log_info(-1,0,"inneighbors(sched,$(string(node2))):  ", map(vp->string(string(get_node_from_vtx(sched,vp)),", "), inneighbors(sched,v2))...)
+                                    @log_info(-1,0,"outneighbors(sched,$(string(node2))): ",map(vp->string(string(get_node_from_vtx(sched,vp)),", "), outneighbors(sched,v2))...)
+                                end
+
+                                dt_min = generate_path_spec(sched,problem_spec,new_node).min_path_duration
                                 Xa[v,v2] = @variable(model, binary=true) # initialize a new binary variable in the sparse adjacency matrix
                                 @constraint(model, tF[v] - (t0[v] + dt_min) >= -Mm*(1 - Xa[v,v2]))
                                 @constraint(model, t0[v2] - tF[v] >= -Mm*(1 - Xa[v,v2]))
@@ -876,10 +884,10 @@ function formulate_milp(milp_model::SparseAdjacencyMILP,project_schedule::Operat
     Xj = SparseMatrixCSC{VariableRef,Int}(nv(G),nv(G),ones(Int,nv(G)+1),Int[],VariableRef[])
     if job_shop
         for v in 1:nv(G)
-            node = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v))
+            node = get_node_from_id(sched, get_vtx_id(sched, v))
             for v2 in non_upstream_vertices[v] #v+1:nv(G)
                 if v2 > v && ~(v in upstream_vertices[v2]) && ~(has_edge(G,v,v2) || has_edge(G,v2,v))
-                    node2 = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v2))
+                    node2 = get_node_from_id(sched, get_vtx_id(sched, v2))
                     common_resources = intersect(resources_reserved(node),resources_reserved(node2))
                     if length(common_resources) > 0
                         println("MILP FORMULATION: adding a job shop constraint between ",v, " (",string(node),") and ", v2, " (",string(node2),")")
@@ -901,14 +909,14 @@ function formulate_milp(milp_model::SparseAdjacencyMILP,project_schedule::Operat
 
     # Formulate Objective
     # if cost_model <: SumOfMakeSpans
-    #     terminal_vtxs = project_schedule.terminal_vtxs
+    #     terminal_vtxs = sched.terminal_vtxs
     #     @variable(model, T[1:length(terminal_vtxs)])
     #     for (i,project_head) in enumerate(terminal_vtxs)
     #         for v in project_head
     #             @constraint(model, T[i] >= tF[v])
     #         end
     #     end
-    #     cost1 = @expression(model, sum(map(v->tF[v]*get(project_schedule.weights,v,0.0), terminal_vtxs)))
+    #     cost1 = @expression(model, sum(map(v->tF[v]*get(sched.weights,v,0.0), terminal_vtxs)))
     # elseif cost_model <: MakeSpan
     #     @variable(model, T)
     #     @constraint(model, T .>= tF)
@@ -919,11 +927,11 @@ function formulate_milp(milp_model::SparseAdjacencyMILP,project_schedule::Operat
     # # @objective(model, Min, cost1 + sparsity_cost)
     # @objective(model, Min, cost1)
     milp = SparseAdjacencyMILP(model,Xa,Xj, milp_model.job_shop) #, job_shop_variables
-    cost1 = get_objective_expr(milp,cost_model,milp.model,project_schedule,tF)
+    cost1 = get_objective_expr(milp,cost_model,milp.model,sched,tF)
     @objective(milp.model, Min, cost1)
     milp
 end
-function formulate_milp(milp_model::FastSparseAdjacencyMILP,project_schedule::OperatingSchedule,problem_spec::ProblemSpec;
+function formulate_milp(milp_model::FastSparseAdjacencyMILP,sched::OperatingSchedule,problem_spec::ProblemSpec;
         optimizer = Gurobi.Optimizer,
         TimeLimit=100,
         OutputFlag=0,
@@ -942,9 +950,9 @@ function formulate_milp(milp_model::FastSparseAdjacencyMILP,project_schedule::Op
         Presolve=Presolve
         ));
 
-    G = get_graph(project_schedule);
-    cache = preprocess_project_schedule(project_schedule,true)
-    Δt = map(v->get_path_spec(project_schedule, v).min_path_duration, vertices(G))
+    G = get_graph(sched);
+    cache = preprocess_project_schedule(sched,true)
+    Δt = map(v->get_path_spec(sched, v).min_path_duration, vertices(G))
 
     # In order to speed up the solver, we try to reduce the total number of
     # variables in the JuMP Model. Wherever possible, t0[v] and tF[v] are
@@ -953,19 +961,19 @@ function formulate_milp(milp_model::FastSparseAdjacencyMILP,project_schedule::Op
     tF = Vector{Union{Real,VariableRef,GenericAffExpr}}(zeros(nv(G)))
     for v in topological_sort(G)
         if indegree(G,v) == cache.n_eligible_predecessors[v] == 0
-            node_id = get_vtx_id(project_schedule,v)
+            node_id = get_vtx_id(sched,v)
             t0[v] = @expression(model,get(t0_,node_id,0.0))
-            # @show indegree(G,v), v, string(get_node_from_vtx(project_schedule,v)), typeof(t0[v])
+            # @show indegree(G,v), v, string(get_node_from_vtx(sched,v)), typeof(t0[v])
         elseif indegree(G,v) == cache.n_eligible_predecessors[v] == 1
             vp = inneighbors(G,v)[1]
             t0[v] = @expression(model,tF[vp])
-            # @show indegree(G,v), v, string(get_node_from_vtx(project_schedule,v)), typeof(t0[v])
+            # @show indegree(G,v), v, string(get_node_from_vtx(sched,v)), typeof(t0[v])
         else
             t0[v] = @variable(model)
             for vp in inneighbors(G,v)
                 @constraint(model,t0[v] >= tF[vp])
             end
-            # @show indegree(G,v), v, string(get_node_from_vtx(project_schedule,v)), typeof(t0[v])
+            # @show indegree(G,v), v, string(get_node_from_vtx(sched,v)), typeof(t0[v])
         end
         if outdegree(G,v) == cache.n_eligible_successors[v]
             tF[v] = @expression(model,t0[v] + Δt[v])
@@ -979,11 +987,11 @@ function formulate_milp(milp_model::FastSparseAdjacencyMILP,project_schedule::Op
     end
     # set all initial times that are provided
     for (id,t) in t0_
-        v = get_vtx(project_schedule, id)
+        v = get_vtx(sched, id)
         @constraint(model, t0[v] >= t)
     end
     # for (id,t) in tF_
-    #     v = get_vtx(project_schedule, id)
+    #     v = get_vtx(sched, id)
     #     @constraint(model, tF[v] >= t)
     # end
     # Precedence relationships
@@ -998,12 +1006,12 @@ function formulate_milp(milp_model::FastSparseAdjacencyMILP,project_schedule::Op
 
     # Big M constraints
     for v in vertices(G)
-        node = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v))
+        node = get_node_from_id(sched, get_vtx_id(sched, v))
         potential_match = false
         if outdegree(G,v) < cache.n_eligible_successors[v] # NOTE: Trying this out to save time on formulation
             for v2 in cache.non_upstream_vertices[v] # for v2 in vertices(G)
                 if indegree(G,v2) < cache.n_eligible_predecessors[v2]
-                    node2 = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v2))
+                    node2 = get_node_from_id(sched, get_vtx_id(sched, v2))
                     for (template, val) in cache.missing_successors[v]
                         if !matches_template(template, typeof(node2)) # possible to add an edge
                             continue
@@ -1015,7 +1023,7 @@ function formulate_milp(milp_model::FastSparseAdjacencyMILP,project_schedule::Op
                             if (val > 0 && val2 > 0)
                                 potential_match = true
                                 new_node = align_with_successor(node,node2)
-                                dt_min = generate_path_spec(project_schedule,problem_spec,new_node).min_path_duration
+                                dt_min = generate_path_spec(sched,problem_spec,new_node).min_path_duration
                                 Xa[v,v2] = @variable(model, binary=true) # initialize a new binary variable in the sparse adjacency matrix
                                 @constraint(model, tF[v] - (t0[v] + dt_min) >= -Mm*(1 - Xa[v,v2]))
                                 @constraint(model, t0[v2] - tF[v] >= -Mm*(1 - Xa[v,v2]))
@@ -1055,10 +1063,10 @@ function formulate_milp(milp_model::FastSparseAdjacencyMILP,project_schedule::Op
     Xj = SparseMatrixCSC{VariableRef,Int}(nv(G),nv(G),ones(Int,nv(G)+1),Int[],VariableRef[])
     if job_shop
         for v in 1:nv(G)
-            node = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v))
+            node = get_node_from_id(sched, get_vtx_id(sched, v))
             for v2 in cache.non_upstream_vertices[v] #v+1:nv(G)
                 if v2 > v && ~(v in cache.upstream_vertices[v2]) && ~(has_edge(G,v,v2) || has_edge(G,v2,v))
-                    node2 = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v2))
+                    node2 = get_node_from_id(sched, get_vtx_id(sched, v2))
                     common_resources = intersect(resources_reserved(node),resources_reserved(node2))
                     if length(common_resources) > 0
                         println("MILP FORMULATION: adding a job shop constraint between ",v, " (",string(node),") and ", v2, " (",string(node2),")")
@@ -1080,14 +1088,14 @@ function formulate_milp(milp_model::FastSparseAdjacencyMILP,project_schedule::Op
 
     # Formulate Objective
     # if cost_model <: SumOfMakeSpans
-    #     terminal_vtxs = project_schedule.terminal_vtxs
+    #     terminal_vtxs = sched.terminal_vtxs
     #     @variable(model, T[1:length(terminal_vtxs)])
     #     for (i,project_head) in enumerate(terminal_vtxs)
     #         for v in project_head
     #             @constraint(model, T[i] >= tF[v])
     #         end
     #     end
-    #     cost1 = @expression(model, sum(map(v->tF[v]*get(project_schedule.weights,v,0.0), terminal_vtxs)))
+    #     cost1 = @expression(model, sum(map(v->tF[v]*get(sched.weights,v,0.0), terminal_vtxs)))
     # elseif cost_model <: MakeSpan
     #     @variable(model, T)
     #     @constraint(model, T .>= tF)
@@ -1098,21 +1106,21 @@ function formulate_milp(milp_model::FastSparseAdjacencyMILP,project_schedule::Op
     # # @objective(model, Min, cost1 + sparsity_cost)
     # @objective(model, Min, cost1)
     milp = FastSparseAdjacencyMILP(model,Xa,Xj, milp_model.job_shop) #, job_shop_variables
-    cost1 = get_objective_expr(milp,cost_model,milp.model,project_schedule,tF)
+    cost1 = get_objective_expr(milp,cost_model,milp.model,sched,tF)
     @objective(milp.model, Min, cost1)
     milp
 end
-function get_objective_expr(milp,f::SumOfMakeSpans,model,project_schedule,tF)
-    terminal_vtxs = project_schedule.terminal_vtxs
+function get_objective_expr(milp,f::SumOfMakeSpans,model,sched,tF)
+    terminal_vtxs = sched.terminal_vtxs
     @variable(model, T[1:length(terminal_vtxs)])
     for (i,project_head) in enumerate(terminal_vtxs)
         for v in project_head
             @constraint(model, T[i] >= tF[v])
         end
     end
-    cost1 = @expression(model, sum(map(v->tF[v]*get(project_schedule.weights,v,0.0), terminal_vtxs)))
+    cost1 = @expression(model, sum(map(v->tF[v]*get(sched.weights,v,0.0), terminal_vtxs)))
 end
-function get_objective_expr(milp,f::MakeSpan,model,project_schedule,tF)
+function get_objective_expr(milp,f::MakeSpan,model,sched,tF)
     @variable(model, T)
     @constraint(model, T .>= tF) # TODO Maybe the number of constraints here causes a slowdown that could be addressed by only adding constraints on terminal nodes?
     cost1 = @expression(model, T)
