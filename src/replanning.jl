@@ -180,9 +180,12 @@ function break_assignments!(sched::OperatingSchedule,problem_spec,v)
     if isa(node, AbstractRobotAction)
         new_node = replace_robot_id(node,RobotID(-1)) # TODO Why is this line here? I don't think the robot id should be replaced in this node--just it's successors
         if isa(node,BOT_GO)
-            new_node = replace_destination(new_node,LocationID(-1))
+            # new_node = replace_destination(new_node,LocationID(-1))
             for v2 in outneighbors(G,v)
-                rem_edge!(G,v,v2)
+                if isa(get_node_from_vtx(G,vp),BOT_COLLECT)
+                    rem_edge!(G,v,v2)
+                    new_node = replace_destination(new_node,LocationID(-1))
+                end
             end
         end
         replace_in_schedule!(sched,problem_spec,new_node,node_id)
