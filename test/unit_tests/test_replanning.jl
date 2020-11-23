@@ -66,3 +66,20 @@ let
         end
     end
 end
+# Test break_assignments(...)
+let
+    sched = OperatingSchedule()
+    prev_id = ActionID()
+    for (id,n) in [
+            (ActionID(1),GO(1,1,1)),
+            (ActionID(2),GO(1,1,2)),
+            (ActionID(3),COLLECT(1,1,2))
+            ]
+        add_to_schedule!(sched,n,id)
+        add_edge!(sched,prev_id,id)
+        prev_id = id
+    end
+    break_assignments!(sched,ProblemSpec())
+    @test has_edge(sched,ActionID(1),ActionID(2))
+    @test !has_edge(sched,ActionID(2),ActionID(3))
+end

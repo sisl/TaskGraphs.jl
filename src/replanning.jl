@@ -182,7 +182,7 @@ function break_assignments!(sched::OperatingSchedule,problem_spec,v)
         if isa(node,BOT_GO)
             # new_node = replace_destination(new_node,LocationID(-1))
             for v2 in outneighbors(G,v)
-                if isa(get_node_from_vtx(G,vp),BOT_COLLECT)
+                if isa(get_node_from_vtx(sched,v2),BOT_COLLECT)
                     rem_edge!(G,v,v2)
                     new_node = replace_destination(new_node,LocationID(-1))
                 end
