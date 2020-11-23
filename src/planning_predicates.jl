@@ -396,6 +396,13 @@ function replace_initial_location end
 for T in [:BOT_AT,:BOT_GO,:BOT_COLLECT,:BOT_CARRY,:BOT_DEPOSIT]
 	@eval replace_robot_id(node::$T,id) = $T(node,r=id)
 end
+function replace_robot_id(node::A,id) where {A<:TEAM_ACTION}
+	return A(node,instructions=map(n->replace_robot_id(n,id), sub_nodes(node)))
+	# for i in 1:length(sub_nodes(node))
+	# 	n = sub_nodes(node)[i]
+	# 	sub_nodes(node)[i] = replace_robot_id(node,RobotID(-1))
+	# end
+end
 for T in [:BOT_GO,:BOT_CARRY]
 	@eval replace_destination(node::$T,id) = $T(node,x2=id)
 	@eval replace_initial_location(node::$T,id) = $T(node,x1=id)
