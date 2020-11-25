@@ -14,27 +14,27 @@ add_env!(loader,"env_2",init_env_2())
 # PIBT_ITERATION_LIMIT = 5000
 # CBS_ITERATION_LIMIT = 1000
 
-# # New experiments to stress the planner
-# base_dir = joinpath("/scratch/task_graphs_experiments","replanning")
-# base_problem_dir    = joinpath(base_dir,"problem_instances")
-# base_results_dir    = joinpath(base_dir,"results_extended")
-# problem_configs = replanning_config_4()
-# MAX_TIME_LIMIT = 50
-# COMMIT_THRESHOLD = 10
-# ASTAR_ITERATION_LIMIT = 5000
-# PIBT_ITERATION_LIMIT = 5000
-# CBS_ITERATION_LIMIT = 1000
-
-# Final set of experiments
-base_dir = joinpath("/scratch/task_graphs_experiments","replanning")
+# New experiments to stress the planner
+base_dir = joinpath("/scratch/task_graphs_experiments","replanning4")
 base_problem_dir    = joinpath(base_dir,"problem_instances")
-base_results_dir    = joinpath(base_dir,"results")
-problem_configs = replanning_config_5()
-MAX_TIME_LIMIT = 40
+base_results_dir    = joinpath(base_dir,"results_extended")
+problem_configs = replanning_config_4()
+MAX_TIME_LIMIT = 50
 COMMIT_THRESHOLD = 10
 ASTAR_ITERATION_LIMIT = 5000
 PIBT_ITERATION_LIMIT = 5000
 CBS_ITERATION_LIMIT = 1000
+
+# # Final set of experiments
+# base_dir = joinpath("/scratch/task_graphs_experiments","replanning")
+# base_problem_dir    = joinpath(base_dir,"problem_instances")
+# base_results_dir    = joinpath(base_dir,"results")
+# problem_configs = replanning_config_5()
+# MAX_TIME_LIMIT = 40
+# COMMIT_THRESHOLD = 10
+# ASTAR_ITERATION_LIMIT = 5000
+# PIBT_ITERATION_LIMIT = 5000
+# CBS_ITERATION_LIMIT = 1000
 
 reset_task_id_counter!()
 reset_operation_id_counter!()

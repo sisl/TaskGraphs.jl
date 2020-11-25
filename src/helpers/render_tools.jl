@@ -1273,17 +1273,25 @@ function build_table(df;
     aggregator = vals -> sum(vals)/length(vals),
     )
 
+    xkeys = map(x->Dict(xkey=>x), xvals)
+    ykeys = map(y->Dict(ykey=>y), yvals)
     tab = zeros(length(xvals),length(yvals))
+    tab = ResultsTable(xkeys, ykeys, tab)
     for (i,x) in enumerate(xvals)
         for (j,y) in enumerate(yvals)
             idxs = .&((df[!,xkey] .== x),(df[!,ykey] .== y))
-            vals = df[idxs,obj]
-            tab[i,j] = aggregator(vals)
+            # if any(idxs)
+                vals = df[idxs,obj]
+                tab.data[i,j] = aggregator(vals)
+            # else
+            #     tab.data[i,j] = nothing
+            # end
         end
     end
-    xkeys = map(x->Dict(xkey=>x), xvals)
-    ykeys = map(y->Dict(ykey=>y), yvals)
-    return ResultsTable(xkeys, ykeys, tab)
+    # xkeys = map(x->Dict(xkey=>x), xvals)
+    # ykeys = map(y->Dict(ykey=>y), yvals)
+    # return ResultsTable(xkeys, ykeys, tab)
+    return tab
 end
 function table_product(tables,mode=:horizontal)
     @assert length(unique(size.(tables))) == 1 "All tables must have same dimensions"
@@ -1302,6 +1310,8 @@ function print_real(io,v;
         )
     if isa(v,Int)
         print(io,v)
+    elseif isnan(v)
+        print(io,"")
     else
         print(io,round(v;digits=precision))
     end
