@@ -357,7 +357,8 @@ export
     replanning_config_1,
     replanning_config_2,
     replanning_config_3,
-    replanning_config_4
+    replanning_config_4,
+    replanning_config_5
 
 """
     replanning_config_1
@@ -512,6 +513,61 @@ function replanning_config_4()
         # Dict(:M=>30, :arrival_interval=>60, ),
         # Dict(:M=>30, :arrival_interval=>70, ),
         # Dict(:M=>30, :arrival_interval=>80, ),
+    ]
+    product_config_dicts(base_configs,robot_configs,project_configs,stream_configs)
+end
+function replanning_config_5()
+    base_configs = [
+        Dict(
+            :warning_time=>0,
+            :commit_threshold=>10,
+            :fallback_commit_threshold=>10,
+            :num_trials => 8,
+            :max_parents => 3,
+            :depth_bias => 0.4,
+            :dt_min => 0,
+            :dt_max => 0,
+            :dt_collect => 0,
+            :dt_deliver => 0,
+            :env_id=>"env_2",
+            )
+    ]
+    robot_configs = [
+        Dict(:N=>30)
+    ]
+    project_configs = [
+        Dict(:num_projects=>30),
+    ]
+    stream_configs = [
+        Dict(:M=>10, :arrival_interval=>20, ),
+        Dict(:M=>10, :arrival_interval=>30, ),
+        Dict(:M=>10, :arrival_interval=>40, ),
+
+        Dict(:M=>15, :arrival_interval=>20, ),
+        Dict(:M=>15, :arrival_interval=>30, ),
+        Dict(:M=>15, :arrival_interval=>40, ),
+        Dict(:M=>15, :arrival_interval=>50, ),
+
+        Dict(:M=>20, :arrival_interval=>20, ),
+        Dict(:M=>20, :arrival_interval=>30, ),
+        Dict(:M=>20, :arrival_interval=>40, ),
+        Dict(:M=>20, :arrival_interval=>50, ),
+        Dict(:M=>20, :arrival_interval=>60, ),
+
+        Dict(:M=>25, :arrival_interval=>20, ),
+        Dict(:M=>25, :arrival_interval=>30, ),
+        Dict(:M=>25, :arrival_interval=>40, ),
+        Dict(:M=>25, :arrival_interval=>50, ),
+        Dict(:M=>25, :arrival_interval=>60, ),
+        Dict(:M=>25, :arrival_interval=>70, ),
+
+        Dict(:M=>30, :arrival_interval=>20, ),
+        Dict(:M=>30, :arrival_interval=>30, ),
+        Dict(:M=>30, :arrival_interval=>40, ),
+        Dict(:M=>30, :arrival_interval=>50, ),
+        Dict(:M=>30, :arrival_interval=>60, ),
+        Dict(:M=>30, :arrival_interval=>70, ),
+        Dict(:M=>30, :arrival_interval=>80, ),
     ]
     product_config_dicts(base_configs,robot_configs,project_configs,stream_configs)
 end

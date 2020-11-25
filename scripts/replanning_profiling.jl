@@ -14,12 +14,23 @@ add_env!(loader,"env_2",init_env_2())
 # PIBT_ITERATION_LIMIT = 5000
 # CBS_ITERATION_LIMIT = 1000
 
-# New experiments to stress the planner
-base_dir = joinpath("/scratch/task_graphs_experiments","replanning4")
+# # New experiments to stress the planner
+# base_dir = joinpath("/scratch/task_graphs_experiments","replanning")
+# base_problem_dir    = joinpath(base_dir,"problem_instances")
+# base_results_dir    = joinpath(base_dir,"results_extended")
+# problem_configs = replanning_config_4()
+# MAX_TIME_LIMIT = 50
+# COMMIT_THRESHOLD = 10
+# ASTAR_ITERATION_LIMIT = 5000
+# PIBT_ITERATION_LIMIT = 5000
+# CBS_ITERATION_LIMIT = 1000
+
+# Final set of experiments
+base_dir = joinpath("/scratch/task_graphs_experiments","replanning")
 base_problem_dir    = joinpath(base_dir,"problem_instances")
-base_results_dir    = joinpath(base_dir,"results_extended")
-problem_configs = replanning_config_4()
-MAX_TIME_LIMIT = 50
+base_results_dir    = joinpath(base_dir,"results")
+problem_configs = replanning_config_5()
+MAX_TIME_LIMIT = 40
 COMMIT_THRESHOLD = 10
 ASTAR_ITERATION_LIMIT = 5000
 PIBT_ITERATION_LIMIT = 5000
@@ -212,13 +223,13 @@ for (include_keys, filename) in [
     save(filename,plt)
 end
 
-plt = PGFPlots.GroupPlot(3,5)
+plt = PGFPlots.GroupPlot(7,5)
 for (n_vals, m_vals) in [
-    ([10,],[20,30,40,]),
-    ([15,],[30,40,50,]),
-    ([20,],[40,50,60,]),
-    ([25,],[50,60,70,]),
-    ([30,],[60,70,80,]),
+    ([10,],[20,30,40,50,60,70,80]),
+    ([15,],[20,30,40,50,60,70,80]),
+    ([20,],[20,30,40,50,60,70,80]),
+    ([25,],[20,30,40,50,60,70,80]),
+    ([30,],[20,30,40,50,60,70,80]),
     ]
     gp = group_history_plot(df_dict,planner_ordering;
         y_key = :makespans,
@@ -238,6 +249,7 @@ for (n_vals, m_vals) in [
     append!(plt.axes,gp.axes)
 end
 display(plt)
+save("makespan_trends.pdf",plt)
 
 plt = plot_history_layers(df_dict["MergeAndBalance"],[:primary_runtimes,:backup_runtimes];
     legend_entries=["primary","backup"],
