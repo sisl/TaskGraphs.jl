@@ -28,8 +28,8 @@ CBS_ITERATION_LIMIT = 1000
 reset_task_id_counter!()
 reset_operation_id_counter!()
 # # write problems
-# Random.seed!(0)
-# write_problems!(loader,problem_configs,base_problem_dir)
+Random.seed!(0)
+write_problems!(loader,problem_configs,base_problem_dir)
 
 feats = [
     RunTime(),IterationCount(),LowLevelIterationCount(),
@@ -95,13 +95,23 @@ end
 # if results show ''"CRCBS.Feature" = val', use the following line to convert:
 # sed -i 's/\"CRCBS\.\([A-Za-z]*\)\"/\1/g' **/**/*.toml
 
-Revise.includet(joinpath(pathof(TaskGraphs),"..","helpers/render_tools.jl"))
+# copy problems and results folder4
+n = 180
+paths = [base_problem_dir, map(c->c.results_path, planner_configs)...]
+for p in paths
+    for f in collect(readdir(p;join=true))
+        id = parse(Int,f[end-3:end])
+        new_name = TaskGraphs.padded_problem_name(id+n,"problem","")
+        new_f = joinpath(p,new_name)
+        # @show id, new_name
+        # @show f, new_f
+        @info mv(f,new_f)
+    end
+end
+source_dir = "/scratch/task_graphs_experiments/replanning3/results_no_fail/"
+destination_dir = "/scratch/task_graphs_experiments/replanning4/results_extended/"
 
-# Debugging MergeAndBalance
-planner = planner_configs[2].planner
-set_commit_threshold(planner.primary_planner,5)
-warmup(planner,loader)
-profile_replanner!(loader,planner,base_problem_dir,joinpath(pwd(),"results.toml"))
+Revise.includet(joinpath(pathof(TaskGraphs),"..","helpers/render_tools.jl"))
 
 # # plotting results
 
