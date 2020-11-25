@@ -1118,6 +1118,9 @@ function plot_histories_pgf(df_list::Vector,ax=PGFPlots.Axis();
                     (df[!,m_key] .== m_val),
                     (df[!,n_key] .== n_val),
                     )
+                if !any(idxs)
+                    continue
+                end
                 if !isempty(include_keys)
                     idxs = .&(idxs, [(df[!,k] .== v) for (k,v) in include_keys]...)
                 end

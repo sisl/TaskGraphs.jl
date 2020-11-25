@@ -95,21 +95,30 @@ end
 # if results show ''"CRCBS.Feature" = val', use the following line to convert:
 # sed -i 's/\"CRCBS\.\([A-Za-z]*\)\"/\1/g' **/**/*.toml
 
+problem_configs = [replanning_config_3()..., replanning_config_4()...]
 # copy problems and results folder4
-n = 180
-paths = [base_problem_dir, map(c->c.results_path, planner_configs)...]
-for p in paths
-    for f in collect(readdir(p;join=true))
-        id = parse(Int,f[end-3:end])
-        new_name = TaskGraphs.padded_problem_name(id+n,"problem","")
-        new_f = joinpath(p,new_name)
-        # @show id, new_name
-        # @show f, new_f
-        @info mv(f,new_f)
-    end
-end
-source_dir = "/scratch/task_graphs_experiments/replanning3/results_no_fail/"
-destination_dir = "/scratch/task_graphs_experiments/replanning4/results_extended/"
+# n = 180
+# paths = [base_problem_dir, map(c->c.results_path, planner_configs)...]
+# for p in paths
+#     for f in collect(readdir(p;join=true))
+#         id = parse(Int,f[end-3:end])
+#         new_name = TaskGraphs.padded_problem_name(id+n,"problem","")
+#         new_f = joinpath(p,new_name)
+#         # @show id, new_name
+#         # @show f, new_f
+#         # @info mv(f,new_f)
+#     end
+# end
+# source_prob_dir = "/scratch/task_graphs_experiments/replanning3/problem_instances/"
+# source_results_dir = "/scratch/task_graphs_experiments/replanning3/results_no_fail/"
+# for (src,dst) in [
+#     (source_prob_dir,base_problem_dir),
+#     map(c->(joinpath(source_results_dir,c.planner_name),
+#         joinpath(base_results_dir,c.planner_name)), planner_configs)...
+#     ]
+#     @show src, dst
+#
+# end
 
 Revise.includet(joinpath(pathof(TaskGraphs),"..","helpers/render_tools.jl"))
 

@@ -31,16 +31,30 @@ let
 
     search_env = construct_search_env(solver,sched,spec,graph)
 
-    t_commit = 3
+    t_commit = 7
     t_split = t_commit
     replan_model = MergeAndBalance()
     new_sched, new_cache = prune_schedule(replan_model,search_env,t_commit)
     plot_project_schedule(new_sched,new_cache;verbose=false)
 
-
     robot_positions=get_env_snapshot(search_env,t_split)
     @test sanity_check(new_sched)
-    new_sched, new_cache = split_active_vtxs!(replan_model,,problem_spec,new_cache,t_split;robot_positions=robot_positions)
+    new_sched, new_cache = split_active_vtxs!(replan_model,new_sched,problem_spec,new_cache,t_split;robot_positions=robot_positions)
+    plot_project_schedule(new_sched,new_cache;verbose=false)
+
+    # freeze nodes that terminate before cutoff time
+    new_sched, new_cache = fix_precutoff_nodes!(replan_model,new_sched,problem_spec,new_cache,t_split)
+    plot_project_schedule(new_sched,new_cache;verbose=false,
+        color_function = (G,v,x,y,r)->get_path_spec(new_sched,v).fixed ? "gray" : get_prop(G,v,:color),
+    )
+
+    # Remove all "assignments" from schedule
+    break_assignments!(replan_model,new_sched,problem_spec)
+    @assert sanity_check(new_sched," after break_assignments!()")
+    new_cache = initialize_planning_cache(new_sched,new_cache.t0,min.(new_cache.tF,t_commit))
+    plot_project_schedule(new_sched,new_cache;verbose=true,
+        color_function = (G,v,x,y,r)->get_path_spec(new_sched,v).fixed ? "gray" : get_prop(G,v,:color),
+    )
 
 end
 let
@@ -61,19 +75,54 @@ let
     next_sched = OperatingSchedule()
 
     replan_model = MergeAndBalance()
-    set_commit_threshold!(replan_model,1)
-    commit_threshold=get_commit_threshold(replan_model)
 
-    @test sanity_check(sched)
-
-    t_commit = get_commit_time(replan_model, search_env, t_request, commit_threshold)
+    t_commit = 5
     t_final = minimum(map(length, get_paths(get_route_plan(search_env))))
     t_split = min(t_commit,t_final)
     robot_positions=get_env_snapshot(search_env,t_split)
     reset_solver!(solver)
-    # TaskGraphs.set_time_limits!(replan_model,solver,t_request,t_commit)
-    # Update operating schedule
-    new_sched, new_cache = prune_schedule(replan_model,search_env,t_split)
 
+    plot_project_schedule(search_env;verbose=false)
+
+    new_sched, new_cache = prune_schedule(replan_model,search_env,t_split)
+    @assert sanity_check(new_sched," after prune_schedule()")
+    plot_project_schedule(new_sched,new_cache;verbose=false)
+
+    # split active nodes
+    new_sched, new_cache = split_active_vtxs!(replan_model,new_sched,problem_spec,new_cache,t_split;robot_positions=robot_positions)
+    @assert sanity_check(new_sched," after split_active_vtxs!()")
+    plot_project_schedule(new_sched,new_cache;verbose=false)
+
+    # freeze nodes that terminate before cutoff time
+    new_sched, new_cache = fix_precutoff_nodes!(replan_model,new_sched,problem_spec,new_cache,t_split)
+    plot_project_schedule(new_sched,new_cache;verbose=false,
+        color_function = (G,v,x,y,r)->get_path_spec(new_sched,v).fixed ? "gray" : get_prop(G,v,:color),
+    )
+
+    # Remove all "assignments" from schedule
+    break_assignments!(replan_model,new_sched,problem_spec)
+    @assert sanity_check(new_sched," after break_assignments!()")
+    new_cache = initialize_planning_cache(new_sched,new_cache.t0,min.(new_cache.tF,t_commit))
+    plot_project_schedule(new_sched,new_cache;verbose=true,
+        color_function = (G,v,x,y,r)->get_path_spec(new_sched,v).fixed ? "gray" : get_prop(G,v,:color),
+    )
+
+    # splice projects together!
+    splice_schedules!(new_sched,next_sched)
+    @assert sanity_check(new_sched," after splice_schedules!()")
+    # NOTE: better performance is obtained when t_commit is the default t0 (tighter constraint on milp)
+    t0 = map(v->get(new_cache.t0, v, t_commit), vertices(get_graph(new_sched)))
+    tF = map(v->get(new_cache.tF, v, t_commit), vertices(get_graph(new_sched)))
+    base_search_env = construct_search_env(
+        solver,
+        new_sched,
+        search_env,
+        initialize_planning_cache(new_sched,t0,tF)
+        )
+    base_route_plan = initialize_route_plan(search_env,get_cost_model(base_search_env))
+    # @log_info(3,solver,"Previous route plan: \n",sprint_route_plan(route_plan))
+    trimmed_route_plan = trim_route_plan(base_search_env, base_route_plan, t_commit)
+    # @log_info(3,solver,"Trimmed route plan: \n",sprint_route_plan(trimmed_route_plan))
+    SearchEnv(base_search_env, route_plan=trimmed_route_plan)
 
 end
