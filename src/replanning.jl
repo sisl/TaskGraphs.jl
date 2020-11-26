@@ -359,6 +359,7 @@ export
     DeferUntilCompletion,
     ReassignFreeRobots,
     MergeAndBalance,
+    ConstrainedMergeAndBalance,
     Oracle,
     NullReplanner,
     get_commit_time,
@@ -454,6 +455,17 @@ that will take place
 @with_kw struct MergeAndBalance      <: ReplannerModel
     config::ReplannerConfig = ReplannerConfig()
 end
+"""
+    ConstrainedMergeAndBalance <: ReplannerModel
+
+Identical to `MergeAndBalance`, except that the replanning commit time may be
+pushed farther into the future to limit the total problem size at each replanning
+stage.
+"""
+@with_kw struct ConstrainedMergeAndBalance      <: ReplannerModel
+    config::ReplannerConfig = ReplannerConfig()
+    max_problem_size::Int   = 400 # max permissible number of variables in sub problem
+end
 @with_kw struct Oracle               <: ReplannerModel
     config::ReplannerConfig = ReplannerConfig(
         timeout_buffer         = -110,
@@ -535,13 +547,13 @@ function reset_cache!(planner::ReplannerWithBackup)
     reset_cache!(planner.backup_planner)
 end
 
-function get_commit_time(replan_model, search_env, t_request, commit_threshold=get_commit_threshold(replan_model))
-    t_request + commit_threshold
+function get_commit_time(replan_model, search_env, request, commit_threshold=get_commit_threshold(replan_model))
+    request.t_request + commit_threshold
 end
-get_commit_time(replan_model::Oracle, search_env, t_request, args...) = t_request
-get_commit_time(replan_model::DeferUntilCompletion, search_env, t_request, commit_threshold) = max(t_request + commit_threshold, maximum(get_cache(search_env).tF))
+get_commit_time(replan_model::Oracle, search_env, request, args...) = request.t_request
+get_commit_time(replan_model::DeferUntilCompletion, search_env, request, commit_threshold) = max(request.t_request + commit_threshold, maximum(get_cache(search_env).tF))
 get_commit_time(replan_model::NullReplanner,args...) = get_commit_time(DeferUntilCompletion(),args...)
-function get_commit_time(replan_model::ReassignFreeRobots, search_env, t_request, commit_threshold)
+function get_commit_time(replan_model::ReassignFreeRobots, search_env, request, commit_threshold)
     free_time = maximum(get_cache(search_env).tF)
     for v in vertices(get_schedule(search_env))
         node = get_node_from_vtx(get_schedule(search_env),v)
@@ -551,7 +563,26 @@ function get_commit_time(replan_model::ReassignFreeRobots, search_env, t_request
             end
         end
     end
-    max(t_request + commit_threshold,free_time)
+    max(request.t_request + commit_threshold,free_time)
+end
+function get_commit_time(replan_model::ConstrainedMergeAndBalance, search_env, request, commit_threshold)
+    nv_max = replan_model.max_problem_size - nv(request.schedule)
+    t_commit = request.t_request + commit_threshold
+    if nv_max < nv(get_schedule(search_env))
+        t_commit = max(t_commit, sort(get_cache(search_env).tF; rev=true)[nv_max])
+    end
+    return t_commit
+    # n_old = sum(get_cache(search_env).tF)
+    # free_time = maximum(get_cache(search_env).tF)
+    # for v in vertices(get_schedule(search_env))
+    #     node = get_node_from_vtx(get_schedule(search_env),v)
+    #     if isa(node,GO)
+    #         if get_id(get_destination_location_id(node)) == -1
+    #             free_time = min(free_time, get_cache(search_env).t0[v])
+    #         end
+    #     end
+    # end
+    # max(request.t_request + commit_threshold,free_time)
 end
 
 break_assignments!(replan_model::ReplannerModel,args...) = break_assignments!(args...)
@@ -620,7 +651,7 @@ function replan!(solver, replan_model, search_env, request;
 
     @assert sanity_check(sched," in replan!()")
     # Freeze route_plan and schedule at t_commit
-    t_commit = get_commit_time(replan_model, search_env, t_request, commit_threshold)
+    t_commit = get_commit_time(replan_model, search_env, request, commit_threshold)
     t_final = minimum(map(length, get_paths(get_route_plan(search_env))))
     t_split = min(t_commit,t_final)
     robot_positions=get_env_snapshot(search_env,t_split)
