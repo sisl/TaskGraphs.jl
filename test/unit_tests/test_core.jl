@@ -187,6 +187,7 @@ let
         TOML.print(io, TOML.parse(project_spec))
     end
     project_spec_mod = read_project_spec(filename)
+    @show project_spec_mod.object_id_to_idx
     # run(`rm $filename`)
 
     r0 = [get_id(get_initial_location_id(robot_ICs[k])) for k in sort(collect(keys(robot_ICs)))]

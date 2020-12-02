@@ -1086,13 +1086,14 @@ function plot_histories_pgf(df_list::Vector,ax=PGFPlots.Axis();
         ylabel=string("\$",string(n_key)," = ",n_vals...,"\$"),
         colors=["red","blue","black","brown"],
         legend_entries = ["" for c in colors],
+        legend_flag = true,
         ytick_show=false,
         ymode="log",
         legend_pos = "outer north east",
         legend_font = "footnotesize",
         lines=true,
-        opt_mark="x",
-        non_opt_mark="o",
+        opt_marks=map(d->"x",df_list),
+        non_opt_marks=opt_marks,
     )
 
     ax.ymode    =   ymode
@@ -1101,6 +1102,13 @@ function plot_histories_pgf(df_list::Vector,ax=PGFPlots.Axis();
     end
     if ytick_show
         ax.ylabel = ylabel
+    else
+        ax.ylabel = nothing
+        if ax.style === nothing
+            ax.style="yticklabels=none"
+        elseif findfirst(ax.style,"yticklabels") === nothing
+            ax.style=string(ax.style,", ","yticklabels=none")
+        end
     end
     if use_y_lims
         ax.ymin = y_min
@@ -1113,7 +1121,8 @@ function plot_histories_pgf(df_list::Vector,ax=PGFPlots.Axis();
     counters = zeros(length(df_list))
     for (i,m_val) in enumerate(m_vals)
         for (j,n_val) in enumerate(n_vals)
-            for (df_idx,(df,color,l_entry)) in enumerate(zip(df_list,colors,legend_entries))
+            for (df_idx,(df,color,l_entry,opt_mark,non_opt_mark)) in enumerate(
+                    zip(df_list,colors,legend_entries,opt_marks,non_opt_marks))
                 idxs = .&(
                     (df[!,m_key] .== m_val),
                     (df[!,n_key] .== n_val),
@@ -1170,7 +1179,7 @@ function plot_histories_pgf(df_list::Vector,ax=PGFPlots.Axis();
                                         onlyMarks=true,
                                         mark=mark,
                                         )
-                            if counters[df_idx] == 0 && length(l_entry) > 0
+                            if legend_flag && counters[df_idx] == 0 && length(l_entry) > 0
                                 p.legendentry = l_entry
                                 counters[df_idx] += 1
                                 insert!(ax.plots,1,p)
@@ -1189,6 +1198,7 @@ end
 function plot_history_layers(df,keylist,ax=PGFPlots.Axis();
         legend_entries = map(string,keylist),
         colors = ["red","blue","black","brown"],
+        opt_marks=["diamond","x","triangle","+"],
         kwargs...
     )
     plt = ax
@@ -1197,6 +1207,7 @@ function plot_history_layers(df,keylist,ax=PGFPlots.Axis();
             y_key = k,
             legend_entries=[legend_entries[i]],
             colors = [colors[i]],
+            opt_marks = [opt_marks[i]],
             kwargs...,
             )
     end
@@ -1218,11 +1229,13 @@ function group_history_plot(df_list::Vector;
     y_key=:makespans,
     y_min=minimum(map(df->minimum(map(minimum,df[!,y_key])),df_list)),
     y_max=maximum(map(df->maximum(map(maximum,df[!,y_key])),df_list)),
+    legend_flag = true,
     kwargs...
     )
     g = PGFPlots.GroupPlot(length(m_vals),length(n_vals))
     for (i,m_val) in enumerate(m_vals)
         ytick_show = (i == 1)
+        legend_flag = legend_flag && (i == 1)
         for (j,n_val) in enumerate(n_vals)
             plt = plot_histories_pgf(df_list;
                 y_key=y_key,
@@ -1231,6 +1244,7 @@ function group_history_plot(df_list::Vector;
                 n_key=n_key,
                 n_vals=[n_val,],
                 ytick_show = ytick_show,
+                legend_flag = legend_flag,
                 y_min=y_min,
                 y_max=y_max,
                 kwargs...)

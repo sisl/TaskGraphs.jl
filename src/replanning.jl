@@ -572,17 +572,6 @@ function get_commit_time(replan_model::ConstrainedMergeAndBalance, search_env, r
         t_commit = max(t_commit, sort(get_cache(search_env).tF; rev=true)[nv_max])
     end
     return t_commit
-    # n_old = sum(get_cache(search_env).tF)
-    # free_time = maximum(get_cache(search_env).tF)
-    # for v in vertices(get_schedule(search_env))
-    #     node = get_node_from_vtx(get_schedule(search_env),v)
-    #     if isa(node,GO)
-    #         if get_id(get_destination_location_id(node)) == -1
-    #             free_time = min(free_time, get_cache(search_env).t0[v])
-    #         end
-    #     end
-    # end
-    # max(request.t_request + commit_threshold,free_time)
 end
 
 break_assignments!(replan_model::ReplannerModel,args...) = break_assignments!(args...)

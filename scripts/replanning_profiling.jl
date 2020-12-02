@@ -15,32 +15,32 @@ add_env!(loader,"env_2",init_env_2())
 # CBS_ITERATION_LIMIT = 1000
 
 # New experiments to stress the planner
-base_dir = joinpath("/scratch/task_graphs_experiments","replanning4")
-base_problem_dir    = joinpath(base_dir,"problem_instances")
-base_results_dir    = joinpath(base_dir,"results_extended")
-problem_configs = replanning_config_4()
-MAX_TIME_LIMIT = 50
-COMMIT_THRESHOLD = 10
-ASTAR_ITERATION_LIMIT = 5000
-PIBT_ITERATION_LIMIT = 5000
-CBS_ITERATION_LIMIT = 1000
-
-# # Final set of experiments
-# base_dir = joinpath("/scratch/task_graphs_experiments","replanning")
+# base_dir = joinpath("/scratch/task_graphs_experiments","replanning4")
 # base_problem_dir    = joinpath(base_dir,"problem_instances")
-# base_results_dir    = joinpath(base_dir,"results")
-# problem_configs = replanning_config_5()
-# MAX_TIME_LIMIT = 40
+# base_results_dir    = joinpath(base_dir,"results_extended")
+# problem_configs = replanning_config_4()
+# MAX_TIME_LIMIT = 50
 # COMMIT_THRESHOLD = 10
 # ASTAR_ITERATION_LIMIT = 5000
 # PIBT_ITERATION_LIMIT = 5000
 # CBS_ITERATION_LIMIT = 1000
 
+# Final set of experiments
+base_dir = joinpath("/scratch/task_graphs_experiments","replanning")
+base_problem_dir    = joinpath(base_dir,"problem_instances")
+base_results_dir    = joinpath(base_dir,"results")
+problem_configs = replanning_config_5()
+MAX_TIME_LIMIT = 40
+COMMIT_THRESHOLD = 10
+ASTAR_ITERATION_LIMIT = 5000
+PIBT_ITERATION_LIMIT = 5000
+CBS_ITERATION_LIMIT = 1000
+
 reset_task_id_counter!()
 reset_operation_id_counter!()
 # # write problems
 Random.seed!(0)
-write_problems!(loader,problem_configs,base_problem_dir)
+# write_problems!(loader,problem_configs,base_problem_dir)
 
 feats = [
     RunTime(),IterationCount(),LowLevelIterationCount(),
@@ -51,10 +51,11 @@ feats = [
 final_feats = [SolutionCost(),NumConflicts(),RobotPaths()]
 planner_configs = []
 for (primary_replanner, backup_replanner) in [
-        (NullReplanner(),       DeferUntilCompletion()),
-        (MergeAndBalance(),     DeferUntilCompletion()),
-        (ReassignFreeRobots(),  DeferUntilCompletion()),
-        (DeferUntilCompletion(),DeferUntilCompletion()),
+        (ConstrainedMergeAndBalance(max_problem_size=300),     DeferUntilCompletion()),
+        # (NullReplanner(),       DeferUntilCompletion()),
+        # (MergeAndBalance(),     DeferUntilCompletion()),
+        # (ReassignFreeRobots(),  DeferUntilCompletion()),
+        # (DeferUntilCompletion(),DeferUntilCompletion()),
     ]
     # Primary planner
     path_finder = DefaultAStarSC()
@@ -93,20 +94,20 @@ for (primary_replanner, backup_replanner) in [
     push!(planner_configs,planner_config)
 end
 
-for planner_config in planner_configs
-    # warm up to precompile replanning code
-    warmup(planner_config.planner,loader)
-    # profile
-    profile_replanner!(loader,
-        planner_config.planner,
-        base_problem_dir,
-        planner_config.results_path)
-end
+# for planner_config in planner_configs
+#     # warm up to precompile replanning code
+#     warmup(planner_config.planner,loader)
+#     # profile
+#     profile_replanner!(loader,
+#         planner_config.planner,
+#         base_problem_dir,
+#         planner_config.results_path)
+# end
 
 # if results show ''"CRCBS.Feature" = val', use the following line to convert:
 # sed -i 's/\"CRCBS\.\([A-Za-z]*\)\"/\1/g' **/**/*.toml
 
-problem_configs = [replanning_config_3()..., replanning_config_4()...]
+# problem_configs = [replanning_config_3()..., replanning_config_4()...]
 # copy problems and results folder4
 # n = 180
 # paths = [base_problem_dir, map(c->c.results_path, planner_configs)...]
@@ -159,9 +160,11 @@ for planner_config in planner_configs
     df_dict[planner_config.planner_name] = df
 end
 df_list = Vector{DataFrame}([df_dict[config.planner_name] for config in planner_configs])
+min_makespans = minimum(map(df->map(minimum, df.makespans), df_list))
 for (k,df) in df_dict
     # df.backlog_factor = map(maximum, df.completion_times) ./ ((df.num_projects .+ 1) .* df.arrival_interval) # .+ map(minimum, df.makespans))
-    df.backlog_factor = map(maximum, df.completion_times) ./ ((df.num_projects .+ 0) .* df.arrival_interval .+ map(minimum, df.makespans))
+    # df.backlog_factor = map(maximum, df.completion_times) ./ ((df.num_projects .+ 0) .* df.arrival_interval .+ map(minimum, df.makespans))
+    df.backlog_factor = map(maximum, df.completion_times) ./ ((df.num_projects .+ 0) .* df.arrival_interval .+ min_makespans)
     df.avg_makespan = map(sum, df.makespans) ./ df.num_projects
     df.tasks_per_minute = 60.0*df.tasks_per_second
     df.fallback_count = map(sum, df.backup_flags)
@@ -215,8 +218,7 @@ for (include_keys, filename) in [
         ymode="linear",
         colors = colors,
         lines=false,
-        opt_mark="x",
-        non_opt_mark="x"
+        opt_marks=["diamond","x","triangle","+"],
     )
     plt.legendPos="north west"
     # display(plt)
@@ -245,27 +247,75 @@ for (n_vals, m_vals) in [
         m_vals = m_vals,
         lines=false,
         colors=colors,
+        opt_marks=["diamond","x","triangle","+"],
     )
     append!(plt.axes,gp.axes)
 end
 display(plt)
 save("makespan_trends.pdf",plt)
 
+plt = PGFPlots.GroupPlot(3,2)
+for (idx,(n_vals, m_vals)) in enumerate([
+    ([15,],[50,30,20]),
+    ([30,],[50,30,20]),
+    ])
+    gp = group_history_plot(df_dict,planner_ordering;
+        y_key = :makespans,
+        use_y_lims=true,
+        y_min=-100,
+        # y_max=2500,
+        # legend_entries=map(l->l[2:end],legend_entries),
+        legend_entries=legend_entries,
+        legend_pos = "north west",
+        legend_flag = idx == 1,
+        include_keys = [:num_projects=>30],
+        ymode="linear",
+        x_key=:none,
+        n_key = :M,
+        n_vals = n_vals,
+        m_key = :arrival_interval,
+        m_vals = m_vals,
+        lines=false,
+        colors=colors,
+        opt_marks=["diamond","x","triangle","+"],
+    )
+    append!(plt.axes,gp.axes)
+end
+for (i,ax) in enumerate(plt.axes)
+    if i in Set([4,5,6])
+        # ax.ylabel = "makespan"
+    else
+        ax.xlabel = nothing
+        if ax.style === nothing
+            ax.style="xticklabels=none"
+        else
+            ax.style=string(ax.style,", ","xticklabels=none")
+        end
+    end
+end
+plt.groupStyle="horizontal sep = 8pt, vertical sep = 8pt"
+display(plt)
+save("makespan_comparisons.tex",plt)
+save("makespan_comparisons.pdf",plt)
+
+
 plt = plot_history_layers(df_dict["MergeAndBalance"],[:primary_runtimes,:backup_runtimes];
     legend_entries=["primary","backup"],
     x_key=:none,
     n_key = :M,
-    n_vals = [30,],
+    n_vals = [25,],
     m_key = :arrival_interval,
-    m_vals = [60,],
+    m_vals = [50,],
     include_keys = [:num_projects=>30],
     xlabel="",
     ylabel="",
     ymode="linear",
     lines=false,
+    opt_marks=["diamond","+"],
 )
 plt.legendPos = "north east"
-save("planner_runtimes-30-60.tex",plt)
+display(plt)
+save("planner_runtimes-25-50.tex",plt)
 
 for (df,planner_config) in zip(df_list,planner_configs)
     plt = PGFPlots.GroupPlot(3,5)
