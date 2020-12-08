@@ -92,6 +92,17 @@ function reinitialize_planning_cache!(sched,cache,
     cache
 end
 
+export update_planning_cache_times!
+
+function update_planning_cache_times!(sched,cache)
+    t0,tF,slack,local_slack = process_schedule(sched,cache.t0,cache.tF)
+    cache.t0            .= t0
+    cache.tF            .= tF
+    cache.slack         .= slack
+    cache.local_slack   .= local_slack
+    return cache
+end
+
 """
     `reset_cache!(cache,schedule)`
 
@@ -245,13 +256,24 @@ end
 function Base.show(io::IO,env::SearchEnv)
     sprint_search_env(io,env)
 end
+for op in [:update_planning_cache_times!]
+    @eval $op(env::SearchEnv) = $op(get_schedule(env),get_cache(env))
+end
 
 export
     get_t0,
-    get_tF
+    get_tF,
+    set_t0!,
+    set_tF!
 
-get_t0(env::SearchEnv,v::Int) = get_cache(env).t0[v]
-get_tF(env::SearchEnv,v::Int) = get_cache(env).tF[v]
+get_t0(cache::PlanningCache,v::Int) = cache.t0[v]
+get_tF(cache::PlanningCache,v::Int) = cache.tF[v]
+get_t0(env::SearchEnv,v::Int) = get_t0(get_cache(env),v)
+get_tF(env::SearchEnv,v::Int) = get_tF(get_cache(env),v)
+function set_t0!(cache::PlanningCache,v::Int,val) cache.t0[v] = val end
+function set_tF!(cache::PlanningCache,v::Int,val) cache.tF[v] = val end
+set_t0!(env::SearchEnv,v::Int,val) = set_t0!(get_cache(env),v,val)
+set_tF!(env::SearchEnv,v::Int,val) = set_tF!(get_cache(env),v,val)
 for op in [:get_t0,:get_tF]
     @eval $op(env::SearchEnv,id::AbstractID) = $op(env,get_vtx(get_schedule(env),id))
 end

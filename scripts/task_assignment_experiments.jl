@@ -57,13 +57,14 @@ for solver_config in solver_configs
     run_profiling(loader,solver_config,problem_dir)
 end
 
+Revise.includet(joinpath(pathof(TaskGraphs),"..","helpers/render_tools.jl"))
+
 # plot results
 config_template = problem_configs[1]
 config_df = construct_config_dataframe(loader,problem_dir,config_template)
 for solver_config in solver_configs
     results_df = construct_results_dataframe(loader,solver_config,config_template)
     df = innerjoin(config_df,results_df,on=:problem_name)
-    include(joinpath(pathof(TaskGraphs),"..","helpers/render_tools.jl"))
     # plt = get_box_plot_group_plot(df;obj=:RunTime,title=split(solver_config.results_path,"/")[end])
     plt = get_titled_group_box_plot(df;scale=1.0,obj=:RunTime,title=split(solver_config.results_path,"/")[end])
     display(plt);

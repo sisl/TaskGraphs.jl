@@ -1300,6 +1300,51 @@ function JuMP.optimize!(model::GreedyAssignment)
     model
 end
 
+export compute_lower_bound
+"""
+    compute_lower_bound(sched,dist_mtx,reserved,assigned)
+
+Compute the lower bound on makespan for `sched::OperatingSchedule`.
+
+Args:
+- `assigned` the set of vertices whose incoming edges are already assigned
+- `reserved` the set of vertices whose outgoing edges are already assigned
+- `dist_mtx` encodes the cost of each edge v -> vp as `dist_mtx[v,vp]`
+- `pairs`    specifies eligible edges
+"""
+function compute_lower_bound(env,
+    reserved=Set{Int}(),
+    assigned=Set{Int}(),
+    dist_mtx = construct_schedule_distance_matrix(get_schedule(env),get_problem_spec(env)),
+    pairs=[BOT_GO=>BOT_COLLECT],
+    )
+    cache = deepcopy(get_cache(env))
+    sched = get_schedule(env)
+    for p in pairs
+        for vp in topological_sort_by_dfs(get_graph(sched))
+            if (vp in assigned) || !isa(get_node_from_vtx(sched,vp), p.second)
+                continue
+            end
+            t0 = typemax(Int)
+            # n2 = string(get_node_from_vtx(sched,vp))
+            for v in topological_sort_by_dfs(get_graph(sched))
+                if (v in reserved) || !isa(get_node_from_vtx(sched,v), p.first)
+                    continue
+                end
+                # n1 = string(get_node_from_vtx(sched,v))
+                # @show v=>vp, n1 => n2
+                @log_info(1,global_verbosity(),"$v=>$vp, $(string(get_node_from_vtx(sched,v)))=>$(string(get_node_from_vtx(sched,vp)))")
+                t0 = min(t0,get_t0(cache,v)+dist_mtx[v,vp])
+            end
+            if t0 > get_t0(env,vp)
+                set_t0!(cache,vp,t0)
+                update_planning_cache_times!(sched,cache)
+            end
+        end
+    end
+    return cache
+end
+
 export
     propagate_valid_ids!
 
