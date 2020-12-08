@@ -1129,28 +1129,31 @@ end
 export
     GreedyAssignment
 
+abstract type GreedyCost end
+struct GreedyPathLengthCost <: GreedyCost end
+struct GreedyFinalTimeCost  <: GreedyCost end
+struct GreedyLowerBoundCost <: GreedyCost end
+
 """
     GreedyAssignment - baseline for task assignment. It works by maintaining two
     "open" sets of vertices: one containing vertices that are eligible for a
 """
-@with_kw struct GreedyAssignment{C} <: TaskGraphsMILP
+@with_kw struct GreedyAssignment{C,M} <: TaskGraphsMILP
     schedule::OperatingSchedule   = OperatingSchedule()
     problem_spec::ProblemSpec   = ProblemSpec()
     cost_model::C               = SumOfMakeSpans()
-    # X::M                        = sparse(zeros(Int,nv(project_schedule),nv(project_schedule)))
+    greedy_cost::M              = GreedyPathLengthCost()
     t0::Vector{Int}             = zeros(Int,nv(schedule))
-    # cost::Float64               = Inf
-    # lower_bound::Float64        = Inf
 end
 exclude_solutions!(model::GreedyAssignment) = nothing # exclude most recent solution in order to get next best solution
 JuMP.termination_status(model::GreedyAssignment)    = MOI.OPTIMAL
 JuMP.primal_status(model::GreedyAssignment)         = MOI.FEASIBLE_POINT
 get_assignment_matrix(model::GreedyAssignment)      = adjacency_matrix(get_graph(model.schedule))
-function JuMP.objective_function(model::GreedyAssignment{SumOfMakeSpans})
+function JuMP.objective_function(model::GreedyAssignment{SumOfMakeSpans,M}) where {M}
     t0,tF,slack,local_slack = process_schedule(model.schedule,model.t0)
     return sum(tF[model.schedule.terminal_vtxs] .* map(v->model.schedule.weights[v], model.schedule.terminal_vtxs))
 end
-function JuMP.objective_function(model::GreedyAssignment{MakeSpan})
+function JuMP.objective_function(model::GreedyAssignment{MakeSpan,M}) where {M}
     t0,tF,slack,local_slack = process_schedule(model.schedule,model.t0)
     return maximum(tF[model.schedule.terminal_vtxs])
 end
@@ -1231,6 +1234,9 @@ function update_greedy_sets!(model,G,C,Ai,Ao,n_required_predecessors,n_eligible_
     end
 end
 
+get_edge_cost(model::GreedyAssignment{M,GreedyPathLengthCost},D,v,v2) where M = D[v,v2]
+get_edge_cost(model::GreedyAssignment{M,GreedyFinalTimeCost},D,v,v2) where M = model.t0[v] + D[v,v2]
+
 """
 Identifies the nodes `v ∈ Ai` and `v2 ∈ Ao` with the shortest distance
 `D[v,v2]`.
@@ -1276,16 +1282,16 @@ already be in `C`. In order for `v` to be added to `Ao`, `v` must have less than
 the allowable number of outgoing edges, and must be in `C`.
 """
 function JuMP.optimize!(model::GreedyAssignment)
-    project_schedule    = model.schedule
+    sched    = model.schedule
     problem_spec        = model.problem_spec
-    G                   = get_graph(project_schedule);
-    cache = preprocess_project_schedule(project_schedule,true)
+    G                   = get_graph(sched);
+    cache = preprocess_project_schedule(sched,true)
     C = Set{Int}() # Closed set (these nodes have enough predecessors)
     Ai = Set{Int}() # Nodes that don't have enough incoming edges
     Ao = Set{Int}() # Nodes that can have more outgoing edges
     update_greedy_sets!(model,G,C,Ai,Ao,
         cache.n_required_predecessors,cache.n_eligible_successors)
-    D = construct_schedule_distance_matrix(project_schedule,problem_spec)
+    D = construct_schedule_distance_matrix(sched,problem_spec)
     while length(Ai) > 0
         for (v,v2) in select_next_edges(model,D,Ao,Ai)
             setdiff!(Ao,v)
@@ -1295,78 +1301,81 @@ function JuMP.optimize!(model::GreedyAssignment)
         update_greedy_sets!(model,G,C,Ai,Ao,
             cache.n_required_predecessors,cache.n_eligible_successors)
     end
-    set_leaf_operation_vtxs!(project_schedule)
-    propagate_valid_ids!(project_schedule,problem_spec)
+    set_leaf_operation_vtxs!(sched)
+    propagate_valid_ids!(sched,problem_spec)
     model
 end
 
 export compute_lower_bound
 """
-    compute_lower_bound(sched,dist_mtx,reserved,assigned)
+    compute_lower_bound(env,[starts,assigned,dist_mtx,pairs])
 
-Compute the lower bound on makespan for `sched::OperatingSchedule`.
+Computes a lower bound on makespan for `sched::OperatingSchedule` by assuming
+    that any robot can be simultaneously assigned to multiple tasks.
 
 Args:
+- `env`      SearchEnv
+- `starts`   the set of vertices whose outgoing edges are available
 - `assigned` the set of vertices whose incoming edges are already assigned
-- `reserved` the set of vertices whose outgoing edges are already assigned
 - `dist_mtx` encodes the cost of each edge v -> vp as `dist_mtx[v,vp]`
 - `pairs`    specifies eligible edges
 """
 function compute_lower_bound(env,
-    reserved=Set{Int}(),
-    assigned=Set{Int}(),
+    starts=Set{Int}(vertices(get_schedule(env))), # starting vtxs
+    assigned=Set{Int}(), # closed set
     dist_mtx = construct_schedule_distance_matrix(get_schedule(env),get_problem_spec(env)),
     pairs=[BOT_GO=>BOT_COLLECT],
     )
     cache = deepcopy(get_cache(env))
-    sched = get_schedule(env)
+    sched = deepcopy(get_schedule(env))
     for p in pairs
         for vp in topological_sort_by_dfs(get_graph(sched))
             if (vp in assigned) || !isa(get_node_from_vtx(sched,vp), p.second)
                 continue
             end
             t0 = typemax(Int)
-            # n2 = string(get_node_from_vtx(sched,vp))
-            for v in topological_sort_by_dfs(get_graph(sched))
-                if (v in reserved) || !isa(get_node_from_vtx(sched,v), p.first)
+            v = -1
+            for src in starts # topological_sort_by_dfs(get_graph(sched))
+                if !isa(get_node_from_vtx(sched,src), p.first)
                     continue
                 end
-                # n1 = string(get_node_from_vtx(sched,v))
-                # @show v=>vp, n1 => n2
-                @log_info(1,global_verbosity(),"$v=>$vp, $(string(get_node_from_vtx(sched,v)))=>$(string(get_node_from_vtx(sched,vp)))")
-                t0 = min(t0,get_t0(cache,v)+dist_mtx[v,vp])
+                t0_ = get_t0(cache,src)+dist_mtx[src,vp]
+                if t0_ < t0
+                    v = src
+                    t0 = t0_
+                end
             end
-            if t0 > get_t0(env,vp)
-                set_t0!(cache,vp,t0)
-                update_planning_cache_times!(sched,cache)
-            end
+            add_edge!(get_graph(sched),v,vp)
+            set_t0!(cache,vp,t0)
+            @log_info(1,global_verbosity(),"$v=>$vp, $(string(get_node_from_vtx(sched,v)))=>$(string(get_node_from_vtx(sched,vp))), t0=$t0")
         end
     end
+    update_planning_cache_times!(sched,cache)
     return cache
 end
 
 export
     propagate_valid_ids!
 
-function propagate_valid_ids!(project_schedule::OperatingSchedule,problem_spec::ProblemSpec)
-    G = get_graph(project_schedule)
+function propagate_valid_ids!(sched::OperatingSchedule,problem_spec::ProblemSpec)
+    G = get_graph(sched)
     @assert(is_cyclic(G) == false, "is_cyclic(G)") # string(sparse(adj_matrix))
     # Propagate valid IDs through the schedule
     for v in topological_sort(G)
-        # if !get_path_spec(project_schedule, v).fixed
-            node_id = get_vtx_id(project_schedule, v)
-            node = get_node_from_id(project_schedule, node_id)
+        # if !get_path_spec(sched, v).fixed
+            node_id = get_vtx_id(sched, v)
+            node = get_node_from_id(sched, node_id)
             for v2 in inneighbors(G,v)
-                node = align_with_predecessor(node,get_node_from_vtx(project_schedule, v2))
+                node = align_with_predecessor(node,get_node_from_vtx(sched, v2))
             end
             for v2 in outneighbors(G,v)
-                node = align_with_successor(node,get_node_from_vtx(project_schedule, v2))
+                node = align_with_successor(node,get_node_from_vtx(sched, v2))
             end
-            path_spec = get_path_spec(project_schedule, v)
+            path_spec = get_path_spec(sched, v)
             if path_spec.fixed
-                replace_in_schedule!(project_schedule, path_spec, node, node_id)
+                replace_in_schedule!(sched, path_spec, node, node_id)
             else
-                replace_in_schedule!(project_schedule, problem_spec, node, node_id)
+                replace_in_schedule!(sched, problem_spec, node, node_id)
             end
         # end
     end
