@@ -1318,6 +1318,9 @@ function table_product(tables,mode=:horizontal)
         return transpose(table_product(map(transpose,tables),:horizontal))
     end
 end
+function table_reduce(table,op)
+    return ResultsTable(get_xkeys(table),get_ykeys(table),map(op,get_data(table)))
+end
 """ utility for printing real-valued elements of a table """
 function print_real(io,v;
         precision=3,
@@ -1352,7 +1355,7 @@ function print_multi_value_real(io,vals;
         end
     end
 end
-function print_latex_header(io,tab;span=4,delim=" & ",newline=" \\\\\n",start_char="& ")
+function print_latex_header(io,tab;span=length(get_data(tab)[1,1]),delim=" & ",newline=" \\\\\n",start_char="& ")
     print(io,"\\begin{tabular}{",map(i->"l ",1:size(tab,2)*span+1)...,"}","\n")
     print(io,start_char)
     for (j,ykeys) in enumerate(get_ykeys(tab))
@@ -1365,9 +1368,15 @@ function print_latex_header(io,tab;span=4,delim=" & ",newline=" \\\\\n",start_ch
         end
     end
 end
-function print_latex_row_start(io,tab,i;span=4,delim=" & ")
+function print_latex_row_start(io,tab,i;span=length(get_data(tab)[1,1]),delim=" & ")
     xkeys = get_xkeys(tab)[i]
-    print(io,["\$$(k)=$(v)\$" for (k,v) in xkeys]...)
+    for (k,v) in xkeys
+        print(io,"\$$(k)=$(v)\$")
+        if length(xkeys > 1)
+            print(io,",")
+        end
+    end
+    # print(io,["\$$(k)=$(v)\$" for (k,v) in xkeys]...)
     print(io,delim)
 end
 function write_tex_table(io,tab;

@@ -52,10 +52,10 @@ final_feats = [SolutionCost(),NumConflicts(),RobotPaths()]
 planner_configs = []
 for (primary_replanner, backup_replanner) in [
         (ConstrainedMergeAndBalance(max_problem_size=300),     DeferUntilCompletion()),
-        # (NullReplanner(),       DeferUntilCompletion()),
-        # (MergeAndBalance(),     DeferUntilCompletion()),
-        # (ReassignFreeRobots(),  DeferUntilCompletion()),
-        # (DeferUntilCompletion(),DeferUntilCompletion()),
+        (NullReplanner(),       DeferUntilCompletion()),
+        (MergeAndBalance(),     DeferUntilCompletion()),
+        (ReassignFreeRobots(),  DeferUntilCompletion()),
+        (DeferUntilCompletion(),DeferUntilCompletion()),
     ]
     # Primary planner
     path_finder = DefaultAStarSC()
@@ -170,9 +170,37 @@ for (k,df) in df_dict
     df.fallback_count = map(sum, df.backup_flags)
     df.fallback_rate = df.fallback_count ./ df.num_projects
 end
-planner_ordering = ["MergeAndBalance","ReassignFreeRobots","DeferUntilCompletion","NullReplanner"]
-legend_entries=["\\mergeAndBalance","\\reassignFree","\\deferUntilCompletion","\\backupOnly"]
-colors=["red","blue","black","brown"]
+plot_configs = Dict(
+    "MergeAndBalance"=>Dict(
+        :legend_entry   => "\\mergeAndBalance-∞",
+        :color          => "lime",
+        :mark           => "star",
+        ),
+    "ConstrainedMergeAndBalance"=>Dict(
+        :legend_entry   => "\\mergeAndBalance",
+        :color          => "red",
+        :mark           => "diamond",
+        ),
+    "ReassignFreeRobots"=>Dict(
+        :legend_entry   => "\\reassignFree",
+        :color          => "blue",
+        :mark           => "x",
+        ),
+    "DeferUntilCompletion"=>Dict(
+        :legend_entry   => "\\deferUntilCompletion",
+        :color          => "black",
+        :mark           => "triangle",
+        ),
+    "NullReplanner"=>Dict(
+        :legend_entry   => "\\backupOnly",
+        :color          => "brown",
+        :mark           => "+",
+        ),
+)
+
+planner_ordering = ["ConstrainedMergeAndBalance","ReassignFreeRobots","DeferUntilCompletion","NullReplanner"]
+# legend_entries=["\\mergeAndBalance","\\reassignFree","\\deferUntilCompletion","\\backupOnly"]
+# colors=["red","blue","black","brown"]
 
 # table of rates
 # tab = build_table(df_dict["MergeAndBalance"])
@@ -182,11 +210,11 @@ ykey = :arrival_interval
 f = vals -> sum(vals)/length(vals)
 table_base_dir = joinpath(pwd(),"tables")
 mkpath(table_base_dir)
-for (obj,prec,comp_func) in [
-    (:tasks_per_minute,1,argmax),
-    (:backlog_factor,2,argmin),
-    (:avg_makespan,0,argmin),
-    (:fallback_rate,2,argmin),
+for (obj,prec,comp_func,rprec,op) in [
+    (:tasks_per_minute, 1,  argmax, 2, arr->arr[1]/maximum(arr[2:end])),
+    (:backlog_factor,   2,  argmin, 2, arr->minimum(arr[2:end])/arr[1]),
+    (:avg_makespan,     0,  argmin, 2, arr->minimum(arr[2:end])/arr[1]),
+    (:fallback_rate,    2,  argmin, 2, arr->arr[1]/maximum(arr[2:end])),
     ]
     tables = []
     for k in planner_ordering
@@ -202,13 +230,20 @@ for (obj,prec,comp_func) in [
         header_printer=print_latex_header,
         row_start_printer=print_latex_row_start,
         )
+    reduced_table = table_reduce(composite_table,op)
+    write_tex_table(joinpath(table_base_dir,"$(string(obj))_reduced.tex"),
+        reduced_table;
+        print_func=(io,vals)->print_real(io,vals;precision=rprec),
+        header_printer=print_latex_header,
+        row_start_printer=print_latex_row_start,
+        )
 end
+
 for (include_keys, filename) in [
     ([:num_projects=>30,:M=>10,:arrival_interval=>40],"makespans-10-40.tex"),
     ([:num_projects=>30,:M=>30,:arrival_interval=>80],"makespans-30-80.tex"),
     ]
     plt = plot_histories_pgf(df_dict,planner_ordering;
-        legend_entries=legend_entries,
         y_key=:makespans,
         x_key=:none,
         include_keys = include_keys,
@@ -216,9 +251,10 @@ for (include_keys, filename) in [
         ylabel = "makespans",
         ytick_show = true,
         ymode="linear",
-        colors = colors,
         lines=false,
-        opt_marks=["diamond","x","triangle","+"],
+        legend_entries=map(k->plot_configs[k][:legend_entry],planner_ordering),
+        colors = map(k->plot_configs[k][:color],planner_ordering),
+        opt_marks=map(k->plot_configs[k][:mark],planner_ordering),
     )
     plt.legendPos="north west"
     # display(plt)
@@ -226,13 +262,14 @@ for (include_keys, filename) in [
 end
 
 plt = PGFPlots.GroupPlot(7,5)
-for (n_vals, m_vals) in [
+plt.groupStyle="horizontal sep = 8pt, vertical sep = 8pt"
+for (idx,(n_vals, m_vals)) in enumerate([
     ([10,],[20,30,40,50,60,70,80]),
     ([15,],[20,30,40,50,60,70,80]),
     ([20,],[20,30,40,50,60,70,80]),
     ([25,],[20,30,40,50,60,70,80]),
     ([30,],[20,30,40,50,60,70,80]),
-    ]
+    ])
     gp = group_history_plot(df_dict,planner_ordering;
         y_key = :makespans,
         use_y_lims=true,
@@ -246,38 +283,51 @@ for (n_vals, m_vals) in [
         m_key = :arrival_interval,
         m_vals = m_vals,
         lines=false,
-        colors=colors,
-        opt_marks=["diamond","x","triangle","+"],
+        colors=map(k->plot_configs[k][:color],planner_ordering),
+        opt_marks=map(k->plot_configs[k][:mark],planner_ordering),
     )
+    if idx < 5
+        for ax in gp.axes
+            ax.xlabel = nothing
+            if ax.style === nothing
+                ax.style="xticklabels=none"
+            else
+                ax.style=string(ax.style,", ","xticklabels=none")
+            end
+        end
+    end
     append!(plt.axes,gp.axes)
 end
 display(plt)
 save("makespan_trends.pdf",plt)
 
+
+planner_ordering2 = ["MergeAndBalance","ConstrainedMergeAndBalance","ReassignFreeRobots","DeferUntilCompletion","NullReplanner"]
 plt = PGFPlots.GroupPlot(3,2)
 for (idx,(n_vals, m_vals)) in enumerate([
     ([15,],[50,30,20]),
     ([30,],[50,30,20]),
     ])
-    gp = group_history_plot(df_dict,planner_ordering;
+    gp = group_history_plot(df_dict,planner_ordering2;
         y_key = :makespans,
         use_y_lims=true,
         y_min=-100,
         # y_max=2500,
-        # legend_entries=map(l->l[2:end],legend_entries),
-        legend_entries=legend_entries,
+        # legend_entries=legend_entries,
         legend_pos = "north west",
         legend_flag = idx == 1,
         include_keys = [:num_projects=>30],
         ymode="linear",
         x_key=:none,
+        # x_key=:arrival_times,
         n_key = :M,
         n_vals = n_vals,
         m_key = :arrival_interval,
         m_vals = m_vals,
         lines=false,
-        colors=colors,
-        opt_marks=["diamond","x","triangle","+"],
+        legend_entries=map(k->plot_configs[k][:legend_entry][2:end],planner_ordering2),
+        colors=map(k->plot_configs[k][:color],planner_ordering2),
+        opt_marks=["diamond","x","triangle","+","star"],
     )
     append!(plt.axes,gp.axes)
 end
@@ -299,7 +349,8 @@ save("makespan_comparisons.tex",plt)
 save("makespan_comparisons.pdf",plt)
 
 
-plt = plot_history_layers(df_dict["MergeAndBalance"],[:primary_runtimes,:backup_runtimes];
+name = "ConstrainedMergeAndBalance"
+plt = plot_history_layers(df_dict[name],[:primary_runtimes,:backup_runtimes];
     legend_entries=["primary","backup"],
     x_key=:none,
     n_key = :M,

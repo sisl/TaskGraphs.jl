@@ -10,7 +10,7 @@ cells={anchor=west}}
 \begin{document}
 \begin{tikzpicture}[]
 \begin{groupplot}[group style={horizontal sep = 8pt, vertical sep = 8pt, group size=3 by 2}]
-\nextgroupplot [legend pos = {north west}, legend style = {font=\footnotesize}, ylabel = {$M = 15$}, ymax = {6006}, ymode = {linear}, xticklabels=none, ymin = {-100}]\addplot+ [mark = {+}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
+\nextgroupplot [legend pos = {north west}, legend style = {font=\footnotesize}, ylabel = {$M = 15$}, ymax = {6006}, ymode = {linear}, xticklabels=none, ymin = {-100}]\addplot+ [mark = {star}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
 (1, 168)
 (2, 233)
 (3, 308)
@@ -42,8 +42,8 @@ cells={anchor=west}}
 (29, 2353)
 (30, 2417)
 };
-\addlegendentry{\backupOnly}
-\addplot+ [mark = {triangle}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
+\addlegendentry{backupOnly}
+\addplot+ [mark = {+}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
 (1, 167)
 (2, 206)
 (3, 226)
@@ -75,8 +75,8 @@ cells={anchor=west}}
 (29, 1487)
 (30, 1551)
 };
-\addlegendentry{\deferUntilCompletion}
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addlegendentry{deferUntilCompletion}
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (1, 167)
 (3, 182)
 (4, 251)
@@ -101,8 +101,41 @@ cells={anchor=west}}
 (29, 1105)
 (30, 1263)
 };
-\addlegendentry{\reassignFree}
-\addplot+ [mark = {diamond}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+\addlegendentry{reassignFree}
+\addplot+ [mark = {x}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+(1, 167)
+(2, 99)
+(3, 80)
+(4, 94)
+(5, 104)
+(6, 139)
+(7, 159)
+(8, 92)
+(9, 91)
+(10, 77)
+(11, 134)
+(12, 113)
+(13, 105)
+(14, 108)
+(15, 129)
+(16, 81)
+(17, 135)
+(18, 96)
+(19, 109)
+(20, 84)
+(21, 98)
+(22, 101)
+(23, 120)
+(24, 121)
+(25, 114)
+(26, 129)
+(27, 111)
+(28, 79)
+(29, 95)
+(30, 121)
+};
+\addlegendentry{mergeAndBalance}
+\addplot+ [mark = {diamond}, only marks = {true}, lime,solid, mark options={solid,fill=lime}]coordinates {
 (1, 167)
 (2, 99)
 (3, 80)
@@ -134,8 +167,8 @@ cells={anchor=west}}
 (29, 95)
 (30, 121)
 };
-\addlegendentry{\mergeAndBalance}
-\addplot+ [mark = {diamond}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+\addlegendentry{mergeAndBalance-∞}
+\addplot+ [mark = {diamond}, only marks = {true}, lime,solid, mark options={solid,fill=lime}]coordinates {
 (1, 104)
 (2, 83)
 (3, 104)
@@ -167,7 +200,7 @@ cells={anchor=west}}
 (29, 131)
 (30, 113)
 };
-\addplot+ [mark = {diamond}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+\addplot+ [mark = {diamond}, only marks = {true}, lime,solid, mark options={solid,fill=lime}]coordinates {
 (1, 108)
 (2, 110)
 (3, 130)
@@ -199,7 +232,7 @@ cells={anchor=west}}
 (29, 93)
 (30, 117)
 };
-\addplot+ [mark = {diamond}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+\addplot+ [mark = {diamond}, only marks = {true}, lime,solid, mark options={solid,fill=lime}]coordinates {
 (1, 165)
 (2, 119)
 (3, 85)
@@ -231,7 +264,7 @@ cells={anchor=west}}
 (29, 108)
 (30, 118)
 };
-\addplot+ [mark = {diamond}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+\addplot+ [mark = {diamond}, only marks = {true}, lime,solid, mark options={solid,fill=lime}]coordinates {
 (1, 114)
 (2, 123)
 (3, 171)
@@ -263,7 +296,7 @@ cells={anchor=west}}
 (29, 62)
 (30, 61)
 };
-\addplot+ [mark = {diamond}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+\addplot+ [mark = {diamond}, only marks = {true}, lime,solid, mark options={solid,fill=lime}]coordinates {
 (1, 148)
 (2, 112)
 (3, 87)
@@ -295,7 +328,7 @@ cells={anchor=west}}
 (29, 134)
 (30, 70)
 };
-\addplot+ [mark = {diamond}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+\addplot+ [mark = {diamond}, only marks = {true}, lime,solid, mark options={solid,fill=lime}]coordinates {
 (1, 106)
 (2, 103)
 (3, 99)
@@ -327,7 +360,7 @@ cells={anchor=west}}
 (29, 199)
 (30, 80)
 };
-\addplot+ [mark = {diamond}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+\addplot+ [mark = {diamond}, only marks = {true}, lime,solid, mark options={solid,fill=lime}]coordinates {
 (1, 107)
 (2, 128)
 (3, 155)
@@ -359,7 +392,231 @@ cells={anchor=west}}
 (29, 77)
 (30, 107)
 };
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addplot+ [mark = {x}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+(1, 104)
+(2, 83)
+(3, 104)
+(4, 119)
+(5, 121)
+(6, 96)
+(7, 93)
+(8, 117)
+(9, 121)
+(10, 98)
+(11, 122)
+(12, 105)
+(13, 92)
+(14, 140)
+(15, 130)
+(16, 152)
+(17, 156)
+(18, 101)
+(19, 110)
+(20, 96)
+(21, 121)
+(22, 73)
+(23, 117)
+(24, 84)
+(25, 102)
+(26, 91)
+(27, 103)
+(28, 109)
+(29, 131)
+(30, 110)
+};
+\addplot+ [mark = {x}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+(1, 108)
+(2, 110)
+(3, 128)
+(4, 127)
+(5, 117)
+(6, 111)
+(7, 104)
+(8, 92)
+(9, 108)
+(10, 106)
+(11, 65)
+(12, 103)
+(13, 90)
+(14, 118)
+(15, 78)
+(16, 101)
+(17, 77)
+(18, 124)
+(19, 112)
+(20, 82)
+(21, 171)
+(22, 136)
+(23, 89)
+(24, 116)
+(25, 86)
+(26, 125)
+(27, 111)
+(28, 71)
+(29, 92)
+(30, 117)
+};
+\addplot+ [mark = {x}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+(1, 160)
+(2, 119)
+(3, 85)
+(4, 102)
+(5, 81)
+(6, 69)
+(7, 89)
+(8, 110)
+(9, 107)
+(10, 108)
+(11, 90)
+(12, 138)
+(13, 101)
+(14, 100)
+(15, 130)
+(16, 92)
+(17, 82)
+(18, 106)
+(19, 124)
+(20, 105)
+(21, 144)
+(22, 123)
+(23, 117)
+(24, 98)
+(25, 122)
+(26, 77)
+(27, 95)
+(28, 102)
+(29, 106)
+(30, 118)
+};
+\addplot+ [mark = {x}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+(1, 114)
+(2, 123)
+(3, 171)
+(4, 120)
+(5, 121)
+(6, 130)
+(7, 95)
+(8, 99)
+(9, 90)
+(10, 127)
+(11, 93)
+(12, 139)
+(13, 92)
+(14, 98)
+(15, 108)
+(16, 132)
+(17, 165)
+(18, 106)
+(19, 109)
+(20, 100)
+(21, 127)
+(22, 110)
+(23, 125)
+(24, 96)
+(25, 89)
+(26, 139)
+(27, 124)
+(28, 104)
+(29, 61)
+(30, 61)
+};
+\addplot+ [mark = {x}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+(1, 148)
+(2, 112)
+(3, 87)
+(4, 136)
+(5, 103)
+(6, 91)
+(7, 127)
+(8, 93)
+(9, 113)
+(10, 132)
+(11, 119)
+(12, 104)
+(13, 88)
+(14, 87)
+(15, 88)
+(16, 111)
+(17, 112)
+(18, 117)
+(19, 77)
+(20, 94)
+(21, 102)
+(22, 108)
+(23, 78)
+(24, 82)
+(25, 103)
+(26, 100)
+(27, 112)
+(28, 101)
+(29, 135)
+(30, 73)
+};
+\addplot+ [mark = {x}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+(1, 106)
+(2, 103)
+(3, 99)
+(4, 107)
+(5, 155)
+(6, 110)
+(7, 90)
+(8, 123)
+(9, 99)
+(10, 75)
+(11, 95)
+(12, 119)
+(13, 133)
+(14, 94)
+(15, 94)
+(16, 95)
+(17, 78)
+(18, 111)
+(19, 111)
+(20, 125)
+(21, 81)
+(22, 89)
+(23, 90)
+(24, 99)
+(25, 118)
+(26, 218)
+(27, 112)
+(28, 86)
+(29, 200)
+(30, 81)
+};
+\addplot+ [mark = {x}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+(1, 107)
+(2, 128)
+(3, 155)
+(4, 116)
+(5, 111)
+(6, 114)
+(7, 112)
+(8, 84)
+(9, 121)
+(10, 101)
+(11, 119)
+(12, 82)
+(13, 149)
+(14, 62)
+(15, 121)
+(16, 111)
+(17, 128)
+(18, 96)
+(19, 144)
+(20, 103)
+(21, 107)
+(22, 99)
+(23, 100)
+(24, 78)
+(25, 82)
+(26, 116)
+(27, 97)
+(28, 112)
+(29, 89)
+(30, 101)
+};
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (2, 230)
 (5, 328)
 (7, 483)
@@ -368,7 +625,7 @@ cells={anchor=west}}
 (22, 895)
 (27, 1134)
 };
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (1, 104)
 (2, 107)
 (3, 122)
@@ -395,14 +652,14 @@ cells={anchor=west}}
 (28, 409)
 (29, 417)
 };
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (19, 206)
 (21, 234)
 (23, 293)
 (26, 391)
 (30, 474)
 };
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (1, 108)
 (2, 124)
 (3, 143)
@@ -432,11 +689,11 @@ cells={anchor=west}}
 (28, 271)
 (30, 339)
 };
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (25, 331)
 (29, 359)
 };
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (1, 165)
 (2, 207)
 (4, 226)
@@ -460,7 +717,7 @@ cells={anchor=west}}
 (29, 743)
 (30, 761)
 };
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (3, 312)
 (6, 296)
 (8, 361)
@@ -470,7 +727,7 @@ cells={anchor=west}}
 (24, 688)
 (28, 768)
 };
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (1, 114)
 (2, 151)
 (3, 208)
@@ -496,7 +753,7 @@ cells={anchor=west}}
 (29, 1239)
 (30, 1255)
 };
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (8, 304)
 (11, 369)
 (15, 602)
@@ -504,7 +761,7 @@ cells={anchor=west}}
 (24, 1111)
 (28, 1248)
 };
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (1, 148)
 (2, 180)
 (3, 199)
@@ -529,7 +786,7 @@ cells={anchor=west}}
 (28, 829)
 (29, 852)
 };
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (4, 277)
 (7, 329)
 (10, 546)
@@ -538,7 +795,7 @@ cells={anchor=west}}
 (23, 924)
 (30, 876)
 };
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (1, 106)
 (2, 122)
 (3, 108)
@@ -564,7 +821,7 @@ cells={anchor=west}}
 (29, 1008)
 (30, 930)
 };
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (10, 215)
 (13, 291)
 (16, 422)
@@ -572,7 +829,7 @@ cells={anchor=west}}
 (23, 656)
 (27, 894)
 };
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (1, 113)
 (2, 134)
 (3, 184)
@@ -599,14 +856,14 @@ cells={anchor=west}}
 (28, 324)
 (29, 300)
 };
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (15, 328)
 (19, 353)
 (22, 334)
 (26, 369)
 (30, 356)
 };
-\addplot+ [mark = {triangle}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
+\addplot+ [mark = {+}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
 (1, 104)
 (2, 127)
 (3, 171)
@@ -638,7 +895,7 @@ cells={anchor=west}}
 (29, 1505)
 (30, 1554)
 };
-\addplot+ [mark = {triangle}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
+\addplot+ [mark = {+}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
 (1, 108)
 (2, 157)
 (3, 222)
@@ -670,7 +927,7 @@ cells={anchor=west}}
 (29, 1384)
 (30, 1440)
 };
-\addplot+ [mark = {triangle}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
+\addplot+ [mark = {+}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
 (1, 165)
 (2, 224)
 (3, 256)
@@ -702,7 +959,7 @@ cells={anchor=west}}
 (29, 1417)
 (30, 1475)
 };
-\addplot+ [mark = {triangle}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
+\addplot+ [mark = {+}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
 (1, 114)
 (2, 177)
 (3, 290)
@@ -734,7 +991,7 @@ cells={anchor=west}}
 (29, 1623)
 (30, 1624)
 };
-\addplot+ [mark = {triangle}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
+\addplot+ [mark = {+}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
 (1, 148)
 (2, 196)
 (3, 222)
@@ -766,7 +1023,7 @@ cells={anchor=west}}
 (29, 1383)
 (30, 1394)
 };
-\addplot+ [mark = {triangle}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
+\addplot+ [mark = {+}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
 (1, 106)
 (2, 149)
 (3, 188)
@@ -798,7 +1055,7 @@ cells={anchor=west}}
 (29, 1533)
 (30, 1547)
 };
-\addplot+ [mark = {triangle}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
+\addplot+ [mark = {+}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
 (1, 113)
 (2, 181)
 (3, 277)
@@ -830,7 +1087,7 @@ cells={anchor=west}}
 (29, 1457)
 (30, 1496)
 };
-\addplot+ [mark = {+}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
+\addplot+ [mark = {star}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
 (1, 147)
 (2, 215)
 (3, 279)
@@ -862,7 +1119,7 @@ cells={anchor=west}}
 (29, 2265)
 (30, 2376)
 };
-\addplot+ [mark = {+}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
+\addplot+ [mark = {star}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
 (1, 96)
 (2, 197)
 (3, 268)
@@ -894,7 +1151,7 @@ cells={anchor=west}}
 (29, 2081)
 (30, 2138)
 };
-\addplot+ [mark = {+}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
+\addplot+ [mark = {star}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
 (1, 156)
 (2, 222)
 (3, 277)
@@ -926,7 +1183,7 @@ cells={anchor=west}}
 (29, 2199)
 (30, 2286)
 };
-\addplot+ [mark = {+}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
+\addplot+ [mark = {star}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
 (1, 150)
 (2, 254)
 (3, 382)
@@ -958,7 +1215,7 @@ cells={anchor=west}}
 (29, 2356)
 (30, 2382)
 };
-\addplot+ [mark = {+}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
+\addplot+ [mark = {star}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
 (1, 197)
 (2, 308)
 (3, 380)
@@ -990,7 +1247,7 @@ cells={anchor=west}}
 (29, 2170)
 (30, 2201)
 };
-\addplot+ [mark = {+}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
+\addplot+ [mark = {star}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
 (1, 174)
 (2, 240)
 (3, 291)
@@ -1022,7 +1279,7 @@ cells={anchor=west}}
 (29, 2659)
 (30, 2727)
 };
-\addplot+ [mark = {+}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
+\addplot+ [mark = {star}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
 (1, 110)
 (2, 178)
 (3, 301)
@@ -1054,7 +1311,7 @@ cells={anchor=west}}
 (29, 2125)
 (30, 2237)
 };
-\nextgroupplot [legend pos = {north west}, legend style = {font=\footnotesize}, ymax = {6006}, ymode = {linear}, yticklabels=none, xticklabels=none, ymin = {-100}]\addplot+ [mark = {diamond}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+\nextgroupplot [legend pos = {north west}, legend style = {font=\footnotesize}, ymax = {6006}, ymode = {linear}, yticklabels=none, xticklabels=none, ymin = {-100}]\addplot+ [mark = {diamond}, only marks = {true}, lime,solid, mark options={solid,fill=lime}]coordinates {
 (1, 119)
 (2, 110)
 (3, 85)
@@ -1086,7 +1343,7 @@ cells={anchor=west}}
 (29, 110)
 (30, 159)
 };
-\addplot+ [mark = {diamond}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+\addplot+ [mark = {diamond}, only marks = {true}, lime,solid, mark options={solid,fill=lime}]coordinates {
 (1, 99)
 (2, 128)
 (3, 82)
@@ -1118,7 +1375,7 @@ cells={anchor=west}}
 (29, 102)
 (30, 87)
 };
-\addplot+ [mark = {diamond}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+\addplot+ [mark = {diamond}, only marks = {true}, lime,solid, mark options={solid,fill=lime}]coordinates {
 (1, 95)
 (2, 94)
 (3, 122)
@@ -1150,7 +1407,7 @@ cells={anchor=west}}
 (29, 119)
 (30, 147)
 };
-\addplot+ [mark = {diamond}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+\addplot+ [mark = {diamond}, only marks = {true}, lime,solid, mark options={solid,fill=lime}]coordinates {
 (1, 116)
 (2, 94)
 (3, 114)
@@ -1182,7 +1439,7 @@ cells={anchor=west}}
 (29, 111)
 (30, 143)
 };
-\addplot+ [mark = {diamond}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+\addplot+ [mark = {diamond}, only marks = {true}, lime,solid, mark options={solid,fill=lime}]coordinates {
 (1, 136)
 (2, 101)
 (3, 91)
@@ -1214,7 +1471,7 @@ cells={anchor=west}}
 (29, 94)
 (30, 72)
 };
-\addplot+ [mark = {diamond}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+\addplot+ [mark = {diamond}, only marks = {true}, lime,solid, mark options={solid,fill=lime}]coordinates {
 (1, 102)
 (2, 90)
 (3, 101)
@@ -1246,7 +1503,7 @@ cells={anchor=west}}
 (29, 79)
 (30, 112)
 };
-\addplot+ [mark = {diamond}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+\addplot+ [mark = {diamond}, only marks = {true}, lime,solid, mark options={solid,fill=lime}]coordinates {
 (1, 119)
 (2, 115)
 (3, 103)
@@ -1278,7 +1535,7 @@ cells={anchor=west}}
 (29, 105)
 (30, 104)
 };
-\addplot+ [mark = {diamond}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+\addplot+ [mark = {diamond}, only marks = {true}, lime,solid, mark options={solid,fill=lime}]coordinates {
 (1, 129)
 (2, 100)
 (3, 119)
@@ -1310,7 +1567,263 @@ cells={anchor=west}}
 (29, 90)
 (30, 121)
 };
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addplot+ [mark = {x}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+(1, 119)
+(2, 110)
+(3, 85)
+(4, 100)
+(5, 162)
+(6, 121)
+(7, 118)
+(8, 114)
+(9, 93)
+(10, 86)
+(11, 171)
+(12, 126)
+(13, 143)
+(14, 95)
+(15, 90)
+(16, 101)
+(17, 87)
+(18, 104)
+(19, 78)
+(20, 111)
+(21, 131)
+(22, 88)
+(23, 121)
+(24, 86)
+(25, 86)
+(26, 126)
+(27, 101)
+(28, 109)
+(29, 110)
+(30, 159)
+};
+\addplot+ [mark = {x}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+(1, 99)
+(2, 128)
+(3, 82)
+(4, 169)
+(5, 126)
+(6, 120)
+(7, 104)
+(8, 109)
+(9, 130)
+(10, 86)
+(11, 72)
+(12, 93)
+(13, 141)
+(14, 119)
+(15, 101)
+(16, 90)
+(17, 142)
+(18, 160)
+(19, 102)
+(20, 100)
+(21, 120)
+(22, 107)
+(23, 84)
+(24, 95)
+(25, 93)
+(26, 110)
+(27, 87)
+(28, 95)
+(29, 104)
+(30, 86)
+};
+\addplot+ [mark = {x}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+(1, 95)
+(2, 94)
+(3, 122)
+(4, 115)
+(5, 115)
+(6, 115)
+(7, 109)
+(8, 106)
+(9, 125)
+(10, 110)
+(11, 117)
+(12, 95)
+(13, 75)
+(14, 107)
+(15, 102)
+(16, 85)
+(17, 73)
+(18, 124)
+(19, 73)
+(20, 104)
+(21, 126)
+(22, 112)
+(23, 85)
+(24, 122)
+(25, 117)
+(26, 108)
+(27, 191)
+(28, 99)
+(29, 119)
+(30, 147)
+};
+\addplot+ [mark = {x}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+(1, 116)
+(2, 94)
+(3, 114)
+(4, 123)
+(5, 114)
+(6, 91)
+(7, 200)
+(8, 123)
+(9, 117)
+(10, 107)
+(11, 109)
+(12, 110)
+(13, 122)
+(14, 104)
+(15, 145)
+(16, 111)
+(17, 124)
+(18, 76)
+(19, 121)
+(20, 99)
+(21, 108)
+(22, 79)
+(23, 89)
+(24, 87)
+(25, 153)
+(26, 96)
+(27, 107)
+(28, 89)
+(29, 115)
+(30, 143)
+};
+\addplot+ [mark = {x}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+(1, 136)
+(2, 101)
+(3, 91)
+(4, 111)
+(5, 107)
+(6, 171)
+(7, 100)
+(8, 77)
+(9, 114)
+(10, 104)
+(11, 85)
+(12, 107)
+(13, 118)
+(14, 95)
+(15, 101)
+(16, 132)
+(17, 112)
+(18, 120)
+(19, 115)
+(20, 120)
+(21, 70)
+(22, 125)
+(23, 124)
+(24, 96)
+(25, 119)
+(26, 113)
+(27, 139)
+(28, 151)
+(29, 94)
+(30, 73)
+};
+\addplot+ [mark = {x}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+(1, 95)
+(2, 91)
+(3, 100)
+(4, 131)
+(5, 102)
+(6, 133)
+(7, 116)
+(8, 119)
+(9, 113)
+(10, 95)
+(11, 133)
+(12, 128)
+(13, 122)
+(14, 97)
+(15, 112)
+(16, 116)
+(17, 104)
+(18, 91)
+(19, 135)
+(20, 86)
+(21, 108)
+(22, 97)
+(23, 100)
+(24, 100)
+(25, 81)
+(26, 130)
+(27, 129)
+(28, 94)
+(29, 90)
+(30, 110)
+};
+\addplot+ [mark = {x}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+(1, 119)
+(2, 115)
+(3, 103)
+(4, 125)
+(5, 82)
+(6, 114)
+(7, 187)
+(8, 100)
+(9, 143)
+(10, 100)
+(11, 111)
+(12, 164)
+(13, 100)
+(14, 74)
+(15, 86)
+(16, 138)
+(17, 101)
+(18, 90)
+(19, 144)
+(20, 100)
+(21, 94)
+(22, 66)
+(23, 95)
+(24, 105)
+(25, 100)
+(26, 83)
+(27, 110)
+(28, 91)
+(29, 103)
+(30, 104)
+};
+\addplot+ [mark = {x}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+(1, 129)
+(2, 100)
+(3, 119)
+(4, 122)
+(5, 69)
+(6, 121)
+(7, 92)
+(8, 105)
+(9, 99)
+(10, 77)
+(11, 115)
+(12, 92)
+(13, 88)
+(14, 132)
+(15, 115)
+(16, 85)
+(17, 65)
+(18, 114)
+(19, 89)
+(20, 90)
+(21, 116)
+(22, 111)
+(23, 108)
+(24, 98)
+(25, 115)
+(26, 104)
+(27, 100)
+(28, 105)
+(29, 92)
+(30, 121)
+};
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (1, 119)
 (2, 136)
 (3, 113)
@@ -1335,7 +1848,7 @@ cells={anchor=west}}
 (28, 1515)
 (29, 1657)
 };
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (7, 345)
 (11, 549)
 (15, 884)
@@ -1344,7 +1857,7 @@ cells={anchor=west}}
 (26, 1485)
 (30, 1796)
 };
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (1, 99)
 (2, 136)
 (3, 123)
@@ -1370,7 +1883,7 @@ cells={anchor=west}}
 (28, 1483)
 (30, 1685)
 };
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (5, 302)
 (9, 550)
 (17, 861)
@@ -1378,7 +1891,7 @@ cells={anchor=west}}
 (25, 1280)
 (29, 1619)
 };
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (1, 95)
 (2, 109)
 (3, 153)
@@ -1404,7 +1917,7 @@ cells={anchor=west}}
 (28, 1175)
 (29, 1207)
 };
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (5, 272)
 (11, 359)
 (15, 629)
@@ -1412,7 +1925,7 @@ cells={anchor=west}}
 (24, 1165)
 (30, 1346)
 };
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (1, 116)
 (2, 121)
 (3, 156)
@@ -1438,7 +1951,7 @@ cells={anchor=west}}
 (29, 1599)
 (30, 1758)
 };
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (7, 366)
 (10, 533)
 (13, 761)
@@ -1446,7 +1959,7 @@ cells={anchor=west}}
 (24, 1432)
 (26, 1566)
 };
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (1, 136)
 (2, 160)
 (3, 209)
@@ -1471,7 +1984,7 @@ cells={anchor=west}}
 (28, 1591)
 (30, 1630)
 };
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (4, 287)
 (8, 589)
 (13, 843)
@@ -1480,7 +1993,7 @@ cells={anchor=west}}
 (27, 1594)
 (29, 1668)
 };
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (1, 102)
 (2, 104)
 (3, 124)
@@ -1505,7 +2018,7 @@ cells={anchor=west}}
 (28, 1419)
 (30, 1483)
 };
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (7, 284)
 (10, 425)
 (15, 563)
@@ -1514,7 +2027,7 @@ cells={anchor=west}}
 (26, 1404)
 (29, 1526)
 };
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (1, 119)
 (2, 202)
 (3, 253)
@@ -1540,7 +2053,7 @@ cells={anchor=west}}
 (28, 1816)
 (30, 1923)
 };
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (4, 343)
 (10, 785)
 (16, 1135)
@@ -1548,7 +2061,7 @@ cells={anchor=west}}
 (25, 1751)
 (29, 1903)
 };
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (1, 129)
 (2, 145)
 (3, 227)
@@ -1574,7 +2087,7 @@ cells={anchor=west}}
 (29, 1590)
 (30, 1825)
 };
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (5, 323)
 (8, 568)
 (12, 660)
@@ -1582,7 +2095,7 @@ cells={anchor=west}}
 (21, 1194)
 (26, 1570)
 };
-\addplot+ [mark = {triangle}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
+\addplot+ [mark = {+}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
 (1, 124)
 (2, 194)
 (3, 238)
@@ -1614,7 +2127,7 @@ cells={anchor=west}}
 (29, 2050)
 (30, 2169)
 };
-\addplot+ [mark = {triangle}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
+\addplot+ [mark = {+}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
 (1, 99)
 (2, 180)
 (3, 222)
@@ -1646,7 +2159,7 @@ cells={anchor=west}}
 (29, 2015)
 (30, 2058)
 };
-\addplot+ [mark = {triangle}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
+\addplot+ [mark = {+}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
 (1, 95)
 (2, 148)
 (3, 226)
@@ -1678,7 +2191,7 @@ cells={anchor=west}}
 (29, 1981)
 (30, 2091)
 };
-\addplot+ [mark = {triangle}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
+\addplot+ [mark = {+}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
 (1, 116)
 (2, 170)
 (3, 241)
@@ -1710,7 +2223,7 @@ cells={anchor=west}}
 (29, 2082)
 (30, 2184)
 };
-\addplot+ [mark = {triangle}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
+\addplot+ [mark = {+}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
 (1, 136)
 (2, 197)
 (3, 251)
@@ -1742,7 +2255,7 @@ cells={anchor=west}}
 (29, 2127)
 (30, 2160)
 };
-\addplot+ [mark = {triangle}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
+\addplot+ [mark = {+}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
 (1, 102)
 (2, 152)
 (3, 210)
@@ -1774,7 +2287,7 @@ cells={anchor=west}}
 (29, 2006)
 (30, 2078)
 };
-\addplot+ [mark = {triangle}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
+\addplot+ [mark = {+}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
 (1, 119)
 (2, 190)
 (3, 252)
@@ -1806,7 +2319,7 @@ cells={anchor=west}}
 (29, 2036)
 (30, 2100)
 };
-\addplot+ [mark = {triangle}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
+\addplot+ [mark = {+}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
 (1, 129)
 (2, 187)
 (3, 260)
@@ -1838,7 +2351,7 @@ cells={anchor=west}}
 (29, 1815)
 (30, 1894)
 };
-\addplot+ [mark = {+}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
+\addplot+ [mark = {star}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
 (1, 141)
 (2, 244)
 (3, 312)
@@ -1870,7 +2383,7 @@ cells={anchor=west}}
 (29, 2919)
 (30, 3089)
 };
-\addplot+ [mark = {+}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
+\addplot+ [mark = {star}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
 (1, 129)
 (2, 238)
 (3, 302)
@@ -1902,7 +2415,7 @@ cells={anchor=west}}
 (29, 2851)
 (30, 2911)
 };
-\addplot+ [mark = {+}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
+\addplot+ [mark = {star}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
 (1, 95)
 (2, 170)
 (3, 293)
@@ -1934,7 +2447,7 @@ cells={anchor=west}}
 (29, 2905)
 (30, 3039)
 };
-\addplot+ [mark = {+}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
+\addplot+ [mark = {star}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
 (1, 121)
 (2, 194)
 (3, 315)
@@ -1966,7 +2479,7 @@ cells={anchor=west}}
 (29, 2986)
 (30, 3140)
 };
-\addplot+ [mark = {+}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
+\addplot+ [mark = {star}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
 (1, 147)
 (2, 207)
 (3, 275)
@@ -1998,7 +2511,7 @@ cells={anchor=west}}
 (29, 3194)
 (30, 3263)
 };
-\addplot+ [mark = {+}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
+\addplot+ [mark = {star}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
 (1, 112)
 (2, 184)
 (3, 277)
@@ -2030,7 +2543,7 @@ cells={anchor=west}}
 (29, 2775)
 (30, 2861)
 };
-\addplot+ [mark = {+}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
+\addplot+ [mark = {star}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
 (1, 112)
 (2, 190)
 (3, 300)
@@ -2062,7 +2575,7 @@ cells={anchor=west}}
 (29, 2901)
 (30, 2993)
 };
-\addplot+ [mark = {+}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
+\addplot+ [mark = {star}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
 (1, 147)
 (2, 240)
 (3, 325)
@@ -2094,7 +2607,7 @@ cells={anchor=west}}
 (29, 2610)
 (30, 2692)
 };
-\nextgroupplot [legend pos = {north west}, legend style = {font=\footnotesize}, ymax = {6006}, ymode = {linear}, yticklabels=none, xticklabels=none, ymin = {-100}]\addplot+ [mark = {diamond}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+\nextgroupplot [legend pos = {north west}, legend style = {font=\footnotesize}, ymax = {6006}, ymode = {linear}, yticklabels=none, xticklabels=none, ymin = {-100}]\addplot+ [mark = {diamond}, only marks = {true}, lime,solid, mark options={solid,fill=lime}]coordinates {
 (1, 122)
 (2, 151)
 (3, 137)
@@ -2126,7 +2639,7 @@ cells={anchor=west}}
 (29, 147)
 (30, 120)
 };
-\addplot+ [mark = {diamond}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+\addplot+ [mark = {diamond}, only marks = {true}, lime,solid, mark options={solid,fill=lime}]coordinates {
 (1, 89)
 (2, 86)
 (3, 102)
@@ -2149,7 +2662,7 @@ cells={anchor=west}}
 (20, 203)
 (21, 221)
 };
-\addplot+ [mark = {diamond}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+\addplot+ [mark = {diamond}, only marks = {true}, lime,solid, mark options={solid,fill=lime}]coordinates {
 (22, 383)
 (23, 474)
 (24, 532)
@@ -2160,7 +2673,7 @@ cells={anchor=west}}
 (29, 976)
 (30, 1113)
 };
-\addplot+ [mark = {diamond}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+\addplot+ [mark = {diamond}, only marks = {true}, lime,solid, mark options={solid,fill=lime}]coordinates {
 (1, 141)
 (2, 138)
 (3, 118)
@@ -2191,10 +2704,10 @@ cells={anchor=west}}
 (28, 74)
 (29, 136)
 };
-\addplot+ [mark = {diamond}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+\addplot+ [mark = {diamond}, only marks = {true}, lime,solid, mark options={solid,fill=lime}]coordinates {
 (30, 236)
 };
-\addplot+ [mark = {diamond}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+\addplot+ [mark = {diamond}, only marks = {true}, lime,solid, mark options={solid,fill=lime}]coordinates {
 (1, 129)
 (2, 140)
 (3, 86)
@@ -2226,7 +2739,7 @@ cells={anchor=west}}
 (29, 163)
 (30, 124)
 };
-\addplot+ [mark = {diamond}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+\addplot+ [mark = {diamond}, only marks = {true}, lime,solid, mark options={solid,fill=lime}]coordinates {
 (1, 82)
 (2, 82)
 (3, 121)
@@ -2258,7 +2771,7 @@ cells={anchor=west}}
 (29, 78)
 (30, 151)
 };
-\addplot+ [mark = {diamond}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+\addplot+ [mark = {diamond}, only marks = {true}, lime,solid, mark options={solid,fill=lime}]coordinates {
 (1, 97)
 (2, 94)
 (3, 122)
@@ -2290,7 +2803,7 @@ cells={anchor=west}}
 (29, 98)
 (30, 150)
 };
-\addplot+ [mark = {diamond}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+\addplot+ [mark = {diamond}, only marks = {true}, lime,solid, mark options={solid,fill=lime}]coordinates {
 (1, 120)
 (2, 129)
 (3, 85)
@@ -2322,7 +2835,7 @@ cells={anchor=west}}
 (29, 68)
 (30, 91)
 };
-\addplot+ [mark = {diamond}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+\addplot+ [mark = {diamond}, only marks = {true}, lime,solid, mark options={solid,fill=lime}]coordinates {
 (1, 116)
 (2, 115)
 (3, 125)
@@ -2354,7 +2867,263 @@ cells={anchor=west}}
 (29, 135)
 (30, 101)
 };
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addplot+ [mark = {x}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+(1, 122)
+(2, 151)
+(3, 137)
+(4, 83)
+(5, 84)
+(6, 128)
+(7, 105)
+(8, 60)
+(9, 113)
+(10, 104)
+(11, 75)
+(12, 133)
+(13, 109)
+(14, 108)
+(15, 104)
+(16, 114)
+(17, 139)
+(18, 70)
+(19, 71)
+(20, 121)
+(21, 106)
+(22, 119)
+(23, 101)
+(24, 88)
+(25, 109)
+(26, 84)
+(27, 84)
+(28, 130)
+(29, 147)
+(30, 120)
+};
+\addplot+ [mark = {x}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+(1, 89)
+(2, 85)
+(3, 97)
+(4, 110)
+(5, 108)
+(6, 158)
+(7, 117)
+(8, 124)
+(9, 88)
+(10, 122)
+(11, 110)
+(12, 117)
+(13, 85)
+(14, 167)
+(15, 151)
+(16, 103)
+(17, 146)
+(18, 109)
+(19, 200)
+(20, 115)
+(21, 115)
+(22, 91)
+(23, 106)
+(24, 83)
+(25, 98)
+(26, 68)
+(27, 134)
+(28, 123)
+(29, 129)
+(30, 110)
+};
+\addplot+ [mark = {x}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+(1, 141)
+(2, 138)
+(3, 118)
+(4, 91)
+(5, 111)
+(6, 103)
+(7, 82)
+(8, 105)
+(9, 105)
+(10, 96)
+(11, 152)
+(12, 130)
+(13, 129)
+(14, 101)
+(15, 117)
+(16, 84)
+(17, 98)
+(18, 84)
+(19, 103)
+(20, 127)
+(21, 124)
+(22, 141)
+(23, 156)
+(24, 110)
+(25, 130)
+(26, 134)
+(27, 73)
+(28, 74)
+(29, 100)
+(30, 115)
+};
+\addplot+ [mark = {x}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+(1, 129)
+(2, 140)
+(3, 86)
+(4, 116)
+(5, 92)
+(6, 113)
+(7, 185)
+(8, 140)
+(9, 141)
+(10, 82)
+(11, 94)
+(12, 186)
+(13, 145)
+(14, 109)
+(15, 92)
+(16, 86)
+(17, 111)
+(18, 94)
+(19, 145)
+(20, 171)
+(21, 110)
+(22, 70)
+(23, 103)
+(24, 123)
+(25, 119)
+(26, 77)
+(27, 275)
+(28, 154)
+(29, 156)
+(30, 121)
+};
+\addplot+ [mark = {x}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+(1, 82)
+(2, 82)
+(3, 121)
+(4, 104)
+(5, 114)
+(6, 155)
+(7, 96)
+(8, 94)
+(9, 87)
+(10, 98)
+(11, 95)
+(12, 109)
+(13, 112)
+(14, 129)
+(15, 142)
+(16, 177)
+(17, 129)
+(18, 243)
+(19, 112)
+(20, 157)
+(21, 120)
+(22, 148)
+(23, 111)
+(24, 132)
+(25, 132)
+(26, 110)
+(27, 144)
+(28, 101)
+(29, 78)
+(30, 157)
+};
+\addplot+ [mark = {x}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+(1, 97)
+(2, 94)
+(3, 122)
+(4, 88)
+(5, 82)
+(6, 110)
+(7, 109)
+(8, 82)
+(9, 100)
+(10, 96)
+(11, 98)
+(12, 82)
+(13, 101)
+(14, 133)
+(15, 125)
+(16, 119)
+(17, 94)
+(18, 114)
+(19, 92)
+(20, 128)
+(21, 74)
+(22, 117)
+(23, 106)
+(24, 109)
+(25, 171)
+(26, 122)
+(27, 150)
+(28, 111)
+(29, 117)
+(30, 163)
+};
+\addplot+ [mark = {x}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+(1, 120)
+(2, 129)
+(3, 85)
+(4, 112)
+(5, 82)
+(6, 107)
+(7, 133)
+(8, 66)
+(9, 97)
+(10, 102)
+(11, 118)
+(12, 92)
+(13, 118)
+(14, 122)
+(15, 61)
+(16, 101)
+(17, 148)
+(18, 142)
+(19, 109)
+(20, 130)
+(21, 100)
+(22, 91)
+(23, 94)
+(24, 116)
+(25, 105)
+(26, 128)
+(27, 104)
+(28, 102)
+(29, 71)
+(30, 91)
+};
+\addplot+ [mark = {x}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+(1, 116)
+(2, 98)
+(3, 126)
+(4, 98)
+(5, 116)
+(6, 149)
+(7, 113)
+(8, 82)
+(9, 110)
+(10, 92)
+(11, 96)
+(12, 91)
+(13, 78)
+(14, 115)
+(15, 117)
+(16, 124)
+(17, 91)
+(18, 106)
+(19, 108)
+(20, 98)
+(21, 136)
+(22, 186)
+(23, 95)
+(24, 135)
+(25, 139)
+(26, 114)
+(27, 110)
+(28, 114)
+(29, 139)
+(30, 101)
+};
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (1, 122)
 (2, 152)
 (3, 171)
@@ -2379,7 +3148,7 @@ cells={anchor=west}}
 (29, 1462)
 (30, 1483)
 };
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (4, 230)
 (7, 408)
 (10, 494)
@@ -2388,7 +3157,7 @@ cells={anchor=west}}
 (21, 1209)
 (27, 1382)
 };
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (1, 89)
 (2, 103)
 (3, 132)
@@ -2415,14 +3184,14 @@ cells={anchor=west}}
 (29, 1645)
 (30, 1621)
 };
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (7, 435)
 (11, 840)
 (18, 1188)
 (21, 1337)
 (27, 1589)
 };
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (1, 141)
 (3, 299)
 (4, 365)
@@ -2447,7 +3216,7 @@ cells={anchor=west}}
 (28, 1591)
 (29, 1716)
 };
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (2, 297)
 (5, 444)
 (9, 575)
@@ -2456,7 +3225,7 @@ cells={anchor=west}}
 (26, 1588)
 (30, 1853)
 };
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (1, 129)
 (2, 147)
 (3, 156)
@@ -2481,7 +3250,7 @@ cells={anchor=west}}
 (29, 2082)
 (30, 2100)
 };
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (5, 327)
 (8, 574)
 (13, 874)
@@ -2490,7 +3259,7 @@ cells={anchor=west}}
 (25, 1686)
 (27, 2001)
 };
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (1, 82)
 (2, 108)
 (3, 148)
@@ -2516,7 +3285,7 @@ cells={anchor=west}}
 (28, 1823)
 (29, 2025)
 };
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (4, 243)
 (8, 524)
 (13, 858)
@@ -2524,7 +3293,7 @@ cells={anchor=west}}
 (24, 1633)
 (30, 2162)
 };
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (1, 97)
 (2, 116)
 (3, 146)
@@ -2549,7 +3318,7 @@ cells={anchor=west}}
 (28, 1740)
 (30, 1900)
 };
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (6, 310)
 (11, 518)
 (15, 839)
@@ -2558,7 +3327,7 @@ cells={anchor=west}}
 (27, 1700)
 (29, 1829)
 };
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (1, 120)
 (2, 164)
 (4, 252)
@@ -2584,7 +3353,7 @@ cells={anchor=west}}
 (28, 1721)
 (30, 1781)
 };
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (3, 268)
 (7, 538)
 (13, 698)
@@ -2592,7 +3361,7 @@ cells={anchor=west}}
 (23, 1412)
 (29, 1794)
 };
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (1, 116)
 (2, 160)
 (3, 207)
@@ -2618,7 +3387,7 @@ cells={anchor=west}}
 (28, 1690)
 (30, 1773)
 };
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (6, 353)
 (10, 611)
 (16, 921)
@@ -2626,7 +3395,7 @@ cells={anchor=west}}
 (25, 1422)
 (29, 1783)
 };
-\addplot+ [mark = {triangle}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
+\addplot+ [mark = {+}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
 (1, 122)
 (2, 242)
 (3, 353)
@@ -2658,7 +3427,7 @@ cells={anchor=west}}
 (29, 2250)
 (30, 2337)
 };
-\addplot+ [mark = {triangle}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
+\addplot+ [mark = {+}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
 (1, 89)
 (2, 147)
 (3, 218)
@@ -2690,7 +3459,7 @@ cells={anchor=west}}
 (29, 2383)
 (30, 2465)
 };
-\addplot+ [mark = {triangle}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
+\addplot+ [mark = {+}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
 (1, 141)
 (2, 249)
 (3, 337)
@@ -2722,7 +3491,7 @@ cells={anchor=west}}
 (29, 2374)
 (30, 2449)
 };
-\addplot+ [mark = {triangle}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
+\addplot+ [mark = {+}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
 (1, 129)
 (2, 235)
 (3, 293)
@@ -2754,7 +3523,7 @@ cells={anchor=west}}
 (29, 2603)
 (30, 2695)
 };
-\addplot+ [mark = {triangle}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
+\addplot+ [mark = {+}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
 (1, 82)
 (2, 133)
 (3, 221)
@@ -2786,7 +3555,7 @@ cells={anchor=west}}
 (29, 2392)
 (30, 2515)
 };
-\addplot+ [mark = {triangle}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
+\addplot+ [mark = {+}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
 (1, 97)
 (2, 162)
 (3, 249)
@@ -2818,7 +3587,7 @@ cells={anchor=west}}
 (29, 2223)
 (30, 2340)
 };
-\addplot+ [mark = {triangle}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
+\addplot+ [mark = {+}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
 (1, 120)
 (2, 216)
 (3, 270)
@@ -2850,7 +3619,7 @@ cells={anchor=west}}
 (29, 2193)
 (30, 2254)
 };
-\addplot+ [mark = {triangle}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
+\addplot+ [mark = {+}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
 (1, 116)
 (2, 183)
 (3, 277)
@@ -2882,7 +3651,7 @@ cells={anchor=west}}
 (29, 2365)
 (30, 2434)
 };
-\addplot+ [mark = {+}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
+\addplot+ [mark = {star}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
 (1, 157)
 (2, 278)
 (3, 394)
@@ -2914,7 +3683,7 @@ cells={anchor=west}}
 (29, 3028)
 (30, 3168)
 };
-\addplot+ [mark = {+}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
+\addplot+ [mark = {star}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
 (1, 107)
 (2, 223)
 (3, 350)
@@ -2946,7 +3715,7 @@ cells={anchor=west}}
 (29, 3439)
 (30, 3605)
 };
-\addplot+ [mark = {+}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
+\addplot+ [mark = {star}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
 (1, 133)
 (2, 275)
 (3, 362)
@@ -2978,7 +3747,7 @@ cells={anchor=west}}
 (29, 2899)
 (30, 3047)
 };
-\addplot+ [mark = {+}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
+\addplot+ [mark = {star}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
 (1, 152)
 (2, 269)
 (3, 353)
@@ -3010,7 +3779,7 @@ cells={anchor=west}}
 (29, 3211)
 (30, 3379)
 };
-\addplot+ [mark = {+}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
+\addplot+ [mark = {star}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
 (1, 95)
 (2, 195)
 (3, 286)
@@ -3042,7 +3811,7 @@ cells={anchor=west}}
 (29, 3447)
 (30, 3629)
 };
-\addplot+ [mark = {+}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
+\addplot+ [mark = {star}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
 (1, 102)
 (2, 168)
 (3, 255)
@@ -3074,7 +3843,7 @@ cells={anchor=west}}
 (29, 3241)
 (30, 3415)
 };
-\addplot+ [mark = {+}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
+\addplot+ [mark = {star}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
 (1, 190)
 (2, 297)
 (3, 396)
@@ -3106,7 +3875,7 @@ cells={anchor=west}}
 (29, 3146)
 (30, 3212)
 };
-\addplot+ [mark = {+}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
+\addplot+ [mark = {star}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
 (1, 138)
 (2, 250)
 (3, 381)
@@ -3138,7 +3907,7 @@ cells={anchor=west}}
 (29, 3020)
 (30, 3122)
 };
-\nextgroupplot [legend pos = {north west}, legend style = {font=\footnotesize}, ylabel = {$M = 30$}, ymax = {6006}, ymode = {linear}, xlabel = {$arrival_interval = 50$}, ymin = {-100}]\addplot+ [mark = {diamond}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+\nextgroupplot [legend pos = {north west}, legend style = {font=\footnotesize}, ylabel = {$M = 30$}, ymax = {6006}, ymode = {linear}, xlabel = {$arrival_interval = 50$}, ymin = {-100}]\addplot+ [mark = {diamond}, only marks = {true}, lime,solid, mark options={solid,fill=lime}]coordinates {
 (1, 143)
 (2, 181)
 (3, 164)
@@ -3170,7 +3939,7 @@ cells={anchor=west}}
 (29, 107)
 (30, 134)
 };
-\addplot+ [mark = {diamond}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+\addplot+ [mark = {diamond}, only marks = {true}, lime,solid, mark options={solid,fill=lime}]coordinates {
 (1, 132)
 (2, 124)
 (3, 93)
@@ -3202,7 +3971,7 @@ cells={anchor=west}}
 (29, 106)
 (30, 144)
 };
-\addplot+ [mark = {diamond}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+\addplot+ [mark = {diamond}, only marks = {true}, lime,solid, mark options={solid,fill=lime}]coordinates {
 (1, 172)
 (2, 166)
 (3, 196)
@@ -3234,7 +4003,7 @@ cells={anchor=west}}
 (29, 105)
 (30, 122)
 };
-\addplot+ [mark = {diamond}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+\addplot+ [mark = {diamond}, only marks = {true}, lime,solid, mark options={solid,fill=lime}]coordinates {
 (1, 117)
 (2, 175)
 (3, 155)
@@ -3266,7 +4035,7 @@ cells={anchor=west}}
 (29, 116)
 (30, 162)
 };
-\addplot+ [mark = {diamond}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+\addplot+ [mark = {diamond}, only marks = {true}, lime,solid, mark options={solid,fill=lime}]coordinates {
 (1, 148)
 (2, 150)
 (3, 175)
@@ -3298,7 +4067,7 @@ cells={anchor=west}}
 (29, 143)
 (30, 127)
 };
-\addplot+ [mark = {diamond}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+\addplot+ [mark = {diamond}, only marks = {true}, lime,solid, mark options={solid,fill=lime}]coordinates {
 (1, 150)
 (2, 119)
 (3, 131)
@@ -3330,7 +4099,7 @@ cells={anchor=west}}
 (29, 124)
 (30, 158)
 };
-\addplot+ [mark = {diamond}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+\addplot+ [mark = {diamond}, only marks = {true}, lime,solid, mark options={solid,fill=lime}]coordinates {
 (1, 141)
 (2, 120)
 (3, 110)
@@ -3362,7 +4131,7 @@ cells={anchor=west}}
 (29, 170)
 (30, 131)
 };
-\addplot+ [mark = {diamond}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+\addplot+ [mark = {diamond}, only marks = {true}, lime,solid, mark options={solid,fill=lime}]coordinates {
 (1, 117)
 (2, 102)
 (3, 92)
@@ -3394,7 +4163,263 @@ cells={anchor=west}}
 (29, 162)
 (30, 111)
 };
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addplot+ [mark = {x}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+(1, 141)
+(2, 183)
+(3, 170)
+(4, 94)
+(5, 155)
+(6, 120)
+(7, 137)
+(8, 109)
+(9, 180)
+(10, 111)
+(11, 162)
+(12, 140)
+(13, 158)
+(14, 108)
+(15, 138)
+(16, 110)
+(17, 154)
+(18, 120)
+(19, 132)
+(20, 214)
+(21, 152)
+(22, 145)
+(23, 178)
+(24, 128)
+(25, 153)
+(26, 101)
+(27, 124)
+(28, 135)
+(29, 109)
+(30, 130)
+};
+\addplot+ [mark = {x}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+(1, 132)
+(2, 124)
+(3, 93)
+(4, 145)
+(5, 112)
+(6, 138)
+(7, 117)
+(8, 144)
+(9, 119)
+(10, 132)
+(11, 145)
+(12, 105)
+(13, 127)
+(14, 131)
+(15, 97)
+(16, 142)
+(17, 106)
+(18, 159)
+(19, 134)
+(20, 139)
+(21, 127)
+(22, 118)
+(23, 132)
+(24, 126)
+(25, 113)
+(26, 154)
+(27, 111)
+(28, 128)
+(29, 110)
+(30, 144)
+};
+\addplot+ [mark = {x}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+(1, 172)
+(2, 153)
+(3, 192)
+(4, 137)
+(5, 134)
+(6, 147)
+(7, 89)
+(8, 148)
+(9, 161)
+(10, 109)
+(11, 131)
+(12, 140)
+(13, 99)
+(14, 137)
+(15, 124)
+(16, 140)
+(17, 127)
+(18, 131)
+(19, 108)
+(20, 165)
+(21, 118)
+(22, 133)
+(23, 102)
+(24, 96)
+(25, 115)
+(26, 140)
+(27, 134)
+(28, 121)
+(29, 105)
+(30, 123)
+};
+\addplot+ [mark = {x}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+(1, 117)
+(2, 175)
+(3, 273)
+(4, 273)
+(5, 228)
+(6, 229)
+(7, 258)
+(8, 217)
+(9, 285)
+(10, 217)
+(11, 197)
+(12, 206)
+(13, 192)
+(14, 135)
+(15, 153)
+(16, 170)
+(17, 171)
+(18, 93)
+(19, 103)
+(20, 105)
+(21, 103)
+(22, 122)
+(23, 129)
+(24, 177)
+(25, 99)
+(26, 116)
+(27, 138)
+(28, 120)
+(29, 120)
+(30, 153)
+};
+\addplot+ [mark = {x}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+(1, 155)
+(2, 152)
+(3, 193)
+(4, 192)
+(5, 145)
+(6, 169)
+(7, 146)
+(8, 184)
+(9, 97)
+(10, 150)
+(11, 118)
+(12, 100)
+(13, 150)
+(14, 93)
+(15, 139)
+(16, 159)
+(17, 124)
+(18, 140)
+(19, 135)
+(20, 131)
+(21, 105)
+(22, 158)
+(23, 136)
+(24, 132)
+(25, 121)
+(26, 82)
+(27, 154)
+(28, 109)
+(29, 144)
+(30, 131)
+};
+\addplot+ [mark = {x}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+(1, 150)
+(2, 126)
+(3, 137)
+(4, 129)
+(5, 129)
+(6, 129)
+(7, 132)
+(8, 143)
+(9, 117)
+(10, 219)
+(11, 134)
+(12, 121)
+(13, 158)
+(14, 124)
+(15, 151)
+(16, 166)
+(17, 115)
+(18, 146)
+(19, 114)
+(20, 124)
+(21, 206)
+(22, 146)
+(23, 109)
+(24, 123)
+(25, 125)
+(26, 133)
+(27, 152)
+(28, 134)
+(29, 123)
+(30, 163)
+};
+\addplot+ [mark = {x}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+(1, 141)
+(2, 120)
+(3, 110)
+(4, 135)
+(5, 166)
+(6, 131)
+(7, 119)
+(8, 110)
+(9, 156)
+(10, 179)
+(11, 165)
+(12, 137)
+(13, 209)
+(14, 126)
+(15, 190)
+(16, 149)
+(17, 118)
+(18, 154)
+(19, 104)
+(20, 105)
+(21, 168)
+(22, 157)
+(23, 143)
+(24, 138)
+(25, 186)
+(26, 111)
+(27, 102)
+(28, 90)
+(29, 170)
+(30, 131)
+};
+\addplot+ [mark = {x}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+(1, 117)
+(2, 102)
+(3, 92)
+(4, 135)
+(5, 144)
+(6, 119)
+(7, 137)
+(8, 131)
+(9, 122)
+(10, 110)
+(11, 102)
+(12, 140)
+(13, 149)
+(14, 116)
+(15, 131)
+(16, 116)
+(17, 99)
+(18, 112)
+(19, 123)
+(20, 137)
+(21, 126)
+(22, 137)
+(23, 134)
+(24, 105)
+(25, 143)
+(26, 131)
+(27, 160)
+(28, 130)
+(29, 161)
+(30, 109)
+};
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (1, 143)
 (2, 236)
 (3, 246)
@@ -3416,7 +4441,7 @@ cells={anchor=west}}
 (29, 2648)
 (30, 2889)
 };
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (4, 357)
 (6, 660)
 (9, 1035)
@@ -3428,7 +4453,7 @@ cells={anchor=west}}
 (25, 2562)
 (28, 2630)
 };
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (1, 132)
 (4, 390)
 (6, 500)
@@ -3447,7 +4472,7 @@ cells={anchor=west}}
 (28, 2229)
 (30, 2285)
 };
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (2, 231)
 (3, 301)
 (5, 497)
@@ -3462,7 +4487,7 @@ cells={anchor=west}}
 (27, 2174)
 (29, 2309)
 };
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (1, 172)
 (2, 237)
 (4, 304)
@@ -3480,7 +4505,7 @@ cells={anchor=west}}
 (28, 2395)
 (30, 2548)
 };
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (3, 382)
 (5, 420)
 (6, 593)
@@ -3496,7 +4521,7 @@ cells={anchor=west}}
 (27, 2472)
 (29, 2578)
 };
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (1, 117)
 (4, 495)
 (5, 703)
@@ -3514,7 +4539,7 @@ cells={anchor=west}}
 (28, 3203)
 (30, 3391)
 };
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (2, 299)
 (3, 431)
 (6, 829)
@@ -3530,7 +4555,7 @@ cells={anchor=west}}
 (27, 3196)
 (29, 3295)
 };
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (1, 148)
 (2, 273)
 (4, 581)
@@ -3551,7 +4576,7 @@ cells={anchor=west}}
 (28, 2376)
 (30, 2573)
 };
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (3, 498)
 (5, 733)
 (7, 862)
@@ -3564,7 +4589,7 @@ cells={anchor=west}}
 (25, 2281)
 (29, 2521)
 };
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (1, 150)
 (2, 206)
 (5, 531)
@@ -3580,7 +4605,7 @@ cells={anchor=west}}
 (24, 2458)
 (27, 2771)
 };
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (3, 438)
 (4, 562)
 (7, 791)
@@ -3598,7 +4623,7 @@ cells={anchor=west}}
 (29, 3037)
 (30, 3206)
 };
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (1, 141)
 (2, 140)
 (5, 371)
@@ -3617,7 +4642,7 @@ cells={anchor=west}}
 (27, 1953)
 (28, 2060)
 };
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (3, 285)
 (4, 492)
 (8, 501)
@@ -3632,7 +4657,7 @@ cells={anchor=west}}
 (29, 2224)
 (30, 2381)
 };
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (1, 117)
 (4, 252)
 (7, 612)
@@ -3650,7 +4675,7 @@ cells={anchor=west}}
 (29, 2128)
 (30, 2196)
 };
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (2, 196)
 (3, 294)
 (5, 410)
@@ -3666,7 +4691,7 @@ cells={anchor=west}}
 (26, 1998)
 (28, 2256)
 };
-\addplot+ [mark = {triangle}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
+\addplot+ [mark = {+}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
 (1, 143)
 (2, 265)
 (3, 370)
@@ -3698,7 +4723,7 @@ cells={anchor=west}}
 (29, 2230)
 (30, 2300)
 };
-\addplot+ [mark = {triangle}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
+\addplot+ [mark = {+}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
 (1, 132)
 (2, 190)
 (3, 222)
@@ -3730,7 +4755,7 @@ cells={anchor=west}}
 (29, 1923)
 (30, 2004)
 };
-\addplot+ [mark = {triangle}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
+\addplot+ [mark = {+}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
 (1, 172)
 (2, 278)
 (3, 406)
@@ -3762,7 +4787,7 @@ cells={anchor=west}}
 (29, 2039)
 (30, 2100)
 };
-\addplot+ [mark = {triangle}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
+\addplot+ [mark = {+}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
 (1, 117)
 (2, 232)
 (3, 328)
@@ -3794,7 +4819,7 @@ cells={anchor=west}}
 (29, 2047)
 (30, 2137)
 };
-\addplot+ [mark = {triangle}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
+\addplot+ [mark = {+}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
 (1, 148)
 (2, 236)
 (3, 355)
@@ -3826,7 +4851,7 @@ cells={anchor=west}}
 (29, 2158)
 (30, 2223)
 };
-\addplot+ [mark = {triangle}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
+\addplot+ [mark = {+}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
 (1, 150)
 (2, 208)
 (3, 281)
@@ -3858,7 +4883,7 @@ cells={anchor=west}}
 (29, 2220)
 (30, 2323)
 };
-\addplot+ [mark = {triangle}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
+\addplot+ [mark = {+}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
 (1, 141)
 (2, 199)
 (3, 248)
@@ -3890,7 +4915,7 @@ cells={anchor=west}}
 (29, 2294)
 (30, 2363)
 };
-\addplot+ [mark = {triangle}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
+\addplot+ [mark = {+}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
 (1, 117)
 (2, 160)
 (3, 191)
@@ -3922,7 +4947,7 @@ cells={anchor=west}}
 (29, 1926)
 (30, 1981)
 };
-\addplot+ [mark = {+}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
+\addplot+ [mark = {star}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
 (1, 147)
 (2, 356)
 (3, 547)
@@ -3954,7 +4979,7 @@ cells={anchor=west}}
 (29, 4954)
 (30, 5046)
 };
-\addplot+ [mark = {+}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
+\addplot+ [mark = {star}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
 (1, 205)
 (2, 337)
 (3, 395)
@@ -3986,7 +5011,7 @@ cells={anchor=west}}
 (29, 4802)
 (30, 5034)
 };
-\addplot+ [mark = {+}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
+\addplot+ [mark = {star}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
 (1, 261)
 (2, 447)
 (3, 668)
@@ -4018,7 +5043,7 @@ cells={anchor=west}}
 (29, 5127)
 (30, 5224)
 };
-\addplot+ [mark = {+}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
+\addplot+ [mark = {star}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
 (1, 288)
 (2, 512)
 (3, 655)
@@ -4050,7 +5075,7 @@ cells={anchor=west}}
 (29, 4569)
 (30, 4804)
 };
-\addplot+ [mark = {+}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
+\addplot+ [mark = {star}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
 (1, 187)
 (2, 414)
 (3, 602)
@@ -4082,7 +5107,7 @@ cells={anchor=west}}
 (29, 4937)
 (30, 5066)
 };
-\addplot+ [mark = {+}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
+\addplot+ [mark = {star}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
 (1, 244)
 (2, 437)
 (3, 607)
@@ -4114,7 +5139,7 @@ cells={anchor=west}}
 (29, 5158)
 (30, 5397)
 };
-\addplot+ [mark = {+}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
+\addplot+ [mark = {star}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
 (1, 154)
 (2, 331)
 (3, 453)
@@ -4146,7 +5171,7 @@ cells={anchor=west}}
 (29, 4827)
 (30, 4995)
 };
-\addplot+ [mark = {+}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
+\addplot+ [mark = {star}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
 (1, 186)
 (2, 279)
 (3, 390)
@@ -4178,7 +5203,7 @@ cells={anchor=west}}
 (29, 4940)
 (30, 5013)
 };
-\nextgroupplot [legend pos = {north west}, legend style = {font=\footnotesize}, ymax = {6006}, ymode = {linear}, xlabel = {$arrival_interval = 30$}, yticklabels=none, ymin = {-100}]\addplot+ [mark = {diamond}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+\nextgroupplot [legend pos = {north west}, legend style = {font=\footnotesize}, ymax = {6006}, ymode = {linear}, xlabel = {$arrival_interval = 30$}, yticklabels=none, ymin = {-100}]\addplot+ [mark = {diamond}, only marks = {true}, lime,solid, mark options={solid,fill=lime}]coordinates {
 (1, 132)
 (2, 99)
 (3, 92)
@@ -4194,7 +5219,7 @@ cells={anchor=west}}
 (13, 124)
 (14, 168)
 };
-\addplot+ [mark = {diamond}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+\addplot+ [mark = {diamond}, only marks = {true}, lime,solid, mark options={solid,fill=lime}]coordinates {
 (15, 355)
 (16, 493)
 (17, 768)
@@ -4212,7 +5237,7 @@ cells={anchor=west}}
 (29, 2853)
 (30, 3067)
 };
-\addplot+ [mark = {diamond}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+\addplot+ [mark = {diamond}, only marks = {true}, lime,solid, mark options={solid,fill=lime}]coordinates {
 (1, 142)
 (2, 163)
 (3, 107)
@@ -4220,7 +5245,7 @@ cells={anchor=west}}
 (5, 144)
 (6, 190)
 };
-\addplot+ [mark = {diamond}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+\addplot+ [mark = {diamond}, only marks = {true}, lime,solid, mark options={solid,fill=lime}]coordinates {
 (7, 384)
 (8, 514)
 (9, 610)
@@ -4246,7 +5271,7 @@ cells={anchor=west}}
 (29, 4554)
 (30, 4655)
 };
-\addplot+ [mark = {diamond}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+\addplot+ [mark = {diamond}, only marks = {true}, lime,solid, mark options={solid,fill=lime}]coordinates {
 (1, 159)
 (2, 108)
 (3, 130)
@@ -4254,7 +5279,7 @@ cells={anchor=west}}
 (5, 156)
 (6, 153)
 };
-\addplot+ [mark = {diamond}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+\addplot+ [mark = {diamond}, only marks = {true}, lime,solid, mark options={solid,fill=lime}]coordinates {
 (7, 283)
 (8, 396)
 (9, 491)
@@ -4280,7 +5305,7 @@ cells={anchor=west}}
 (29, 4115)
 (30, 4221)
 };
-\addplot+ [mark = {diamond}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+\addplot+ [mark = {diamond}, only marks = {true}, lime,solid, mark options={solid,fill=lime}]coordinates {
 (1, 115)
 (2, 132)
 (3, 99)
@@ -4293,7 +5318,7 @@ cells={anchor=west}}
 (10, 125)
 (11, 139)
 };
-\addplot+ [mark = {diamond}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+\addplot+ [mark = {diamond}, only marks = {true}, lime,solid, mark options={solid,fill=lime}]coordinates {
 (12, 324)
 (13, 495)
 (14, 647)
@@ -4314,7 +5339,7 @@ cells={anchor=west}}
 (29, 3504)
 (30, 3658)
 };
-\addplot+ [mark = {diamond}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+\addplot+ [mark = {diamond}, only marks = {true}, lime,solid, mark options={solid,fill=lime}]coordinates {
 (1, 162)
 (2, 141)
 (3, 142)
@@ -4324,7 +5349,7 @@ cells={anchor=west}}
 (7, 173)
 (8, 237)
 };
-\addplot+ [mark = {diamond}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+\addplot+ [mark = {diamond}, only marks = {true}, lime,solid, mark options={solid,fill=lime}]coordinates {
 (9, 410)
 (10, 595)
 (11, 747)
@@ -4348,7 +5373,7 @@ cells={anchor=west}}
 (29, 4168)
 (30, 4397)
 };
-\addplot+ [mark = {diamond}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+\addplot+ [mark = {diamond}, only marks = {true}, lime,solid, mark options={solid,fill=lime}]coordinates {
 (1, 149)
 (2, 100)
 (3, 174)
@@ -4356,7 +5381,7 @@ cells={anchor=west}}
 (5, 142)
 (6, 174)
 };
-\addplot+ [mark = {diamond}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+\addplot+ [mark = {diamond}, only marks = {true}, lime,solid, mark options={solid,fill=lime}]coordinates {
 (7, 315)
 (8, 572)
 (9, 731)
@@ -4382,7 +5407,7 @@ cells={anchor=west}}
 (29, 4548)
 (30, 4803)
 };
-\addplot+ [mark = {diamond}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+\addplot+ [mark = {diamond}, only marks = {true}, lime,solid, mark options={solid,fill=lime}]coordinates {
 (1, 167)
 (2, 119)
 (3, 139)
@@ -4402,7 +5427,7 @@ cells={anchor=west}}
 (17, 106)
 (18, 254)
 };
-\addplot+ [mark = {diamond}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+\addplot+ [mark = {diamond}, only marks = {true}, lime,solid, mark options={solid,fill=lime}]coordinates {
 (19, 429)
 (20, 650)
 (21, 844)
@@ -4416,7 +5441,7 @@ cells={anchor=west}}
 (29, 2235)
 (30, 2433)
 };
-\addplot+ [mark = {diamond}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+\addplot+ [mark = {diamond}, only marks = {true}, lime,solid, mark options={solid,fill=lime}]coordinates {
 (1, 116)
 (2, 129)
 (3, 124)
@@ -4431,7 +5456,7 @@ cells={anchor=west}}
 (12, 208)
 (13, 219)
 };
-\addplot+ [mark = {diamond}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+\addplot+ [mark = {diamond}, only marks = {true}, lime,solid, mark options={solid,fill=lime}]coordinates {
 (14, 361)
 (15, 622)
 (16, 928)
@@ -4450,7 +5475,263 @@ cells={anchor=west}}
 (29, 3775)
 (30, 4003)
 };
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addplot+ [mark = {x}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+(1, 132)
+(2, 103)
+(3, 110)
+(4, 170)
+(5, 120)
+(6, 176)
+(7, 214)
+(8, 203)
+(9, 180)
+(10, 190)
+(11, 223)
+(12, 227)
+(13, 222)
+(14, 278)
+(15, 235)
+(16, 250)
+(17, 309)
+(18, 290)
+(19, 319)
+(20, 320)
+(21, 331)
+(22, 362)
+(23, 348)
+(24, 379)
+(25, 423)
+(26, 421)
+(27, 401)
+(28, 419)
+(29, 405)
+(30, 473)
+};
+\addplot+ [mark = {x}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+(1, 142)
+(2, 164)
+(3, 128)
+(4, 202)
+(5, 189)
+(6, 228)
+(7, 222)
+(8, 231)
+(9, 219)
+(10, 252)
+(11, 308)
+(12, 296)
+(13, 342)
+(14, 317)
+(15, 315)
+(16, 403)
+(17, 339)
+(18, 340)
+(19, 429)
+(20, 410)
+(21, 435)
+(22, 408)
+(23, 450)
+(24, 418)
+(25, 430)
+(26, 462)
+(27, 475)
+(28, 483)
+(29, 494)
+(30, 480)
+};
+\addplot+ [mark = {x}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+(1, 159)
+(2, 113)
+(3, 159)
+(4, 156)
+(5, 180)
+(6, 190)
+(7, 174)
+(8, 197)
+(9, 176)
+(10, 278)
+(11, 232)
+(12, 243)
+(13, 204)
+(14, 238)
+(15, 246)
+(16, 303)
+(17, 251)
+(18, 303)
+(19, 283)
+(20, 313)
+(21, 343)
+(22, 316)
+(23, 321)
+(24, 398)
+(25, 332)
+(26, 356)
+(27, 382)
+(28, 375)
+(29, 421)
+(30, 374)
+};
+\addplot+ [mark = {x}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+(1, 115)
+(2, 132)
+(3, 108)
+(4, 131)
+(5, 123)
+(6, 135)
+(7, 153)
+(8, 188)
+(9, 229)
+(10, 194)
+(11, 213)
+(12, 235)
+(13, 216)
+(14, 251)
+(15, 237)
+(16, 248)
+(17, 276)
+(18, 265)
+(19, 323)
+(20, 311)
+(21, 391)
+(22, 388)
+(23, 423)
+(24, 370)
+(25, 419)
+(26, 407)
+(27, 401)
+(28, 507)
+(29, 457)
+(30, 461)
+};
+\addplot+ [mark = {x}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+(1, 162)
+(2, 128)
+(3, 159)
+(4, 155)
+(5, 218)
+(6, 227)
+(7, 222)
+(8, 277)
+(9, 272)
+(10, 233)
+(11, 273)
+(12, 285)
+(13, 316)
+(14, 313)
+(15, 329)
+(16, 308)
+(17, 336)
+(18, 326)
+(19, 386)
+(20, 384)
+(21, 414)
+(22, 405)
+(23, 463)
+(24, 422)
+(25, 448)
+(26, 473)
+(27, 489)
+(28, 468)
+(29, 561)
+(30, 556)
+};
+\addplot+ [mark = {x}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+(1, 149)
+(2, 114)
+(3, 147)
+(4, 180)
+(5, 158)
+(6, 168)
+(7, 207)
+(8, 215)
+(9, 203)
+(10, 194)
+(11, 237)
+(12, 215)
+(13, 274)
+(14, 272)
+(15, 286)
+(16, 289)
+(17, 336)
+(18, 348)
+(19, 334)
+(20, 374)
+(21, 327)
+(22, 389)
+(23, 395)
+(24, 406)
+(25, 413)
+(26, 391)
+(27, 408)
+(28, 449)
+(29, 438)
+(30, 513)
+};
+\addplot+ [mark = {x}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+(1, 167)
+(2, 121)
+(3, 155)
+(4, 135)
+(5, 144)
+(6, 153)
+(7, 157)
+(8, 227)
+(9, 160)
+(10, 195)
+(11, 205)
+(12, 173)
+(13, 194)
+(14, 280)
+(15, 248)
+(16, 323)
+(17, 257)
+(18, 285)
+(19, 342)
+(20, 398)
+(21, 335)
+(22, 352)
+(23, 342)
+(24, 361)
+(25, 425)
+(26, 381)
+(27, 391)
+(28, 393)
+(29, 404)
+(30, 401)
+};
+\addplot+ [mark = {x}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+(1, 116)
+(2, 129)
+(3, 131)
+(4, 178)
+(5, 148)
+(6, 175)
+(7, 157)
+(8, 217)
+(9, 183)
+(10, 190)
+(11, 220)
+(12, 286)
+(13, 238)
+(14, 287)
+(15, 275)
+(16, 319)
+(17, 280)
+(18, 314)
+(19, 346)
+(20, 353)
+(21, 359)
+(22, 396)
+(23, 419)
+(24, 355)
+(25, 426)
+(26, 419)
+(27, 398)
+(28, 428)
+(29, 440)
+(30, 492)
+};
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (1, 132)
 (3, 318)
 (5, 459)
@@ -4470,7 +5751,7 @@ cells={anchor=west}}
 (28, 2935)
 (30, 3171)
 };
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (2, 241)
 (4, 480)
 (6, 599)
@@ -4484,7 +5765,7 @@ cells={anchor=west}}
 (26, 2703)
 (29, 3018)
 };
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (1, 142)
 (2, 164)
 (4, 329)
@@ -4505,7 +5786,7 @@ cells={anchor=west}}
 (29, 3005)
 (30, 3042)
 };
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (3, 308)
 (6, 508)
 (8, 695)
@@ -4518,7 +5799,7 @@ cells={anchor=west}}
 (27, 2694)
 (28, 2902)
 };
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (1, 159)
 (2, 172)
 (4, 315)
@@ -4539,7 +5820,7 @@ cells={anchor=west}}
 (28, 2831)
 (30, 3029)
 };
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (3, 325)
 (5, 431)
 (8, 669)
@@ -4552,7 +5833,7 @@ cells={anchor=west}}
 (26, 2687)
 (29, 3056)
 };
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (1, 115)
 (2, 153)
 (4, 246)
@@ -4573,7 +5854,7 @@ cells={anchor=west}}
 (28, 2798)
 (30, 3066)
 };
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (3, 282)
 (6, 571)
 (8, 905)
@@ -4586,7 +5867,7 @@ cells={anchor=west}}
 (26, 2494)
 (29, 2960)
 };
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (1, 162)
 (2, 188)
 (4, 500)
@@ -4605,7 +5886,7 @@ cells={anchor=west}}
 (29, 3668)
 (30, 3724)
 };
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (3, 404)
 (5, 790)
 (7, 1133)
@@ -4620,7 +5901,7 @@ cells={anchor=west}}
 (27, 3318)
 (28, 3544)
 };
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (1, 149)
 (3, 330)
 (4, 346)
@@ -4641,7 +5922,7 @@ cells={anchor=west}}
 (29, 2974)
 (30, 3145)
 };
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (2, 253)
 (5, 458)
 (7, 598)
@@ -4654,7 +5935,7 @@ cells={anchor=west}}
 (25, 2752)
 (28, 2963)
 };
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (1, 167)
 (3, 351)
 (5, 608)
@@ -4674,7 +5955,7 @@ cells={anchor=west}}
 (28, 2771)
 (29, 2851)
 };
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (2, 284)
 (4, 531)
 (7, 915)
@@ -4688,7 +5969,7 @@ cells={anchor=west}}
 (27, 2772)
 (30, 2966)
 };
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (1, 116)
 (3, 304)
 (5, 475)
@@ -4708,7 +5989,7 @@ cells={anchor=west}}
 (28, 3632)
 (30, 3790)
 };
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (2, 257)
 (4, 535)
 (8, 917)
@@ -4722,7 +6003,7 @@ cells={anchor=west}}
 (27, 3517)
 (29, 3776)
 };
-\addplot+ [mark = {triangle}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
+\addplot+ [mark = {+}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
 (1, 132)
 (2, 182)
 (3, 232)
@@ -4754,7 +6035,7 @@ cells={anchor=west}}
 (29, 2715)
 (30, 2832)
 };
-\addplot+ [mark = {triangle}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
+\addplot+ [mark = {+}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
 (1, 142)
 (2, 260)
 (3, 324)
@@ -4786,7 +6067,7 @@ cells={anchor=west}}
 (29, 2911)
 (30, 2982)
 };
-\addplot+ [mark = {triangle}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
+\addplot+ [mark = {+}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
 (1, 159)
 (2, 225)
 (3, 313)
@@ -4818,7 +6099,7 @@ cells={anchor=west}}
 (29, 2618)
 (30, 2673)
 };
-\addplot+ [mark = {triangle}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
+\addplot+ [mark = {+}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
 (1, 115)
 (2, 206)
 (3, 265)
@@ -4850,7 +6131,7 @@ cells={anchor=west}}
 (29, 2763)
 (30, 2832)
 };
-\addplot+ [mark = {triangle}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
+\addplot+ [mark = {+}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
 (1, 162)
 (2, 244)
 (3, 336)
@@ -4882,7 +6163,7 @@ cells={anchor=west}}
 (29, 2719)
 (30, 2856)
 };
-\addplot+ [mark = {triangle}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
+\addplot+ [mark = {+}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
 (1, 149)
 (2, 210)
 (3, 295)
@@ -4914,7 +6195,7 @@ cells={anchor=west}}
 (29, 2581)
 (30, 2737)
 };
-\addplot+ [mark = {triangle}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
+\addplot+ [mark = {+}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
 (1, 167)
 (2, 241)
 (3, 340)
@@ -4946,7 +6227,7 @@ cells={anchor=west}}
 (29, 2736)
 (30, 2807)
 };
-\addplot+ [mark = {triangle}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
+\addplot+ [mark = {+}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
 (1, 116)
 (2, 200)
 (3, 281)
@@ -4978,7 +6259,7 @@ cells={anchor=west}}
 (29, 2849)
 (30, 2974)
 };
-\addplot+ [mark = {+}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
+\addplot+ [mark = {star}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
 (1, 160)
 (2, 245)
 (3, 370)
@@ -5010,7 +6291,7 @@ cells={anchor=west}}
 (29, 4626)
 (30, 4870)
 };
-\addplot+ [mark = {+}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
+\addplot+ [mark = {star}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
 (1, 157)
 (2, 328)
 (3, 492)
@@ -5042,7 +6323,7 @@ cells={anchor=west}}
 (29, 5589)
 (30, 5689)
 };
-\addplot+ [mark = {+}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
+\addplot+ [mark = {star}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
 (1, 194)
 (2, 382)
 (3, 522)
@@ -5074,7 +6355,7 @@ cells={anchor=west}}
 (29, 5635)
 (30, 5795)
 };
-\addplot+ [mark = {+}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
+\addplot+ [mark = {star}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
 (1, 174)
 (2, 289)
 (3, 389)
@@ -5106,7 +6387,7 @@ cells={anchor=west}}
 (29, 5275)
 (30, 5413)
 };
-\addplot+ [mark = {+}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
+\addplot+ [mark = {star}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
 (1, 211)
 (2, 384)
 (3, 551)
@@ -5138,7 +6419,7 @@ cells={anchor=west}}
 (29, 5459)
 (30, 5688)
 };
-\addplot+ [mark = {+}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
+\addplot+ [mark = {star}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
 (1, 238)
 (2, 317)
 (3, 497)
@@ -5170,7 +6451,7 @@ cells={anchor=west}}
 (29, 5622)
 (30, 5955)
 };
-\addplot+ [mark = {+}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
+\addplot+ [mark = {star}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
 (1, 208)
 (2, 319)
 (3, 471)
@@ -5202,7 +6483,7 @@ cells={anchor=west}}
 (29, 4941)
 (30, 5140)
 };
-\addplot+ [mark = {+}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
+\addplot+ [mark = {star}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
 (1, 218)
 (2, 443)
 (3, 568)
@@ -5234,13 +6515,13 @@ cells={anchor=west}}
 (29, 5773)
 (30, 6006)
 };
-\nextgroupplot [legend pos = {north west}, legend style = {font=\footnotesize}, ymax = {6006}, ymode = {linear}, xlabel = {$arrival_interval = 20$}, yticklabels=none, ymin = {-100}]\addplot+ [mark = {diamond}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+\nextgroupplot [legend pos = {north west}, legend style = {font=\footnotesize}, ymax = {6006}, ymode = {linear}, xlabel = {$arrival_interval = 20$}, yticklabels=none, ymin = {-100}]\addplot+ [mark = {diamond}, only marks = {true}, lime,solid, mark options={solid,fill=lime}]coordinates {
 (1, 186)
 (2, 118)
 (3, 154)
 (4, 121)
 };
-\addplot+ [mark = {diamond}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+\addplot+ [mark = {diamond}, only marks = {true}, lime,solid, mark options={solid,fill=lime}]coordinates {
 (5, 305)
 (6, 516)
 (7, 641)
@@ -5268,11 +6549,11 @@ cells={anchor=west}}
 (29, 4473)
 (30, 4655)
 };
-\addplot+ [mark = {diamond}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+\addplot+ [mark = {diamond}, only marks = {true}, lime,solid, mark options={solid,fill=lime}]coordinates {
 (1, 119)
 (2, 218)
 };
-\addplot+ [mark = {diamond}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+\addplot+ [mark = {diamond}, only marks = {true}, lime,solid, mark options={solid,fill=lime}]coordinates {
 (3, 342)
 (4, 526)
 (5, 732)
@@ -5302,11 +6583,11 @@ cells={anchor=west}}
 (29, 5125)
 (30, 5331)
 };
-\addplot+ [mark = {diamond}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+\addplot+ [mark = {diamond}, only marks = {true}, lime,solid, mark options={solid,fill=lime}]coordinates {
 (1, 132)
 (2, 144)
 };
-\addplot+ [mark = {diamond}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+\addplot+ [mark = {diamond}, only marks = {true}, lime,solid, mark options={solid,fill=lime}]coordinates {
 (3, 288)
 (4, 425)
 (5, 559)
@@ -5336,12 +6617,12 @@ cells={anchor=west}}
 (29, 5084)
 (30, 5256)
 };
-\addplot+ [mark = {diamond}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+\addplot+ [mark = {diamond}, only marks = {true}, lime,solid, mark options={solid,fill=lime}]coordinates {
 (1, 121)
 (2, 141)
 (3, 142)
 };
-\addplot+ [mark = {diamond}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+\addplot+ [mark = {diamond}, only marks = {true}, lime,solid, mark options={solid,fill=lime}]coordinates {
 (4, 298)
 (5, 508)
 (6, 743)
@@ -5370,14 +6651,14 @@ cells={anchor=west}}
 (29, 5085)
 (30, 5316)
 };
-\addplot+ [mark = {diamond}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+\addplot+ [mark = {diamond}, only marks = {true}, lime,solid, mark options={solid,fill=lime}]coordinates {
 (1, 121)
 (2, 117)
 (3, 131)
 (4, 134)
 (5, 133)
 };
-\addplot+ [mark = {diamond}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+\addplot+ [mark = {diamond}, only marks = {true}, lime,solid, mark options={solid,fill=lime}]coordinates {
 (6, 288)
 (7, 439)
 (8, 587)
@@ -5404,12 +6685,12 @@ cells={anchor=west}}
 (29, 4599)
 (30, 4693)
 };
-\addplot+ [mark = {diamond}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+\addplot+ [mark = {diamond}, only marks = {true}, lime,solid, mark options={solid,fill=lime}]coordinates {
 (1, 146)
 (2, 113)
 (3, 159)
 };
-\addplot+ [mark = {diamond}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+\addplot+ [mark = {diamond}, only marks = {true}, lime,solid, mark options={solid,fill=lime}]coordinates {
 (4, 307)
 (5, 487)
 (6, 719)
@@ -5438,12 +6719,12 @@ cells={anchor=west}}
 (29, 5373)
 (30, 5654)
 };
-\addplot+ [mark = {diamond}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+\addplot+ [mark = {diamond}, only marks = {true}, lime,solid, mark options={solid,fill=lime}]coordinates {
 (1, 140)
 (2, 145)
 (3, 140)
 };
-\addplot+ [mark = {diamond}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+\addplot+ [mark = {diamond}, only marks = {true}, lime,solid, mark options={solid,fill=lime}]coordinates {
 (4, 298)
 (5, 528)
 (6, 648)
@@ -5472,12 +6753,12 @@ cells={anchor=west}}
 (29, 4823)
 (30, 5062)
 };
-\addplot+ [mark = {diamond}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+\addplot+ [mark = {diamond}, only marks = {true}, lime,solid, mark options={solid,fill=lime}]coordinates {
 (1, 107)
 (2, 111)
 (3, 139)
 };
-\addplot+ [mark = {diamond}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+\addplot+ [mark = {diamond}, only marks = {true}, lime,solid, mark options={solid,fill=lime}]coordinates {
 (4, 294)
 (5, 466)
 (6, 649)
@@ -5506,7 +6787,263 @@ cells={anchor=west}}
 (29, 5321)
 (30, 5486)
 };
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addplot+ [mark = {x}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+(1, 192)
+(2, 165)
+(3, 188)
+(4, 209)
+(5, 220)
+(6, 323)
+(7, 250)
+(8, 289)
+(9, 305)
+(10, 337)
+(11, 343)
+(12, 375)
+(13, 426)
+(14, 374)
+(15, 448)
+(16, 452)
+(17, 493)
+(18, 503)
+(19, 574)
+(20, 578)
+(21, 602)
+(22, 635)
+(23, 618)
+(24, 625)
+(25, 652)
+(26, 656)
+(27, 691)
+(28, 730)
+(29, 756)
+(30, 788)
+};
+\addplot+ [mark = {x}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+(1, 119)
+(2, 237)
+(3, 193)
+(4, 234)
+(5, 289)
+(6, 259)
+(7, 271)
+(8, 384)
+(9, 336)
+(10, 377)
+(11, 373)
+(12, 459)
+(13, 432)
+(14, 445)
+(15, 496)
+(16, 550)
+(17, 545)
+(18, 595)
+(19, 591)
+(20, 600)
+(21, 631)
+(22, 650)
+(23, 648)
+(24, 670)
+(25, 695)
+(26, 748)
+(27, 758)
+(28, 753)
+(29, 772)
+(30, 785)
+};
+\addplot+ [mark = {x}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+(1, 132)
+(2, 156)
+(3, 168)
+(4, 184)
+(5, 198)
+(6, 213)
+(7, 212)
+(8, 262)
+(9, 268)
+(10, 258)
+(11, 326)
+(12, 343)
+(13, 333)
+(14, 373)
+(15, 420)
+(16, 380)
+(17, 424)
+(18, 492)
+(19, 442)
+(20, 507)
+(21, 498)
+(22, 514)
+(23, 534)
+(24, 542)
+(25, 622)
+(26, 569)
+(27, 614)
+(28, 667)
+(29, 648)
+(30, 659)
+};
+\addplot+ [mark = {x}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+(1, 121)
+(2, 151)
+(3, 175)
+(4, 200)
+(5, 219)
+(6, 235)
+(7, 210)
+(8, 288)
+(9, 305)
+(10, 314)
+(11, 365)
+(12, 410)
+(13, 405)
+(14, 437)
+(15, 476)
+(16, 513)
+(17, 570)
+(18, 562)
+(19, 566)
+(20, 566)
+(21, 585)
+(22, 645)
+(23, 661)
+(24, 684)
+(25, 714)
+(26, 797)
+(27, 771)
+(28, 805)
+(29, 806)
+(30, 818)
+};
+\addplot+ [mark = {x}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+(1, 123)
+(2, 135)
+(3, 168)
+(4, 164)
+(5, 207)
+(6, 256)
+(7, 292)
+(8, 255)
+(9, 298)
+(10, 306)
+(11, 326)
+(12, 386)
+(13, 373)
+(14, 386)
+(15, 382)
+(16, 422)
+(17, 405)
+(18, 424)
+(19, 429)
+(20, 491)
+(21, 487)
+(22, 557)
+(23, 510)
+(24, 583)
+(25, 584)
+(26, 595)
+(27, 636)
+(28, 651)
+(29, 647)
+(30, 677)
+};
+\addplot+ [mark = {x}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+(1, 148)
+(2, 131)
+(3, 185)
+(4, 168)
+(5, 265)
+(6, 276)
+(7, 292)
+(8, 277)
+(9, 317)
+(10, 325)
+(11, 356)
+(12, 363)
+(13, 354)
+(14, 378)
+(15, 420)
+(16, 444)
+(17, 504)
+(18, 500)
+(19, 499)
+(20, 525)
+(21, 563)
+(22, 591)
+(23, 605)
+(24, 616)
+(25, 652)
+(26, 668)
+(27, 689)
+(28, 727)
+(29, 763)
+(30, 762)
+};
+\addplot+ [mark = {x}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+(1, 140)
+(2, 153)
+(3, 174)
+(4, 191)
+(5, 283)
+(6, 189)
+(7, 239)
+(8, 275)
+(9, 310)
+(10, 359)
+(11, 339)
+(12, 331)
+(13, 357)
+(14, 399)
+(15, 455)
+(16, 425)
+(17, 464)
+(18, 509)
+(19, 514)
+(20, 512)
+(21, 563)
+(22, 553)
+(23, 555)
+(24, 616)
+(25, 621)
+(26, 627)
+(27, 633)
+(28, 634)
+(29, 671)
+(30, 724)
+};
+\addplot+ [mark = {x}, only marks = {true}, red,solid, mark options={solid,fill=red}]coordinates {
+(1, 107)
+(2, 122)
+(3, 159)
+(4, 168)
+(5, 176)
+(6, 238)
+(7, 270)
+(8, 291)
+(9, 326)
+(10, 316)
+(11, 344)
+(12, 360)
+(13, 374)
+(14, 423)
+(15, 410)
+(16, 416)
+(17, 478)
+(18, 483)
+(19, 590)
+(20, 519)
+(21, 534)
+(22, 545)
+(23, 641)
+(24, 602)
+(25, 651)
+(26, 675)
+(27, 683)
+(28, 704)
+(29, 728)
+(30, 734)
+};
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (1, 186)
 (2, 184)
 (4, 431)
@@ -5528,7 +7065,7 @@ cells={anchor=west}}
 (28, 2828)
 (30, 2988)
 };
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (3, 371)
 (6, 611)
 (10, 1021)
@@ -5540,7 +7077,7 @@ cells={anchor=west}}
 (26, 2674)
 (29, 3005)
 };
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (1, 119)
 (2, 273)
 (4, 490)
@@ -5561,7 +7098,7 @@ cells={anchor=west}}
 (28, 3178)
 (29, 3305)
 };
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (3, 397)
 (6, 770)
 (7, 954)
@@ -5574,7 +7111,7 @@ cells={anchor=west}}
 (27, 3177)
 (30, 3475)
 };
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (1, 132)
 (2, 211)
 (6, 754)
@@ -5594,7 +7131,7 @@ cells={anchor=west}}
 (28, 2861)
 (30, 3042)
 };
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (3, 377)
 (4, 590)
 (5, 724)
@@ -5608,7 +7145,7 @@ cells={anchor=west}}
 (26, 2570)
 (29, 3006)
 };
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (1, 121)
 (2, 196)
 (3, 300)
@@ -5630,7 +7167,7 @@ cells={anchor=west}}
 (29, 2878)
 (30, 3020)
 };
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (4, 483)
 (7, 649)
 (9, 871)
@@ -5642,7 +7179,7 @@ cells={anchor=west}}
 (26, 2586)
 (28, 2789)
 };
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (1, 121)
 (2, 174)
 (4, 391)
@@ -5663,7 +7200,7 @@ cells={anchor=west}}
 (28, 3648)
 (30, 3845)
 };
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (3, 298)
 (6, 675)
 (8, 903)
@@ -5676,7 +7213,7 @@ cells={anchor=west}}
 (27, 3550)
 (29, 3793)
 };
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (1, 148)
 (2, 190)
 (4, 406)
@@ -5695,7 +7232,7 @@ cells={anchor=west}}
 (28, 3325)
 (30, 3582)
 };
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (3, 401)
 (5, 617)
 (9, 1058)
@@ -5710,7 +7247,7 @@ cells={anchor=west}}
 (26, 3157)
 (29, 3529)
 };
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (1, 140)
 (2, 153)
 (3, 210)
@@ -5730,7 +7267,7 @@ cells={anchor=west}}
 (27, 3591)
 (30, 4063)
 };
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (4, 325)
 (7, 677)
 (11, 1400)
@@ -5744,7 +7281,7 @@ cells={anchor=west}}
 (28, 3731)
 (29, 3897)
 };
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (1, 107)
 (2, 175)
 (4, 395)
@@ -5765,7 +7302,7 @@ cells={anchor=west}}
 (28, 3441)
 (30, 3629)
 };
-\addplot+ [mark = {x}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
+\addplot+ [mark = {triangle}, only marks = {true}, blue,solid, mark options={solid,fill=blue}]coordinates {
 (3, 325)
 (6, 715)
 (9, 1058)
@@ -5778,7 +7315,7 @@ cells={anchor=west}}
 (26, 3191)
 (29, 3561)
 };
-\addplot+ [mark = {triangle}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
+\addplot+ [mark = {+}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
 (1, 192)
 (2, 283)
 (3, 379)
@@ -5810,7 +7347,7 @@ cells={anchor=west}}
 (29, 3092)
 (30, 3214)
 };
-\addplot+ [mark = {triangle}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
+\addplot+ [mark = {+}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
 (1, 119)
 (2, 306)
 (3, 421)
@@ -5842,7 +7379,7 @@ cells={anchor=west}}
 (29, 3248)
 (30, 3331)
 };
-\addplot+ [mark = {triangle}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
+\addplot+ [mark = {+}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
 (1, 132)
 (2, 240)
 (3, 338)
@@ -5874,7 +7411,7 @@ cells={anchor=west}}
 (29, 2776)
 (30, 2853)
 };
-\addplot+ [mark = {triangle}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
+\addplot+ [mark = {+}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
 (1, 121)
 (2, 230)
 (3, 338)
@@ -5906,7 +7443,7 @@ cells={anchor=west}}
 (29, 3318)
 (30, 3417)
 };
-\addplot+ [mark = {triangle}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
+\addplot+ [mark = {+}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
 (1, 123)
 (2, 208)
 (3, 310)
@@ -5938,7 +7475,7 @@ cells={anchor=west}}
 (29, 2806)
 (30, 2884)
 };
-\addplot+ [mark = {triangle}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
+\addplot+ [mark = {+}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
 (1, 148)
 (2, 228)
 (3, 346)
@@ -5970,7 +7507,7 @@ cells={anchor=west}}
 (29, 3173)
 (30, 3278)
 };
-\addplot+ [mark = {triangle}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
+\addplot+ [mark = {+}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
 (1, 140)
 (2, 250)
 (3, 357)
@@ -6002,7 +7539,7 @@ cells={anchor=west}}
 (29, 2834)
 (30, 2962)
 };
-\addplot+ [mark = {triangle}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
+\addplot+ [mark = {+}, only marks = {true}, black,solid, mark options={solid,fill=black}]coordinates {
 (1, 107)
 (2, 185)
 (3, 287)
@@ -6034,7 +7571,7 @@ cells={anchor=west}}
 (29, 3085)
 (30, 3163)
 };
-\addplot+ [mark = {+}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
+\addplot+ [mark = {star}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
 (1, 247)
 (2, 410)
 (3, 541)
@@ -6066,7 +7603,7 @@ cells={anchor=west}}
 (29, 5238)
 (30, 5407)
 };
-\addplot+ [mark = {+}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
+\addplot+ [mark = {star}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
 (1, 248)
 (2, 477)
 (3, 625)
@@ -6098,7 +7635,7 @@ cells={anchor=west}}
 (29, 5652)
 (30, 5895)
 };
-\addplot+ [mark = {+}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
+\addplot+ [mark = {star}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
 (1, 244)
 (2, 416)
 (3, 636)
@@ -6130,7 +7667,7 @@ cells={anchor=west}}
 (29, 5613)
 (30, 5745)
 };
-\addplot+ [mark = {+}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
+\addplot+ [mark = {star}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
 (1, 151)
 (2, 292)
 (3, 475)
@@ -6162,7 +7699,7 @@ cells={anchor=west}}
 (29, 5624)
 (30, 5855)
 };
-\addplot+ [mark = {+}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
+\addplot+ [mark = {star}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
 (1, 181)
 (2, 392)
 (3, 565)
@@ -6194,7 +7731,7 @@ cells={anchor=west}}
 (29, 5416)
 (30, 5536)
 };
-\addplot+ [mark = {+}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
+\addplot+ [mark = {star}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
 (1, 226)
 (2, 385)
 (3, 622)
@@ -6226,7 +7763,7 @@ cells={anchor=west}}
 (29, 5500)
 (30, 5738)
 };
-\addplot+ [mark = {+}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
+\addplot+ [mark = {star}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
 (1, 244)
 (2, 425)
 (3, 696)
@@ -6258,7 +7795,7 @@ cells={anchor=west}}
 (29, 5677)
 (30, 5916)
 };
-\addplot+ [mark = {+}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
+\addplot+ [mark = {star}, only marks = {true}, brown,solid, mark options={solid,fill=brown}]coordinates {
 (1, 140)
 (2, 273)
 (3, 432)

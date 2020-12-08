@@ -67,11 +67,11 @@ function read_abstract_id(dict)
     end
     return nothing
 end
-# function TOML.parse(a::A) where {A<:AbstractPlanningPredicate)
-#     dict = Dict{String,Any}()
-#     dict["type"] = string(A)
-#     dict["id"] = TOML.parse()
-# end
+function parse_predicate(a::A,dict=Dict{String,Any}()) where {A<:AbstractPlanningPredicate}
+    dict["type"] = string(A)
+    dict["id"] = TOML.parse()
+    return dict
+end
 # function TOML.parse(sched::OperatingSchedule)
 #
 # end

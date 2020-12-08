@@ -568,7 +568,7 @@ end
 function get_commit_time(replan_model::ConstrainedMergeAndBalance, search_env, request, commit_threshold)
     nv_max = replan_model.max_problem_size - nv(request.schedule)
     t_commit = request.t_request + commit_threshold
-    if nv_max < nv(get_schedule(search_env))
+    if 0 < nv_max < nv(get_schedule(search_env))
         t_commit = max(t_commit, sort(get_cache(search_env).tF; rev=true)[nv_max])
     end
     return t_commit

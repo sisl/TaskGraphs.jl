@@ -84,3 +84,28 @@ let
         end
     end
 end
+let
+    planner = FullReplanner(
+        solver = NBSSolver(),
+        replanner = ConstrainedMergeAndBalance(max_problem_size=20)
+    )
+    planner2 = FullReplanner(
+        solver = NBSSolver(),
+        replanner = MergeAndBalance()
+    )
+    set_commit_threshold!(planner,2)
+    set_commit_threshold!(planner2,2)
+    set_real_time_flag!(planner,false) # turn off real-time op constraints
+    set_real_time_flag!(planner2,false) # turn off real-time op constraints
+    # set_commit_threshold!(replan_model,40) # setting high commit threshold to allow for warmup
+    prob = replanning_problem_1(planner.solver)
+    env = prob.env
+    stage = 0
+
+    stage += 1
+    request = prob.requests[stage]
+    remap_object_ids!(request.schedule,env.schedule)
+    base_env = replan!(planner,env,request)
+    env, cost = solve!(planner.solver,PC_TAPF(base_env))
+
+end
