@@ -66,14 +66,11 @@ end
 
 function initialize_planning_cache(schedule::OperatingSchedule,t0_=zeros(nv(schedule)),tF_=zeros(nv(schedule)))
     t0,tF,slack,local_slack = process_schedule(schedule,t0_,tF_)
-    # allowable_slack = map(i->minimum(i),slack) # soft deadline (can be tightened as necessary)
-    # allowable_slack = map(i->i==Inf ? typemax(Int) : Int(i), allowable_slack) # initialize deadline at infinity
     cache = PlanningCache(t0=t0,tF=tF,slack=slack,local_slack=local_slack) #,max_deadline=allowable_slack)
     for v in get_all_root_nodes(schedule)
         push!(cache.active_set,v)
         enqueue!(cache.node_queue,v=>isps_queue_cost(schedule,cache,v)) # need to store slack
     end
-    # TODO skip over all nodes for which path_spec.plan_path == false
     cache
 end
 function reinitialize_planning_cache!(sched,cache,
@@ -540,39 +537,6 @@ function update_planning_cache!(solver,env::SearchEnv,v::Int,t::Int=-1)
     # update t0, tF, slack, local_slack
     Δt = t - cache.tF[v]
     if Δt > 0
-        # delay = Δt - minimum(cache.slack[v])
-        # if delay > 0
-        #     @log_info(-1,solver.l3_verbosity,"LOW LEVEL SEARCH: schedule delay of ",delay," time steps incurred by path for vertex v = ",v," - ",string(get_node_from_vtx(schedule,v)), " - tF = ",get_final_state(path).t)
-        #     # Backtracking
-        #     tightenable_set = backtrack_deadlines(solver,cache,schedule,v)
-        #     delay_vec = get_delay_vec(solver,cache,schedule,v)
-        #     # @show delay_vec
-        #     if any(delay_vec .> 0)
-        #         for v_ in topological_sort(graph)
-        #             if delay_vec[v_] > 0
-        #                 @log_info(-1,solver,"ISPS: tightening at v = ",v_," - ",string(get_node_from_vtx(schedule,v_)))
-        #                 tighten_deadline!(solver,env,solution,v_)
-        #                 break
-        #             end
-        #         end
-        #     # if length(tightenable_set) > 0
-        #     #     for v_ in tightenable_set
-        #     #         @log_info(-1,solver,"ISPS: backtracking at v = ",v_," - ",string(get_node_from_vtx(schedule,v_)))
-        #     #         # tighten_deadline!(solver,env,solution,v_)
-        #     #     end
-        #         t0,tF,slack,local_slack = process_schedule(schedule;
-        #             t0=map(i->i in closed_set ? cache.t0[i] : 0, vertices(schedule)),
-        #             tF=map(i->i in closed_set ? cache.tF[i] : 0, vertices(schedule)),
-        #             # t0=map(i->is_root_node(schedule,v) ? cache.t0[i] : 0, vertices(schedule)),
-        #             # tF=map(i->is_root_node(schedule,v) ? cache.tF[i] : 0, vertices(schedule)),
-        #         )
-        #         cache.t0            .= t0
-        #         cache.tF            .= tF
-        #         cache.slack         .= slack
-        #         cache.local_slack   .= local_slack
-        #         return cache
-        #     end
-        # end
         cache.tF[v] = t
         t0,tF,slack,local_slack = process_schedule(schedule,cache.t0,cache.tF)
         cache.t0            .= t0
@@ -632,15 +596,6 @@ function update_planning_cache!(solver,env)
                 done = false
             end
         end
-        # for (i,path) in enumerate(get_paths(env))
-        #     cbs_env = build_env(solver,env,node,AgentID(i))
-        #     sp = get_final_state(path)
-        #     if is_goal(cbs_env,sp) && CRCBS.is_valid(cbs_env,get_goal(cbs_env))
-        #         v = get_vtx(get_schedule(env),env.node_id)
-        #         update_env!(solver,env,v,path)
-        #         update_planning_cache!(solver,solution)
-        #     end
-        # end
         if done
             break
         end

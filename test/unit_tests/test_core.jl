@@ -158,25 +158,29 @@ let
     solver = TaskGraphsMILPSolver(AssignmentMILP())
     project_spec, problem_spec, robot_ICs, env_graph, _ = pctapf_problem_1()
 
-    project_schedule = construct_partial_project_schedule(project_spec,problem_spec,robot_ICs)
-    model = formulate_milp(solver,project_schedule,problem_spec;cost_model=MakeSpan())
+    sched = construct_partial_project_schedule(project_spec,problem_spec,robot_ICs)
+    model = formulate_milp(solver,sched,problem_spec;cost_model=MakeSpan())
     optimize!(model)
     @test termination_status(model) == MOI.OPTIMAL
     cost = Int(round(value(objective_function(model))))
-    update_project_schedule!(solver,model,project_schedule,problem_spec,get_assignment_matrix(model))
+    update_project_schedule!(solver,model,sched,problem_spec,get_assignment_matrix(model))
 
-    t0,tF,slack,local_slack = process_schedule(project_schedule)
-    @test t0[get_vtx(project_schedule,RobotID(1))] == 0
-    @test t0[get_vtx(project_schedule,RobotID(2))] == 0
+    t0,tF,slack,local_slack = process_schedule(sched)
+    TaskGraphs.update_schedule_times!(sched)
+    @test all(t0 .==  map(v->get_t0(sched,v),vertices(sched)))
+    @test all(tF .==  map(v->get_tF(sched,v),vertices(sched)))
+
+    @test t0[get_vtx(sched,RobotID(1))] == 0
+    @test t0[get_vtx(sched,RobotID(2))] == 0
     # try with perturbed start times
-    t0[get_vtx(project_schedule,RobotID(2))] = 1
-    t0,tF,slack,local_slack = process_schedule(project_schedule,t0)
-    @test t0[get_vtx(project_schedule,RobotID(1))] == 0
-    @test t0[get_vtx(project_schedule,RobotID(2))] == 1
+    t0[get_vtx(sched,RobotID(2))] = 1
+    t0,tF,slack,local_slack = process_schedule(sched,t0)
+    @test t0[get_vtx(sched,RobotID(1))] == 0
+    @test t0[get_vtx(sched,RobotID(2))] == 1
 
-    @test length(get_vtx_ids(project_schedule)) == nv(get_graph(project_schedule))
-    for (v,id) in enumerate(project_schedule.vtx_ids)
-        @test get_vtx(project_schedule, id) == v
+    @test length(get_vtx_ids(sched)) == nv(get_graph(sched))
+    for (v,id) in enumerate(sched.vtx_ids)
+        @test get_vtx(sched, id) == v
     end
 end
 let

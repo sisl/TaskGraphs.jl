@@ -118,18 +118,6 @@ function remap_object_ids!(sched::OperatingSchedule,args...)
     remap_object_ids!(sched.vtx_ids,args...)
     remap_object_ids!(sched.planning_nodes,args...)
     remap_object_ids!(sched.vtx_map,args...)
-    # for v in vertices(get_graph(sched))
-    #     sched.vtx_ids[v] = remap_object_id(sched.vtx_ids[v],args...)
-    #     sched.planning_nodes[v] = remap_object_id(sched.planning_nodes[v],args...)
-    #     # sched.path_specs[v] = remap_object_id(sched.path_specs[v],args...)
-    # end
-    # for dict in [sched.vtx_map,]
-    #     for k in collect(keys(dict))
-    #         new_node = remap_object_id(dict[k],args...)
-    #         delete!(dict, k)
-    #         dict[remap_object_id(k,args...)] = new_node
-    #     end
-    # end
     @assert sanity_check(sched," after remap_object_ids!()")
     sched
 end
@@ -137,7 +125,6 @@ function remap_object_ids!(new_schedule::OperatingSchedule,old_schedule::Operati
     max_obj_id = 0
     for id in get_vtx_ids(old_schedule)
         if typeof(id) <: ObjectID
-            # max_obj_id = maximum([get_id(id) for id in get_vtx_ids(old_schedule) if typeof(id) <: ObjectID])
             max_obj_id = max(get_id(id),max_obj_id)
         end
     end

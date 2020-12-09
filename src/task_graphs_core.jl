@@ -388,7 +388,7 @@ Fields:
     Instead, retrieve the portion of the path directly from the pre-existing
     solution.
 """
-@with_kw struct PathSpec
+@with_kw mutable struct PathSpec
     node_type           ::Symbol        = :EMPTY
     start_vtx           ::Int           = -1
     final_vtx           ::Int           = -1
@@ -403,6 +403,23 @@ Fields:
     free                ::Bool          = false
     fixed               ::Bool          = false
 end
+get_t0(spec::PathSpec) = spec.t0
+set_t0!(spec::PathSpec,val) = begin spec.t0 = val end
+get_tF(spec::PathSpec) = spec.tF
+set_tF!(spec::PathSpec,val) = begin spec.tF = val end
+get_min_duration(spec::PathSpec) = spec.min_duration
+set_min_duration!(spec::PathSpec,val) = begin spec.min_duration = val end
+
+const path_spec_accessor_interface = [
+    :get_t0,
+    :get_tF,
+    :get_min_duration,
+    ]
+const path_spec_mutator_interface = [
+    :set_min_duration!,
+    :set_t0!,
+    :set_tF!,
+    ]
 
 export ScheduleNode
 
@@ -434,7 +451,6 @@ export
     get_vtx_id,
     replace_in_schedule!,
     add_to_schedule!,
-    # construct_project_schedule,
     process_schedule
 
 """
@@ -450,13 +466,13 @@ constraint between them.
     planning_nodes      ::Vector{ScheduleNode}  = Vector{ScheduleNode}()
     vtx_map             ::Dict{AbstractID,Int}  = Dict{AbstractID,Int}()
     vtx_ids             ::Vector{AbstractID}    = Vector{AbstractID}() # maps vertex uid to actual graph node
-    # path_specs          ::Vector{PathSpec}      = Vector{PathSpec}()
     terminal_vtxs       ::Vector{Int}           = Vector{Int}() # list of "project heads"
     weights             ::Dict{Int,Float64}     = Dict{Int,Float64}() # weights corresponding to project heads
 end
 Base.zero(sched::OperatingSchedule{G}) where {G} = OperatingSchedule(graph=G())
 LightGraphs.edges(sched::OperatingSchedule) = edges(sched.graph)
 LightGraphs.is_directed(sched::OperatingSchedule) = true
+# path spec interface
 for op in [
     :edgetype,:has_edge,:has_vertex,:inneighbors,:ne,:nv,:outneighbors,
     :vertices,#:indegree,:outdegree
@@ -487,7 +503,6 @@ export
     insert_to_vtx_map!
 
 function set_vtx_map!(sched::OperatingSchedule,node,id::AbstractID,v::Int)
-    # sched.planning_nodes[id] = pred
     @assert nv(sched) >= v
     sched.vtx_map[id] = v
     sched.planning_nodes[v] = node
@@ -503,17 +518,14 @@ export
     set_path_spec!,
     add_path_spec!
 
-# get_path_spec(sched::P,v::Int) where {P<:OperatingSchedule} = sched.path_specs[v]
 get_path_spec(sched::OperatingSchedule,v::Int) = get_path_spec(get_schedule_node(sched,v))
 set_path_spec!(sched::OperatingSchedule,v::Int,spec::PathSpec) = set_path_spec!(get_schedule_node(sched,v),spec)
-# function set_path_spec!(sched::P,v::Int,spec::S) where {P<:OperatingSchedule,S<:PathSpec}
-#     # sched.path_specs[v] = spec
-#     sched.planning_nodes[v].spec = spec
-# end
-# function add_path_spec!(sched::P,spec::S) where {P<:OperatingSchedule,S<:PathSpec}
-#     push!(sched.path_specs, spec)
-#     set_path_spec!(sched, nv(sched.graph), spec)
-# end
+for op in path_spec_accessor_interface
+    @eval $op(sched::OperatingSchedule,v) = $op(get_path_spec(sched,v))
+end
+for op in path_spec_mutator_interface
+    @eval $op(sched::OperatingSchedule,v,val) = $op(get_path_spec(sched,v),val)
+end
 
 
 """
@@ -641,16 +653,10 @@ function replace_in_schedule!(sched::OperatingSchedule,node::ScheduleNode)
     v = get_vtx(sched, id)
     @assert v != -1 "node id $(string(id)) is not in schedule and therefore cannot be replaced"
     set_vtx_map!(sched,node,id,v)
-    # set_path_spec!(sched,v,path_spec)
     sched
 end
 function replace_in_schedule!(sched::P,path_spec::T,pred,id::ID) where {P<:OperatingSchedule,T<:PathSpec,ID<:AbstractID}
     replace_in_schedule!(sched,ScheduleNode(id,pred,path_spec))
-    # v = get_vtx(sched, id)
-    # @assert v != -1 "node id $(string(id)) is not in schedule and therefore cannot be replaced"
-    # set_vtx_map!(sched,pred,id,v)
-    # set_path_spec!(sched,v,path_spec)
-    # sched
 end
 function replace_in_schedule!(sched::P,spec::T,pred,id::ID) where {P<:OperatingSchedule,T<:ProblemSpec,ID<:AbstractID}
     replace_in_schedule!(sched,generate_path_spec(sched,spec,pred),pred,id)
@@ -670,16 +676,10 @@ function add_to_schedule!(sched::OperatingSchedule,node::ScheduleNode)
     @assert get_vtx(sched, id) == -1 "Trying to add $(string(id)) => $(string(pred)) to schedule, but $(string(id)) => $(string(get_node_from_id(sched,id))) already exists"
     add_vertex!(get_graph(sched))
     insert_to_vtx_map!(sched,node,id,nv(get_graph(sched)))
-    # add_path_spec!(sched,path_spec)
     sched
 end
 function add_to_schedule!(sched::P,path_spec::T,pred,id::ID) where {P<:OperatingSchedule,T<:PathSpec,ID<:AbstractID}
     add_to_schedule!(sched,ScheduleNode(id,pred,path_spec))
-    # @assert get_vtx(sched, id) == -1 "Trying to add $(string(id)) => $(string(pred)) to schedule, but $(string(id)) => $(string(get_node_from_id(sched,id))) already exists"
-    # add_vertex!(get_graph(sched))
-    # insert_to_vtx_map!(sched,pred,id,nv(get_graph(sched)))
-    # add_path_spec!(sched,path_spec)
-    # sched
 end
 function add_to_schedule!(sched::P,spec::T,pred,id::ID) where {P<:OperatingSchedule,T<:ProblemSpec,ID<:AbstractID}
     add_to_schedule!(sched,generate_path_spec(sched,spec,pred),pred,id)
@@ -733,10 +733,8 @@ removes a node (by id) from sched.
 function delete_node!(sched::OperatingSchedule, id::AbstractID)
     v = get_vtx(sched, id)
     delete!(sched.vtx_map, id)
-    # delete!(sched.planning_nodes, id)
     rem_vertex!(get_graph(sched), v)
     deleteat!(sched.vtx_ids, v)
-    # deleteat!(sched.path_specs, v)
     deleteat!(sched.planning_nodes, v)
     for vtx in v:nv(get_graph(sched))
         node_id = sched.vtx_ids[vtx]
@@ -827,24 +825,17 @@ function sanity_check(sched::OperatingSchedule,append_string="")
     return true
 end
 function validate(spec::ProjectSpec,op)
-    # for op in spec.operations
     for pred in preconditions(op)
         @assert get_final_condition(spec,get_object_id(pred)) == pred
     end
     for pred in postconditions(op)
         @assert get_initial_condition(spec,get_object_id(pred)) == pred
     end
-    # end
 end
 function validate(sched::OperatingSchedule)
     G = get_graph(sched)
     try
         @assert !is_cyclic(G) "is_cyclic(G)"
-        # for node in sched.planning_nodes
-        #     if typeof(node) <: COLLECT
-        #         @assert(get_location_id(node) != -1, string("get_location_id(node) != -1 for node id ", id))
-        #     end
-        # end
         for e in edges(G)
             node1 = get_node_from_id(sched, get_vtx_id(sched, e.src))
             node2 = get_node_from_id(sched, get_vtx_id(sched, e.dst))
@@ -1172,7 +1163,6 @@ function construct_partial_project_schedule(spec::ProjectSpec,problem_spec::Prob
         problem_spec,
     )
 end
-
 function construct_partial_project_schedule(robot_ICs::Vector{R},prob_spec=
         ProblemSpec(N=length(robot_ICs))
         ) where {R<:BOT_AT}
@@ -1215,7 +1205,6 @@ function process_schedule(sched::P,t0=zeros(Int,nv(sched)),
     end
     ########## Compute Lower Bounds Via Forward Dynamic Programming pass
     for v in traversal
-        # path_spec = sched.path_specs[v]
         path_spec = get_path_spec(sched,v)
         Δt_min = path_spec.min_duration
         for v2 in inneighbors(G,v)
@@ -1231,6 +1220,35 @@ function process_schedule(sched::P,t0=zeros(Int,nv(sched)),
         end
     end
     t0,tF,slack,local_slack
+end
+function update_schedule_times!(sched::OperatingSchedule)
+    G = get_graph(sched)
+    for v in topological_sort_by_dfs(G)
+        t0 = get_t0(sched,v)
+        for v2 in inneighbors(G,v)
+            t0 = max(t0,get_tF(sched,v2))
+        end
+        set_t0!(sched,v,t0)
+        set_tF!(sched,v,max(get_tF(sched,v),t0+get_min_duration(sched,v)))
+    end
+    return sched
+end
+function compute_slack(sched::OperatingSchedule)
+    G = get_graph(sched)
+    n_roots = max(length(sched.terminal_vtxs),1)
+    slack = map(i->Inf*ones(n_roots), vertices(G))
+    local_slack = map(i->Inf*ones(n_roots), vertices(G))
+    # True terminal nodes
+    for (i,v) in enumerate(sched.terminal_vtxs)
+        slack[v][i] = 0 # only slack for corresponding head is set to 0
+    end
+    for v in reverse(topological_sort_by_dfs(G))
+        for v2 in outneighbors(G,v)
+            local_slack[v] = min.(local_slack[v], (get_t0(sched,v2) - get_tF(sched,v)))
+            slack[v] = min.(slack[v], slack[v2] .+ (get_t0(sched,v2) - get_tF(sched,v)))
+        end
+    end
+    slack,local_slack
 end
 
 export
