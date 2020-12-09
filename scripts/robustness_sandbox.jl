@@ -75,7 +75,7 @@ plot_project_schedule(env)
 # cbs_env = build_env(solver, pcmapf, search_env, node, VtxID(v))
 # remove_edges!(get_graph(cbs_env),Set([Edge(1,2)]))
 # TaskGraphs.regenerate_path_specs!(solver,search_env)
-# @show get_path_spec(sched, v).min_path_duration
+# @show get_path_spec(sched, v).min_duration
 #
 # set_verbosity!(solver,6)
 # set_iteration_limit!(low_level(low_level(route_planner(solver))),50)

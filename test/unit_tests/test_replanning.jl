@@ -18,6 +18,22 @@ let
     FullReplanner()
     ProjectRequest(OperatingSchedule(),10,10)
 end
+let
+    @test remap_object_id(ObjectID(1),2) == ObjectID(3)
+    @test remap_object_id(OBJECT_AT(1,1),2) == OBJECT_AT(3,1)
+    remap_object_id(ScheduleNode(
+        ObjectID(1),
+        OBJECT_AT(1,1),
+        PathSpec(object_id=1)
+        ),2)
+    prob = pctapf_problem_1(NBSSolver())
+    sched = get_schedule(prob.env)
+    remap_object_ids!(sched,10)
+    for (k,v) in get_object_ICs(sched)
+        @test get_id(k) > 10
+        @test get_id(get_object_id(v)) > 10
+    end
+end
 # Test break_assignments(...)
 let
     sched = OperatingSchedule()

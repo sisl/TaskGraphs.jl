@@ -568,7 +568,7 @@ function formulate_schedule_milp(sched::OperatingSchedule,problem_spec::ProblemS
     )
     G = get_graph(sched);
     assignments = [];
-    Δt = map(v->get_path_spec(sched, v).min_path_duration, vertices(G))
+    Δt = map(v->get_path_spec(sched, v).min_duration, vertices(G))
 
     model = Model(with_optimizer(optimizer,
         TimeLimit=TimeLimit,
@@ -673,7 +673,7 @@ function formulate_schedule_milp(sched::OperatingSchedule,problem_spec::ProblemS
                     potential_match = true # TODO: investigate why the solver fails when this is moved inside the following if statement
                     if (val > 0 && val2 > 0)
                         new_node = align_with_successor(node,node2)
-                        dt_min = generate_path_spec(sched,problem_spec,new_node).min_path_duration
+                        dt_min = generate_path_spec(sched,problem_spec,new_node).min_duration
                         @constraint(model, tF[v] - (t0[v] + dt_min) >= -Mm*(1 - Xa[v,v2]))
                         @constraint(model, t0[v2] - tF[v] >= -Mm*(1 - Xa[v,v2]))
                         break
@@ -791,7 +791,7 @@ function formulate_milp(milp_model::SparseAdjacencyMILP,sched::OperatingSchedule
         n_eligible_predecessors, n_required_successors, n_required_predecessors,
         upstream_vertices, non_upstream_vertices
         ) = preprocess_project_schedule(sched)
-    Δt = map(v->get_path_spec(sched, v).min_path_duration, vertices(G))
+    Δt = map(v->get_path_spec(sched, v).min_duration, vertices(G))
 
     @variable(model, t0[1:nv(G)] >= 0.0); # initial times for all nodes
     @variable(model, tF[1:nv(G)] >= 0.0); # final times for all nodes
@@ -844,7 +844,7 @@ function formulate_milp(milp_model::SparseAdjacencyMILP,sched::OperatingSchedule
                                     @log_info(-1,0,"outneighbors(sched,$(string(node2))): ",map(vp->string(string(get_node_from_vtx(sched,vp)),", "), outneighbors(sched,v2))...)
                                 end
 
-                                dt_min = generate_path_spec(sched,problem_spec,new_node).min_path_duration
+                                dt_min = generate_path_spec(sched,problem_spec,new_node).min_duration
                                 Xa[v,v2] = @variable(model, binary=true) # initialize a new binary variable in the sparse adjacency matrix
                                 @constraint(model, tF[v] - (t0[v] + dt_min) >= -Mm*(1 - Xa[v,v2]))
                                 @constraint(model, t0[v2] - tF[v] >= -Mm*(1 - Xa[v,v2]))
@@ -952,7 +952,7 @@ function formulate_milp(milp_model::FastSparseAdjacencyMILP,sched::OperatingSche
 
     G = get_graph(sched);
     cache = preprocess_project_schedule(sched,true)
-    Δt = map(v->get_path_spec(sched, v).min_path_duration, vertices(G))
+    Δt = map(v->get_path_spec(sched, v).min_duration, vertices(G))
 
     # In order to speed up the solver, we try to reduce the total number of
     # variables in the JuMP Model. Wherever possible, t0[v] and tF[v] are
@@ -1023,7 +1023,7 @@ function formulate_milp(milp_model::FastSparseAdjacencyMILP,sched::OperatingSche
                             if (val > 0 && val2 > 0)
                                 potential_match = true
                                 new_node = align_with_successor(node,node2)
-                                dt_min = generate_path_spec(sched,problem_spec,new_node).min_path_duration
+                                dt_min = generate_path_spec(sched,problem_spec,new_node).min_duration
                                 Xa[v,v2] = @variable(model, binary=true) # initialize a new binary variable in the sparse adjacency matrix
                                 @constraint(model, tF[v] - (t0[v] + dt_min) >= -Mm*(1 - Xa[v,v2]))
                                 @constraint(model, t0[v2] - tF[v] >= -Mm*(1 - Xa[v,v2]))
@@ -1206,7 +1206,7 @@ function construct_schedule_distance_matrix(project_schedule,problem_spec)
                             end
                             if (val > 0 && val2 > 0)
                                 new_node = align_with_successor(node,node2)
-                                D[v,v2] = generate_path_spec(project_schedule,problem_spec,new_node).min_path_duration
+                                D[v,v2] = generate_path_spec(project_schedule,problem_spec,new_node).min_duration
                             end
                         end
                     end

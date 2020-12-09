@@ -88,6 +88,22 @@ remap_object_id(node::OBJECT_AT,args...)    = OBJECT_AT(remap_object_id(get_obje
 remap_object_id(node::A,args...) where {A<:Union{COLLECT,DEPOSIT}} = A(o=remap_object_id(get_object_id(node),args...),r=get_robot_id(node),x=get_location_id(node))
 remap_object_id(node::A,args...) where {A<:CARRY} = A(o=remap_object_id(get_object_id(node),args...),r=node.r,x1=node.x1,x2=node.x2)
 remap_object_id(node::A,args...) where {A<:TEAM_ACTION} = A(instructions=map(i->remap_object_id(i,args...),node.instructions),shape=node.shape)
+remap_object_id(node::ScheduleNode,args...) = ScheduleNode(
+    remap_object_id(node.id,args...),
+    remap_object_id(node.node,args...),
+    remap_object_id(node.spec,args...)
+    )
+function remap_object_ids!(vec::Vector,args...)
+    map!(i->remap_object_id(i,args...),vec,vec)
+end
+function remap_object_ids!(dict::Dict,args...)
+    for k in collect(keys(dict))
+        val = remap_object_id(dict[k],args...)
+        delete!(dict, k)
+        dict[remap_object_id(k,args...)] = val
+    end
+    dict
+end
 function remap_object_ids!(node::Operation,args...)
     new_pre = Set([remap_object_id(o,args...) for o in node.pre])
     empty!(node.pre)
@@ -98,22 +114,24 @@ function remap_object_ids!(node::Operation,args...)
     node
 end
 remap_object_id(node::Operation,args...)    = remap_object_ids!(deepcopy(node),args...)
-function remap_object_ids!(project_schedule::OperatingSchedule,args...)
-    for i in 1:length(project_schedule.vtx_ids)
-        project_schedule.vtx_ids[i] = remap_object_id(project_schedule.vtx_ids[i],args...)
-    end
-    for dict in (project_schedule.vtx_map, project_schedule.planning_nodes)
-        for k in collect(keys(dict))
-            new_node = remap_object_id(dict[k],args...)
-            delete!(dict, k)
-            dict[remap_object_id(k,args...)] = new_node
-        end
-    end
-    for v in vertices(get_graph(project_schedule))
-        project_schedule.path_specs[v] = remap_object_id(project_schedule.path_specs[v],args...)
-    end
-    @assert sanity_check(project_schedule," after remap_object_ids!()")
-    project_schedule
+function remap_object_ids!(sched::OperatingSchedule,args...)
+    remap_object_ids!(sched.vtx_ids,args...)
+    remap_object_ids!(sched.planning_nodes,args...)
+    remap_object_ids!(sched.vtx_map,args...)
+    # for v in vertices(get_graph(sched))
+    #     sched.vtx_ids[v] = remap_object_id(sched.vtx_ids[v],args...)
+    #     sched.planning_nodes[v] = remap_object_id(sched.planning_nodes[v],args...)
+    #     # sched.path_specs[v] = remap_object_id(sched.path_specs[v],args...)
+    # end
+    # for dict in [sched.vtx_map,]
+    #     for k in collect(keys(dict))
+    #         new_node = remap_object_id(dict[k],args...)
+    #         delete!(dict, k)
+    #         dict[remap_object_id(k,args...)] = new_node
+    #     end
+    # end
+    @assert sanity_check(sched," after remap_object_ids!()")
+    sched
 end
 function remap_object_ids!(new_schedule::OperatingSchedule,old_schedule::OperatingSchedule)
     max_obj_id = 0

@@ -65,12 +65,8 @@ Elements:
     r0::Vector{Int}         = Int[]
     s0::Vector{Int}         = Int[] # pickup stations for each task
     sF::Vector{Int}         = Int[] # delivery station for each task
-    # nR::Vector{Int}         = map(o->1,s0) # num robots required for each task (>1 => collaborative task)
-    # N::Int                  = length(r0) # num robots
-    # M::Int                  = length(s0) # num tasks
     Δt_collect::Vector{Float64} = zeros(length(s0)) # duration of COLLECT operations
     Δt_deliver::Vector{Float64} = zeros(length(s0)) # duration of DELIVER operations
-    # @assert length(r0) == N
     @assert length(s0) == length(sF) == length(Δt_collect) == length(Δt_deliver) # == M
 end
 TaskGraphs.get_distance(spec::ProblemSpec,args...) = get_distance(spec.D,args...)
@@ -375,7 +371,7 @@ Fields:
 * `node_type::Symbol = :EMPTY`
 * `start_vtx::Int = -1`
 * `final_vtx::Int = -1`
-* `min_path_duration::Int = 0`
+* `min_duration::Int = 0`
 * `agent_id::Int = -1`
 * `object_id::Int = -1`
 * `plan_path::Bool = true` - flag indicating whether a path must be planned.
@@ -396,7 +392,9 @@ Fields:
     node_type           ::Symbol        = :EMPTY
     start_vtx           ::Int           = -1
     final_vtx           ::Int           = -1
-    min_path_duration   ::Int           =  0
+    t0                  ::Int           = 0
+    min_duration        ::Int           = 0
+    tF                  ::Int           = t0 + min_duration
     agent_id            ::BotID         = RobotID()
     object_id           ::ObjectID      = ObjectID()
     plan_path           ::Bool          = true
@@ -406,7 +404,17 @@ Fields:
     fixed               ::Bool          = false
 end
 
-# remap_object_id(spec::PathSpec,max_obj_id)  = PathSpec(spec,object_id=spec.object_id + max_obj_id)
+export ScheduleNode
+
+mutable struct ScheduleNode{I<:AbstractID,V<:AbstractPlanningPredicate}
+    id::I
+    node::V
+    spec::PathSpec
+end
+get_path_spec(node::ScheduleNode) = node.spec
+function set_path_spec!(node::ScheduleNode,spec)
+    node.spec = spec
+end
 
 export
     OperatingSchedule,
@@ -418,6 +426,7 @@ export
     get_operations,
     get_vtx_ids,
     get_node_from_id,
+    get_schedule_node,
     get_node_from_vtx,
     get_completion_time,
     get_duration,
@@ -438,17 +447,16 @@ constraint between them.
 """
 @with_kw struct OperatingSchedule{G<:AbstractGraph} <: AbstractGraph{Int}
     graph               ::G                     = DiGraph()
-    planning_nodes      ::Dict{AbstractID,AbstractPlanningPredicate}    = Dict{AbstractID,AbstractPlanningPredicate}()
+    planning_nodes      ::Vector{ScheduleNode}  = Vector{ScheduleNode}()
     vtx_map             ::Dict{AbstractID,Int}  = Dict{AbstractID,Int}()
-    # TODO add UID vector so that vertex deletion can be constant time
     vtx_ids             ::Vector{AbstractID}    = Vector{AbstractID}() # maps vertex uid to actual graph node
-    path_specs          ::Vector{PathSpec}      = Vector{PathSpec}()
+    # path_specs          ::Vector{PathSpec}      = Vector{PathSpec}()
     terminal_vtxs       ::Vector{Int}           = Vector{Int}() # list of "project heads"
     weights             ::Dict{Int,Float64}     = Dict{Int,Float64}() # weights corresponding to project heads
 end
-Base.zero(schedule::OperatingSchedule{G}) where {G} = OperatingSchedule(graph=G())
-LightGraphs.edges(schedule::OperatingSchedule) = edges(schedule.graph)
-LightGraphs.is_directed(schedule::OperatingSchedule) = true
+Base.zero(sched::OperatingSchedule{G}) where {G} = OperatingSchedule(graph=G())
+LightGraphs.edges(sched::OperatingSchedule) = edges(sched.graph)
+LightGraphs.is_directed(sched::OperatingSchedule) = true
 for op in [
     :edgetype,:has_edge,:has_vertex,:inneighbors,:ne,:nv,:outneighbors,
     :vertices,#:indegree,:outdegree
@@ -456,33 +464,38 @@ for op in [
     @eval LightGraphs.$op(sched::OperatingSchedule,args...) = $op(sched.graph,args...)
 end
 
-CRCBS.get_graph(schedule::P) where {P<:OperatingSchedule}       = schedule.graph
-get_vtx_ids(schedule::P) where {P<:OperatingSchedule}     = schedule.vtx_ids
-get_terminal_vtxs(schedule::P) where {P<:OperatingSchedule}  = schedule.terminal_vtxs
-get_root_node_weights(schedule::P) where {P<:OperatingSchedule}  = schedule.weights
+CRCBS.get_graph(sched::P) where {P<:OperatingSchedule}       = sched.graph
+get_vtx_ids(sched::P) where {P<:OperatingSchedule}           = sched.vtx_ids
+get_terminal_vtxs(sched::P) where {P<:OperatingSchedule}     = sched.terminal_vtxs
+get_root_node_weights(sched::P) where {P<:OperatingSchedule} = sched.weights
 
-get_node_from_id(schedule::P,id::A) where {P<:OperatingSchedule,A<:AbstractID}= schedule.planning_nodes[id]
-CRCBS.get_vtx(schedule::P,id::A) where {P<:OperatingSchedule,A<:AbstractID} = get(schedule.vtx_map, id, -1)
-get_vtx_id(schedule::P,v::Int) where {P<:OperatingSchedule}                   = schedule.vtx_ids[v]
-get_node_from_vtx(schedule::P,v::Int) where {P<:OperatingSchedule}= schedule.planning_nodes[schedule.vtx_ids[v]]
+CRCBS.get_vtx(sched::OperatingSchedule,id::AbstractID)  = get(sched.vtx_map, id, -1)
+get_vtx_id(sched::OperatingSchedule,v::Int)             = sched.vtx_ids[v]
+get_schedule_node(sched,v::Int)         = sched.planning_nodes[v]
+get_schedule_node(sched,id::AbstractID) = get_schedule_node(sched,get_vtx(sched,id))
+get_node_from_id(sched::OperatingSchedule,id::AbstractID) = get_schedule_node(sched,id).node
+get_node_from_vtx(sched::OperatingSchedule,v::Int)      = get_schedule_node(sched,v).node
 
-get_nodes_of_type(schedule::P,T) where {P<:OperatingSchedule} = Dict(id=>get_node_from_id(schedule, id) for id in schedule.vtx_ids if typeof(id)<:T)
-get_object_ICs(schedule::P) where {P<:OperatingSchedule}  = get_nodes_of_type(schedule,ObjectID)
-get_robot_ICs(schedule::P) where {P<:OperatingSchedule}   = get_nodes_of_type(schedule,BotID)
-get_actions(schedule::P) where {P<:OperatingSchedule}     = get_nodes_of_type(schedule,ActionID)
-get_operations(schedule::P) where {P<:OperatingSchedule}  = get_nodes_of_type(schedule,OperationID)
+get_nodes_of_type(sched::P,T) where {P<:OperatingSchedule} = Dict(id=>get_node_from_id(sched, id) for id in sched.vtx_ids if typeof(id)<:T)
+get_object_ICs(sched::P) where {P<:OperatingSchedule}  = get_nodes_of_type(sched,ObjectID)
+get_robot_ICs(sched::P) where {P<:OperatingSchedule}   = get_nodes_of_type(sched,BotID)
+get_actions(sched::P) where {P<:OperatingSchedule}     = get_nodes_of_type(sched,ActionID)
+get_operations(sched::P) where {P<:OperatingSchedule}  = get_nodes_of_type(sched,OperationID)
 
 export
     set_vtx_map!,
     insert_to_vtx_map!
 
-function set_vtx_map!(schedule::S,pred::P,id::A,v::Int) where {S<:OperatingSchedule,P<:AbstractPlanningPredicate,A<:AbstractID}
-    schedule.planning_nodes[id] = pred
-    schedule.vtx_map[id] = v
+function set_vtx_map!(sched::OperatingSchedule,node,id::AbstractID,v::Int)
+    # sched.planning_nodes[id] = pred
+    @assert nv(sched) >= v
+    sched.vtx_map[id] = v
+    sched.planning_nodes[v] = node
 end
-function insert_to_vtx_map!(schedule::P,pred,id::ID,idx::Int) where {P<:OperatingSchedule,ID<:AbstractID}
-    push!(schedule.vtx_ids, id)
-    set_vtx_map!(schedule,pred,id,idx)
+function insert_to_vtx_map!(sched::OperatingSchedule,node,id::AbstractID,idx::Int=nv(sched))
+    push!(sched.vtx_ids, id)
+    push!(sched.planning_nodes, node)
+    set_vtx_map!(sched,node,id,idx)
 end
 
 export
@@ -490,32 +503,18 @@ export
     set_path_spec!,
     add_path_spec!
 
-get_path_spec(schedule::P,v::Int) where {P<:OperatingSchedule} = schedule.path_specs[v]
-function set_path_spec!(schedule::P,v::Int,spec::S) where {P<:OperatingSchedule,S<:PathSpec}
-    schedule.path_specs[v] = spec
-end
-function add_path_spec!(schedule::P,spec::S) where {P<:OperatingSchedule,S<:PathSpec}
-    push!(schedule.path_specs, spec)
-    set_path_spec!(schedule, nv(schedule.graph), spec)
-end
+# get_path_spec(sched::P,v::Int) where {P<:OperatingSchedule} = sched.path_specs[v]
+get_path_spec(sched::OperatingSchedule,v::Int) = get_path_spec(get_schedule_node(sched,v))
+set_path_spec!(sched::OperatingSchedule,v::Int,spec::PathSpec) = set_path_spec!(get_schedule_node(sched,v),spec)
+# function set_path_spec!(sched::P,v::Int,spec::S) where {P<:OperatingSchedule,S<:PathSpec}
+#     # sched.path_specs[v] = spec
+#     sched.planning_nodes[v].spec = spec
+# end
+# function add_path_spec!(sched::P,spec::S) where {P<:OperatingSchedule,S<:PathSpec}
+#     push!(sched.path_specs, spec)
+#     set_path_spec!(sched, nv(sched.graph), spec)
+# end
 
-export
-    ScheduleNode,
-    get_schedule_node
-
-struct ScheduleNode{I,V}
-    v::Int
-    node_id::I
-    node::V
-    path_spec::PathSpec
-end
-function get_schedule_node(schedule,node_id::AbstractID)
-    v = get_vtx(schedule,node_id)
-    node = get_node_from_id(schedule,node_id)
-    path_spec = get_path_spec(schedule,v)
-    return ScheduleNode(v,node_id,node,path_spec)
-end
-get_schedule_node(schedule,v::Int) = get_schedule_node(schedule,get_vtx_id(schedule,v))
 
 """
     generate_path_spec(schedule,spec,node)
@@ -528,7 +527,7 @@ Arguments:
 * spec::ProblemSpec
 * node::T <: AbstractPlanningPredicate
 """
-function generate_path_spec(schedule::P,spec::T,a::BOT_GO) where {P<:OperatingSchedule,T<:ProblemSpec}
+function generate_path_spec(sched::P,spec::T,a::BOT_GO) where {P<:OperatingSchedule,T<:ProblemSpec}
     s0 = get_id(get_initial_location_id(a))
     s = get_id(get_destination_location_id(a))
     r = get_robot_id(a)
@@ -536,13 +535,13 @@ function generate_path_spec(schedule::P,spec::T,a::BOT_GO) where {P<:OperatingSc
         node_type=Symbol(typeof(a)),
         start_vtx=s0,
         final_vtx=s,
-        min_path_duration=get_distance(spec.D,s0,s), # ProblemSpec distance matrix
+        min_duration=get_distance(spec.D,s0,s), # ProblemSpec distance matrix
         agent_id=r,
         tight=true,
         free = (s==-1) # if destination is -1, there is no goal location
         )
 end
-function generate_path_spec(schedule::P,spec::T,a::BOT_CARRY) where {P<:OperatingSchedule,T<:ProblemSpec}
+function generate_path_spec(sched::P,spec::T,a::BOT_CARRY) where {P<:OperatingSchedule,T<:ProblemSpec}
     s0 = get_id(get_initial_location_id(a))
     s = get_id(get_destination_location_id(a))
     r = get_robot_id(a)
@@ -551,12 +550,12 @@ function generate_path_spec(schedule::P,spec::T,a::BOT_CARRY) where {P<:Operatin
         node_type=Symbol(typeof(a)),
         start_vtx=s0,
         final_vtx=s,
-        min_path_duration=get_distance(spec.D,s0,s), # ProblemSpec distance matrix
+        min_duration=get_distance(spec.D,s0,s), # ProblemSpec distance matrix
         agent_id=r,
         object_id = o
         )
 end
-function generate_path_spec(schedule::P,spec::T,a::BOT_COLLECT) where {P<:OperatingSchedule,T<:ProblemSpec}
+function generate_path_spec(sched::P,spec::T,a::BOT_COLLECT) where {P<:OperatingSchedule,T<:ProblemSpec}
     s0 = get_id(get_initial_location_id(a))
     s = get_id(get_destination_location_id(a))
     r = get_robot_id(a)
@@ -565,13 +564,13 @@ function generate_path_spec(schedule::P,spec::T,a::BOT_COLLECT) where {P<:Operat
         node_type=Symbol(typeof(a)),
         start_vtx=s0,
         final_vtx=s,
-        min_path_duration=get(spec.Δt_collect,o,0),
+        min_duration=get(spec.Δt_collect,o,0),
         agent_id=r,
         object_id = o,
         static=true
         )
 end
-function generate_path_spec(schedule::P,spec::T,a::BOT_DEPOSIT) where {P<:OperatingSchedule,T<:ProblemSpec}
+function generate_path_spec(sched::P,spec::T,a::BOT_DEPOSIT) where {P<:OperatingSchedule,T<:ProblemSpec}
     s0 = get_id(get_initial_location_id(a))
     s = get_id(get_destination_location_id(a))
     r = get_robot_id(a)
@@ -580,55 +579,55 @@ function generate_path_spec(schedule::P,spec::T,a::BOT_DEPOSIT) where {P<:Operat
         node_type=Symbol(typeof(a)),
         start_vtx=s0,
         final_vtx=s,
-        min_path_duration=get(spec.Δt_deliver,o,0),
+        min_duration=get(spec.Δt_deliver,o,0),
         agent_id=r,
         object_id = o,
         static=true
         )
 end
-function generate_path_spec(schedule::P,spec::T,pred::OBJECT_AT) where {P<:OperatingSchedule,T<:ProblemSpec}
+function generate_path_spec(sched::P,spec::T,pred::OBJECT_AT) where {P<:OperatingSchedule,T<:ProblemSpec}
     path_spec = PathSpec(
         node_type=Symbol(typeof(pred)),
         start_vtx=get_id(get_location_id(pred)),
         final_vtx=get_id(get_location_id(pred)),
-        min_path_duration=0,
+        min_duration=0,
         plan_path = false,
         object_id = get_id(get_object_id(pred))
         )
 end
-function generate_path_spec(schedule::P,spec::T,pred::BOT_AT) where {P<:OperatingSchedule,T<:ProblemSpec}
+function generate_path_spec(sched::P,spec::T,pred::BOT_AT) where {P<:OperatingSchedule,T<:ProblemSpec}
     r = get_robot_id(pred)
     path_spec = PathSpec(
         node_type=Symbol(typeof(pred)),
         start_vtx=get_id(get_location_id(pred)),
         final_vtx=get_id(get_location_id(pred)),
-        min_path_duration=0,
+        min_duration=0,
         agent_id=r,
         free=true
         )
 end
-function generate_path_spec(schedule::P,spec::T,op::Operation) where {P<:OperatingSchedule,T<:ProblemSpec}
+function generate_path_spec(sched::P,spec::T,op::Operation) where {P<:OperatingSchedule,T<:ProblemSpec}
     path_spec = PathSpec(
         node_type=Symbol(typeof(op)),
         start_vtx = -1,
         final_vtx = -1,
         plan_path = false,
-        min_path_duration=duration(op)
+        min_duration=duration(op)
         )
 end
-function generate_path_spec(schedule::P,spec::T,pred::TEAM_ACTION) where {P<:OperatingSchedule,T<:ProblemSpec}
+function generate_path_spec(sched::P,spec::T,pred::TEAM_ACTION) where {P<:OperatingSchedule,T<:ProblemSpec}
     s0 = get_id(get_initial_location_id(pred.instructions[1]))
     s = get_id(get_destination_location_id(pred.instructions[1]))
     path_spec = PathSpec(
         node_type=Symbol(typeof(pred)),
-        # min_path_duration = maximum(map(a->generate_path_spec(schedule,spec,a).min_path_duration, pred.instructions)),
-        min_path_duration = get_distance(spec.D,s0,s,team_configuration(pred)),
+        # min_duration = maximum(map(a->generate_path_spec(sched,spec,a).min_duration, pred.instructions)),
+        min_duration = get_distance(spec.D,s0,s,team_configuration(pred)),
         plan_path = true,
         static = (team_action_type(pred) <: Union{COLLECT,DEPOSIT})
         )
 end
-function generate_path_spec(schedule::P,pred) where {P<:OperatingSchedule}
-    generate_path_spec(schedule,ProblemSpec(),pred)
+function generate_path_spec(sched::P,pred) where {P<:OperatingSchedule}
+    generate_path_spec(sched,ProblemSpec(),pred)
 end
 
 """
@@ -637,50 +636,68 @@ end
 Replace the `ScheduleNode` associated with `id` with the new node `pred`, and
 the accompanying `PathSpec` `path_spec`.
 """
-function replace_in_schedule!(schedule::P,path_spec::T,pred,id::ID) where {P<:OperatingSchedule,T<:PathSpec,ID<:AbstractID}
-    v = get_vtx(schedule, id)
+function replace_in_schedule!(sched::OperatingSchedule,node::ScheduleNode)
+    id = node.id
+    v = get_vtx(sched, id)
     @assert v != -1 "node id $(string(id)) is not in schedule and therefore cannot be replaced"
-    set_vtx_map!(schedule,pred,id,v)
-    set_path_spec!(schedule,v,path_spec)
-    schedule
+    set_vtx_map!(sched,node,id,v)
+    # set_path_spec!(sched,v,path_spec)
+    sched
 end
-function replace_in_schedule!(schedule::P,spec::T,pred,id::ID) where {P<:OperatingSchedule,T<:ProblemSpec,ID<:AbstractID}
-    replace_in_schedule!(schedule,generate_path_spec(schedule,spec,pred),pred,id)
+function replace_in_schedule!(sched::P,path_spec::T,pred,id::ID) where {P<:OperatingSchedule,T<:PathSpec,ID<:AbstractID}
+    replace_in_schedule!(sched,ScheduleNode(id,pred,path_spec))
+    # v = get_vtx(sched, id)
+    # @assert v != -1 "node id $(string(id)) is not in schedule and therefore cannot be replaced"
+    # set_vtx_map!(sched,pred,id,v)
+    # set_path_spec!(sched,v,path_spec)
+    # sched
 end
-function replace_in_schedule!(schedule::P,pred,id::ID) where {P<:OperatingSchedule,ID<:AbstractID}
-    replace_in_schedule!(schedule,ProblemSpec(),pred,id)
+function replace_in_schedule!(sched::P,spec::T,pred,id::ID) where {P<:OperatingSchedule,T<:ProblemSpec,ID<:AbstractID}
+    replace_in_schedule!(sched,generate_path_spec(sched,spec,pred),pred,id)
+end
+function replace_in_schedule!(sched::P,pred,id::ID) where {P<:OperatingSchedule,ID<:AbstractID}
+    replace_in_schedule!(sched,ProblemSpec(),pred,id)
 end
 
 """
-    add_to_schedule!(schedule::OperatingSchedule,path_spec::T,pred,id::ID) where {T<:PathSpec,ID<:AbstractID}
+    add_to_schedule!(sched::OperatingSchedule,path_spec::T,pred,id::ID) where {T<:PathSpec,ID<:AbstractID}
 
 Add `ScheduleNode` pred to `sched` with associated `AbstractID` `id` and
 `PathSpec` `path_spec`.
 """
-function add_to_schedule!(sched::P,path_spec::T,pred,id::ID) where {P<:OperatingSchedule,T<:PathSpec,ID<:AbstractID}
+function add_to_schedule!(sched::OperatingSchedule,node::ScheduleNode)
+    id = node.id
     @assert get_vtx(sched, id) == -1 "Trying to add $(string(id)) => $(string(pred)) to schedule, but $(string(id)) => $(string(get_node_from_id(sched,id))) already exists"
     add_vertex!(get_graph(sched))
-    insert_to_vtx_map!(sched,pred,id,nv(get_graph(sched)))
-    add_path_spec!(sched,path_spec)
+    insert_to_vtx_map!(sched,node,id,nv(get_graph(sched)))
+    # add_path_spec!(sched,path_spec)
     sched
 end
-function add_to_schedule!(schedule::P,spec::T,pred,id::ID) where {P<:OperatingSchedule,T<:ProblemSpec,ID<:AbstractID}
-    add_to_schedule!(schedule,generate_path_spec(schedule,spec,pred),pred,id)
+function add_to_schedule!(sched::P,path_spec::T,pred,id::ID) where {P<:OperatingSchedule,T<:PathSpec,ID<:AbstractID}
+    add_to_schedule!(sched,ScheduleNode(id,pred,path_spec))
+    # @assert get_vtx(sched, id) == -1 "Trying to add $(string(id)) => $(string(pred)) to schedule, but $(string(id)) => $(string(get_node_from_id(sched,id))) already exists"
+    # add_vertex!(get_graph(sched))
+    # insert_to_vtx_map!(sched,pred,id,nv(get_graph(sched)))
+    # add_path_spec!(sched,path_spec)
+    # sched
 end
-function add_to_schedule!(schedule::P,pred,id::ID) where {P<:OperatingSchedule,ID<:AbstractID}
-    add_to_schedule!(schedule,ProblemSpec(),pred,id)
+function add_to_schedule!(sched::P,spec::T,pred,id::ID) where {P<:OperatingSchedule,T<:ProblemSpec,ID<:AbstractID}
+    add_to_schedule!(sched,generate_path_spec(sched,spec,pred),pred,id)
+end
+function add_to_schedule!(sched::P,pred,id::ID) where {P<:OperatingSchedule,ID<:AbstractID}
+    add_to_schedule!(sched,ProblemSpec(),pred,id)
 end
 
 function LightGraphs.has_edge(s::OperatingSchedule,i::AbstractID,j::AbstractID)
     has_edge(get_graph(s), get_vtx(s,i), get_vtx(s,j))
 end
-function LightGraphs.add_edge!(schedule::P,id1::A,id2::B) where {P<:OperatingSchedule,A<:AbstractID,B<:AbstractID}
-    success = add_edge!(get_graph(schedule), get_vtx(schedule,id1), get_vtx(schedule,id2))
-    schedule
+function LightGraphs.add_edge!(sched::P,id1::A,id2::B) where {P<:OperatingSchedule,A<:AbstractID,B<:AbstractID}
+    success = add_edge!(get_graph(sched), get_vtx(sched,id1), get_vtx(sched,id2))
+    sched
 end
-function LightGraphs.rem_edge!(schedule::P,id1::A,id2::B) where {P<:OperatingSchedule,A<:AbstractID,B<:AbstractID}
-    success = rem_edge!(get_graph(schedule), get_vtx(schedule,id1), get_vtx(schedule,id2))
-    schedule
+function LightGraphs.rem_edge!(sched::P,id1::A,id2::B) where {P<:OperatingSchedule,A<:AbstractID,B<:AbstractID}
+    success = rem_edge!(get_graph(sched), get_vtx(sched,id1), get_vtx(sched,id2))
+    sched
 end
 
 export
@@ -689,50 +706,51 @@ export
     delete_node!,
     delete_nodes!
 
-function get_leaf_operation_vtxs(schedule::OperatingSchedule)
+function get_leaf_operation_vtxs(sched::OperatingSchedule)
     terminal_vtxs = Int[]
-    for v in get_all_terminal_nodes(schedule)
-        if typeof(get_node_from_id(schedule, get_vtx_id(schedule,v))) == Operation
+    for v in get_all_terminal_nodes(sched)
+        if isa(get_vtx_id(sched,v),OperationID)
             push!(terminal_vtxs,v)
         end
     end
     return terminal_vtxs
 end
-function set_leaf_operation_vtxs!(schedule::OperatingSchedule)
-    empty!(get_terminal_vtxs(schedule))
-    empty!(get_root_node_weights(schedule))
-    for vtx in get_leaf_operation_vtxs(schedule)
-        push!(get_terminal_vtxs(schedule),vtx)
-        get_root_node_weights(schedule)[vtx] = 1.0
+function set_leaf_operation_vtxs!(sched::OperatingSchedule)
+    empty!(get_terminal_vtxs(sched))
+    empty!(get_root_node_weights(sched))
+    for vtx in get_leaf_operation_vtxs(sched)
+        push!(get_terminal_vtxs(sched),vtx)
+        get_root_node_weights(sched)[vtx] = 1.0
     end
-    schedule
+    sched
 end
 
 """
     delete_node!
 
-removes a node (by id) from schedule.
+removes a node (by id) from sched.
 """
-function delete_node!(schedule::OperatingSchedule, id::AbstractID)
-    v = get_vtx(schedule, id)
-    delete!(schedule.vtx_map, id)
-    delete!(schedule.planning_nodes, id)
-    rem_vertex!(get_graph(schedule), v)
-    deleteat!(schedule.vtx_ids, v)
-    deleteat!(schedule.path_specs, v)
-    for vtx in v:nv(get_graph(schedule))
-        node_id = schedule.vtx_ids[vtx]
-        schedule.vtx_map[node_id] = vtx
+function delete_node!(sched::OperatingSchedule, id::AbstractID)
+    v = get_vtx(sched, id)
+    delete!(sched.vtx_map, id)
+    # delete!(sched.planning_nodes, id)
+    rem_vertex!(get_graph(sched), v)
+    deleteat!(sched.vtx_ids, v)
+    # deleteat!(sched.path_specs, v)
+    deleteat!(sched.planning_nodes, v)
+    for vtx in v:nv(get_graph(sched))
+        node_id = sched.vtx_ids[vtx]
+        sched.vtx_map[node_id] = vtx
     end
-    schedule
+    sched
 end
-delete_node!(schedule::OperatingSchedule, v::Int) = delete_node!(schedule,get_vtx_id(schedule,v))
-function delete_nodes!(schedule::OperatingSchedule, vtxs::Vector{Int})
-    node_ids = map(v->get_vtx_id(schedule,v), vtxs)
+delete_node!(sched::OperatingSchedule, v::Int) = delete_node!(sched,get_vtx_id(sched,v))
+function delete_nodes!(sched::OperatingSchedule, vtxs::Vector{Int})
+    node_ids = map(v->get_vtx_id(sched,v), vtxs)
     for id in node_ids
-        delete_node!(schedule,id)
+        delete_node!(sched,id)
     end
-    schedule
+    sched
 end
 
 export backtrack_node
@@ -760,9 +778,6 @@ export
     validate,
     sanity_check
 
-# function dump_schedule(sched,path="tmp.schedule")
-#
-# end
 
 function validate(path::Path, msg::String)
     @assert( !any(convert_to_vertex_lists(path) .== -1), msg )
@@ -774,28 +789,27 @@ end
 function validate(path::Path, v::Int, cbs_env)
     validate(path, string("v = ",v,", path = ",convert_to_vertex_lists(path),", goal: ",cbs_env.goal))
 end
-function sanity_check(project_schedule::OperatingSchedule,append_string="")
-    G = get_graph(project_schedule)
+function sanity_check(sched::OperatingSchedule,append_string="")
+    G = get_graph(sched)
     try
         @assert !is_cyclic(G) "is_cyclic(G)"
-        for (id,node) in project_schedule.planning_nodes
+        for v in vertices(G)
+            node = get_node_from_vtx(sched, v)
+            id = get_vtx_id(sched,v)
             if typeof(node) <: COLLECT
                 @assert(get_location_id(node) != -1, string("get_location_id(node) != -1 for node id ", id))
             end
-        end
-        for v in vertices(G)
-            node = get_node_from_vtx(project_schedule, v)
             if isa(node,Operation)
                 input_ids = Set(map(o->get_id(get_object_id(o)),collect(node.pre)))
                 for v2 in inneighbors(G,v)
-                    node2 = get_node_from_vtx(project_schedule, v2)
+                    node2 = get_node_from_vtx(sched, v2)
                     @assert(get_id(get_object_id(node2)) in input_ids, string(string(node2), " should not be an inneighbor of ",string(node), " whose inputs should be ",input_ids))
                 end
                 @assert(
                     indegree(G,v) == length(node.pre),
                     string("Operation ",string(node),
                         " needs edges from objects ",collect(input_ids),
-                        " but only has edges from objects ",map(v2->get_id(get_object_id(get_node_from_vtx(project_schedule, v2))),inneighbors(G,v))
+                        " but only has edges from objects ",map(v2->get_id(get_object_id(get_node_from_vtx(sched, v2))),inneighbors(G,v))
                     )
                     )
             end
@@ -822,27 +836,31 @@ function validate(spec::ProjectSpec,op)
     end
     # end
 end
-function validate(project_schedule::OperatingSchedule)
-    G = get_graph(project_schedule)
+function validate(sched::OperatingSchedule)
+    G = get_graph(sched)
     try
         @assert !is_cyclic(G) "is_cyclic(G)"
-        for (id,node) in project_schedule.planning_nodes
-            if typeof(node) <: COLLECT
-                @assert(get_location_id(node) != -1, string("get_location_id(node) != -1 for node id ", id))
-            end
-        end
+        # for node in sched.planning_nodes
+        #     if typeof(node) <: COLLECT
+        #         @assert(get_location_id(node) != -1, string("get_location_id(node) != -1 for node id ", id))
+        #     end
+        # end
         for e in edges(G)
-            node1 = get_node_from_id(project_schedule, get_vtx_id(project_schedule, e.src))
-            node2 = get_node_from_id(project_schedule, get_vtx_id(project_schedule, e.dst))
+            node1 = get_node_from_id(sched, get_vtx_id(sched, e.src))
+            node2 = get_node_from_id(sched, get_vtx_id(sched, e.dst))
             @assert(validate_edge(node1,node2), string(" INVALID EDGE: ", string(node1), " --> ",string(node2)))
         end
         for v in vertices(G)
-            node = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v))
+            id = get_vtx_id(sched, v)
+            node = get_node_from_id(sched, id)
+            if typeof(node) <: COLLECT
+                @assert(get_location_id(node) != -1, string("get_location_id(node) != -1 for node id ", id))
+            end
             @assert( outdegree(G,v) >= sum([0, values(required_successors(node))...]) , string("node = ", string(node), " outdegree = ",outdegree(G,v), " "))
             @assert( indegree(G,v) >= sum([0, values(required_predecessors(node))...]), string("node = ", string(node), " indegree = ",indegree(G,v), " ") )
             if isa(node, Union{BOT_GO,BOT_COLLECT,BOT_CARRY,BOT_DEPOSIT})
                 for v2 in outneighbors(G,v)
-                    node2 = get_node_from_vtx(project_schedule, v2)
+                    node2 = get_node_from_vtx(sched, v2)
                     if isa(node2, Union{BOT_GO,BOT_COLLECT,BOT_CARRY,BOT_DEPOSIT})
                         if length(intersect(resources_reserved(node),resources_reserved(node2))) == 0 # job shop constraint
                             @assert( get_robot_id(node) == get_robot_id(node2), string("robot IDs do not match: ",string(node), " --> ", string(node2)))
@@ -863,11 +881,11 @@ function validate(project_schedule::OperatingSchedule)
     end
     return true
 end
-function validate(project_schedule::OperatingSchedule,paths::Vector{Vector{Int}},t0::Vector{Int},tF::Vector{Int})
-    # G = get_graph(project_schedule)
-    for v in vertices(project_schedule)
-        node = get_node_from_vtx(project_schedule, v)
-        path_spec = get_path_spec(project_schedule, v)
+function validate(sched::OperatingSchedule,paths::Vector{Vector{Int}},t0::Vector{Int},tF::Vector{Int})
+    # G = get_graph(sched)
+    for v in vertices(sched)
+        node = get_node_from_vtx(sched, v)
+        path_spec = get_path_spec(sched, v)
         agent_id = get_id(path_spec.agent_id)
         if agent_id != -1
             path = paths[agent_id]
@@ -1180,25 +1198,26 @@ Args:
 * [OPTIONAL] t0::Vector{Int}: default = zeros(Int,nv(schedule))
 * [OPTIONAL] tF::Vector{Int}: default = zeros(Int,nv(schedule))
 """
-function process_schedule(schedule::P,t0=zeros(Int,nv(schedule)),
-        tF=zeros(Int,nv(schedule))
+function process_schedule(sched::P,t0=zeros(Int,nv(sched)),
+        tF=zeros(Int,nv(sched))
     ) where {P<:OperatingSchedule}
 
-    G = get_graph(schedule)
+    G = get_graph(sched)
     traversal = topological_sort_by_dfs(G)
-    n_roots = max(length(schedule.terminal_vtxs),1)
+    n_roots = max(length(sched.terminal_vtxs),1)
     slack = map(i->Inf*ones(n_roots), vertices(G))
     local_slack = map(i->Inf*ones(n_roots), vertices(G))
     # max_deadlines = map(i->typemax(Int), vertices(G))
     # True terminal nodes
-    for (i,v) in enumerate(schedule.terminal_vtxs)
+    for (i,v) in enumerate(sched.terminal_vtxs)
         slack[v] = Inf*ones(n_roots)
         slack[v][i] = 0 # only slack for corresponding head is set to 0
     end
     ########## Compute Lower Bounds Via Forward Dynamic Programming pass
     for v in traversal
-        path_spec = schedule.path_specs[v]
-        Δt_min = path_spec.min_path_duration
+        # path_spec = sched.path_specs[v]
+        path_spec = get_path_spec(sched,v)
+        Δt_min = path_spec.min_duration
         for v2 in inneighbors(G,v)
             t0[v] = max(t0[v], tF[v2])
         end
@@ -1218,21 +1237,21 @@ export
     get_collect_node,
     get_deposit_node
 
-function get_collect_node(schedule::P,id::ObjectID) where {P<:OperatingSchedule}
+function get_collect_node(sched::P,id::ObjectID) where {P<:OperatingSchedule}
     current_id = id
-    node = get_node_from_id(schedule,current_id)
+    node = get_node_from_id(sched,current_id)
     while typeof(node) != COLLECT
-        current_id = get_vtx_id(schedule, outneighbors(get_graph(schedule),get_vtx(schedule,current_id))[1])
-        node = get_node_from_id(schedule, current_id)
+        current_id = get_vtx_id(sched, outneighbors(get_graph(sched),get_vtx(sched,current_id))[1])
+        node = get_node_from_id(sched, current_id)
     end
     return current_id, node
 end
-function get_deposit_node(schedule::P,id::ObjectID) where {P<:OperatingSchedule}
+function get_deposit_node(sched::P,id::ObjectID) where {P<:OperatingSchedule}
     current_id = id
-    node = get_node_from_id(schedule,current_id)
+    node = get_node_from_id(sched,current_id)
     while typeof(node) != DEPOSIT
-        current_id = get_vtx_id(schedule, outneighbors(get_graph(schedule),get_vtx(schedule,current_id))[1])
-        node = get_node_from_id(schedule, current_id)
+        current_id = get_vtx_id(sched, outneighbors(get_graph(sched),get_vtx(sched,current_id))[1])
+        node = get_node_from_id(sched, current_id)
     end
     return current_id, node
 end

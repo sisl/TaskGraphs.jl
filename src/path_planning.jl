@@ -191,7 +191,7 @@ function populate_environment_layer_dict!(layers,
         env::GridFactoryEnvironment,
         prob_spec::ProblemSpec,
     )
-    gkeys = unique(map(graph_key, values(sched.planning_nodes)))
+    gkeys = unique(map(graph_key, map(n->n.node, sched.planning_nodes)))
     for k in gkeys
         layers[k] = construct_environment_layer(env,prob_spec)
     end
@@ -939,7 +939,7 @@ function CRCBS.build_env(
     end
     for v_next in outneighbors(get_graph(get_schedule(env)),v)
         if get_path_spec(get_schedule(env), v_next).static == true
-            duration_next = get_path_spec(get_schedule(env),v_next).min_path_duration
+            duration_next = get_path_spec(get_schedule(env),v_next).min_duration
             for c in sorted_state_constraints(env,get_constraints(node, agent_id)) #.sorted_state_constraints
                 if get_sp(get_path_node(c)).vtx == goal_vtx
                     if 0 < get_time_of(c) - goal_time < duration_next

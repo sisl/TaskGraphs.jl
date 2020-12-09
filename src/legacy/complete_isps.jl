@@ -4,7 +4,7 @@
 # function reverse_propagate_delay!(solver,cache,schedule,delay_vec)
 #     buffer = zeros(nv(schedule))
 #     for v in reverse(topological_sort_by_dfs(get_graph(schedule)))
-#         Δt_min = get_path_spec(schedule,v).min_path_duration
+#         Δt_min = get_path_spec(schedule,v).min_duration
 #         buffer[v] = (cache.tF[v] - (cache.t0[v] + Δt_min))
 #         for v2 in outneighbors(schedule,v)
 #             delay_vec[v] = max(delay_vec[v], delay_vec[v2] - buffer[v2])
@@ -16,7 +16,7 @@
 # function get_delay_vec(solver,cache,schedule,v0)
 #     delay = zeros(nv(schedule))
 #     for v in reverse(topological_sort_by_dfs(get_graph(schedule)))
-#         Δt_min = get_path_spec(schedule,v).min_path_duration
+#         Δt_min = get_path_spec(schedule,v).min_duration
 #         delay[v] = (cache.tF[v] - (cache.t0[v] + Δt_min + minimum(cache.local_slack[v])))
 #     end
 #     # zero out all vtxs that are not predecessors of v
@@ -33,7 +33,7 @@
 #     delay_cut = Set{Int}()
 #     while length(frontier) > 0
 #         v = pop!(frontier)
-#         Δt_min = get_path_spec(schedule,v).min_path_duration
+#         Δt_min = get_path_spec(schedule,v).min_duration
 #         buffer = (cache.tF[v] - (cache.t0[v] + Δt_min))
 #         if get_path_spec(schedule,v).fixed
 #             continue

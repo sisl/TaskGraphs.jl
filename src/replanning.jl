@@ -140,8 +140,8 @@ function split_active_vtxs!(sched::OperatingSchedule,problem_spec::ProblemSpec,c
             push!(tF,tF[v])
             tF[v] = t
             # reset path specs
-            set_path_spec!(sched,v,PathSpec(get_path_spec(sched,v),fixed=true,plan_path=false,min_path_duration=tF[v]-t0[v]))
-            set_path_spec!(sched,v2,PathSpec(get_path_spec(sched,v2),tight=true,min_path_duration=tF[v2]-t0[v2]))
+            set_path_spec!(sched,v,PathSpec(get_path_spec(sched,v),fixed=true,plan_path=false,min_duration=tF[v]-t0[v]))
+            set_path_spec!(sched,v2,PathSpec(get_path_spec(sched,v2),tight=true,min_duration=tF[v2]-t0[v2]))
         end
     end
     set_leaf_operation_vtxs!(sched)
