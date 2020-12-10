@@ -344,7 +344,7 @@ function plan_next_path!(solver::ISPS, pc_mapf::AbstractPC_MAPF, env::SearchEnv,
                 """
                 ISPS:
                     schedule_node: $(string(schedule_node))
-                    cache.tF[v]: $(get_tF(env,v))
+                    get_tF(sched,v): $(get_tF(env,v))
                     maximum(get_cache(env).tF): $(makespan(get_schedule(env)))
                 """)
                 valid_flag = plan_path!(low_level(solver),pc_mapf,env,node,schedule_node,v)
@@ -356,7 +356,7 @@ function plan_next_path!(solver::ISPS, pc_mapf::AbstractPC_MAPF, env::SearchEnv,
                     convert_to_vertex_lists(get_route_plan(env));leftaligned=true),
                 """
                     cache.tF: $(get_tF(env,v))
-                    cache.tF[v]: $(get_tF(env,v))
+                    get_tF(sched,v): $(get_tF(env,v))
                 """)
             catch e
                 if isa(e, SolverException)

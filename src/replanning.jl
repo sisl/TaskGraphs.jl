@@ -88,30 +88,26 @@ export
     splice_schedules!
 
 """
-    get_active_and_fixed_vtxs(sched::OperatingSchedule,
-        cache::PlanningCache,t)
+    get_active_and_fixed_vtxs(sched::OperatingSchedule,t)
 
-"active" vertices "straddle" the query time ti
+"active" vertices "straddle" the query time t
 "fixed" vertices finish before the query time t
 """
-function get_active_and_fixed_vtxs(sched::OperatingSchedule,cache::PlanningCache,t)
+function get_active_and_fixed_vtxs(sched::OperatingSchedule,t)
     active_vtxs = Set{Int}()
     fixed_vtxs = Set{Int}()
     for v in vertices(get_graph(sched))
-        # if cache.tF[v] + minimum(cache.local_slack[v]) <= t
         if get_tF(sched,v) + minimum(get_local_slack(sched,v)) <= t
             push!(fixed_vtxs, v)
-        # elseif cache.t0[v] <= t < cache.tF[v] + minimum(cache.local_slack[v])
     elseif get_t0(sched,v) <= t < get_tF(sched,v) + minimum(get_local_slack(sched,v))
             push!(active_vtxs, v)
         end
     end
-    # @assert all(map(v->cache.tF[v] + minimum(cache.local_slack[v]), collect(active_vtxs)) .>= t)
     @assert all(map(v->get_tF(sched,v) + minimum(get_local_slack(sched,v)), collect(active_vtxs)) .>= t)
     active_vtxs, fixed_vtxs
 end
-get_active_vtxs(sched,cache,t) = get_active_and_fixed_vtxs(sched,cache,t)[1]
-get_fixed_vtxs(sched,cache,t) = get_active_and_fixed_vtxs(sched,cache,t)[2]
+get_active_vtxs(sched,t) = get_active_and_fixed_vtxs(sched,t)[1]
+get_fixed_vtxs(sched,t) = get_active_and_fixed_vtxs(sched,t)[2]
 
 function split_action_node!(sched::OperatingSchedule,problem_spec::ProblemSpec,node::ScheduleNode,x,t)
     @assert isa(node.id,ActionID)
@@ -132,19 +128,19 @@ end
 
 """
     split_active_vtxs!(sched::OperatingSchedule,
-        problem_spec::ProblemSpec,cache::PlanningCache,t;
+        problem_spec::ProblemSpec,t;
 
 Split all GO nodes that "straddle" the cutoff time.
 """
-function split_active_vtxs!(sched::OperatingSchedule,problem_spec::ProblemSpec,cache::PlanningCache,t;
+function split_active_vtxs!(sched::OperatingSchedule,problem_spec::ProblemSpec,t;
     robot_positions::Dict{RobotID,ROBOT_AT}=Dict{RobotID,ROBOT_AT}()
     )
     G = get_graph(sched)
     # identify nodes "cut" by timestep t
-    active_vtxs, fixed_vtxs = get_active_and_fixed_vtxs(sched,cache,t)
+    active_vtxs, fixed_vtxs = get_active_and_fixed_vtxs(sched,t)
     # split active nodes
-    t0 = deepcopy(cache.t0)
-    tF = deepcopy(cache.tF)
+    # t0 = deepcopy(get_t0(sched))
+    # tF = deepcopy(get_tF(sched))
     for v in active_vtxs
         # node_id = get_vtx_id(sched,v)
         # node = get_node_from_id(sched, node_id)
@@ -177,33 +173,30 @@ function split_active_vtxs!(sched::OperatingSchedule,problem_spec::ProblemSpec,c
     end
     set_leaf_operation_vtxs!(sched)
     process_schedule!(sched)
-    new_cache = initialize_planning_cache(sched,t0,tF)
-    sched, new_cache
+    sched
 end
 
 """
     fix_precutoff_nodes!(sched::OperatingSchedule,
-        problem_spec::ProblemSpec,cache::PlanningCache,t)
+        problem_spec::ProblemSpec,t)
 
 Identify all nodes that end before the cutoff time, and change their path spec
     so that the route planner will not actually plan a path for them.
 """
-function fix_precutoff_nodes!(sched::OperatingSchedule,problem_spec::ProblemSpec,cache::PlanningCache,t)
+function fix_precutoff_nodes!(sched::OperatingSchedule,problem_spec::ProblemSpec,t)
     # active_vtxs = Set{Int}()
-    active_vtxs, fixed_vtxs = get_active_and_fixed_vtxs(sched,cache,t)
+    active_vtxs, fixed_vtxs = get_active_and_fixed_vtxs(sched,t)
     # set all fixed_vtxs to plan_path=false
     for v in fixed_vtxs
         set_path_spec!(sched,v,PathSpec(get_path_spec(sched,v), plan_path=false, fixed=true))
     end
     # verify that all vertices following active_vtxs have a start time > 0
-    # @assert all(map(v->cache.t0[v], collect(fixed_vtxs)) .<= t)
-    # @assert all(map(v->cache.tF[v] + minimum(cache.local_slack[v]), collect(active_vtxs)) .>= t)
     @assert all(map(v->get_t0(sched,v), collect(fixed_vtxs)) .<= t)
     @assert all(map(v->get_tF(sched,v) + minimum(get_local_slack(sched,v)), collect(active_vtxs)) .>= t)
-    sched, cache
+    sched
 end
 function fix_precutoff_nodes!(env::SearchEnv,t=minimum(map(length, get_paths(get_route_plan(env)))))
-    fix_precutoff_nodes!(get_schedule(env),get_problem_spec(env),get_cache(env),t)
+    fix_precutoff_nodes!(get_schedule(env),get_problem_spec(env),t)
     return env
 end
 
@@ -251,19 +244,18 @@ end
 
 """
     prune_schedule(sched::OperatingSchedule,
-        problem_spec::ProblemSpec,cache::PlanningCache,t)
+        problem_spec::ProblemSpec,t)
 
     remove nodes that don't need to be kept around any longer
 """
 function prune_schedule(sched::OperatingSchedule,
         problem_spec::ProblemSpec,
-        cache::PlanningCache,
         t,
         )
     G = get_graph(sched)
 
     # identify nodes "cut" by timestep
-    active_vtxs, fixed_vtxs = get_active_and_fixed_vtxs(sched,cache,t)
+    active_vtxs, fixed_vtxs = get_active_and_fixed_vtxs(sched,t)
     # construct set of all nodes to prune out.
     remove_set = Set{Int}()
     for v in active_vtxs
@@ -299,9 +291,6 @@ function prune_schedule(sched::OperatingSchedule,
         add_edge!(new_sched, get_vtx_id(sched, e.src), get_vtx_id(sched, e.dst))
     end
     # Initialize new cache
-    # G = get_graph(new_sched)
-    # t0 = map(v->get(cache.t0, get_vtx(sched, get_vtx_id(new_sched, v)), 0.0), vertices(G))
-    # tF = map(v->get(cache.tF, get_vtx(sched, get_vtx_id(new_sched, v)), 0.0), vertices(G))
     # draw new ROBOT_AT -> GO edges where necessary
     for v in vertices(new_sched)
         # node_id = get_vtx_id(new_sched,v)
@@ -311,9 +300,7 @@ function prune_schedule(sched::OperatingSchedule,
         if isa(pred,BOT_GO) && indegree(new_sched,v) == 0
             robot_id = get_robot_id(pred)
             robot_node = replace_in_schedule!(new_sched, BOT_AT(robot_id, pred.x1), robot_id)
-            # t0[get_vtx(new_sched,robot_id)] = t0[v]
             set_t0!(robot_node,get_t0(node))
-            # add_edge!(new_sched, robot_id, node_id)
             add_edge!(new_sched, robot_node, node)
         end
         if isa(pred,Operation) && indegree(new_sched,v) < num_required_predecessors(pred)
@@ -324,8 +311,6 @@ function prune_schedule(sched::OperatingSchedule,
                     add_to_schedule!(new_sched,o,get_object_id(o))
                     set_t0!(new_sched,get_object_id(o),get_t0(node))
                     set_tF!(new_sched,get_object_id(o),get_t0(node))
-                    # push!(t0,t0[v])
-                    # push!(tF,t0[v])
                     add_edge!(new_sched, get_object_id(o), node)
                 end
             end
@@ -334,14 +319,11 @@ function prune_schedule(sched::OperatingSchedule,
     set_leaf_operation_vtxs!(new_sched)
     process_schedule!(new_sched)
     # init planning cache with the existing solution
-    # new_cache = initialize_planning_cache(new_sched,t0,tF)
-    new_cache = initialize_planning_cache(new_sched)
-
     @assert sanity_check(new_sched)
 
-    new_sched, new_cache
+    new_sched
 end
-prune_schedule(env::SearchEnv,args...) = prune_schedule(get_schedule(env),get_problem_spec(env),get_cache(env),args...)
+prune_schedule(env::SearchEnv,args...) = prune_schedule(get_schedule(env),get_problem_spec(env),args...)
 prune_schedule(solver,env::SearchEnv,args...) = prune_schedule(env,args...)
 
 """
@@ -352,20 +334,17 @@ all `Operation`s that are completed before `t`, remove all nodes upstream of
 them (except for ROBOT_AT nodes), and create new edges between the ROBOT_AT
 nodes and their first GO assignments.
 """
-function prune_project_schedule(sched::OperatingSchedule,problem_spec::ProblemSpec,cache::PlanningCache,t;
+function prune_project_schedule(sched::OperatingSchedule,problem_spec::ProblemSpec,t;
         robot_positions::Dict{RobotID,ROBOT_AT}=Dict{RobotID,ROBOT_AT}()
     )
-    new_sched, new_cache = prune_schedule(sched,problem_spec,cache,t)
+    new_sched = prune_schedule(sched,problem_spec,t)
     # split active nodes
-    new_sched, new_cache = split_active_vtxs!(new_sched,problem_spec,new_cache,t;robot_positions=robot_positions)
+    new_sched = split_active_vtxs!(new_sched,problem_spec,t;robot_positions=robot_positions)
     # freeze nodes that terminate before cutoff time
-    fix_precutoff_nodes!(new_sched,problem_spec,new_cache,t)
+    fix_precutoff_nodes!(new_sched,problem_spec,t)
     # Remove all "assignments" from schedule
     break_assignments!(new_sched,problem_spec)
-
-    # new_cache = initialize_planning_cache(new_sched,new_cache.t0,min.(new_cache.tF,t))
-    new_cache = initialize_planning_cache(new_sched) # tF should be taken care of by split_active_vtxs!(...)
-    new_sched, new_cache
+    new_sched
 end
 
 """
@@ -601,10 +580,9 @@ function get_commit_time(replan_model, search_env, request, commit_threshold=get
     request.t_request + commit_threshold
 end
 get_commit_time(replan_model::Oracle, search_env, request, args...) = request.t_request
-get_commit_time(replan_model::DeferUntilCompletion, search_env, request, commit_threshold) = max(request.t_request + commit_threshold, maximum(get_cache(search_env).tF))
+get_commit_time(replan_model::DeferUntilCompletion, search_env, request, commit_threshold) = max(request.t_request + commit_threshold, maximum(get_tF(get_schedule(search_env))))
 get_commit_time(replan_model::NullReplanner,args...) = get_commit_time(DeferUntilCompletion(),args...)
 function get_commit_time(replan_model::ReassignFreeRobots, search_env, request, commit_threshold)
-    # free_time = maximum(get_cache(search_env).tF)
     free_time = makespan(get_schedule(search_env))
     for v in vertices(get_schedule(search_env))
         # node = get_node_from_vtx(get_schedule(search_env),v)
@@ -621,7 +599,6 @@ function get_commit_time(replan_model::ConstrainedMergeAndBalance, search_env, r
     nv_max = replan_model.max_problem_size - nv(request.schedule)
     t_commit = request.t_request + commit_threshold
     if 0 < nv_max < nv(get_schedule(search_env))
-        # t_commit = max(t_commit, sort(get_cache(search_env).tF; rev=true)[nv_max])
         t_commit = max(t_commit, sort(get_tF(get_schedule(search_env)); rev=true)[nv_max])
     end
     return t_commit
@@ -664,9 +641,9 @@ function set_time_limits!(flag::Bool,replan_model::NullReplanner,solver,t_reques
     return solver
 end
 
-split_active_vtxs!(replan_model::ReplannerModel,new_sched,problem_spec,new_cache,t_commit;kwargs...) = split_active_vtxs!(new_sched,problem_spec,new_cache,t_commit;kwargs...)
+split_active_vtxs!(replan_model::ReplannerModel,new_sched,problem_spec,t_commit;kwargs...) = split_active_vtxs!(new_sched,problem_spec,t_commit;kwargs...)
 
-fix_precutoff_nodes!(replan_model,new_sched,problem_spec,new_cache,t_commit) = fix_precutoff_nodes!(new_sched,problem_spec,new_cache,t_commit)
+fix_precutoff_nodes!(replan_model,new_sched,problem_spec,t_commit) = fix_precutoff_nodes!(new_sched,problem_spec,t_commit)
 
 
 """
@@ -700,30 +677,26 @@ function replan!(solver, replan_model, search_env, request;
     reset_solver!(solver)
     set_time_limits!(replan_model,solver,t_request,t_commit)
     # Update operating schedule
-    new_sched, new_cache = prune_schedule(replan_model,search_env,t_split)
+    new_sched = prune_schedule(replan_model,search_env,t_split)
     @assert sanity_check(new_sched," after prune_schedule()")
     # split active nodes
-    new_sched, new_cache = split_active_vtxs!(replan_model,new_sched,problem_spec,new_cache,t_split;robot_positions=robot_positions)
+    new_sched = split_active_vtxs!(replan_model,new_sched,problem_spec,t_split;robot_positions=robot_positions)
     @assert sanity_check(new_sched," after split_active_vtxs!()")
     # freeze nodes that terminate before cutoff time
-    new_sched, new_cache = fix_precutoff_nodes!(replan_model,new_sched,problem_spec,new_cache,t_split)
+    new_sched = fix_precutoff_nodes!(replan_model,new_sched,problem_spec,t_split)
     # Remove all "assignments" from schedule
     break_assignments!(replan_model,new_sched,problem_spec)
     @assert sanity_check(new_sched," after break_assignments!()")
-    # new_cache = initialize_planning_cache(new_sched,new_cache.t0,min.(new_cache.tF,t_commit))
     # splice projects together!
     set_t0!(next_sched,t_commit)
     splice_schedules!(new_sched,next_sched)
     process_schedule!(new_sched)
     @assert sanity_check(new_sched," after splice_schedules!()")
     # NOTE: better performance is obtained when t_commit is the default t0 (tighter constraint on milp)
-    # t0 = map(v->get(new_cache.t0, v, t_commit), vertices(get_graph(new_sched)))
-    # tF = map(v->get(new_cache.tF, v, t_commit), vertices(get_graph(new_sched)))
     base_search_env = construct_search_env(
         solver,
         new_sched,
         search_env,
-        # initialize_planning_cache(new_sched,t0,tF)
         initialize_planning_cache(new_sched)
         )
     base_route_plan = initialize_route_plan(search_env,get_cost_model(base_search_env))

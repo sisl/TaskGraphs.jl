@@ -629,15 +629,15 @@ end
 export
     get_object_paths
 
-function get_object_paths(solution,schedule,cache)
+function get_object_paths(solution,sched,cache)
     robot_paths = convert_to_vertex_lists(solution)
     tF = maximum(map(length, robot_paths))
     object_paths = Vector{Vector{Int}}()
     object_intervals = Vector{Vector{Int}}()
     object_ids = Int[]
     path_idxs = Int[]
-    for v in vertices(schedule.graph)
-        node = get_node_from_id(schedule,get_vtx_id(schedule,v))
+    for v in vertices(sched.graph)
+        node = get_node_from_id(sched,get_vtx_id(sched,v))
         if isa(node, Union{CARRY,TEAM_CARRY})
             if isa(node, CARRY)
                 object_id = get_object_id(node)
@@ -650,15 +650,15 @@ function get_object_paths(solution,schedule,cache)
                 s0_list = map(n->get_id(get_initial_location_id(n)), node.instructions)
                 sF_list = map(n->get_id(get_destination_location_id(n)), node.instructions)
             end
-            object_vtx = get_vtx(schedule,object_id)
+            object_vtx = get_vtx(sched,object_id)
             for (idx,(agent_id,s0,sF)) in enumerate(zip(agent_id_list,s0_list,sF_list))
                 if get_id(agent_id) != -1
                     push!(object_paths,[
-                        map(t->s0,0:cache.t0[v]-1)...,
-                        map(t->robot_paths[agent_id][t],min(cache.t0[v]+1,tF):min(cache.tF[v]+1,tF,length(robot_paths[agent_id])))...,
-                        map(t->sF,min(cache.tF[v]+1,tF):tF)...
+                        map(t->s0,0:get_t0(sched,v)-1)...,
+                        map(t->robot_paths[agent_id][t],min(get_t0(sched,v)+1,tF):min(get_tF(sched,v)+1,tF,length(robot_paths[agent_id])))...,
+                        map(t->sF,min(get_tF(sched,v)+1,tF):tF)...
                     ])
-                    push!(object_intervals,[cache.t0[object_vtx],cache.tF[v]+1])
+                    push!(object_intervals,[get_t0(sched,object_vtx),get_tF(sched,v)+1])
                     push!(object_ids, get_id(object_id))
                     push!(path_idxs, idx)
                 end

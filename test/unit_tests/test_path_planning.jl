@@ -32,10 +32,10 @@ let
         set_path_cost!(env2,typemax(cost_type(env)),1)
         @test get_path_costs(env)[1] != get_path_costs(env2)[1]
 
-        env.cache.t0[1] = env2.cache.t0[1] + 1
-        env.cache.tF[1] = env2.cache.tF[1] + 1
-        @test env.cache.t0[1] != env2.cache.t0[1]
-        @test env.cache.tF[1] != env2.cache.tF[1]
+        set_t0!(env,1,get_t0(env2,1) + 1)
+        set_tF!(env,1,get_tF(env2,1) + 1)
+        @test get_t0(env,1) != get_t0(env2,1)
+        @test get_tF(env,1) != get_tF(env2,1)
     end
     let
         node = initialize_root_node(solver,pc_mapf)
@@ -58,10 +58,10 @@ let
 
         CRCBS.cbs_update_conflict_table!(solver,pc_mapf,node2,nothing)
 
-        node.solution.cache.t0[1] = node2.solution.cache.t0[1] + 1
-        node.solution.cache.tF[1] = node2.solution.cache.tF[1] + 1
-        @test node.solution.cache.t0[1] != node2.solution.cache.t0[1]
-        @test node.solution.cache.tF[1] != node2.solution.cache.tF[1]
+        set_t0!(node.solution,1,get_t0(node2.solution,1) + 1)
+        set_tF!(node.solution,1,get_tF(node2.solution,1) + 1)
+        @test get_t0(node.solution,1) != get_t0(node2.solution,1)
+        @test get_tF(node.solution,1) != get_tF(node2.solution,1)
     end
 
 end

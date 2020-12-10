@@ -30,10 +30,6 @@ function stochastic_problem(ptype::Type{P},solver,prob,clean_up_bot_ICS,disturba
     for pred in clean_up_bot_ICS
         add_new_robot_to_schedule!(sched,pred,get_problem_spec(env))
     end
-    # reinitialize_planning_cache!(sched,cache,
-    #     vcat(cache.t0,zeros(nv(sched)-length(cache.t0))),
-    #     vcat(cache.tF,zeros(nv(sched)-length(cache.tF)))
-    # )
     robot_ICs = get_robot_ICs(sched)
     prob_spec = ProblemSpec(
         get_problem_spec(env),
@@ -136,9 +132,6 @@ function remove_vtxs(sched,cache,remove_set)
     set_leaf_operation_vtxs!(new_sched)
     G = get_graph(new_sched)
     # init planning cache with the existing solution
-    # t0 = map(v->get(cache.t0, get_vtx(sched, get_vtx_id(new_sched, v)), 0.0), vertices(G))
-    # tF = map(v->get(cache.tF, get_vtx(sched, get_vtx_id(new_sched, v)), 0.0), vertices(G))
-    # new_cache = initialize_planning_cache(new_sched,t0,tF)
     process_schedule!(new_sched)
     new_cache = initialize_planning_cache(new_sched)
     # @assert sanity_check(new_sched)
@@ -198,17 +191,10 @@ function handle_disturbance!(solver,prob,env::SearchEnv,d::DroppedObject,t,
         new_sched,get_problem_spec(env,:CleanUpBot),o,op_id,CleanUpBot;
         t0=t
     )
-    # set t0 = t across the board for new vertices
-    # for v in vertices(sched)
-    #     set_t0!(sched,v,get_t0())
-    # end
-    # t0 = map(v->get(new_cache.t0, v, t), vertices(get_graph(new_sched)))
-    # tF = map(v->get(new_cache.tF, v, t), vertices(get_graph(new_sched)))
     construct_search_env(
         solver,
         new_sched,
         env,
-        # initialize_planning_cache(new_sched,t0,tF)
         initialize_planning_cache(new_sched)
     )
 end

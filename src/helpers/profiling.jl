@@ -40,7 +40,7 @@ function get_object_path_summaries(env::SearchEnv)
     summaries = Dict{Int,Dict{Symbol,Union{Vector{Int},Int}}}()
     for v in vertices(get_schedule(env))
         node = get_node_from_vtx(get_schedule(env),v)
-        dict = extract_object_data(node,get_cache(env).t0[v],get_cache(env).tF[v])
+        dict = extract_object_data(node,get_t0(env,v),get_tF(env,v))
         if haskey(dict,:object_id)
             object_id = dict[:object_id]
             merge!(get!(summaries,object_id,valtype(summaries)()),dict)
@@ -73,7 +73,7 @@ function reconstruct_object_paths(robot_paths,object_path_summaries)
     return object_paths, object_intervals
 end
 
-export SolutionAdjacencyMatrix 
+export SolutionAdjacencyMatrix
 struct SolutionAdjacencyMatrix <: FeatureExtractor{Dict{String,Any}} end
 function CRCBS.extract_feature(solver,::SolutionAdjacencyMatrix,pc_tapf,env,timer_results)
     mat = adjacency_matrix(get_graph(get_schedule(env)))

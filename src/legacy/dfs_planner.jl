@@ -340,7 +340,7 @@ function CRCBS.solve!(
         mkpath(DEBUG_PATH)
         for env in envs
             v = get_vtx(get_schedule(search_env),env.node_id)
-            @log_info(-1,solver,"node ",string(get_schedule_node(env))," t0=$(get_cache(search_env).t0[v]), tF=$(get_cache(search_env).tF[v]), closed=$(v in get_cache(search_env).closed_set),")
+            @log_info(-1,solver,"node ",string(get_schedule_node(env))," t0=$(get_t0(search_env,v)), tF=$(get_tF(search_env,v)), closed=$(v in get_cache(search_env).closed_set),")
         end
         robot_paths = convert_to_vertex_lists(route_plan)
         object_paths, object_intervals, object_ids, path_idxs = get_object_paths(route_plan,search_env)

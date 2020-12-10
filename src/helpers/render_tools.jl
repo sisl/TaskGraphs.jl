@@ -325,7 +325,7 @@ function visualize_env(search_env::S,vtxs,pickup_vtxs,dropoff_vtxs,t=0;
         line_width=2pt) where {S<:SearchEnv}
 
     cache = get_cache(search_env)
-    project_schedule = get_schedule(search_env)
+    sched = get_schedule(search_env)
 
     color_scale = Scale.color_discrete_hue()
     colors_vec = color_scale.f(n)
@@ -336,15 +336,15 @@ function visualize_env(search_env::S,vtxs,pickup_vtxs,dropoff_vtxs,t=0;
 
     t1 = Int(floor(t))+1
     path_layers = []
-    for v in 1:get_num_vtxs(project_schedule)
-        vtx_id = get_vtx_id(project_schedule, v)
+    for v in 1:get_num_vtxs(sched)
+        vtx_id = get_vtx_id(sched, v)
         if typeof(vtx_id) <: ActionID
-            node = get_node_from_id(project_schedule,vtx_id)
-            if (cache.t0[v] <= t) && (cache.tF[v] >= t)
-                spec = get_path_spec(project_schedule, v)
+            node = get_node_from_id(sched,vtx_id)
+            if (get_t0(sched,v) <= t) && (get_tF(sched,v) >= t)
+                spec = get_path_spec(sched, v)
                 agent_id = get_id(spec.agent_id)
                 agent_path = robot_paths[agent_id]
-                p = agent_path[max(1,min(t1+1,cache.tF[v]+1)):cache.tF[v]+1]
+                p = agent_path[max(1,min(t1+1,get_tF(sched,v)+1)):get_tF(sched,v)+1]
                 if length(p) > 0
                     idx1 = agent_path[max(1,min(t1,length(agent_path)))]
                     idx2 = agent_path[max(1,min(t1+1,length(agent_path)))]
@@ -1443,9 +1443,9 @@ function render_factory_floor(env::GridFactoryEnvironment;
 end
 
 function get_node_shape(search_env::SearchEnv,graph,v,x,y,r)
-    project_schedule = get_schedule(search_env)
+    sched = get_schedule(search_env)
     cache = get_cache(search_env)
-    node_id = get_vtx_id(project_schedule,get_prop(graph,v,:vtx_id))
+    node_id = get_vtx_id(sched,get_prop(graph,v,:vtx_id))
     if typeof(node_id) <: ActionID
         return Compose.circle(x,y,r)
     elseif typeof(node_id) <: RobotID
@@ -1457,9 +1457,9 @@ function get_node_shape(search_env::SearchEnv,graph,v,x,y,r)
     end
 end
 function get_node_color(search_env::SearchEnv,graph,v,x,y,r)
-    project_schedule = get_schedule(search_env)
+    sched = get_schedule(search_env)
     cache = get_cache(search_env)
-    node_id = get_vtx_id(project_schedule,get_prop(graph,v,:vtx_id))
+    node_id = get_vtx_id(sched,get_prop(graph,v,:vtx_id))
     if typeof(node_id) <: ActionID
         return "cyan"
     elseif typeof(node_id) <: CleanUpBotID
@@ -1473,10 +1473,10 @@ function get_node_color(search_env::SearchEnv,graph,v,x,y,r)
     end
 end
 function get_node_text(search_env::SearchEnv,graph,v,x,y,r)
-    project_schedule = get_schedule(search_env)
+    sched = get_schedule(search_env)
     cache = get_cache(search_env)
     v_ = get_prop(graph,v,:vtx_id)
-    string(cache.t0[v_]," - ",cache.tF[v_],"\n",cache.local_slack[v_]," - ",cache.slack[v_])
+    string(get_t0(sched,v_)," - ",get_tF(sched,v_),"\n",get_local_slack(sched,v_)," - ",get_slack(sched,v_))
 end
 
 function show_times(sched::OperatingSchedule,v)
@@ -1484,14 +1484,14 @@ function show_times(sched::OperatingSchedule,v)
     return string(map(a->string(a[v],","), arr[1:2])...)
 end
 function show_times(cache::PlanningCache,v)
-    slack = minimum(cache.slack[v])
+    slack = minimum(get_slack(sched,v))
     slack_string = slack == Inf ? string(slack) : string(Int(slack))
-    return string(cache.t0[v],",",cache.tF[v],",",slack_string)
+    return string(get_t0(sched,v),",",get_tF(sched,v),",",slack_string)
 end
 
 function plot_project_schedule(
-        project_schedule::OperatingSchedule,
-        cache=initialize_planning_cache(project_schedule),
+        sched::OperatingSchedule,
+        cache=initialize_planning_cache(sched),
         ;
         mode=:root_aligned,
         verbose=true,
@@ -1499,14 +1499,14 @@ function plot_project_schedule(
         color_function = (G,v,x,y,r)->get_prop(G,v,:color),
         text_function = (G,v,x,y,r)->string(
             title_string(
-                get_node_from_id(project_schedule,
-                    get_vtx_id(project_schedule, v)),
+                get_node_from_id(sched,
+                    get_vtx_id(sched, v)),
                 verbose),
             "\n",show_times(cache,v)
             )
         )
-    rg = get_display_metagraph(project_schedule;
-        f=(v,p)->string(v,",",get_id(get_path_spec(project_schedule,v).agent_id)))
+    rg = get_display_metagraph(sched;
+        f=(v,p)->string(v,",",get_id(get_path_spec(sched,v).agent_id)))
     plot_graph_bfs(rg;
         mode=mode,
         shape_function=shape_function,
@@ -1525,18 +1525,17 @@ end
 function snapshot_color_func(env,t)
     sched = get_schedule(env)
     cache = get_cache(env)
-    active = Set(filter(v->cache.t0[v] <= t < cache.tF[v] + maximum(cache.local_slack[v]),vertices(sched)))
+    active = Set(filter(v->get_t0(sched,v) <= t < get_tF(sched,v) + maximum(get_local_slack(sched,v)),vertices(sched)))
     for v in collect(active)
         setdiff!(active,outneighbors(get_graph(sched),v))
     end
-    # active = Set(filter(v->cache.t0[v] <= t <= cache.tF[v]))
+    # active = Set(filter(v->get_t0(sched,v) <= t <= get_tF(sched,v)))
     # active, fixed = get_active_and_fixed_vtxs(sched,cache,t)
     return (G,v,x,y,r)-> v in active ? get_prop(G,v,:color) : "gray"
 end
 function snapshot_text_func(env,t;verbose = true)
     sched = get_schedule(env)
-    cache = get_cache(env)
-    active, fixed = get_active_and_fixed_vtxs(sched,cache,t)
+    active, fixed = get_active_and_fixed_vtxs(sched,t)
     (G,v,x,y,r)->string(
     title_string(get_node_from_id(sched,get_vtx_id(sched, v)),verbose && (v in active)),
     # "\n",show_times(cache,v)
