@@ -29,6 +29,14 @@ end
 export validate
 function validate end
 
+# matches_node_type(::A,::B) where {A<:AbstractPlanningPredicate,B<:AbstractPlanningPredicate} = A <: B
+"""
+    matches_node_type(::A,::Type{B}) where {A<:AbstractPlanningPredicate,B}
+
+Returns true if {A <: B}
+"""
+matches_node_type(::A,::Type{B}) where {A,B} = A <: B
+
 export
     ProblemSpec
 
@@ -471,6 +479,9 @@ const schedule_node_mutator_interface = [
     path_spec_mutator_interface...,
     :set_path_spec!]
 
+matches_node_type(n::ScheduleNode,b::Type{B}) where {B} = matches_node_type(n.node,b)
+
+
 export
     OperatingSchedule,
     get_graph,
@@ -760,7 +771,7 @@ export
 function get_leaf_operation_vtxs(sched::OperatingSchedule)
     terminal_vtxs = Int[]
     for v in get_all_terminal_nodes(sched)
-        if isa(get_vtx_id(sched,v),OperationID)
+        if matches_node_type(get_schedule_node(sched,v),Operation)
             push!(terminal_vtxs,v)
         end
     end
@@ -845,10 +856,10 @@ function sanity_check(sched::OperatingSchedule,append_string="")
         for v in vertices(G)
             node = get_node_from_vtx(sched, v)
             id = get_vtx_id(sched,v)
-            if typeof(node) <: COLLECT
+            if matches_node_type(node,COLLECT)
                 @assert(get_location_id(node) != -1, string("get_location_id(node) != -1 for node id ", id))
             end
-            if isa(node,Operation)
+            if matches_node_type(node,Operation)
                 input_ids = Set(map(o->get_id(get_object_id(o)),collect(node.pre)))
                 for v2 in inneighbors(G,v)
                     node2 = get_node_from_vtx(sched, v2)
@@ -895,15 +906,15 @@ function validate(sched::OperatingSchedule)
         for v in vertices(G)
             id = get_vtx_id(sched, v)
             node = get_node_from_id(sched, id)
-            if typeof(node) <: COLLECT
+            if matches_node_type(node,COLLECT)
                 @assert(get_location_id(node) != -1, string("get_location_id(node) != -1 for node id ", id))
             end
             @assert( outdegree(G,v) >= sum([0, values(required_successors(node))...]) , string("node = ", string(node), " outdegree = ",outdegree(G,v), " "))
             @assert( indegree(G,v) >= sum([0, values(required_predecessors(node))...]), string("node = ", string(node), " indegree = ",indegree(G,v), " ") )
-            if isa(node, Union{BOT_GO,BOT_COLLECT,BOT_CARRY,BOT_DEPOSIT})
+            if matches_node_type(node, Union{BOT_GO,BOT_COLLECT,BOT_CARRY,BOT_DEPOSIT})
                 for v2 in outneighbors(G,v)
                     node2 = get_node_from_vtx(sched, v2)
-                    if isa(node2, Union{BOT_GO,BOT_COLLECT,BOT_CARRY,BOT_DEPOSIT})
+                    if matches_node_type(node2, Union{BOT_GO,BOT_COLLECT,BOT_CARRY,BOT_DEPOSIT})
                         if length(intersect(resources_reserved(node),resources_reserved(node2))) == 0 # job shop constraint
                             @assert( get_robot_id(node) == get_robot_id(node2), string("robot IDs do not match: ",string(node), " --> ", string(node2)))
                         end

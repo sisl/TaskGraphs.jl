@@ -168,26 +168,11 @@ let
     TaskGraphs.process_schedule!(sched)
     @test get_t0(sched,RobotID(1)) == 0
     @test get_t0(sched,RobotID(2)) == 0
-    # t0,tF,slack,local_slack = process_schedule(sched)
-    # @test all(t0 .==  map(v->get_t0(sched,v),vertices(sched)))
-    # @test all(tF .==  map(v->get_tF(sched,v),vertices(sched)))
-    # @test all(slack .==  map(v->get_slack(sched,v),vertices(sched)))
-    # @test all(local_slack .==  map(v->get_local_slack(sched,v),vertices(sched)))
-    # @test t0[get_vtx(sched,RobotID(1))] == 0
-    # @test t0[get_vtx(sched,RobotID(2))] == 0
     # try with perturbed start times
-    t0[get_vtx(sched,RobotID(2))] = 1
     set_t0!(sched,RobotID(2),1)
     TaskGraphs.process_schedule!(sched)
     @test get_t0(sched,RobotID(1)) == 0
     @test get_t0(sched,RobotID(2)) == 1
-    # t0,tF,slack,local_slack = process_schedule(sched,t0)
-    # @test all(t0 .==  map(v->get_t0(sched,v),vertices(sched)))
-    # @test all(tF .==  map(v->get_tF(sched,v),vertices(sched)))
-    # @test all(slack .==  map(v->get_slack(sched,v),vertices(sched)))
-    # @test all(local_slack .==  map(v->get_local_slack(sched,v),vertices(sched)))
-    # @test t0[get_vtx(sched,RobotID(1))] == 0
-    # @test t0[get_vtx(sched,RobotID(2))] == 1
 
     @test length(get_vtx_ids(sched)) == nv(get_graph(sched))
     for (v,id) in enumerate(sched.vtx_ids)

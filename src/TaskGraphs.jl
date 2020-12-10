@@ -30,7 +30,7 @@ global RESULTS_DIR      = joinpath(EXPERIMENT_DIR,"results")
 global VIDEO_DIR        = joinpath(EXPERIMENT_DIR,"videos")
 
 include("planning_predicates.jl")
-@reexport using TaskGraphs.PlanningPredicates
+# @reexport using TaskGraphs.PlanningPredicates
 # include("pccbs.jl")
 include("task_graphs_core.jl")
 include("utils.jl")
