@@ -39,37 +39,38 @@ function sprint_cache(io::IO, cache::PlanningCache;label_pad=14,pad=5)
     print(io,"\t",lpad("closed_set:  "),cache.closed_set,"\n")
     print(io,"\t",lpad("active_set:  "),cache.active_set,"\n")
     print(io,"\t",lpad("node_queue:  "),cache.node_queue,"\n")
-    print(io,"\t",rpad("          v: "),spad(1:length(cache.t0);lchar=" ",rchar=" "),"\n")
-    print(io,"\t",lpad("t0:          "),spad(cache.t0),"\n")
-    print(io,"\t",lpad("tF:          "),spad(cache.tF),"\n")
-    if !isempty(cache.slack)
-        slack_dim = length(cache.slack[1])
-        for i in 1:slack_dim
-            pre = (i == 1) ? "slack:" : ""
-            print(io,"\t",lpad(pre),spad(map(slc->slc[i],cache.slack)),"\n")
-        end
-        for i in 1:slack_dim
-            pre = (i == 1) ? "local_slack:" : ""
-            print(io,"\t",lpad(pre),spad(map(slc->slc[i],cache.local_slack)),"\n")
-        end
-    end
+    # print(io,"\t",rpad("          v: "),spad(1:length(cache.t0);lchar=" ",rchar=" "),"\n")
+    # print(io,"\t",lpad("t0:          "),spad(cache.t0),"\n")
+    # print(io,"\t",lpad("tF:          "),spad(cache.tF),"\n")
+    # if !isempty(cache.slack)
+    #     slack_dim = length(cache.slack[1])
+    #     for i in 1:slack_dim
+    #         pre = (i == 1) ? "slack:" : ""
+    #         print(io,"\t",lpad(pre),spad(map(slc->slc[i],cache.slack)),"\n")
+    #     end
+    #     for i in 1:slack_dim
+    #         pre = (i == 1) ? "local_slack:" : ""
+    #         print(io,"\t",lpad(pre),spad(map(slc->slc[i],cache.local_slack)),"\n")
+    #     end
+    # end
 end
 
 function Base.show(io::IO, cache::PlanningCache)
     sprint_cache(io, cache)
 end
 
-function isps_queue_cost(schedule::OperatingSchedule,cache::PlanningCache,v::Int)
-    path_spec = get_path_spec(schedule,v)
-    return (Int(path_spec.plan_path), minimum(cache.slack[v]))
+function isps_queue_cost(sched::OperatingSchedule,cache::PlanningCache,v::Int)
+    path_spec = get_path_spec(sched,v)
+    # return (Int(path_spec.plan_path), minimum(cache.slack[v]))
+    return (Int(path_spec.plan_path), minimum(get_slack(sched,v)))
 end
 
-function initialize_planning_cache(schedule::OperatingSchedule,t0_=zeros(nv(schedule)),tF_=zeros(nv(schedule)))
-    t0,tF,slack,local_slack = process_schedule(schedule,t0_,tF_)
+function initialize_planning_cache(sched::OperatingSchedule,t0_=zeros(nv(sched)),tF_=zeros(nv(sched)))
+    t0,tF,slack,local_slack = process_schedule(sched,t0_,tF_)
     cache = PlanningCache(t0=t0,tF=tF,slack=slack,local_slack=local_slack) #,max_deadline=allowable_slack)
-    for v in get_all_root_nodes(schedule)
+    for v in get_all_root_nodes(sched)
         push!(cache.active_set,v)
-        enqueue!(cache.node_queue,v=>isps_queue_cost(schedule,cache,v)) # need to store slack
+        enqueue!(cache.node_queue,v=>isps_queue_cost(sched,cache,v)) # need to store slack
     end
     cache
 end
@@ -77,50 +78,53 @@ function reinitialize_planning_cache!(sched,cache,
         t0_ = vcat(cache.t0,zeros(nv(sched)-length(cache.t0))),
         tF_ = vcat(cache.tF,zeros(nv(sched)-length(cache.tF)))
         )
-    t0,tF,slack,local_slack = process_schedule(sched,t0_,tF_)
-    empty!(cache.t0)
-    empty!(cache.tF)
-    empty!(cache.slack)
-    empty!(cache.local_slack)
-    append!(cache.t0,t0)
-    append!(cache.tF,tF)
-    append!(cache.slack,slack)
-    append!(cache.local_slack,local_slack)
+    process_schedule!(sched)
+    # t0,tF,slack,local_slack = process_schedule(sched,t0_,tF_)
+    # empty!(cache.t0)
+    # empty!(cache.tF)
+    # empty!(cache.slack)
+    # empty!(cache.local_slack)
+    # append!(cache.t0,t0)
+    # append!(cache.tF,tF)
+    # append!(cache.slack,slack)
+    # append!(cache.local_slack,local_slack)
     cache
 end
 
 export update_planning_cache_times!
 
 function update_planning_cache_times!(sched,cache)
-    t0,tF,slack,local_slack = process_schedule(sched,cache.t0,cache.tF)
-    cache.t0            .= t0
-    cache.tF            .= tF
-    cache.slack         .= slack
-    cache.local_slack   .= local_slack
+    process_schedule!(sched)
+    # t0,tF,slack,local_slack = process_schedule(sched,cache.t0,cache.tF)
+    # cache.t0            .= t0
+    # cache.tF            .= tF
+    # cache.slack         .= slack
+    # cache.local_slack   .= local_slack
     return cache
 end
 
 """
-    `reset_cache!(cache,schedule)`
+    `reset_cache!(cache,sched)`
 
     Resets the cache so that a solution can be repaired (otherwise calling
     low_level_search!() will return immediately because the cache says it's
     complete)
 """
-function reset_cache!(cache::PlanningCache,schedule::OperatingSchedule,t0=cache.t0,tF=cache.tF)
-    t0,tF,slack,local_slack = process_schedule(schedule,t0,tF)
-    cache.t0            .= t0
-    cache.tF            .= tF
-    cache.slack         .= slack
-    cache.local_slack   .= local_slack
+function reset_cache!(cache::PlanningCache,sched::OperatingSchedule)
+    process_schedule!(sched)
+    # t0,tF,slack,local_slack = process_schedule(sched,t0,tF)
+    # cache.t0            .= t0
+    # cache.tF            .= tF
+    # cache.slack         .= slack
+    # cache.local_slack   .= local_slack
     empty!(cache.closed_set)
     empty!(cache.active_set)
     empty!(cache.node_queue)
-    # for v in get_all_terminal_nodes(schedule)
-    for v in vertices(get_graph(schedule))
-        if is_root_node(get_graph(schedule),v)
+    # for v in get_all_terminal_nodes(sched)
+    for v in vertices(get_graph(sched))
+        if is_root_node(get_graph(sched),v)
             push!(cache.active_set,v)
-            enqueue!(cache.node_queue,v=>isps_queue_cost(schedule,cache,v)) # need to store slack
+            enqueue!(cache.node_queue,v=>isps_queue_cost(sched,cache,v)) # need to store slack
         end
     end
     cache
@@ -225,9 +229,18 @@ get_schedule(env::SearchEnv) = env.schedule
 get_schedule(sched::OperatingSchedule) = sched
 get_cache(env::SearchEnv) = env.cache
 get_route_plan(env::SearchEnv) = env.route_plan
+
+for op in path_spec_accessor_interface
+    @eval $op(env::SearchEnv,v) = $op(get_schedule(env),v)
+end
+for op in path_spec_mutator_interface
+    @eval $op(env::SearchEnv,v,val) = $op(get_schedule(env),v,val)
+end
+
 function CRCBS.get_start(env::SearchEnv,v::Int)
     start_vtx   = get_path_spec(get_schedule(env),v).start_vtx
     start_time  = get_cache(env).t0[v]
+    start_time  = get_t0(env,v)
     State(start_vtx,start_time)
 end
 CRCBS.num_agents(env::SearchEnv) = env.num_agents
@@ -257,23 +270,24 @@ for op in [:update_planning_cache_times!]
     @eval $op(env::SearchEnv) = $op(get_schedule(env),get_cache(env))
 end
 
-export
-    get_t0,
-    get_tF,
-    set_t0!,
-    set_tF!
 
-get_t0(cache::PlanningCache,v::Int) = cache.t0[v]
-get_tF(cache::PlanningCache,v::Int) = cache.tF[v]
-get_t0(env::SearchEnv,v::Int) = get_t0(get_cache(env),v)
-get_tF(env::SearchEnv,v::Int) = get_tF(get_cache(env),v)
-function set_t0!(cache::PlanningCache,v::Int,val) cache.t0[v] = val end
-function set_tF!(cache::PlanningCache,v::Int,val) cache.tF[v] = val end
-set_t0!(env::SearchEnv,v::Int,val) = set_t0!(get_cache(env),v,val)
-set_tF!(env::SearchEnv,v::Int,val) = set_tF!(get_cache(env),v,val)
-for op in [:get_t0,:get_tF]
-    @eval $op(env::SearchEnv,id::AbstractID) = $op(env,get_vtx(get_schedule(env),id))
-end
+# get_t0(cache::PlanningCache,v::Int) = cache.t0[v]
+# get_tF(cache::PlanningCache,v::Int) = cache.tF[v]
+# get_t0(env::SearchEnv,v::Int) = get_t0(get_schedule(env),v)
+# get_tF(env::SearchEnv,v::Int) = get_tF(get_schedule(env),v)
+# function set_t0!(cache::PlanningCache,v::Int,val) cache.t0[v] = val end
+# function set_tF!(cache::PlanningCache,v::Int,val) cache.tF[v] = val end
+# function set_t0!(env::SearchEnv,v::Int,val)
+#     set_t0!(get_cache(env),v,val)
+#     set_t0!(get_schedule(env),v,val)
+# end
+# function set_tF!(env::SearchEnv,v::Int,val)
+#     set_tF!(get_cache(env),v,val)
+#     set_tF!(get_schedule(env),v,val)
+# end
+# for op in [:get_t0,:get_tF]
+#     @eval $op(env::SearchEnv,id::AbstractID) = $op(env,get_vtx(get_schedule(env),id))
+# end
 
 export
     get_env_snapshot,
@@ -338,15 +352,15 @@ function Base.show(io::IO,s::EnvState)
 end
 function get_env_state(env,t)
     sched = get_schedule(env)
-    cache = get_cache(env)
+    # cache = get_cache(env)
     robot_positions = get_env_snapshot(env,t)
     object_positions = Dict{ObjectID,OBJECT_AT}()
     objects_active = Dict{ObjectID,Bool}()
     for (o,o_node) in get_object_ICs(sched)
         v = get_vtx(sched,o)
-        if t <= cache.t0[v]
+        if t <= get_t0(env,v)
             object_positions[o] = o_node
-            objects_active[o] = t >= cache.t0[v]
+            objects_active[o] = t >= get_t0(env,v)
         else
             object_positions[o] = o_node
             vtxs = capture_connected_nodes(
@@ -362,11 +376,11 @@ function get_env_state(env,t)
                 collect(vtxs))[1]
 
             node = get_node_from_vtx(sched,v_deposit)
-            if t >= cache.t0[v_deposit]
+            if t >= get_t0(env,v_deposit)
                 object_positions[o] = OBJECT_AT(o,
                     map(n->get_location_id(n),sub_nodes(node))
                     )
-            elseif t >= cache.t0[v_collect]
+            elseif t >= get_t0(env,v_collect)
                 r_ids = get_robot_ids(node)
                 object_positions[o] = OBJECT_AT(o,
                     map(r->get_location_id(robot_positions[r]),r_ids)
@@ -377,7 +391,7 @@ function get_env_state(env,t)
             #         map(r->get_location_id(robot_positions[r]),r_ids)
             #         )
             end
-            objects_active[o] = (t <= cache.tF[v_deposit])
+            objects_active[o] = (t <= get_tF(env,v_deposit))
         end
     end
     EnvState(
@@ -394,8 +408,10 @@ export get_node_start_and_end_times
 Return dictionaries mapping each node id in schedule to its start and end time
 """
 function get_node_start_and_end_times(sched::OperatingSchedule,cache::PlanningCache,default=0)
-    t0 = Dict{AbstractID,Int}(get_vtx_id(sched, v)=>get(cache.t0, v, default) for v in vertices(sched))
-    tF = Dict{AbstractID,Int}(get_vtx_id(sched, v)=>get(cache.tF, v, default) for v in vertices(sched))
+    # t0 = Dict{AbstractID,Int}(get_vtx_id(sched, v)=>get(cache.t0, v, default) for v in vertices(sched))
+    # tF = Dict{AbstractID,Int}(get_vtx_id(sched, v)=>get(cache.tF, v, default) for v in vertices(sched))
+    t0 = Dict{AbstractID,Int}(get_vtx_id(sched,v)=>get_t0(sched, v) for v in vertices(sched))
+    tF = Dict{AbstractID,Int}(get_vtx_id(sched,v)=>get_tF(sched, v) for v in vertices(sched))
     return t0,tF
 end
 function get_node_start_and_end_times(env::SearchEnv,args...)
@@ -529,20 +545,23 @@ export
 update_planning_cache!(solver,env::SearchEnv,v::Int,path::Path) = update_planning_cache!(solver,env,v,get_t(get_final_state(path)))
 function update_planning_cache!(solver,env::SearchEnv,v::Int,t::Int=-1)
     cache = get_cache(env)
-    schedule = get_schedule(env)
+    sched = get_schedule(env)
     active_set = cache.active_set
     closed_set = cache.closed_set
     node_queue = cache.node_queue
-    graph = get_graph(schedule)
+    graph = get_graph(sched)
     # update t0, tF, slack, local_slack
-    Δt = t - cache.tF[v]
+    # Δt = t - cache.tF[v]
+    Δt = t - get_tF(env,v)
     if Δt > 0
-        cache.tF[v] = t
-        t0,tF,slack,local_slack = process_schedule(schedule,cache.t0,cache.tF)
-        cache.t0            .= t0
-        cache.tF            .= tF
-        cache.slack         .= slack
-        cache.local_slack   .= local_slack
+        set_tF!(sched,v,t)
+        process_schedule!(sched)
+        # cache.tF[v] = t
+        # t0,tF,slack,local_slack = process_schedule(sched,cache.t0,cache.tF)
+        # cache.t0            .= t0
+        # cache.tF            .= tF
+        # cache.slack         .= slack
+        # cache.local_slack   .= local_slack
     end
     # update closed_set
     activated_vtxs = Int[]
@@ -564,10 +583,10 @@ function update_planning_cache!(solver,env::SearchEnv,v::Int,t::Int=-1)
     end
     # update priority queue
     for v2 in active_set
-        node_queue[v2] = isps_queue_cost(schedule,cache,v2)
+        node_queue[v2] = isps_queue_cost(sched,cache,v2)
     end
     @log_info(2,solver,"moved ",v," to closed set, moved ",activated_vtxs," to active set")
-    @log_info(3,solver,string("cache.tF[v] = ",cache.tF))
+    @log_info(3,solver,string("cache.tF[v] = ",get_tF(sched,v)))
     return cache
 end
 """
@@ -583,7 +602,7 @@ complete.
 """
 function update_planning_cache!(solver,env)
     cache = get_cache(env)
-    schedule = get_schedule(env)
+    sched = get_schedule(env)
     node = initialize_root_node(env)
     # dummy_path = path_type(env)()
     # Skip over nodes that don't need planning (either they have already been
@@ -591,7 +610,7 @@ function update_planning_cache!(solver,env)
     while true
         done = true
         for v in collect(cache.active_set)
-            if get_path_spec(schedule,v).plan_path == false
+            if get_path_spec(sched,v).plan_path == false
                 update_planning_cache!(solver,env,v) # NOTE I think this is all we need, since there is no actual path to update
                 done = false
             end
@@ -601,7 +620,7 @@ function update_planning_cache!(solver,env)
         end
     end
     for v in collect(cache.active_set)
-        path_spec = get_path_spec(schedule,v)
+        path_spec = get_path_spec(sched,v)
         agent_id = get_id(path_spec.agent_id)
         if 1 <= agent_id <= num_agents(env)
             # @show string(get_node_from_vtx(get_schedule(env),v))
@@ -609,37 +628,50 @@ function update_planning_cache!(solver,env)
             s = get_final_state(path)
             t = get_t(s)
             d = get_distance(env,s,State(path_spec.final_vtx,-1))
-            cache.tF[v] = max(cache.tF[v],t+d)
+            set_tF!(env,v,max(get_tF(env,v),t+d))
+            # cache.tF[v] = max(cache.tF[v],t+d)
         end
     end
-    t0,tF,slack,local_slack = process_schedule(schedule,cache.t0,cache.tF)
-    cache.t0 .= t0
-    cache.tF .= tF
-    cache.slack .= slack
-    cache.local_slack .= local_slack
+    process_schedule!(sched)
+    # t0,tF,slack,local_slack = process_schedule(sched,cache.t0,cache.tF)
+    # cache.t0 .= t0
+    # cache.tF .= tF
+    # cache.slack .= slack
+    # cache.local_slack .= local_slack
 
     cache
 end
 
-function CRCBS.SumOfMakeSpans(schedule::S,cache::C) where {S<:OperatingSchedule,C<:PlanningCache}
-    SumOfMakeSpans(
-        cache.tF,
-        schedule.terminal_vtxs,
-        map(k->schedule.weights[k], schedule.terminal_vtxs),
-        cache.tF[schedule.terminal_vtxs])
-end
-function CRCBS.MakeSpan(schedule::S,cache::C) where {S<:OperatingSchedule,C<:PlanningCache}
-    MakeSpan(
-        cache.tF,
-        schedule.terminal_vtxs,
-        map(k->schedule.weights[k], schedule.terminal_vtxs),
-        cache.tF[schedule.terminal_vtxs])
+for op in [:SumOfMakeSpans,:MakeSpan]
+    @eval $op(sched::OperatingSchedule,cache::PlanningCache) = $op(
+        get_tF(sched),
+        sched.terminal_vtxs,
+        map(k->sched.weights[k], sched.terminal_vtxs),
+        map(v->get_tF(sched,v),sched.terminal_vtxs),
+    )
 end
 
+# function CRCBS.SumOfMakeSpans(schedule::S,cache::C) where {S<:OperatingSchedule,C<:PlanningCache}
+#     SumOfMakeSpans(
+#         # cache.tF,
+#         map(v->get_tF(sched,v),vertices(sched)),
+#         schedule.terminal_vtxs,
+#         map(k->schedule.weights[k], schedule.terminal_vtxs),
+#         cache.tF[schedule.terminal_vtxs])
+# end
+# function CRCBS.MakeSpan(schedule::S,cache::C) where {S<:OperatingSchedule,C<:PlanningCache}
+#     MakeSpan(
+#         # cache.tF,
+#         map(v->get_tF(sched,v),vertices(sched)),
+#         schedule.terminal_vtxs,
+#         map(k->schedule.weights[k], schedule.terminal_vtxs),
+#         cache.tF[schedule.terminal_vtxs])
+# end
 
-function initialize_route_plan(schedule::OperatingSchedule,cost_model)
+
+function initialize_route_plan(sched::OperatingSchedule,cost_model)
     starts = State[]
-    robot_ics = get_robot_ICs(schedule)
+    robot_ics = get_robot_ICs(sched)
     for k in sort(collect(keys(robot_ics)))
         push!(starts, State(vtx = get_id(get_location_id(robot_ics[k])), t = 0))
     end
@@ -676,10 +708,10 @@ function initialize_route_plan(env::SearchEnv,cost_model)
 end
 function construct_search_env(
         solver,
-        schedule::OperatingSchedule,
+        sched::OperatingSchedule,
         problem_spec::ProblemSpec,
         env_graph,
-        cache::PlanningCache=initialize_planning_cache(schedule),
+        cache::PlanningCache=initialize_planning_cache(sched),
         primary_objective=problem_spec.cost_function,
         ;
         extra_T=400,
@@ -687,18 +719,18 @@ function construct_search_env(
     )
     cost_model, heuristic_model = construct_cost_model(
         solver,
-        schedule,
+        sched,
         cache,
         problem_spec,
         env_graph,
         primary_objective;
         extra_T=extra_T,
         )
-    layers = construct_environment_layer_dict(schedule,env_graph,problem_spec)
-    route_plan = initialize_route_plan(schedule,cost_model)
+    layers = construct_environment_layer_dict(sched,env_graph,problem_spec)
+    route_plan = initialize_route_plan(sched,cost_model)
     N = length(get_paths(route_plan))
     search_env = SearchEnv(
-        schedule=schedule,
+        schedule=sched,
         cache=cache,
         env_layers=layers,
         cost_model=cost_model,
@@ -717,9 +749,9 @@ TODO: Carry over information about `get_cache(search_env)`
 """
 function construct_search_env(
         solver,
-        schedule::OperatingSchedule,
+        sched::OperatingSchedule,
         env::SearchEnv,
-        cache::PlanningCache=initialize_planning_cache(schedule,
+        cache::PlanningCache=initialize_planning_cache(sched,
             deepcopy(get_cache(env).t0), deepcopy(get_cache(env).tF)),
         env_graph=get_graph(env),
         problem_spec = get_problem_spec(env),
@@ -731,18 +763,18 @@ function construct_search_env(
     )
     cost_model, heuristic_model = construct_cost_model(
         solver,
-        schedule,
+        sched,
         cache,
         problem_spec,
         env_graph,
         primary_objective;
         extra_T=extra_T,
         )
-    layers = construct_environment_layer_dict(schedule,env_graph,problem_spec)
+    layers = construct_environment_layer_dict(sched,env_graph,problem_spec)
     route_plan = initialize_route_plan(env,cost_model)
     N = length(get_paths(route_plan))
     search_env = SearchEnv(
-        schedule=schedule,
+        schedule=sched,
         cache=cache,
         env_layers=layers,
         cost_model=cost_model,
@@ -753,7 +785,8 @@ end
 
 update_cost_model!(model::C,env::S) where {C,S<:SearchEnv} = nothing
 function update_cost_model!(model::C,env::S) where {C<:MultiDeadlineCost,S<:SearchEnv}
-    model.tF .= get_cache(env).tF
+    # model.tF .= get_cache(env).tF
+    model.tF .= get_tF(get_schedule(env))
 end
 function update_cost_model!(model::C,env::S) where {C<:CompositeCostModel,S<:SearchEnv}
     for m in model.cost_models
@@ -771,8 +804,8 @@ function update_env!(solver,env::SearchEnv,v::Int,path::P,
         agent_id::Int=get_id(get_path_spec(get_schedule(env),v).agent_id)
         ) where {P<:Path}
     route_plan = get_route_plan(env)
-    cache = get_cache(env)
-    schedule = get_schedule(env)
+    # cache = get_cache(env)
+    # sched = get_schedule(env)
     # UPDATE CACHE
     update_planning_cache!(solver,env,v,get_t(get_final_state(path)))
     update_cost_model!(env)
@@ -804,7 +837,8 @@ Returns the gap between a path's length and it's expected length (based on times
 stored in `get_cache(env).t0`)
 """
 function evaluate_path_gap(search_env::SearchEnv,path,v)
-    t0 = get_cache(search_env).t0[v]
+    # t0 = get_cache(search_env).t0[v]
+    t0 = get_t0(search_env,v)
     gap = t0 - get_end_index(path)
     return gap
 end
@@ -819,7 +853,8 @@ function replan_path!(solver, pc_mapf::AbstractPC_MAPF, env::SearchEnv, node::Co
     path = get_base_path(solver,env,cbs_env)
     # @log_info(-1,solver,"old path cost: ",get_cost(path))
     # @log_info(3,low_level(solver),"old path: \n",convert_to_vertex_lists(path))
-    trim_path!(cbs_env,path,get_cache(env).t0[v])
+    # trim_path!(cbs_env,path,get_cache(env).t0[v])
+    trim_path!(cbs_env,path,get_t0(env,v))
     # @log_info(3,low_level(solver),"trimmed path: \n",convert_to_vertex_lists(path))
     # @log_info(-1,solver,"trimmed path cost: ",get_cost(path))
     ### plan path with new goal time
@@ -844,14 +879,16 @@ function tighten_gaps!(solver, pc_mapf::AbstractPC_MAPF, env::SearchEnv, node::C
         v = get_vtx(sched,node_id)
         gap = evaluate_path_gap(env,path,v)
         if gap > 0
-            t0 = get_cache(env).t0[v]
+            # t0 = get_cache(env).t0[v]
+            t0 = get_t0(env,v)
             @log_info(2, solver, "tighten_gaps!: base path for ",
                 string(get_node_from_vtx(sched,v)),
                 ", v = ",v," ends at t=",get_end_index(path),
                 " but should end at t=",t0," (gap = ", gap,").")
             vtxs = backtrack_node(sched,v)
             for vp in vtxs
-                if get_cache(env).tF[vp] < t0
+                # if get_cache(env).tF[vp] < t0
+                if get_tF(env,vp) < t0
                     @log_info(2,solver," Re-launching planner on ",string(get_node_from_vtx(sched,vp))," (v = ",v,")"," with extended horizon ",t0," ...")
                     if replan_path!(solver, pc_mapf, env, node, VtxID(vp),t0)
                         @log_info(2,solver,"tightening succeeded on ",string(get_node_from_vtx(sched,vp))," (v = ",v,")"," with extended horizon ",t0)
@@ -884,13 +921,16 @@ function CRCBS.build_env(
     ) where {T}
     agent_id = get_id(path_spec.agent_id)
     goal_vtx = path_spec.final_vtx
-    goal_time = get_cache(env).tF[v] # time after which goal can be satisfied
+    # goal_time = get_cache(env).tF[v] # time after which goal can be satisfied
+    goal_time = get_tF(env,v) # time after which goal can be satisfied
     # deadline = get_cache(env).tF[v] .+ min.(get_cache(env).max_deadline[v],get_cache(env).slack[v]) # NOTE iterative deadline tightening was causing problems with slack running out before the goal time, so this line has been replaced by the original
     # deadline = get_cache(env).tF[v] .+ min.(max.(get_cache(env).local_slack[v], get_cache(env).max_deadline[v]),get_cache(env).slack[v]) # This is a potential fix that would allow iterative tightening to keep working
-    deadline = get_cache(env).tF[v] .+ get_cache(env).slack[v]         # deadline for DeadlineCost
+    # deadline = get_cache(env).tF[v] .+ get_cache(env).slack[v]         # deadline for DeadlineCost
+    deadline = get_tF(env,v) .+ get_slack(env,v)         # deadline for DeadlineCost
     # Adjust deadlines if necessary:
     if path_spec.tight == true
-        goal_time += minimum(get_cache(env).local_slack[v])
+        # goal_time += minimum(get_cache(env).local_slack[v])
+        goal_time += minimum(get_local_slack(env,v))
     end
     for v_next in outneighbors(get_graph(get_schedule(env)),v)
         if get_path_spec(get_schedule(env), v_next).static == true
@@ -908,7 +948,8 @@ function CRCBS.build_env(
         end
     end
     if (path_spec.free == true) && is_terminal_node(get_graph(get_schedule(env)),v)
-        goal_time = maximum(get_cache(env).tF)
+        # goal_time = maximum(get_cache(env).tF)
+        goal_time = makespan(get_schedule(env))
         goal_vtx = -1
         # deadline = Inf # already taken care of, perhaps?
         @log_info(3,solver,string("BUILD ENV: ",string(schedule_node),
@@ -1032,13 +1073,14 @@ function CRCBS.initialize_root_node(env::SearchEnv)
             ),
         id = 1)
 end
-function CRCBS.discrete_constraint_table(env::SearchEnv,agent_id=-1,tf=2*maximum(get_cache(env).tF)+100*num_agents(env))
+function CRCBS.discrete_constraint_table(env::SearchEnv,agent_id=-1,tf=2*makespan(get_schedule(env))+100*num_agents(env))
     discrete_constraint_table(num_states(env),num_actions(env),agent_id,tf)
 end
 CRCBS.initialize_root_node(solver,pc_mapf::AbstractPC_MAPF) = initialize_root_node(get_env(pc_mapf))
 function Base.copy(env::SearchEnv)
     SearchEnv(
         env,
+        schedule=deepcopy(get_schedule(env)),
         cache=deepcopy(get_cache(env)),
         route_plan=deepcopy(get_route_plan(env))
         )
@@ -1052,7 +1094,8 @@ CRCBS.default_solution(pc_mapf::M) where {M<:AbstractPC_MAPF} = default_solution
 function CRCBS.cbs_update_conflict_table!(solver,mapf::AbstractPC_MAPF,node,constraint)
     search_env = node.solution
     idxs = collect(1:num_agents(search_env))
-    t0 = max(minimum(get_cache(search_env).t0), 1) # This is particularly relevant for replanning, where we don't care to look for conflicts way back in the past.
+    # t0 = max(minimum(get_cache(search_env).t0), 1) # This is particularly relevant for replanning, where we don't care to look for conflicts way back in the past.
+    t0 = max(minimum(get_t0(get_schedule(search_env))),1) # This is particularly relevant for replanning, where we don't care to look for conflicts way back in the past.
     detect_conflicts!(node.conflict_table,get_route_plan(search_env),idxs,t0)
 end
 CRCBS.detect_conflicts!(table,env::SearchEnv,args...) = detect_conflicts!(table,get_route_plan(env),args...)

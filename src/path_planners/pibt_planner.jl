@@ -39,8 +39,9 @@ function CRCBS.pibt_priority_law(solver,pc_mapf::PC_MAPF,cache,i)
         ~isa(get_schedule_node(env),DEPOSIT),
         ~isa(get_schedule_node(env),CARRY),
         ~isa(get_schedule_node(env),COLLECT),
-        minimum(cache.solution.cache.slack[get_vtx(
-            cache.solution.schedule,env.node_id)]),
+        # minimum(cache.solution.cache.slack[get_vtx(
+        #     cache.solution.schedule,env.node_id)]),
+        minimum(get_slack(cache.solution,env.node_id)),
         -CRCBS.get_timers(cache)[i],
         i
     )

@@ -165,16 +165,27 @@ let
     cost = Int(round(value(objective_function(model))))
     update_project_schedule!(solver,model,sched,problem_spec,get_assignment_matrix(model))
 
+    TaskGraphs.process_schedule!(sched)
+    @test get_t0(sched,RobotID(1)) == 0
+    @test get_t0(sched,RobotID(2)) == 0
     t0,tF,slack,local_slack = process_schedule(sched)
-    TaskGraphs.update_schedule_times!(sched)
     @test all(t0 .==  map(v->get_t0(sched,v),vertices(sched)))
     @test all(tF .==  map(v->get_tF(sched,v),vertices(sched)))
-
+    @test all(slack .==  map(v->get_slack(sched,v),vertices(sched)))
+    @test all(local_slack .==  map(v->get_local_slack(sched,v),vertices(sched)))
     @test t0[get_vtx(sched,RobotID(1))] == 0
     @test t0[get_vtx(sched,RobotID(2))] == 0
     # try with perturbed start times
     t0[get_vtx(sched,RobotID(2))] = 1
+    set_t0!(sched,RobotID(2),1)
+    TaskGraphs.process_schedule!(sched)
+    @test get_t0(sched,RobotID(1)) == 0
+    @test get_t0(sched,RobotID(2)) == 1
     t0,tF,slack,local_slack = process_schedule(sched,t0)
+    @test all(t0 .==  map(v->get_t0(sched,v),vertices(sched)))
+    @test all(tF .==  map(v->get_tF(sched,v),vertices(sched)))
+    @test all(slack .==  map(v->get_slack(sched,v),vertices(sched)))
+    @test all(local_slack .==  map(v->get_local_slack(sched,v),vertices(sched)))
     @test t0[get_vtx(sched,RobotID(1))] == 0
     @test t0[get_vtx(sched,RobotID(2))] == 1
 

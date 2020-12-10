@@ -417,7 +417,7 @@ function formulate_optimization_problem(spec::T,optimizer;
 end
 
 """
-    formulate_milp(milp_model::AssignmentMILP,project_schedule,problem_spec;kwargs...)
+    formulate_milp(milp_model::AssignmentMILP,sched,problem_spec;kwargs...)
 
 Express the TaskGraphs assignment problem as an `AssignmentMILP` using the JuMP
 optimization framework.
@@ -426,7 +426,7 @@ Inputs:
     milp_model::T <: TaskGraphsMILP : a milp model that determines how the
         sequential task assignment problem is modeled. Current options are
         `AssignmentMILP`, `SparseAdjacencyMILP` and `GreedyAssignment`.
-    project_schedule::OperatingSchedule : a partial operating schedule, where
+    sched::OperatingSchedule : a partial operating schedule, where
         some or all assignment edges may be missing.
     problem_spec::ProblemSpec : encodes the distance matrix and other
         information about the problem.
@@ -444,7 +444,7 @@ Keyword Args:
 Outputs:
     `model` - an optimization model of type `T`
 """
-function formulate_milp(milp_model::AssignmentMILP,project_schedule::OperatingSchedule,problem_spec::ProblemSpec;
+function formulate_milp(milp_model::AssignmentMILP,sched::OperatingSchedule,problem_spec::ProblemSpec;
     optimizer=Gurobi.Optimizer,
     cost_model=problem_spec.cost_function,
     kwargs...)
@@ -455,13 +455,13 @@ export
     preprocess_project_schedule
 
 """
-    preprocess_project_schedule(project_schedule)
+    preprocess_project_schedule(sched)
 
 Returns information about the eligible and required successors and predecessors
-of nodes in `project_schedule`
+of nodes in `sched`
 
 Arguments:
-- `project_schedule::OperatingSchedule`
+- `sched::OperatingSchedule`
 
 Outputs:
 - missing_successors
@@ -479,8 +479,8 @@ TODO: OBJECT_AT nodes should always have the properties that
 Not sure if this is currently the case. UPDATE: I believe this has already been
     addressed by making each object come from an initial operation.
 """
-function preprocess_project_schedule(project_schedule)
-    G = get_graph(project_schedule);
+function preprocess_project_schedule(sched)
+    G = get_graph(sched);
     # Identify required and eligible edges
     missing_successors      = Dict{Int,Dict}()
     missing_predecessors    = Dict{Int,Dict}()
@@ -489,7 +489,7 @@ function preprocess_project_schedule(project_schedule)
     n_required_successors   = zeros(Int,nv(G))
     n_required_predecessors = zeros(Int,nv(G))
     for v in vertices(G)
-        node = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v))
+        node = get_node_from_id(sched, get_vtx_id(sched, v))
         for (key,val) in required_successors(node)
             n_required_successors[v] += val
         end
@@ -504,8 +504,8 @@ function preprocess_project_schedule(project_schedule)
         end
         missing_successors[v] = eligible_successors(node)
         for v2 in outneighbors(G,v)
-            id2 = get_vtx_id(project_schedule, v2)
-            node2 = get_node_from_id(project_schedule, id2)
+            id2 = get_vtx_id(sched, v2)
+            node2 = get_node_from_id(sched, id2)
             for key in collect(keys(missing_successors[v]))
                 if matches_template(key,typeof(node2))
                     missing_successors[v][key] -= 1
@@ -515,8 +515,8 @@ function preprocess_project_schedule(project_schedule)
         end
         missing_predecessors[v] = eligible_predecessors(node)
         for v2 in inneighbors(G,v)
-            id2 = get_vtx_id(project_schedule, v2)
-            node2 = get_node_from_id(project_schedule, id2)
+            id2 = get_vtx_id(sched, v2)
+            node2 = get_node_from_id(sched, id2)
             for key in collect(keys(missing_predecessors[v]))
                 if matches_template(key,typeof(node2))
                     missing_predecessors[v][key] -= 1
@@ -533,7 +533,7 @@ function preprocess_project_schedule(project_schedule)
 
     return missing_successors, missing_predecessors, n_eligible_successors, n_eligible_predecessors, n_required_successors, n_required_predecessors, upstream_vertices, non_upstream_vertices
 end
-function preprocess_project_schedule(project_schedule,flag)
+function preprocess_project_schedule(sched,flag)
     missing_successors,
     missing_predecessors,
     n_eligible_successors,
@@ -541,7 +541,7 @@ function preprocess_project_schedule(project_schedule,flag)
     n_required_successors,
     n_required_predecessors,
     upstream_vertices,
-    non_upstream_vertices = preprocess_project_schedule(project_schedule)
+    non_upstream_vertices = preprocess_project_schedule(sched)
     cache = (
         missing_successors=missing_successors,
         missing_predecessors=missing_predecessors,
@@ -568,7 +568,8 @@ function formulate_schedule_milp(sched::OperatingSchedule,problem_spec::ProblemS
     )
     G = get_graph(sched);
     assignments = [];
-    Δt = map(v->get_path_spec(sched, v).min_duration, vertices(G))
+    # Δt = map(v->get_path_spec(sched, v).min_duration, vertices(G))
+    Δt = get_min_duration(sched)
 
     model = Model(with_optimizer(optimizer,
         TimeLimit=TimeLimit,
@@ -791,7 +792,8 @@ function formulate_milp(milp_model::SparseAdjacencyMILP,sched::OperatingSchedule
         n_eligible_predecessors, n_required_successors, n_required_predecessors,
         upstream_vertices, non_upstream_vertices
         ) = preprocess_project_schedule(sched)
-    Δt = map(v->get_path_spec(sched, v).min_duration, vertices(G))
+    # Δt = map(v->get_path_spec(sched, v).min_duration, vertices(G))
+    Δt = get_min_duration(sched)
 
     @variable(model, t0[1:nv(G)] >= 0.0); # initial times for all nodes
     @variable(model, tF[1:nv(G)] >= 0.0); # final times for all nodes
@@ -952,7 +954,8 @@ function formulate_milp(milp_model::FastSparseAdjacencyMILP,sched::OperatingSche
 
     G = get_graph(sched);
     cache = preprocess_project_schedule(sched,true)
-    Δt = map(v->get_path_spec(sched, v).min_duration, vertices(G))
+    # Δt = map(v->get_path_spec(sched, v).min_duration, vertices(G))
+    Δt = get_min_duration(sched)
 
     # In order to speed up the solver, we try to reduce the total number of
     # variables in the JuMP Model. Wherever possible, t0[v] and tF[v] are
@@ -1163,34 +1166,34 @@ function JuMP.objective_function(model::GreedyAssignment)
 end
 JuMP.objective_bound(model::GreedyAssignment)       = objective_function(model)
 JuMP.value(c::Real) = c
-function formulate_milp(milp_model::GreedyAssignment,project_schedule::OperatingSchedule,problem_spec::ProblemSpec;
+function formulate_milp(milp_model::GreedyAssignment,sched::OperatingSchedule,problem_spec::ProblemSpec;
         t0_ = Dict{AbstractID,Float64}(),
         cost_model = SumOfMakeSpans(),
         kwargs...
     )
 
     model = GreedyAssignment(
-        schedule = project_schedule,
+        schedule = sched,
         problem_spec = problem_spec,
         cost_model = cost_model
     )
     for (id,t) in t0_
-        v = get_vtx(project_schedule, id)
+        v = get_vtx(sched, id)
         model.t0[v] = t
     end
     model
 end
 
-function construct_schedule_distance_matrix(project_schedule,problem_spec)
-    G = get_graph(project_schedule);
-    cache = preprocess_project_schedule(project_schedule,true)
+function construct_schedule_distance_matrix(sched,problem_spec)
+    G = get_graph(sched);
+    cache = preprocess_project_schedule(sched,true)
     D = Inf * ones(nv(G),nv(G))
     for v in vertices(G)
         if outdegree(G,v) < cache.n_eligible_successors[v]
-            node = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v))
+            node = get_node_from_id(sched, get_vtx_id(sched, v))
             for v2 in cache.non_upstream_vertices[v]
                 if indegree(G,v2) < cache.n_eligible_predecessors[v2]
-                    node2 = get_node_from_id(project_schedule, get_vtx_id(project_schedule, v2))
+                    node2 = get_node_from_id(sched, get_vtx_id(sched, v2))
                     if has_robot_id(node) && has_robot_id(node2)
                         if get_id(get_robot_id(node)) != -1 && get_id(get_robot_id(node2)) != -1
                             get_robot_id(node) == get_robot_id(node2) ? continue : nothing
@@ -1206,7 +1209,7 @@ function construct_schedule_distance_matrix(project_schedule,problem_spec)
                             end
                             if (val > 0 && val2 > 0)
                                 new_node = align_with_successor(node,node2)
-                                D[v,v2] = generate_path_spec(project_schedule,problem_spec,new_node).min_duration
+                                D[v,v2] = generate_path_spec(sched,problem_spec,new_node).min_duration
                             end
                         end
                     end
@@ -1326,7 +1329,7 @@ function compute_lower_bound(env,
     dist_mtx = construct_schedule_distance_matrix(get_schedule(env),get_problem_spec(env)),
     pairs=[BOT_GO=>BOT_COLLECT],
     )
-    cache = deepcopy(get_cache(env))
+    # cache = deepcopy(get_cache(env))
     sched = deepcopy(get_schedule(env))
     for p in pairs
         for vp in topological_sort_by_dfs(get_graph(sched))
@@ -1339,18 +1342,19 @@ function compute_lower_bound(env,
                 if !isa(get_node_from_vtx(sched,src), p.first)
                     continue
                 end
-                t0_ = get_t0(cache,src)+dist_mtx[src,vp]
+                t0_ = get_t0(sched,src)+dist_mtx[src,vp]
                 if t0_ < t0
                     v = src
                     t0 = t0_
                 end
             end
             add_edge!(get_graph(sched),v,vp)
-            set_t0!(cache,vp,t0)
+            set_t0!(sched,vp,t0)
             @log_info(1,global_verbosity(),"$v=>$vp, $(string(get_node_from_vtx(sched,v)))=>$(string(get_node_from_vtx(sched,vp))), t0=$t0")
         end
     end
-    update_planning_cache_times!(sched,cache)
+    # update_planning_cache_times!(sched,cache)
+    update_schedule_times!(sched)
     return cache
 end
 
@@ -1379,7 +1383,7 @@ function propagate_valid_ids!(sched::OperatingSchedule,problem_spec::ProblemSpec
             end
         # end
     end
-    # project_schedule
+    # sched
     return true
 end
 
@@ -1388,7 +1392,7 @@ end
 
 Args:
 - solver
-- project_schedule
+- sched
 - adj_matrix - adjacency_matrix encoding the edges that need to be added to
     the project schedule
 
@@ -1435,16 +1439,18 @@ function update_project_schedule!(sched::OperatingSchedule,problem_spec,adj_matr
         end
         return false
     end
+    # update_schedule_times!(sched)
+    process_schedule!(sched)
     return true
 end
 
 """
-    update_project_schedule!(solver,milp_model::M,project_schedule,problem_spec,
+    update_project_schedule!(solver,milp_model::M,sched,problem_spec,
         adj_matrix) where {M<:TaskGraphsMILP}
 
 Args:
 - milp_model <: TaskGraphsMILP
-- project_schedule::OperatingSchedule
+- sched::OperatingSchedule
 - problem_spec::ProblemSpec
 - adj_matrix : an adjacency_matrix or (in the case where
     `milp_model::AssignmentMILP`), an assignment matrix

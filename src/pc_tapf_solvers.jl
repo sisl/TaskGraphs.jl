@@ -129,15 +129,16 @@ SumOfTravelTime(), we would get worst-case exponentially slow breadth-first
 search!
 """
 function construct_cost_model(trait::NonPrioritized,
-        solver, schedule, cache, problem_spec, env_graph, primary_objective=SumOfMakeSpans();
+        solver, sched, cache, problem_spec, env_graph, primary_objective=SumOfMakeSpans();
         extra_T::Int=400)
     # N = problem_spec.N
-    N = length(get_robot_ICs(schedule))
+    N = length(get_robot_ICs(sched))
     # @assert problem_spec.N == length(get_robot_ICs(schedule))
     @assert N > 0 "num_robots should be > 0. We need at least one robot!"
     cost_model = construct_composite_cost_model(
-        typeof(primary_objective)(schedule,cache),
-        HardConflictCost(env_graph,maximum(cache.tF)+extra_T, N),
+        typeof(primary_objective)(sched,cache),
+        # HardConflictCost(env_graph,maximum(cache.tF)+extra_T, N),
+        HardConflictCost(env_graph,makespan(sched)+extra_T, N),
         SumOfTravelDistance(),
         FullCostModel(sum,NullCost()), # SumOfTravelTime(),
         FullCostModel(sum,TransformCostModel(c->-1*c,TravelTime()))
@@ -264,16 +265,17 @@ function plan_path!(solver::AStarSC, pc_mapf::AbstractPC_MAPF, env::SearchEnv, n
     if is_terminal_node(get_graph(get_schedule(env)),v)
         @log_info(2,solver,"ISPS: length(path) = ",length(path),
         ". Extending terminal node ", string(schedule_node),
-        " to ",maximum(cache.tF))
-        extend_path!(cbs_env,path,maximum(cache.tF))
+        " to ",makespan(get_schedule(env)))
+        # extend_path!(cbs_env,path,maximum(cache.tF))
+        extend_path!(cbs_env,path,makespan(get_schedule(env)))
         @log_info(2,solver,"ISPS: length(path) = ",length(path),
-        ". maximum(cache.tF) = ",maximum(cache.tF))
+        ". maximum(cache.tF) = ",makespan(get_schedule(env)))
         # solver.DEBUG ? validate(path,v) : nothing
     end
     # add to solution
     update_route_plan!(solver,pc_mapf,env,v,path,cost,schedule_node)
     @log_info(2,solver,"ISPS: after update_route_plan! maximum(cache.tF) = ",
-        maximum(cache.tF))
+        makespan(get_schedule(env)))
     if get_cost(node) >= best_cost(solver)
         @log_info(0,solver,"ISPS: get_cost(node) (",get_cost(node),
             ") >= best_cost(solver)",best_cost(solver)," ... Exiting early")
@@ -342,8 +344,8 @@ function plan_next_path!(solver::ISPS, pc_mapf::AbstractPC_MAPF, env::SearchEnv,
                 """
                 ISPS:
                     schedule_node: $(string(schedule_node))
-                    cache.tF[v]: $(get_cache(env).tF[v])
-                    maximum(get_cache(env).tF): $(maximum(get_cache(env).tF))
+                    cache.tF[v]: $(get_tF(env,v))
+                    maximum(get_cache(env).tF): $(makespan(get_schedule(env)))
                 """)
                 valid_flag = plan_path!(low_level(solver),pc_mapf,env,node,schedule_node,v)
                 @log_info(2,solver,"""
@@ -353,8 +355,8 @@ function plan_next_path!(solver::ISPS, pc_mapf::AbstractPC_MAPF, env::SearchEnv,
                 sprint_indexed_list_array(
                     convert_to_vertex_lists(get_route_plan(env));leftaligned=true),
                 """
-                    cache.tF: $(get_cache(env).tF)
-                    cache.tF[v]: $(get_cache(env).tF[v])
+                    cache.tF: $(get_tF(env,v))
+                    cache.tF[v]: $(get_tF(env,v))
                 """)
             catch e
                 if isa(e, SolverException)
@@ -410,13 +412,16 @@ function CRCBS.low_level_search!(solver::ISPS, pc_mapf::AbstractPC_MAPF,
     for i in 1:iteration_limit(solver)
         increment_iteration_count!(solver)
         # reset solution
+        reset_schedule_times!(get_schedule(search_env),get_schedule(get_env(pc_mapf)))
         reset_cache!(
             get_cache(search_env),
             get_schedule(search_env),
-            get_cache(get_env(pc_mapf)).t0,
-            get_cache(get_env(pc_mapf)).tF)
-        reset_route_plan!(node,
-            get_route_plan(get_env(pc_mapf)))
+            # get_cache(get_env(pc_mapf)).t0,
+            # get_cache(get_env(pc_mapf)).tF,
+            # map(v->get_t0(search_env,v),vertices(get_schedule(get_env(pc_mapf)))),
+            # map(v->get_tF(search_env,v),vertices(get_schedule(get_env(pc_mapf)))),
+            )
+        reset_route_plan!(node,get_route_plan(get_env(pc_mapf)))
         valid_flag = compute_route_plan!(solver, pc_mapf, node)
         if valid_flag == false
             @log_info(0,solver,"ISPS: failed on ",i,"th repair iteration.")

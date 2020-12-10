@@ -106,14 +106,14 @@ function pctapf_problem(
         env_graph,
         args...
     )
-    project_schedule = construct_partial_project_schedule(
+    sched = construct_partial_project_schedule(
         project_spec,
         problem_spec,
         robot_ICs,
         )
     env = construct_search_env(
         solver,
-        project_schedule,
+        sched,
         problem_spec,
         env_graph
         )

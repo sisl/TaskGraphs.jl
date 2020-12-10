@@ -108,7 +108,7 @@ let
         # @show get_logger(solver)
         # @show optimality_gap(solver) > 0
         @test validate(env.schedule)
-        @test validate(env.schedule,convert_to_vertex_lists(get_route_plan(env)), env.cache.t0, env.cache.tF)
+        @test validate(env.schedule,convert_to_vertex_lists(get_route_plan(env)))
     end
 end
 # test task assignment
@@ -177,12 +177,7 @@ let
                         push!(costs, cost[1])
                     end
                     @test validate(env.schedule)
-                    @test validate(
-                        env.schedule,
-                        convert_to_vertex_lists(get_route_plan(env)),
-                        env.cache.t0,
-                        env.cache.tF
-                        )
+                    @test validate(env.schedule,convert_to_vertex_lists(get_route_plan(env)))
                     @test cost != typemax(Int)
                     @test cost != Inf
                 end

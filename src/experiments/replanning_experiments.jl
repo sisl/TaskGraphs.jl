@@ -21,7 +21,7 @@ end
 
 export read_simple_request
 function read_simple_request(toml_dict)
-    SimpleReplanningRequest(
+    request = SimpleReplanningRequest(
         read_problem_def(toml_dict),
         toml_dict["t_request"],
         toml_dict["t_arrival"]
@@ -31,11 +31,14 @@ read_simple_request(path::String) = read_simple_request(TOML.parsefile(path))
 
 function ProjectRequest(def::SimpleReplanningRequest,prob_spec)
     ProjectRequest(
-        schedule = construct_partial_project_schedule(
+        construct_partial_project_schedule(
             def.def.project_spec,prob_spec),
-        t_request = def.t_request,
-        t_arrival = def.t_arrival
+        def.t_request,
+        def.t_arrival
         )
+    set_t0!(request.schedule,t_request)
+    process_schedule!(request.schedule)
+    return request.schedule
 end
 
 export SimpleRepeatedProblemDef

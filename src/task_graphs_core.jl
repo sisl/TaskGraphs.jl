@@ -359,7 +359,17 @@ end
 
 export
     PathSpec,
-    generate_path_spec
+    generate_path_spec,
+    get_t0,
+    get_tF,
+    set_t0!,
+    set_tF!,
+    get_slack,
+    set_slack!,
+    get_local_slack,
+    set_local_slack!,
+    get_min_duration,
+    set_min_duration!
 
 """
     PathSpec
@@ -389,19 +399,24 @@ Fields:
     solution.
 """
 @with_kw mutable struct PathSpec
-    node_type           ::Symbol        = :EMPTY
-    start_vtx           ::Int           = -1
-    final_vtx           ::Int           = -1
-    t0                  ::Int           = 0
-    min_duration        ::Int           = 0
-    tF                  ::Int           = t0 + min_duration
-    agent_id            ::BotID         = RobotID()
-    object_id           ::ObjectID      = ObjectID()
-    plan_path           ::Bool          = true
-    tight               ::Bool          = false
-    static              ::Bool          = false
-    free                ::Bool          = false
-    fixed               ::Bool          = false
+    node_type       ::Symbol            = :EMPTY
+    agent_id        ::BotID             = RobotID()
+    object_id       ::ObjectID          = ObjectID()
+    # spatial
+    start_vtx       ::Int               = -1
+    final_vtx       ::Int               = -1
+    # temporal
+    t0              ::Int               = 0
+    min_duration    ::Int               = 0
+    tF              ::Int               = t0 + min_duration
+    slack           ::Vector{Float64}   = Float64[]
+    local_slack     ::Vector{Float64}   = Float64[]
+    # instructions
+    plan_path       ::Bool              = true
+    tight           ::Bool              = false
+    static          ::Bool              = false
+    free            ::Bool              = false
+    fixed           ::Bool              = false
 end
 get_t0(spec::PathSpec) = spec.t0
 set_t0!(spec::PathSpec,val) = begin spec.t0 = val end
@@ -409,19 +424,30 @@ get_tF(spec::PathSpec) = spec.tF
 set_tF!(spec::PathSpec,val) = begin spec.tF = val end
 get_min_duration(spec::PathSpec) = spec.min_duration
 set_min_duration!(spec::PathSpec,val) = begin spec.min_duration = val end
+get_slack(spec::PathSpec) = spec.slack
+set_slack!(spec::PathSpec,val) = begin spec.slack = val end
+get_local_slack(spec::PathSpec) = spec.local_slack
+set_local_slack!(spec::PathSpec,val) = begin spec.local_slack = val end
 
 const path_spec_accessor_interface = [
     :get_t0,
     :get_tF,
+    :get_slack,
+    :get_local_slack,
     :get_min_duration,
     ]
 const path_spec_mutator_interface = [
     :set_min_duration!,
     :set_t0!,
+    :set_slack!,
+    :set_local_slack!,
     :set_tF!,
     ]
 
-export ScheduleNode
+export
+    ScheduleNode,
+    get_path_spec,
+    set_path_spec!
 
 mutable struct ScheduleNode{I<:AbstractID,V<:AbstractPlanningPredicate}
     id::I
@@ -432,6 +458,18 @@ get_path_spec(node::ScheduleNode) = node.spec
 function set_path_spec!(node::ScheduleNode,spec)
     node.spec = spec
 end
+for op in path_spec_accessor_interface
+    @eval $op(node::ScheduleNode) = $op(get_path_spec(node))
+end
+for op in path_spec_mutator_interface
+    @eval $op(node::ScheduleNode,val) = $op(get_path_spec(node),val)
+end
+const schedule_node_accessor_interface = [
+    path_spec_accessor_interface...,
+    :get_path_spec]
+const schedule_node_mutator_interface = [
+    path_spec_mutator_interface...,
+    :set_path_spec!]
 
 export
     OperatingSchedule,
@@ -473,24 +511,34 @@ Base.zero(sched::OperatingSchedule{G}) where {G} = OperatingSchedule(graph=G())
 LightGraphs.edges(sched::OperatingSchedule) = edges(sched.graph)
 LightGraphs.is_directed(sched::OperatingSchedule) = true
 # path spec interface
-for op in [
-    :edgetype,:has_edge,:has_vertex,:inneighbors,:ne,:nv,:outneighbors,
-    :vertices,#:indegree,:outdegree
-    ]
-    @eval LightGraphs.$op(sched::OperatingSchedule,args...) = $op(sched.graph,args...)
-end
 
 CRCBS.get_graph(sched::P) where {P<:OperatingSchedule}       = sched.graph
 get_vtx_ids(sched::P) where {P<:OperatingSchedule}           = sched.vtx_ids
 get_terminal_vtxs(sched::P) where {P<:OperatingSchedule}     = sched.terminal_vtxs
 get_root_node_weights(sched::P) where {P<:OperatingSchedule} = sched.weights
 
+CRCBS.get_vtx(sched::OperatingSchedule,v::Int)          = v
 CRCBS.get_vtx(sched::OperatingSchedule,id::AbstractID)  = get(sched.vtx_map, id, -1)
+CRCBS.get_vtx(sched::OperatingSchedule,node::ScheduleNode) = get_vtx(sched,node.id)
 get_vtx_id(sched::OperatingSchedule,v::Int)             = sched.vtx_ids[v]
-get_schedule_node(sched,v::Int)         = sched.planning_nodes[v]
-get_schedule_node(sched,id::AbstractID) = get_schedule_node(sched,get_vtx(sched,id))
-get_node_from_id(sched::OperatingSchedule,id::AbstractID) = get_schedule_node(sched,id).node
-get_node_from_vtx(sched::OperatingSchedule,v::Int)      = get_schedule_node(sched,v).node
+get_schedule_node(sched::OperatingSchedule,v) = sched.planning_nodes[get_vtx(sched,v)]
+# get_schedule_node(sched,id) = get_schedule_node(sched,get_vtx(sched,id))
+# get_schedule_node(sched,node::ScheduleNode) = get_schedule_node(sched,node.id)
+# get_node_from_id(sched::OperatingSchedule,id::AbstractID) = get_schedule_node(sched,id).node
+# get_node_from_vtx(sched::OperatingSchedule,v::Int)      = get_schedule_node(sched,v).node
+get_node_from_id(sched::OperatingSchedule,id) = get_schedule_node(sched,id).node
+get_node_from_vtx(sched::OperatingSchedule,v) = get_schedule_node(sched,v).node
+
+for op in [:edgetype,:ne,:nv,:vertices,]
+    @eval LightGraphs.$op(sched::OperatingSchedule) = $op(get_graph(sched))
+end
+for op in [:outneighbors,:inneighbors,:indegree,:outdegree,:has_vertex,]
+    @eval LightGraphs.$op(sched::OperatingSchedule,v::Int) = $op(get_graph(sched),v)
+    @eval LightGraphs.$op(sched::OperatingSchedule,id) = $op(sched,get_vtx(sched,id))
+end
+for op in [:has_edge,:add_edge!,:rem_edge!]
+    @eval LightGraphs.$op(s::OperatingSchedule,u,v) = $op(get_graph(s),get_vtx(s,u),get_vtx(s,v))
+end
 
 get_nodes_of_type(sched::P,T) where {P<:OperatingSchedule} = Dict(id=>get_node_from_id(sched, id) for id in sched.vtx_ids if typeof(id)<:T)
 get_object_ICs(sched::P) where {P<:OperatingSchedule}  = get_nodes_of_type(sched,ObjectID)
@@ -514,17 +562,21 @@ function insert_to_vtx_map!(sched::OperatingSchedule,node,id::AbstractID,idx::In
 end
 
 export
-    get_path_spec,
-    set_path_spec!,
     add_path_spec!
 
-get_path_spec(sched::OperatingSchedule,v::Int) = get_path_spec(get_schedule_node(sched,v))
-set_path_spec!(sched::OperatingSchedule,v::Int,spec::PathSpec) = set_path_spec!(get_schedule_node(sched,v),spec)
-for op in path_spec_accessor_interface
-    @eval $op(sched::OperatingSchedule,v) = $op(get_path_spec(sched,v))
+# get_path_spec(sched::OperatingSchedule,v::Int) = get_path_spec(get_schedule_node(sched,v))
+# set_path_spec!(sched::OperatingSchedule,v::Int,spec::PathSpec) = set_path_spec!(get_schedule_node(sched,v),spec)
+for op in schedule_node_accessor_interface
+    @eval $op(sched::OperatingSchedule,v) = $op(get_schedule_node(sched,v))
+    @eval $op(sched::OperatingSchedule) = map(v->$op(get_schedule_node(sched,v)), vertices(sched))
 end
-for op in path_spec_mutator_interface
-    @eval $op(sched::OperatingSchedule,v,val) = $op(get_path_spec(sched,v),val)
+for op in schedule_node_mutator_interface
+    @eval $op(sched::OperatingSchedule,v,val) = $op(get_schedule_node(sched,v),val)
+    @eval $op(sched::OperatingSchedule,val) = begin
+        for v in vertices(sched)
+            $op(get_schedule_node(sched,v),val)
+        end
+    end
 end
 
 
@@ -653,7 +705,7 @@ function replace_in_schedule!(sched::OperatingSchedule,node::ScheduleNode)
     v = get_vtx(sched, id)
     @assert v != -1 "node id $(string(id)) is not in schedule and therefore cannot be replaced"
     set_vtx_map!(sched,node,id,v)
-    sched
+    node
 end
 function replace_in_schedule!(sched::P,path_spec::T,pred,id::ID) where {P<:OperatingSchedule,T<:PathSpec,ID<:AbstractID}
     replace_in_schedule!(sched,ScheduleNode(id,pred,path_spec))
@@ -676,7 +728,7 @@ function add_to_schedule!(sched::OperatingSchedule,node::ScheduleNode)
     @assert get_vtx(sched, id) == -1 "Trying to add $(string(id)) => $(string(pred)) to schedule, but $(string(id)) => $(string(get_node_from_id(sched,id))) already exists"
     add_vertex!(get_graph(sched))
     insert_to_vtx_map!(sched,node,id,nv(get_graph(sched)))
-    sched
+    node
 end
 function add_to_schedule!(sched::P,path_spec::T,pred,id::ID) where {P<:OperatingSchedule,T<:PathSpec,ID<:AbstractID}
     add_to_schedule!(sched,ScheduleNode(id,pred,path_spec))
@@ -688,17 +740,16 @@ function add_to_schedule!(sched::P,pred,id::ID) where {P<:OperatingSchedule,ID<:
     add_to_schedule!(sched,ProblemSpec(),pred,id)
 end
 
-function LightGraphs.has_edge(s::OperatingSchedule,i::AbstractID,j::AbstractID)
-    has_edge(get_graph(s), get_vtx(s,i), get_vtx(s,j))
-end
-function LightGraphs.add_edge!(sched::P,id1::A,id2::B) where {P<:OperatingSchedule,A<:AbstractID,B<:AbstractID}
-    success = add_edge!(get_graph(sched), get_vtx(sched,id1), get_vtx(sched,id2))
-    sched
-end
-function LightGraphs.rem_edge!(sched::P,id1::A,id2::B) where {P<:OperatingSchedule,A<:AbstractID,B<:AbstractID}
-    success = rem_edge!(get_graph(sched), get_vtx(sched,id1), get_vtx(sched,id2))
-    sched
-end
+# function LightGraphs.has_edge(s::OperatingSchedule,i::AbstractID,j::AbstractID)
+#     has_edge(get_graph(s), get_vtx(s,i), get_vtx(s,j))
+# end
+# function LightGraphs.add_edge!(sched::P,id1::A,id2::B) where {P<:OperatingSchedule,A<:AbstractID,B<:AbstractID}
+#     add_edge!(get_graph(sched), get_vtx(sched,id1), get_vtx(sched,id2))
+# end
+# function LightGraphs.rem_edge!(sched::P,id1::A,id2::B) where {P<:OperatingSchedule,A<:AbstractID,B<:AbstractID}
+#     rem_edge!(get_graph(sched), get_vtx(sched,id1), get_vtx(sched,id2))
+# end
+# LightGraphs.rem_edge!(sched::OperatingSchedule,n1::ScheduleNode,n2::ScheduleNode) = rem_edge!(sched,n1.id,n2.id)
 
 export
     get_leaf_operation_vtxs,
@@ -872,7 +923,7 @@ function validate(sched::OperatingSchedule)
     end
     return true
 end
-function validate(sched::OperatingSchedule,paths::Vector{Vector{Int}},t0::Vector{Int},tF::Vector{Int})
+function validate(sched::OperatingSchedule,paths::Vector{Vector{Int}})
     # G = get_graph(sched)
     for v in vertices(sched)
         node = get_node_from_vtx(sched, v)
@@ -883,16 +934,16 @@ function validate(sched::OperatingSchedule,paths::Vector{Vector{Int}},t0::Vector
             start_vtx = path_spec.start_vtx
             final_vtx = path_spec.final_vtx
             try
-                @assert(length(path) > t0[v], string("length(path) == $(length(path)), should be greater than t0[v] == $(t0[v]) in node ",string(node)))
-                @assert(length(path) > t0[v], string("length(path) == $(length(path)), should be greater than tF[v] == $(tF[v]) in node ",string(node)))
+                @assert(length(path) > get_t0(sched,v), string("length(path) == $(length(path)), should be greater than get_t0(sched,v) == $(get_t0(sched,v)) in node ",string(node)))
+                @assert(length(path) > get_tF(sched,v), string("length(path) == $(length(path)), should be greater than get_t0(sched,v) == $(get_t0(sched,v)) in node ",string(node)))
                 if start_vtx != -1
-                    if length(path) > t0[v]
-                        @assert(path[t0[v] + 1] == start_vtx, string("node: ",string(node), ", start_vtx: ",start_vtx, ", t0+1: ",t0[v]+1,", path[t0[v] + 1] = ",path[t0[v] + 1],", path: ", path))
+                    if length(path) > get_t0(sched,v)
+                        @assert(path[get_t0(sched,v) + 1] == start_vtx, string("node: ",string(node), ", start_vtx: ",start_vtx, ", t0+1: ",get_t0(sched,v)+1,", path[get_t0(sched,v) + 1] = ",path[get_t0(sched,v) + 1],", path: ", path))
                     end
                 end
                 if final_vtx != -1
-                    if length(path) > tF[v]
-                        @assert(path[tF[v] + 1] == final_vtx, string("node: ",string(node), ", final vtx: ",final_vtx, ", tF+1: ",tF[v]+1,", path[tF[v] + 1] = ",path[tF[v] + 1],", path: ", path))
+                    if length(path) > get_tF(sched,v)
+                        @assert(path[get_tF(sched,v) + 1] == final_vtx, string("node: ",string(node), ", final vtx: ",final_vtx, ", tF+1: ",get_tF(sched,v)+1,", path[get_tF(sched,v) + 1] = ",path[get_tF(sched,v) + 1],", path: ", path))
                     end
                 end
             catch e
@@ -963,27 +1014,33 @@ function add_headless_delivery_task!(
         pickup_station_id::LocationID=get_location_id(get_node_from_id(sched,object_id)),
         dropoff_station_id::LocationID=get_dropoff(get_node_from_id(sched,op_id),object_id),
         # robot_id::BotID{R}=RobotID(-1)
+        ;
+        t0::Int=0,
     ) where {R<:AbstractRobotType}
 
     robot_id = BotID{R}(-1)
     action_id = get_unique_action_id()
     add_to_schedule!(sched, problem_spec, BOT_COLLECT(robot_id, object_id, pickup_station_id), action_id)
+    set_t0!(sched,action_id,t0)
     add_edge!(sched, object_id, action_id)
 
     prev_action_id = action_id
     action_id = get_unique_action_id()
     add_to_schedule!(sched, problem_spec, BOT_CARRY(robot_id, object_id, pickup_station_id, dropoff_station_id), action_id)
+    set_t0!(sched,action_id,t0)
     add_edge!(sched, prev_action_id, action_id)
 
     prev_action_id = action_id
     action_id = get_unique_action_id()
     add_to_schedule!(sched, problem_spec, BOT_DEPOSIT(robot_id, object_id, dropoff_station_id), action_id)
+    set_t0!(sched,action_id,t0)
     add_edge!(sched, action_id, op_id)
     add_edge!(sched, prev_action_id, action_id)
 
     prev_action_id = action_id
     action_id = get_unique_action_id()
     add_to_schedule!(sched, problem_spec, BOT_GO(robot_id, dropoff_station_id,LocationID(-1)), action_id)
+    set_t0!(sched,action_id,t0)
     add_edge!(sched, prev_action_id, action_id)
 
     return
@@ -1132,7 +1189,7 @@ function construct_partial_project_schedule(
                     ObjectID(object_id),op_id) #,pickup_station_ids,dropoff_station_ids)
             else # SINGLE AGENT TRANSPORT
                 add_headless_delivery_task!(sched,problem_spec,
-                    ObjectID(object_id),op_id)#,pickup_station_ids[1],dropoff_station_ids[1])
+                    ObjectID(object_id),op_id)
             end
         end
         for object_id in get_output_ids(op)
@@ -1150,6 +1207,7 @@ function construct_partial_project_schedule(
         end
     end
     set_leaf_operation_vtxs!(sched)
+    process_schedule!(sched)
     sched
 end
 function construct_partial_project_schedule(spec::ProjectSpec,problem_spec::ProblemSpec,robot_ICs=Vector{BOT_AT}())
@@ -1233,12 +1291,11 @@ function update_schedule_times!(sched::OperatingSchedule)
     end
     return sched
 end
-function compute_slack(sched::OperatingSchedule)
+function update_slack!(sched::OperatingSchedule)
     G = get_graph(sched)
     n_roots = max(length(sched.terminal_vtxs),1)
     slack = map(i->Inf*ones(n_roots), vertices(G))
     local_slack = map(i->Inf*ones(n_roots), vertices(G))
-    # True terminal nodes
     for (i,v) in enumerate(sched.terminal_vtxs)
         slack[v][i] = 0 # only slack for corresponding head is set to 0
     end
@@ -1248,8 +1305,24 @@ function compute_slack(sched::OperatingSchedule)
             slack[v] = min.(slack[v], slack[v2] .+ (get_t0(sched,v2) - get_tF(sched,v)))
         end
     end
-    slack,local_slack
+    for v in vertices(sched)
+        set_slack!(sched,v,slack[v])
+        set_local_slack!(sched,v,local_slack[v])
+    end
+    return sched
 end
+function process_schedule!(sched)
+    update_schedule_times!(sched)
+    update_slack!(sched)
+end
+function reset_schedule_times!(sched::OperatingSchedule,ref)
+    for v in vertices(sched)
+        set_t0!(sched,v,get_t0(ref,get_vtx_id(sched,v)))
+        set_tF!(sched,v,get_tF(ref,get_vtx_id(sched,v)))
+    end
+    process_schedule!(sched)
+end
+makespan(sched::OperatingSchedule) = maximum(get_tF(sched))
 
 export
     get_collect_node,
