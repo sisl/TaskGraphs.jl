@@ -59,13 +59,6 @@ function initialize_planning_cache(sched::OperatingSchedule)
     cache
 end
 
-export update_planning_cache_times!
-
-function update_planning_cache_times!(sched,cache)
-    process_schedule!(sched)
-    return cache
-end
-
 """
     `reset_cache!(cache,sched)`
 
@@ -222,9 +215,6 @@ end
 function Base.show(io::IO,env::SearchEnv)
     sprint_search_env(io,env)
 end
-for op in [:update_planning_cache_times!]
-    @eval $op(env::SearchEnv) = $op(get_schedule(env),get_cache(env))
-end
 
 export
     get_env_snapshot,
@@ -344,14 +334,13 @@ export get_node_start_and_end_times
 
 Return dictionaries mapping each node id in schedule to its start and end time
 """
-function get_node_start_and_end_times(sched::OperatingSchedule,cache::PlanningCache,default=0)
+function get_node_start_and_end_times(sched::OperatingSchedule)
     t0 = Dict{AbstractID,Int}(get_vtx_id(sched,v)=>get_t0(sched, v) for v in vertices(sched))
     tF = Dict{AbstractID,Int}(get_vtx_id(sched,v)=>get_tF(sched, v) for v in vertices(sched))
     return t0,tF
 end
-function get_node_start_and_end_times(env::SearchEnv,args...)
-    get_node_start_and_end_times(get_schedule(env),get_cache(env),args...)
-end
+get_node_start_and_end_times(env::SearchEnv) = get_node_start_and_end_times(get_schedule(env))
+
 
 export
     AbstractPC_MAPF,
@@ -467,7 +456,6 @@ function get_next_node_matching_agent_id(env::SearchEnv,agent_id)
     if has_vertex(get_schedule(env),v)
         return get_vtx_id(get_schedule(env),v)
     end
-    # return RobotID(agent_id)
     return agent_id
 end
 
@@ -484,8 +472,6 @@ function update_planning_cache!(solver,env::SearchEnv,v::Int,t::Int=-1)
     active_set = cache.active_set
     closed_set = cache.closed_set
     node_queue = cache.node_queue
-    graph = get_graph(sched)
-    # update t0, tF, slack, local_slack
     Δt = t - get_tF(env,v)
     if Δt > 0
         set_tF!(sched,v,t)
@@ -496,9 +482,9 @@ function update_planning_cache!(solver,env::SearchEnv,v::Int,t::Int=-1)
     push!(closed_set,v)
     # update active_set
     setdiff!(active_set, v)
-    for v2 in outneighbors(graph,v)
+    for v2 in outneighbors(sched,v)
         active = true
-        for v1 in inneighbors(graph,v2)
+        for v1 in inneighbors(sched,v2)
             if !(v1 in closed_set)
                 active = false
                 break

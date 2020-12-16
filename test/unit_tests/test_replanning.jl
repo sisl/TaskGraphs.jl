@@ -67,9 +67,12 @@ let
     request = prob.requests[stage]
     remap_object_ids!(request.schedule,env.schedule)
     base_env = replan!(planner,env,request)
-
-    env, cost = solve!(planner.solver,PC_TAPF(base_env))
-
+    for v in vertices(request.schedule)
+        node = get_schedule_node(request.schedule,v)
+        @test get_t0(node) >= request.t_request
+        @test get_t0(base_env,node) >= get_commit_time(planner,env,request)
+    end
+    # env, cost = solve!(planner.solver,PC_TAPF(base_env))
 end
 let
     cache = features=[

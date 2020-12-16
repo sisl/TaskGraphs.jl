@@ -1090,7 +1090,7 @@ function plot_histories_pgf(df_list::Vector,ax=PGFPlots.Axis();
         ytick_show=false,
         ymode="log",
         legend_pos = "outer north east",
-        legend_font = "footnotesize",
+        legend_font = "\\footnotesize",
         lines=true,
         opt_marks=map(d->"x",df_list),
         non_opt_marks=opt_marks,
@@ -1117,7 +1117,7 @@ function plot_histories_pgf(df_list::Vector,ax=PGFPlots.Axis();
     if length(legend_pos) > 0
         ax.legendPos = legend_pos
     end
-    ax.legendStyle = "font=\\$(legend_font)"
+    ax.legendStyle = "font=$(legend_font)"
     counters = zeros(length(df_list))
     for (i,m_val) in enumerate(m_vals)
         for (j,n_val) in enumerate(n_vals)
@@ -1229,14 +1229,14 @@ function group_history_plot(df_list::Vector;
     y_key=:makespans,
     y_min=minimum(map(df->minimum(map(minimum,df[!,y_key])),df_list)),
     y_max=maximum(map(df->maximum(map(maximum,df[!,y_key])),df_list)),
-    legend_flag = true,
+    legend_location = (1,1),
     kwargs...
     )
     g = PGFPlots.GroupPlot(length(m_vals),length(n_vals))
     for (i,m_val) in enumerate(m_vals)
         ytick_show = (i == 1)
-        legend_flag = legend_flag && (i == 1)
         for (j,n_val) in enumerate(n_vals)
+            legend_flag = (legend_location[1] == i) && (legend_location[2] == j)
             plt = plot_histories_pgf(df_list;
                 y_key=y_key,
                 m_key=m_key,

@@ -540,7 +540,7 @@ get_schedule_node(sched::OperatingSchedule,v) = sched.planning_nodes[get_vtx(sch
 get_node_from_id(sched::OperatingSchedule,id) = get_schedule_node(sched,id).node
 get_node_from_vtx(sched::OperatingSchedule,v) = get_schedule_node(sched,v).node
 
-for op in [:edgetype,:ne,:nv,:vertices,]
+for op in [:edgetype,:ne,:nv,:vertices,:is_cyclic,:topological_sort_by_dfs]
     @eval LightGraphs.$op(sched::OperatingSchedule) = $op(get_graph(sched))
 end
 for op in [:outneighbors,:inneighbors,:indegree,:outdegree,:has_vertex,]
@@ -838,7 +838,6 @@ export
     validate,
     sanity_check
 
-
 function validate(path::Path, msg::String)
     @assert( !any(convert_to_vertex_lists(path) .== -1), msg )
     return true
@@ -850,10 +849,9 @@ function validate(path::Path, v::Int, cbs_env)
     validate(path, string("v = ",v,", path = ",convert_to_vertex_lists(path),", goal: ",cbs_env.goal))
 end
 function sanity_check(sched::OperatingSchedule,append_string="")
-    G = get_graph(sched)
     try
-        @assert !is_cyclic(G) "is_cyclic(G)"
-        for v in vertices(G)
+        @assert !is_cyclic(sched) "is_cyclic(sched)"
+        for v in vertices(sched)
             node = get_node_from_vtx(sched, v)
             id = get_vtx_id(sched,v)
             if matches_node_type(node,COLLECT)
@@ -861,15 +859,15 @@ function sanity_check(sched::OperatingSchedule,append_string="")
             end
             if matches_node_type(node,Operation)
                 input_ids = Set(map(o->get_id(get_object_id(o)),collect(node.pre)))
-                for v2 in inneighbors(G,v)
+                for v2 in inneighbors(sched,v)
                     node2 = get_node_from_vtx(sched, v2)
                     @assert(get_id(get_object_id(node2)) in input_ids, string(string(node2), " should not be an inneighbor of ",string(node), " whose inputs should be ",input_ids))
                 end
                 @assert(
-                    indegree(G,v) == length(node.pre),
+                    indegree(sched,v) == length(node.pre),
                     string("Operation ",string(node),
                         " needs edges from objects ",collect(input_ids),
-                        " but only has edges from objects ",map(v2->get_id(get_object_id(get_node_from_vtx(sched, v2))),inneighbors(G,v))
+                        " but only has edges from objects ",map(v2->get_id(get_object_id(get_node_from_vtx(sched, v2))),inneighbors(sched,v))
                     )
                     )
             end
@@ -895,26 +893,25 @@ function validate(spec::ProjectSpec,op)
     end
 end
 function validate(sched::OperatingSchedule)
-    G = get_graph(sched)
     try
-        @assert !is_cyclic(G) "is_cyclic(G)"
-        for e in edges(G)
+        @assert !is_cyclic(sched) "is_cyclic(G)"
+        for e in edges(sched)
             node1 = get_node_from_id(sched, get_vtx_id(sched, e.src))
             node2 = get_node_from_id(sched, get_vtx_id(sched, e.dst))
             @assert(validate_edge(node1,node2), string(" INVALID EDGE: ", string(node1), " --> ",string(node2)))
         end
-        for v in vertices(G)
+        for v in vertices(sched)
             id = get_vtx_id(sched, v)
             node = get_node_from_id(sched, id)
             if matches_node_type(node,COLLECT)
                 @assert(get_location_id(node) != -1, string("get_location_id(node) != -1 for node id ", id))
             end
-            @assert( outdegree(G,v) >= sum([0, values(required_successors(node))...]) , string("node = ", string(node), " outdegree = ",outdegree(G,v), " "))
-            @assert( indegree(G,v) >= sum([0, values(required_predecessors(node))...]), string("node = ", string(node), " indegree = ",indegree(G,v), " ") )
-            if matches_node_type(node, Union{BOT_GO,BOT_COLLECT,BOT_CARRY,BOT_DEPOSIT})
-                for v2 in outneighbors(G,v)
+            @assert( outdegree(sched,v) >= sum([0, values(required_successors(node))...]) , string("node = ", string(node), " outdegree = ",outdegree(G,v), " "))
+            @assert( indegree(sched,v) >= sum([0, values(required_predecessors(node))...]), string("node = ", string(node), " indegree = ",indegree(G,v), " ") )
+            if matches_node_type(node, AbstractSingleRobotAction)
+                for v2 in outneighbors(sched,v)
                     node2 = get_node_from_vtx(sched, v2)
-                    if matches_node_type(node2, Union{BOT_GO,BOT_COLLECT,BOT_CARRY,BOT_DEPOSIT})
+                    if matches_node_type(node2, AbstractSingleRobotAction)
                         if length(intersect(resources_reserved(node),resources_reserved(node2))) == 0 # job shop constraint
                             @assert( get_robot_id(node) == get_robot_id(node2), string("robot IDs do not match: ",string(node), " --> ", string(node2)))
                         end
@@ -935,7 +932,6 @@ function validate(sched::OperatingSchedule)
     return true
 end
 function validate(sched::OperatingSchedule,paths::Vector{Vector{Int}})
-    # G = get_graph(sched)
     for v in vertices(sched)
         node = get_node_from_vtx(sched, v)
         path_spec = get_path_spec(sched, v)

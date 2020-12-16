@@ -191,9 +191,12 @@ end
 
 export
     AbstractRobotAction,
+    AbstractSingleRobotAction,
     GO,COLLECT,CARRY,DEPOSIT
 
 abstract type AbstractRobotAction{R<:AbstractRobotType} <: AbstractPlanningPredicate end
+abstract type AbstractSingleRobotAction{R<:AbstractRobotType} <: AbstractRobotAction{R} end
+abstract type AbstractTeamRobotAction{R<:AbstractRobotType} <: AbstractRobotAction{R} end
 
 
 export BOT_GO
@@ -202,7 +205,7 @@ export BOT_GO
 
 Encodes the event "robot `r` goes from `x1` to `x2`"
 """
-@with_kw struct BOT_GO{R} <: AbstractRobotAction{R} # go to position x
+@with_kw struct BOT_GO{R} <: AbstractSingleRobotAction{R} # go to position x
     r::BotID{R} 		= BotID{R}()
     x1::LocationID	= LocationID()
     x2::LocationID	= LocationID()
@@ -215,7 +218,7 @@ export BOT_CARRY
 
 Encodes the event "robot `r` carries object `o` from `x1` to `x2`"
 """
-@with_kw struct BOT_CARRY{R} <: AbstractRobotAction{R} # carry object o to position x
+@with_kw struct BOT_CARRY{R} <: AbstractSingleRobotAction{R} # carry object o to position x
     r::BotID{R}		= BotID{R}()
     o::ObjectID		= ObjectID()
     x1::LocationID	= LocationID()
@@ -229,7 +232,7 @@ export BOT_COLLECT
 
 Encodes the event "robot `r` collects object `o` from `x`
 """
-@with_kw struct BOT_COLLECT{R} <: AbstractRobotAction{R}
+@with_kw struct BOT_COLLECT{R} <: AbstractSingleRobotAction{R}
     r::BotID{R}     = BotID{R}()
     o::ObjectID 	= ObjectID()
     x::LocationID 	= LocationID()
@@ -242,7 +245,7 @@ export BOT_DEPOSIT
 
 Encodes the event "robot `r` collects object `o` from `x`
 """
-@with_kw struct BOT_DEPOSIT{R} <: AbstractRobotAction{R}
+@with_kw struct BOT_DEPOSIT{R} <: AbstractSingleRobotAction{R}
     r::BotID{R}     = BotID{R}()
     o::ObjectID 	= ObjectID()
     x::LocationID 	= LocationID()
@@ -277,7 +280,7 @@ const CUB_DEPOSIT = BOT_DEPOSIT{CleanUpBot}
 
 Encodes the event "robot `r` cleans up locations vtxs`
 """
-@with_kw struct CLEAN_UP <: AbstractRobotAction{CleanUpBot}
+@with_kw struct CLEAN_UP <: AbstractSingleRobotAction{CleanUpBot}
 	r::BotID{CleanUpBot} = BotID{CleanUpBot}()
 	vtxs::Vector{LocationID} = Vector{LocationID}()
 end
@@ -287,7 +290,7 @@ end
 
 Encodes the task of collecting, carrying, and depositing a dead robot
 """
-@with_kw struct UNDERTAKE <: AbstractRobotAction{CleanUpBot}
+@with_kw struct UNDERTAKE <: AbstractSingleRobotAction{CleanUpBot}
 	r::BotID{CleanUpBot}	= BotID{CleanUpBot}()
 	dr::BotID 				= RobotID()
 	x1::LocationID 			= LocationID()
@@ -312,7 +315,7 @@ For collaborative tasks.
     (except between collaborating team members) are ignored for a TEAM_GO task. This is
     because of the "push-and-rotate" thing once they reach the goal vertices.
 """
-@with_kw struct TEAM_ACTION{R,A<:AbstractRobotAction{R}} <: AbstractRobotAction{R}
+@with_kw struct TEAM_ACTION{R,A<:AbstractRobotAction{R}} <: AbstractTeamRobotAction{R}
     instructions::Vector{A} = Vector{A}()
 	shape::Tuple{Int,Int} 	= (1,1)
     n::Int 					= length(instructions) # number of robots
@@ -719,3 +722,34 @@ title_string(op::Operation,verbose=true)= verbose ? string("op",get_id(get_opera
 title_string(a::TEAM_ACTION,verbose=true) where {R,A} = verbose ? string("T-", team_action_type(a), "\n","r: (",map(i->string(get_id(get_robot_id(i)), ","), a.instructions)...,")") : string("TEAM","\n",title_string(team_action_type(a)(),verbose)) #string("TEAM\n", string(team_action_type(a)))
 
 # end # module PlanningPredicates
+
+# single robot actions: BOT_GO, BOT_COLLECT, BOT_CARRY, BOT_DEPOSIT
+# initial condition preds: OBJECT_AT, ROBOT_AT
+# event preds: Operation
+
+const predicate_get_interface = [
+	:get_initial_location_id,
+	:get_destination_location_id,
+	:get_robot_id,
+	:get_object_id,
+	:has_object_id,
+	:has_robot_id,
+	:required_successors,
+	:required_predecessors,
+	:eligible_successors,
+	:eligible_predecessors,
+	:num_required_successors,
+	:num_required_predecessors,
+	:num_eligible_successors,
+	:num_eligible_predecessors,
+	:resources_reserved,
+	:title_string
+]
+const predicate_comparison_interface = [
+	:matches_template,
+	:validate_edge,
+]
+
+abstract type PredicateTrait end
+struct HasObject <: PredicateTrait end
+struct HasRobot <: PredicateTrait end

@@ -172,27 +172,27 @@ for (k,df) in df_dict
 end
 plot_configs = Dict(
     "MergeAndBalance"=>Dict(
-        :legend_entry   => "\\mergeAndBalance-∞",
-        :color          => "lime",
+        :legend_entry   => "\$\\mergeAndBalance^\\infty\$",
+        :color          => "green!60!black",
         :mark           => "star",
         ),
     "ConstrainedMergeAndBalance"=>Dict(
-        :legend_entry   => "\\mergeAndBalance",
+        :legend_entry   => "\$\\mergeAndBalance\$",
         :color          => "red",
         :mark           => "diamond",
         ),
     "ReassignFreeRobots"=>Dict(
-        :legend_entry   => "\\reassignFree",
+        :legend_entry   => "\$\\reassignFree\$",
         :color          => "blue",
         :mark           => "x",
         ),
     "DeferUntilCompletion"=>Dict(
-        :legend_entry   => "\\deferUntilCompletion",
+        :legend_entry   => "\$\\deferUntilCompletion\$",
         :color          => "black",
         :mark           => "triangle",
         ),
     "NullReplanner"=>Dict(
-        :legend_entry   => "\\backupOnly",
+        :legend_entry   => "\$\\backupOnly\$",
         :color          => "brown",
         :mark           => "+",
         ),
@@ -305,17 +305,20 @@ save("makespan_trends.pdf",plt)
 planner_ordering2 = ["MergeAndBalance","ConstrainedMergeAndBalance","ReassignFreeRobots","DeferUntilCompletion","NullReplanner"]
 plt = PGFPlots.GroupPlot(3,2)
 for (idx,(n_vals, m_vals)) in enumerate([
-    ([15,],[50,30,20]),
-    ([30,],[50,30,20]),
+    # ([15,],[50,30,20]),
+    # ([30,],[50,30,20]),
+    ([15,],[20,30,50]),
+    ([30,],[20,30,50]),
     ])
     gp = group_history_plot(df_dict,planner_ordering2;
         y_key = :makespans,
         use_y_lims=true,
         y_min=-100,
         # y_max=2500,
-        # legend_entries=legend_entries,
         legend_pos = "north west",
-        legend_flag = idx == 1,
+        legend_font= "\\fontsize{8}{9}\\selectfont",
+        # legend_flag = idx == 1,
+        legend_location = idx == 1 ? (3,1) : (-1,-1),
         include_keys = [:num_projects=>30],
         ymode="linear",
         x_key=:none,
@@ -325,7 +328,8 @@ for (idx,(n_vals, m_vals)) in enumerate([
         m_key = :arrival_interval,
         m_vals = m_vals,
         lines=false,
-        legend_entries=map(k->plot_configs[k][:legend_entry][2:end],planner_ordering2),
+        legend_entries=map(k->plot_configs[k][:legend_entry],planner_ordering2),
+        # legend_entries=map(k->plot_configs[k][:legend_entry][3:end-1],planner_ordering2),
         colors=map(k->plot_configs[k][:color],planner_ordering2),
         opt_marks=["diamond","x","triangle","+","star"],
     )
@@ -344,7 +348,7 @@ for (i,ax) in enumerate(plt.axes)
     end
 end
 plt.groupStyle="horizontal sep = 8pt, vertical sep = 8pt"
-display(plt)
+# display(plt)
 save("makespan_comparisons.tex",plt)
 save("makespan_comparisons.pdf",plt)
 

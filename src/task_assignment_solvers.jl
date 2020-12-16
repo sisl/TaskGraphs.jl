@@ -1329,7 +1329,6 @@ function compute_lower_bound(env,
     dist_mtx = construct_schedule_distance_matrix(get_schedule(env),get_problem_spec(env)),
     pairs=[BOT_GO=>BOT_COLLECT],
     )
-    # cache = deepcopy(get_cache(env))
     sched = deepcopy(get_schedule(env))
     for p in pairs
         for vp in topological_sort_by_dfs(get_graph(sched))
@@ -1353,8 +1352,7 @@ function compute_lower_bound(env,
             @log_info(1,global_verbosity(),"$v=>$vp, $(string(get_node_from_vtx(sched,v)))=>$(string(get_node_from_vtx(sched,vp))), t0=$t0")
         end
     end
-    # update_planning_cache_times!(sched,cache)
-    update_schedule_times!(sched)
+    process_schedule!(sched)
     return cache
 end
 
@@ -1362,28 +1360,24 @@ export
     propagate_valid_ids!
 
 function propagate_valid_ids!(sched::OperatingSchedule,problem_spec::ProblemSpec)
-    G = get_graph(sched)
-    @assert(is_cyclic(G) == false, "is_cyclic(G)") # string(sparse(adj_matrix))
+    @assert(is_cyclic(sched) == false, "is_cyclic(sched)") # string(sparse(adj_matrix))
     # Propagate valid IDs through the schedule
-    for v in topological_sort(G)
-        # if !get_path_spec(sched, v).fixed
-            node_id = get_vtx_id(sched, v)
-            node = get_node_from_id(sched, node_id)
-            for v2 in inneighbors(G,v)
-                node = align_with_predecessor(node,get_node_from_vtx(sched, v2))
-            end
-            for v2 in outneighbors(G,v)
-                node = align_with_successor(node,get_node_from_vtx(sched, v2))
-            end
-            path_spec = get_path_spec(sched, v)
-            if path_spec.fixed
-                replace_in_schedule!(sched, path_spec, node, node_id)
-            else
-                replace_in_schedule!(sched, problem_spec, node, node_id)
-            end
-        # end
+    for v in topological_sort_by_dfs(sched)
+        node_id = get_vtx_id(sched, v)
+        node = get_node_from_id(sched, node_id)
+        for v2 in inneighbors(sched,v)
+            node = align_with_predecessor(node,get_node_from_vtx(sched, v2))
+        end
+        for v2 in outneighbors(sched,v)
+            node = align_with_successor(node,get_node_from_vtx(sched, v2))
+        end
+        path_spec = get_path_spec(sched, v)
+        if path_spec.fixed
+            replace_in_schedule!(sched, path_spec, node, node_id)
+        else
+            replace_in_schedule!(sched, problem_spec, node, node_id)
+        end
     end
-    # sched
     return true
 end
 
@@ -1439,7 +1433,6 @@ function update_project_schedule!(sched::OperatingSchedule,problem_spec,adj_matr
         end
         return false
     end
-    # update_schedule_times!(sched)
     process_schedule!(sched)
     return true
 end
