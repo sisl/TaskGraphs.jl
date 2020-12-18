@@ -491,7 +491,6 @@ matches_node_type(n::ScheduleNode,b::Type{B}) where {B} = matches_node_type(n.no
 
 export
     OperatingSchedule,
-    get_graph,
     get_object_ICs,
     get_object_FCs,
     get_robot_ICs,
@@ -499,7 +498,6 @@ export
     get_operations,
     get_vtx_ids,
     get_node_from_id,
-    get_schedule_node,
     get_node_from_vtx,
     get_completion_time,
     get_duration,
@@ -517,82 +515,35 @@ constraints between them. Each `ScheduleNode` has a corresponding vertex index
 and an `AbstractID`. An edge from node1 to node2 indicates a precedence
 constraint between them.
 """
-@with_kw struct OperatingSchedule{G<:AbstractGraph} <: AbstractGraph{Int}
-    graph               ::G                     = DiGraph()
-    planning_nodes      ::Vector{ScheduleNode}  = Vector{ScheduleNode}()
+@with_kw struct OperatingSchedule <: AbstractCustomDiGraph{ScheduleNode,AbstractID}
+    graph               ::DiGraph               = DiGraph()
+    nodes      ::Vector{ScheduleNode}  = Vector{ScheduleNode}()
     vtx_map             ::Dict{AbstractID,Int}  = Dict{AbstractID,Int}()
     vtx_ids             ::Vector{AbstractID}    = Vector{AbstractID}() # maps vertex uid to actual graph node
     terminal_vtxs       ::Vector{Int}           = Vector{Int}() # list of "project heads"
     weights             ::Dict{Int,Float64}     = Dict{Int,Float64}() # weights corresponding to project heads
 end
-Base.zero(sched::OperatingSchedule{G}) where {G} = OperatingSchedule(graph=G())
-LightGraphs.edges(sched::OperatingSchedule) = edges(sched.graph)
-LightGraphs.is_directed(sched::OperatingSchedule) = true
-# path spec interface
-
-CRCBS.get_graph(sched::P) where {P<:OperatingSchedule}       = sched.graph
-get_vtx_ids(sched::P) where {P<:OperatingSchedule}           = sched.vtx_ids
 get_terminal_vtxs(sched::P) where {P<:OperatingSchedule}     = sched.terminal_vtxs
 get_root_node_weights(sched::P) where {P<:OperatingSchedule} = sched.weights
 
-CRCBS.get_vtx(sched::OperatingSchedule,v::Int)          = v
-CRCBS.get_vtx(sched::OperatingSchedule,id::AbstractID)  = get(sched.vtx_map, id, -1)
-CRCBS.get_vtx(sched::OperatingSchedule,node::ScheduleNode) = get_vtx(sched,node.id)
-get_vtx_id(sched::OperatingSchedule,v::Int)             = sched.vtx_ids[v]
-get_schedule_node(sched::OperatingSchedule,v) = sched.planning_nodes[get_vtx(sched,v)]
-# get_schedule_node(sched,id) = get_schedule_node(sched,get_vtx(sched,id))
-# get_schedule_node(sched,node::ScheduleNode) = get_schedule_node(sched,node.id)
-# get_node_from_id(sched::OperatingSchedule,id::AbstractID) = get_schedule_node(sched,id).node
-# get_node_from_vtx(sched::OperatingSchedule,v::Int)      = get_schedule_node(sched,v).node
-get_node_from_id(sched::OperatingSchedule,id) = get_schedule_node(sched,id).node
-get_node_from_vtx(sched::OperatingSchedule,v) = get_schedule_node(sched,v).node
+GraphUtils.get_vtx(sched::OperatingSchedule,node::ScheduleNode) = get_vtx(sched,node.id)
+get_node_from_id(sched::OperatingSchedule,id) = get_node(sched,id).node
+get_node_from_vtx(sched::OperatingSchedule,v) = get_node(sched,v).node
 
-for op in [:edgetype,:ne,:nv,:vertices,:is_cyclic,:topological_sort_by_dfs]
-    @eval LightGraphs.$op(sched::OperatingSchedule) = $op(get_graph(sched))
-end
-for op in [:outneighbors,:inneighbors,:indegree,:outdegree,:has_vertex]
-    @eval LightGraphs.$op(sched::OperatingSchedule,v::Int) = $op(get_graph(sched),v)
-    @eval LightGraphs.$op(sched::OperatingSchedule,id) = $op(sched,get_vtx(sched,id))
-end
-for op in [:has_edge,:add_edge!,:rem_edge!]
-    @eval LightGraphs.$op(s::OperatingSchedule,u,v) = $op(get_graph(s),get_vtx(s,u),get_vtx(s,v))
-end
+get_object_ICs(sched::P) where {P<:OperatingSchedule}  = Dict(k=>v.node for (k,v) in get_nodes_of_type(sched,ObjectID))
+get_robot_ICs(sched::P) where {P<:OperatingSchedule}   = Dict(k=>v.node for (k,v) in get_nodes_of_type(sched,BotID))
+get_actions(sched::P) where {P<:OperatingSchedule}     = Dict(k=>v.node for (k,v) in get_nodes_of_type(sched,ActionID))
+get_operations(sched::P) where {P<:OperatingSchedule}  = Dict(k=>v.node for (k,v) in get_nodes_of_type(sched,OperationID))
 
-get_nodes_of_type(sched::P,T) where {P<:OperatingSchedule} = Dict(id=>get_node_from_id(sched, id) for id in sched.vtx_ids if typeof(id)<:T)
-get_object_ICs(sched::P) where {P<:OperatingSchedule}  = get_nodes_of_type(sched,ObjectID)
-get_robot_ICs(sched::P) where {P<:OperatingSchedule}   = get_nodes_of_type(sched,BotID)
-get_actions(sched::P) where {P<:OperatingSchedule}     = get_nodes_of_type(sched,ActionID)
-get_operations(sched::P) where {P<:OperatingSchedule}  = get_nodes_of_type(sched,OperationID)
-
-export
-    set_vtx_map!,
-    insert_to_vtx_map!
-
-function set_vtx_map!(sched::OperatingSchedule,node,id::AbstractID,v::Int)
-    @assert nv(sched) >= v
-    sched.vtx_map[id] = v
-    sched.planning_nodes[v] = node
-end
-function insert_to_vtx_map!(sched::OperatingSchedule,node,id::AbstractID,idx::Int=nv(sched))
-    push!(sched.vtx_ids, id)
-    push!(sched.planning_nodes, node)
-    set_vtx_map!(sched,node,id,idx)
-end
-
-export
-    add_path_spec!
-
-# get_path_spec(sched::OperatingSchedule,v::Int) = get_path_spec(get_schedule_node(sched,v))
-# set_path_spec!(sched::OperatingSchedule,v::Int,spec::PathSpec) = set_path_spec!(get_schedule_node(sched,v),spec)
 for op in schedule_node_accessor_interface
-    @eval $op(sched::OperatingSchedule,v) = $op(get_schedule_node(sched,v))
-    @eval $op(sched::OperatingSchedule) = map(v->$op(get_schedule_node(sched,v)), vertices(sched))
+    @eval $op(sched::OperatingSchedule,v) = $op(get_node(sched,v))
+    @eval $op(sched::OperatingSchedule) = map(v->$op(get_node(sched,v)), vertices(sched))
 end
 for op in schedule_node_mutator_interface
-    @eval $op(sched::OperatingSchedule,v,val) = $op(get_schedule_node(sched,v),val)
+    @eval $op(sched::OperatingSchedule,v,val) = $op(get_node(sched,v),val)
     @eval $op(sched::OperatingSchedule,val) = begin
         for v in vertices(sched)
-            $op(get_schedule_node(sched,v),val)
+            $op(get_node(sched,v),val)
         end
     end
 end
@@ -758,27 +709,16 @@ function add_to_schedule!(sched::P,pred,id::ID) where {P<:OperatingSchedule,ID<:
     add_to_schedule!(sched,ProblemSpec(),pred,id)
 end
 
-# function LightGraphs.has_edge(s::OperatingSchedule,i::AbstractID,j::AbstractID)
-#     has_edge(get_graph(s), get_vtx(s,i), get_vtx(s,j))
-# end
-# function LightGraphs.add_edge!(sched::P,id1::A,id2::B) where {P<:OperatingSchedule,A<:AbstractID,B<:AbstractID}
-#     add_edge!(get_graph(sched), get_vtx(sched,id1), get_vtx(sched,id2))
-# end
-# function LightGraphs.rem_edge!(sched::P,id1::A,id2::B) where {P<:OperatingSchedule,A<:AbstractID,B<:AbstractID}
-#     rem_edge!(get_graph(sched), get_vtx(sched,id1), get_vtx(sched,id2))
-# end
-# LightGraphs.rem_edge!(sched::OperatingSchedule,n1::ScheduleNode,n2::ScheduleNode) = rem_edge!(sched,n1.id,n2.id)
-
 export
     get_leaf_operation_vtxs,
-    set_leaf_operation_vtxs!,
-    delete_node!,
-    delete_nodes!
+    set_leaf_operation_vtxs!
+    # delete_node!,
+    # delete_nodes!
 
 function get_leaf_operation_vtxs(sched::OperatingSchedule)
     terminal_vtxs = Int[]
     for v in get_all_terminal_nodes(sched)
-        if matches_node_type(get_schedule_node(sched,v),Operation)
+        if matches_node_type(get_node(sched,v),Operation)
             push!(terminal_vtxs,v)
         end
     end
@@ -790,32 +730,6 @@ function set_leaf_operation_vtxs!(sched::OperatingSchedule)
     for vtx in get_leaf_operation_vtxs(sched)
         push!(get_terminal_vtxs(sched),vtx)
         get_root_node_weights(sched)[vtx] = 1.0
-    end
-    sched
-end
-
-"""
-    delete_node!
-
-removes a node (by id) from sched.
-"""
-function delete_node!(sched::OperatingSchedule, id::AbstractID)
-    v = get_vtx(sched, id)
-    rem_vertex!(get_graph(sched), v)
-    deleteat!(sched.planning_nodes, v)
-    delete!(sched.vtx_map, id)
-    deleteat!(sched.vtx_ids, v)
-    for vtx in v:nv(get_graph(sched))
-        node_id = sched.vtx_ids[vtx]
-        sched.vtx_map[node_id] = vtx
-    end
-    sched
-end
-delete_node!(sched::OperatingSchedule, v) = delete_node!(sched,get_vtx_id(sched,v))
-function delete_nodes!(sched::OperatingSchedule, vtxs::Vector{Int})
-    node_ids = map(v->get_vtx_id(sched,v), vtxs)
-    for id in node_ids
-        delete_node!(sched,id)
     end
     sched
 end
@@ -976,49 +890,6 @@ end
 export
     add_single_robot_delivery_task!
 
-# function add_single_robot_delivery_task!(sched::OperatingSchedule,spec::ProblemSpec,id::AbstractID,r::Int,o::Int,x1::Int,x2::Int)
-#     add_single_robot_delivery_task!(sched,spec,id,RobotID(r),ObjectID(o),LocationID(x1),LocationID(x2))
-# end
-# function add_single_robot_delivery_task!(
-#         schedule::S,
-#         problem_spec::T,
-#         pred_id::AbstractID,
-#         robot_id::RobotID,
-#         object_id::ObjectID,
-#         pickup_station_id::LocationID,
-#         dropoff_station_id::LocationID
-#         ) where {S<:OperatingSchedule,T<:ProblemSpec}
-#
-#     if robot_id != -1
-#         robot_pred = get_node_from_id(schedule,robot_id)
-#         robot_start_station_id = get_initial_location_id(get_node_from_id(schedule, pred_id))
-#     else
-#         robot_start_station_id = LocationID(-1)
-#     end
-#
-#     # THIS NODE IS DETERMINED BY THE TASK ASSIGNMENT.
-#     action_id = get_unique_action_id()
-#     add_to_schedule!(schedule, problem_spec, GO(robot_id, robot_start_station_id, pickup_station_id), action_id)
-#     add_edge!(schedule, pred_id, action_id)
-#
-#     prev_action_id = action_id
-#     action_id = get_unique_action_id()
-#     add_to_schedule!(schedule, problem_spec, COLLECT(robot_id, object_id, pickup_station_id), action_id)
-#     add_edge!(schedule, prev_action_id, action_id)
-#     add_edge!(schedule, ObjectID(object_id), action_id)
-#
-#     prev_action_id = action_id
-#     action_id = get_unique_action_id()
-#     add_to_schedule!(schedule, problem_spec, CARRY(robot_id, object_id, pickup_station_id, dropoff_station_id), action_id)
-#     add_edge!(schedule, prev_action_id, action_id)
-#
-#     prev_action_id = action_id
-#     action_id = get_unique_action_id()
-#     add_to_schedule!(schedule, problem_spec, DEPOSIT(robot_id, object_id, dropoff_station_id), action_id)
-#     add_edge!(schedule, prev_action_id, action_id)
-#
-#     action_id
-# end
 function add_headless_delivery_task!(
         sched::OperatingSchedule,
         problem_spec::ProblemSpec,
@@ -1360,122 +1231,6 @@ function get_deposit_node(sched::P,id::ObjectID) where {P<:OperatingSchedule}
     end
     return current_id, node
 end
-
-# ################################################################################
-# ############################## New Functionality ###############################
-# ################################################################################
-#
-# export
-#     TaskGraphsMILP,
-#     AssignmentMILP,
-#     AdjacencyMILP,
-#     SparseAdjacencyMILP
-#
-# """
-#     TaskGraphsMILP
-#
-# Concrete subtypes of `TaskGraphsMILP` define different ways to formulat the
-# sequential assignment portion of a PC-TAPF problem.
-# """
-# abstract type TaskGraphsMILP end
-# """
-#     AssignmentMILP <: TaskGraphsMILP
-#
-# Used to formulate a MILP where the decision variable is a matrix `X`, where
-# `X[i,j] = 1` means that robot `i` is assigned to delivery task `j`. The
-# dimensionality of `X` is (N+M) × M, where N is the number of robots and M is the
-# number of delivery tasks. the last M rows of `X` correspond to "dummy robots",
-# i.e. the N+jth row corresponds to "the robot that already completed task j". The
-# use of these dummy robot variables allows the sequential assignment problem to
-# be posed as a one-off assignment problem with inter-task constraints.
-# """
-# @with_kw struct AssignmentMILP <: TaskGraphsMILP
-#     model::JuMP.Model = Model()
-# end
-# """
-#     TeamAssignmentMILP
-#
-# ***Not yet implemented.***
-#
-# Eextend the assignment matrix
-# formulation of `AssignmentMILP` to the "team-forming" case where robots must
-# collaboratively transport some objects.
-# """
-# @with_kw struct TeamAssignmentMILP <: TaskGraphsMILP
-#     model::JuMP.Model = Model()
-#     task_group::Vector{Vector{Int}}
-# end
-# @with_kw struct AdjacencyMILP <: TaskGraphsMILP
-#     model::JuMP.Model = Model()
-#     job_shop::Bool=false
-# end
-# """
-#     SparseAdjacencyMILP
-#
-# Formulates a MILP where the decision variable is a sparse adjacency matrix `X`
-#     for the operating schedule graph. If `X[i,j] = 1`, there is an edge from
-#     node `i` to node `j`.
-# Experiments have shown that the sparse matrix approach leads to much faster
-# solve times than the dense matrix approach.
-# """
-# @with_kw struct SparseAdjacencyMILP <: TaskGraphsMILP
-#     model::JuMP.Model = Model()
-#     Xa::SparseMatrixCSC{VariableRef,Int} = SparseMatrixCSC{VariableRef,Int}(0,0,ones(Int,1),Int[],VariableRef[]) # assignment adjacency matrix
-#     Xj::SparseMatrixCSC{VariableRef,Int} = SparseMatrixCSC{VariableRef,Int}(0,0,ones(Int,1),Int[],VariableRef[]) # job shop adjacency matrix
-#     job_shop::Bool=false
-# end
-# JuMP.optimize!(model::M) where {M<:TaskGraphsMILP}          = optimize!(model.model)
-# JuMP.termination_status(model::M) where {M<:TaskGraphsMILP} = termination_status(model.model)
-# JuMP.objective_function(model::M) where {M<:TaskGraphsMILP} = objective_function(model.model)
-# JuMP.objective_bound(model::M) where {M<:TaskGraphsMILP}    = objective_bound(model.model)
-# JuMP.primal_status(model::M) where {M<:TaskGraphsMILP}      = primal_status(model.model)
-# JuMP.dual_status(model::M) where {M<:TaskGraphsMILP}        = dual_status(model.model)
-# # for op = (:optimize!, :termination_status, :objective_function)
-# #     eval(quote
-# #         JuMP.$op(model::M,args...) where {M<:TaskGraphsMILP} = $op(model.model,args...)
-# #     end)
-# # end
-#
-# export
-#     exclude_solutions!,
-#     exclude_current_solution!
-#
-# """
-#     exclude_solutions!(model::JuMP.Model,forbidden_solutions::Vector{Matrix{Int}})
-#
-# Adds constraints to model such that the solution may not match any solution
-# contained in forbidden_solutions. Assumes that the model contains a variable
-# container called X whose entries are binary and whose dimensions are identical
-# to the dimensions of each solution in forbidden_solutions.
-# """
-# function exclude_solutions!(model::JuMP.Model,X::Matrix{Int})
-#     @assert !any((X .< 0) .| (X .> 1))
-#     @constraint(model, sum(model[:X] .* X) <= sum(model[:X])-1)
-# end
-# exclude_solutions!(model::TaskGraphsMILP,args...) = exclude_solutions!(model.model, args...)
-# function exclude_solutions!(model::JuMP.Model,M::Int,forbidden_solutions::Vector{Matrix{Int}})
-#     for X in forbidden_solutions
-#         exclude_solutions!(model,X)
-#     end
-# end
-# function exclude_solutions!(model::JuMP.Model)
-#     if termination_status(model) != MOI.OPTIMIZE_NOT_CALLED
-#         X = get_assignment_matrix(model)
-#         exclude_solutions!(model,X)
-#     end
-# end
-# exclude_current_solution!(args...) = exclude_solutions!(args...)
-#
-#
-# export
-#     get_assignment_matrix,
-#     get_assignment_dict
-#
-# function get_assignment_matrix(model::M) where {M<:JuMP.Model}
-#     Matrix{Int}(min.(1, round.(value.(model[:X])))) # guarantees binary matrix
-# end
-# get_assignment_matrix(model::TaskGraphsMILP) = get_assignment_matrix(model.model)
-#
 
 export get_assignment_dict
 

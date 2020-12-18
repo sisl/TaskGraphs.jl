@@ -144,7 +144,7 @@ function split_active_vtxs!(sched::OperatingSchedule,problem_spec::ProblemSpec,t
     for v in active_vtxs
         # node_id = get_vtx_id(sched,v)
         # node = get_node_from_id(sched, node_id)
-        node = get_schedule_node(sched,v)
+        node = get_node(sched,v)
         if isa(node,BOT_GO) # split TODO why aren't we splitting CARRY, COLLECT, and DEPOSIT as well?
             x = robot_positions[node.r].x
             node1,node2 = split_action_node!(sched,problem_spec,node,x,t)
@@ -280,7 +280,7 @@ function prune_schedule(sched::OperatingSchedule,
     keep_vtxs = setdiff(Set{Int}(collect(vertices(G))), remove_set)
     # add all non-deleted nodes to new project schedule
     for v in keep_vtxs
-        add_to_schedule!(new_sched,get_schedule_node(sched,v))
+        add_to_schedule!(new_sched,get_node(sched,v))
         # node_id = get_vtx_id(sched,v)
         # node = get_node_from_id(sched, node_id)
         # path_spec = get_path_spec(sched,v)
@@ -295,7 +295,7 @@ function prune_schedule(sched::OperatingSchedule,
     for v in vertices(new_sched)
         # node_id = get_vtx_id(new_sched,v)
         # node = get_node_from_id(new_sched, node_id)
-        node = get_schedule_node(new_sched, v)
+        node = get_node(new_sched, v)
         pred = node.node
         if isa(pred,BOT_GO) && indegree(new_sched,v) == 0
             robot_id = get_robot_id(pred)
@@ -354,7 +354,7 @@ Merge next_sched into sched
 """
 function splice_schedules!(sched::P,next_sched::P,enforce_unique=true) where {P<:OperatingSchedule}
     for v in vertices(next_sched)
-        node = get_schedule_node(next_sched,v)
+        node = get_node(next_sched,v)
         # node_id = get_vtx_id(next_sched, v)
         # if !has_vertex(sched,get_vtx(sched,node_id))
         if !has_vertex(sched,node)
@@ -373,8 +373,8 @@ function splice_schedules!(sched::P,next_sched::P,enforce_unique=true) where {P<
         # node_id1 = get_vtx_id(next_sched, e.src)
         # node_id2 = get_vtx_id(next_sched, e.dst)
         # add_edge!(sched, node_id1, node_id2)
-        node1 = get_schedule_node(next_sched, e.src)
-        node2 = get_schedule_node(next_sched, e.dst)
+        node1 = get_node(next_sched, e.src)
+        node2 = get_node(next_sched, e.dst)
         add_edge!(sched, node1, node2)
     end
     set_leaf_operation_vtxs!(sched)
@@ -586,7 +586,7 @@ function get_commit_time(replan_model::ReassignFreeRobots, search_env, request, 
     free_time = makespan(get_schedule(search_env))
     for v in vertices(get_schedule(search_env))
         # node = get_node_from_vtx(get_schedule(search_env),v)
-        node = get_schedule_node(get_schedule(search_env),v)
+        node = get_node(get_schedule(search_env),v)
         if isa(node.node,GO)
             if get_id(get_destination_location_id(node.node)) == -1
                 free_time = min(free_time, get_t0(node))

@@ -68,7 +68,7 @@ let
     remap_object_ids!(request.schedule,env.schedule)
     base_env = replan!(planner,env,request)
     for v in vertices(request.schedule)
-        node = get_schedule_node(request.schedule,v)
+        node = get_node(request.schedule,v)
         @test get_t0(node) >= request.t_request
         @test get_t0(base_env,node) >= get_commit_time(planner,env,request)
     end

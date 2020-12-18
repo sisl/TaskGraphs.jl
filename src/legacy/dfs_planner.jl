@@ -110,7 +110,7 @@ function update_envs!(solver,search_env,envs,paths)
         t_arrival = max(cache.tF[v], s.t + get_distance(get_graph(search_env).dist_function,s.vtx,env.goal.vtx))
         if is_goal(envs[i],s)
             if t_arrival > cache.tF[v] && env.goal.vtx != -1
-                @log_info(-1,solver,"DFS update_envs!(): extending tF[v] from $(cache.tF[v]) to $t_arrival in ",string(get_schedule_node(env)),", s = ",string(s))
+                @log_info(-1,solver,"DFS update_envs!(): extending tF[v] from $(cache.tF[v]) to $t_arrival in ",string(get_node(env)),", s = ",string(s))
                 cache.tF[v] = t_arrival
                 up_to_date = false
             end
@@ -223,7 +223,7 @@ function select_action_dfs!(solver,envs,states,actions,i,ordering,idxs,search_st
             c0 = get_transition_cost(env,s,a)
             if (i >= search_state.reset_i) || (i < search_state.pickup_i && a == ai) || ((c >= c0 || is_valid(env,a)) && a != ai)
                 actions[idx] = ai
-                @log_info(5,solver,"$(repeat(" ",i))i = $i, trying a=",string(ai)," from s = ",string(s),"for env ",string(get_schedule_node(env)), " with env.goal = ",string(env.goal))
+                @log_info(5,solver,"$(repeat(" ",i))i = $i, trying a=",string(ai)," from s = ",string(s),"for env ",string(get_node(env)), " with env.goal = ",string(env.goal))
                 k = get_conflict_idx(envs,states,actions,i,ordering,idxs)
                 # @assert k < i "should only check for conflicts with 1:$i, but found conflict with $k"
                 if k <= 0
@@ -340,7 +340,7 @@ function CRCBS.solve!(
         mkpath(DEBUG_PATH)
         for env in envs
             v = get_vtx(get_schedule(search_env),env.node_id)
-            @log_info(-1,solver,"node ",string(get_schedule_node(env))," t0=$(get_t0(search_env,v)), tF=$(get_tF(search_env,v)), closed=$(v in get_cache(search_env).closed_set),")
+            @log_info(-1,solver,"node ",string(get_node(env))," t0=$(get_t0(search_env,v)), tF=$(get_tF(search_env,v)), closed=$(v in get_cache(search_env).closed_set),")
         end
         robot_paths = convert_to_vertex_lists(route_plan)
         object_paths, object_intervals, object_ids, path_idxs = get_object_paths(route_plan,search_env)

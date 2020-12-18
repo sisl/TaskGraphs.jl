@@ -115,9 +115,9 @@ function remap_object_ids!(node::Operation,args...)
 end
 remap_object_id(node::Operation,args...)    = remap_object_ids!(deepcopy(node),args...)
 function remap_object_ids!(sched::OperatingSchedule,args...)
-    remap_object_ids!(sched.vtx_ids,args...)
-    remap_object_ids!(sched.planning_nodes,args...)
-    remap_object_ids!(sched.vtx_map,args...)
+    remap_object_ids!(get_vtx_ids(sched),args...)
+    remap_object_ids!(get_nodes(sched),args...)
+    remap_object_ids!(get_vtx_map(sched),args...)
     @assert sanity_check(sched," after remap_object_ids!()")
     sched
 end

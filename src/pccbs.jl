@@ -12,8 +12,7 @@
 ################################################################################
 const State = CRCBS.GraphState
 const Action = CRCBS.GraphAction
-# TODO simplify PCCBSEnv and include SearchEnv within it
-# PCCBSEnv
+
 export PCCBSEnv
 
 @with_kw_noshow struct PCCBSEnv{E,N,I,T,C<:AbstractCostModel,H<:AbstractCostModel} <: GraphEnv{State,Action,C}
@@ -28,16 +27,17 @@ export PCCBSEnv
     heuristic::H                    = get_heuristic_model(search_env)
 end
 CRCBS.get_cost_model(env::PCCBSEnv)       = get_cost_model(env.search_env)
-CRCBS.get_agent_id(env::PCCBSEnv)         = env.agent_idx
-CRCBS.get_constraints(env::PCCBSEnv)      = env.constraints
-CRCBS.get_goal(env::PCCBSEnv)             = env.goal
+# CRCBS.get_agent_id(env::PCCBSEnv)         = env.agent_idx
+# CRCBS.get_constraints(env::PCCBSEnv)      = env.constraints
+# CRCBS.get_goal(env::PCCBSEnv)             = env.goal
 CRCBS.get_heuristic_model(env::PCCBSEnv)  = get_heuristic_model(env.search_env)
-get_schedule_node(env::PCCBSEnv)          = env.schedule_node
-CRCBS.get_graph(env::PCCBSEnv)            = get_graph(env.search_env,graph_key(get_schedule_node(env))) #graph
+# get_node(env::PCCBSEnv)          = env.schedule_node
+GraphUtils.get_node(env::PCCBSEnv)        = env.schedule_node
+GraphUtils.get_graph(env::PCCBSEnv)       = get_graph(env.search_env,graph_key(get_node(env))) #graph
 
 function Base.show(io::IO, env::PCCBSEnv)
     print(io,"PCCBSEnv: \n",
-        "\t","schedule_node: ",string(get_schedule_node(env)),"\n",
+        "\t","schedule_node: ",string(get_node(env)),"\n",
         "\t","agent_idx:     ",get_agent_id(env),"\n",
         "\t","goal:          ",string(get_goal(env)),"\n")
 end
@@ -46,7 +46,7 @@ CRCBS.get_next_state(s::State,a::Action)    = State(get_e(a).dst,get_t(s)+get_dt
 CRCBS.get_next_state(env::PCCBSEnv,s,a)  = get_next_state(s,a)
 CRCBS.wait(env::PCCBSEnv,s)              = Action(e=Edge(get_vtx(s),get_vtx(s)))
 
-CRCBS.get_possible_actions(env::PCCBSEnv,s::State) = get_possible_actions(get_schedule_node(env),env,s)
+CRCBS.get_possible_actions(env::PCCBSEnv,s::State) = get_possible_actions(get_node(env),env,s)
 function CRCBS.get_possible_actions(node,env::PCCBSEnv,s::State)
     if CRCBS.is_valid(env,s)
         return map(v2->Action(e=Edge(s.vtx,v2)), outneighbors(get_graph(env),s.vtx))

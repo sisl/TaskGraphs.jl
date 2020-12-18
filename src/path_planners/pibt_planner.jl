@@ -36,9 +36,9 @@ function CRCBS.pibt_priority_law(solver,pc_mapf::PC_MAPF,cache,i)
     env = CRCBS.get_envs(cache)[i]
     return (
         ~CRCBS.is_valid(env,get_goal(env)),
-        ~isa(get_schedule_node(env),DEPOSIT),
-        ~isa(get_schedule_node(env),CARRY),
-        ~isa(get_schedule_node(env),COLLECT),
+        ~isa(get_node(env),DEPOSIT),
+        ~isa(get_node(env),CARRY),
+        ~isa(get_node(env),COLLECT),
         # minimum(cache.solution.cache.slack[get_vtx(
         #     cache.solution.schedule,env.node_id)]),
         minimum(get_slack(cache.solution,env.node_id)),
@@ -70,7 +70,7 @@ function pibt_info_string(cache,i,
         a=CRCBS.get_actions(cache)[i]
     )
     string("\t",i,": ", get_vtx(cache.solution.schedule,env.node_id)," ",
-        string(get_schedule_node(env))," s=",string(s),", a=",string(a),
+        string(get_node(env))," s=",string(s),", a=",string(a),
         ", goal=",string(env.goal),"\n")
 end
 function pibt_info_strings(cache)

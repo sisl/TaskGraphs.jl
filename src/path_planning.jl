@@ -13,7 +13,6 @@
 #
 # using ..TaskGraphs
 
-
 export
     PlanningCache,
     isps_queue_cost,
@@ -124,7 +123,7 @@ export
     graph::GridFactoryEnvironment   = GridFactoryEnvironment()
     problem_spec::ProblemSpec       = ProblemSpec()
 end
-CRCBS.get_graph(layer::EnvironmentLayer)            = layer.graph
+GraphUtils.get_graph(layer::EnvironmentLayer)            = layer.graph
 get_problem_spec(layer::EnvironmentLayer)           = layer.problem_spec
 CRCBS.get_cost_model(layer::EnvironmentLayer)       = layer.cost_model
 CRCBS.get_heuristic_model(layer::EnvironmentLayer)  = layer.heuristic_model
@@ -142,7 +141,7 @@ function populate_environment_layer_dict!(layers,
         env::GridFactoryEnvironment,
         prob_spec::ProblemSpec,
     )
-    gkeys = unique(map(graph_key, map(n->n.node, sched.planning_nodes)))
+    gkeys = unique(map(graph_key, map(n->n.node, sched.nodes)))
     for k in gkeys
         layers[k] = construct_environment_layer(env,prob_spec)
     end
@@ -171,7 +170,7 @@ export
     get_problem_spec,
     get_route_plan
 
-CRCBS.get_graph(env::SearchEnv,k=graph_key())          = get_graph(env.env_layers[k])
+GraphUtils.get_graph(env::SearchEnv,k=graph_key())     = get_graph(env.env_layers[k])
 get_problem_spec(env::SearchEnv,k=graph_key())         = get_problem_spec(env.env_layers[k])
 CRCBS.get_cost_model(env::SearchEnv)        = env.cost_model
 CRCBS.get_heuristic_model(env::SearchEnv)   = env.heuristic_model

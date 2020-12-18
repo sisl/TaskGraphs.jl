@@ -175,13 +175,13 @@ function isolate_delivery_task_vtxs(sched::OperatingSchedule,o::ObjectID,
     # incoming and outgoing robot nodes -- for single and team robot tasks
     in_edges = exclusive_edge_cover(sched,vtxs,:in)
     incoming = filter(node->matches_template(AbstractRobotAction,node),
-        map(e->get_schedule_node(sched,e.src),collect(in_edges)))
+        map(e->get_node(sched,e.src),collect(in_edges)))
     out_edges = exclusive_edge_cover(sched,vtxs,:out)
     outgoing = filter(node->matches_template(AbstractRobotAction,node),
-        map(e->get_schedule_node(sched,e.dst),collect(out_edges)))
+        map(e->get_node(sched,e.dst),collect(out_edges)))
     # target operation node
     op = filter(node->matches_template(Operation,node),
-        map(e->get_schedule_node(sched,e.dst),collect(out_edges)))[1]
+        map(e->get_node(sched,e.dst),collect(out_edges)))[1]
     return incoming, outgoing, op
 end
 

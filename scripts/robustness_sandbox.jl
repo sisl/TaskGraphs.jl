@@ -26,23 +26,13 @@ s_prob = TaskGraphs.stochastic_problem(
 reset_solver!(solver)
 base_env, cost = solve!(solver,s_prob.prob)
 new_env = deepcopy(base_env)
+display(plot_project_schedule(get_schedule(new_env)))
 new_env = handle_disturbance!(solver,s_prob,new_env,DroppedObject(1),2)
-
-t = 2
-env_state = get_env_state(new_env,t)
-sched = new_env.schedule
-o = ObjectID(1)
-vtxs = TaskGraphs.get_delivery_task_vtxs(sched,o)
-incoming,outgoing,op = TaskGraphs.isolate_delivery_task_vtxs(sched,o)
-TaskGraphs.stitch_disjoint_node_sets!(sched,incoming,outgoing,env_state)
-process_schedule!(sched)
-
-plot_project_schedule(new_env)
+display(plot_project_schedule(get_schedule(new_env)))
 
 reset_solver!(solver)
 # set_verbosity!(solver,3)
 env, cost = solve!(solver,PC_TAPF(new_env))
-
 plot_project_schedule(env)
 
 # sched = OperatingSchedule()
@@ -93,3 +83,8 @@ plot_project_schedule(env)
 # set_iteration_limit!(low_level(low_level(route_planner(solver))),50)
 # plan_path!(low_level(low_level(route_planner(solver))),
 #     pcmapf,search_env,node,schedule_node,v)
+
+solver = NBSSolver()
+prob = pctapf_problem_1(solver)
+sched = get_schedule(get_env(prob))
+display(plot_project_schedule(sched))
