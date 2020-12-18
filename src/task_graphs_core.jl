@@ -472,6 +472,13 @@ end
 for op in path_spec_mutator_interface
     @eval $op(node::ScheduleNode,val) = $op(get_path_spec(node),val)
 end
+for op in predicate_accessor_interface
+    @eval $op(node::ScheduleNode) = $op(node.node)
+end
+for op in [:matches_template]
+    @eval $op(template::Type{T},node::ScheduleNode) where {T} = $op(template,node.node)
+end
+
 const schedule_node_accessor_interface = [
     path_spec_accessor_interface...,
     :get_path_spec]
@@ -543,7 +550,7 @@ get_node_from_vtx(sched::OperatingSchedule,v) = get_schedule_node(sched,v).node
 for op in [:edgetype,:ne,:nv,:vertices,:is_cyclic,:topological_sort_by_dfs]
     @eval LightGraphs.$op(sched::OperatingSchedule) = $op(get_graph(sched))
 end
-for op in [:outneighbors,:inneighbors,:indegree,:outdegree,:has_vertex,]
+for op in [:outneighbors,:inneighbors,:indegree,:outdegree,:has_vertex]
     @eval LightGraphs.$op(sched::OperatingSchedule,v::Int) = $op(get_graph(sched),v)
     @eval LightGraphs.$op(sched::OperatingSchedule,id) = $op(sched,get_vtx(sched,id))
 end
@@ -794,17 +801,17 @@ removes a node (by id) from sched.
 """
 function delete_node!(sched::OperatingSchedule, id::AbstractID)
     v = get_vtx(sched, id)
-    delete!(sched.vtx_map, id)
     rem_vertex!(get_graph(sched), v)
-    deleteat!(sched.vtx_ids, v)
     deleteat!(sched.planning_nodes, v)
+    delete!(sched.vtx_map, id)
+    deleteat!(sched.vtx_ids, v)
     for vtx in v:nv(get_graph(sched))
         node_id = sched.vtx_ids[vtx]
         sched.vtx_map[node_id] = vtx
     end
     sched
 end
-delete_node!(sched::OperatingSchedule, v::Int) = delete_node!(sched,get_vtx_id(sched,v))
+delete_node!(sched::OperatingSchedule, v) = delete_node!(sched,get_vtx_id(sched,v))
 function delete_nodes!(sched::OperatingSchedule, vtxs::Vector{Int})
     node_ids = map(v->get_vtx_id(sched,v), vtxs)
     for id in node_ids

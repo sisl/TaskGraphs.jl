@@ -590,11 +590,17 @@ end
 
 Checks if a candidate `node` satisfies the criteria encoded by `template`.
 """
-matches_template(template,node) = false
-matches_template(template::T,node::T) where {T} = true
-matches_template(template::DataType,node::DataType) = template == node
-matches_template(template::T,node::DataType) where {T<:Tuple} = (node in template)
-matches_template(template::T,node) where {T<:Tuple} = matches_template(template, typeof(node))
+# matches_template(template,node) = false
+# matches_template(template::T,node::T) where {T} = true
+# matches_template(template::T,node::S) where {T,S} = S<:T
+# matches_template(template::DataType,node::DataType) = template == node
+matches_template(template::Type{T},node::Type{S}) where {T,S} = S<:T
+matches_template(template::Type{T},node::S) where {T,S} = S<:T
+matches_template(template,node) = matches_template(typeof(template),node)
+# matches_template(template::T,node::DataType) where {T<:Tuple} = (node in template)
+# matches_template(template::T,node::Type{S}) where {T<:Tuple,S} = (S in template)
+matches_template(template::Tuple,node) = any(map(t->matches_template(t,node), template))
+# matches_template(template::T,node) where {T<:Tuple} = matches_template(template, typeof(node))
 
 """
 	resouces_reserved(node)
@@ -727,7 +733,7 @@ title_string(a::TEAM_ACTION,verbose=true) where {R,A} = verbose ? string("T-", t
 # initial condition preds: OBJECT_AT, ROBOT_AT
 # event preds: Operation
 
-const predicate_get_interface = [
+const predicate_accessor_interface = [
 	:get_initial_location_id,
 	:get_destination_location_id,
 	:get_robot_id,

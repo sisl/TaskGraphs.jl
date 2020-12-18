@@ -1479,20 +1479,22 @@ function get_node_text(search_env::SearchEnv,graph,v,x,y,r)
     string(get_t0(sched,v_)," - ",get_tF(sched,v_),"\n",get_local_slack(sched,v_)," - ",get_slack(sched,v_))
 end
 
-function show_times(sched::OperatingSchedule,v)
-    arr = process_schedule(sched)
-    return string(map(a->string(a[v],","), arr[1:2])...)
+function show_times(sched::OperatingSchedule,v,scalar_slack=true)
+    if scalar_slack
+        slack = get_slack(sched,v)[1]
+        slack_string = slack == Inf ? string(slack) : string(Int(slack))
+    else
+        slack_string = string(get_slack(sched,v))
+    end
+    return string(get_t0(sched,v),", ",get_tF(sched,v),", ",slack_string)
 end
-function show_times(cache::PlanningCache,v)
-    slack = minimum(get_slack(sched,v))
-    slack_string = slack == Inf ? string(slack) : string(Int(slack))
-    return string(get_t0(sched,v),",",get_tF(sched,v),",",slack_string)
-end
+# function show_times(cache::PlanningCache,v)
+#     slack = minimum(get_slack(sched,v))
+#     slack_string = slack == Inf ? string(slack) : string(Int(slack))
+#     return string(get_t0(sched,v),",",get_tF(sched,v),",",slack_string)
+# end
 
-function plot_project_schedule(
-        sched::OperatingSchedule,
-        cache=initialize_planning_cache(sched),
-        ;
+function plot_project_schedule(sched::OperatingSchedule;
         mode=:root_aligned,
         verbose=true,
         shape_function = (G,v,x,y,r)->Compose.circle(x,y,r),
@@ -1502,7 +1504,7 @@ function plot_project_schedule(
                 get_node_from_id(sched,
                     get_vtx_id(sched, v)),
                 verbose),
-            "\n",show_times(cache,v)
+            "\n",show_times(sched,v)
             )
         )
     rg = get_display_metagraph(sched;
@@ -1516,7 +1518,7 @@ function plot_project_schedule(
     # `inkscape -z project_schedule1.svg -e project_schedule1.png`
     # OR: `for f in *.svg; do inkscape -z $f -e $f.png; done`
 end
-plot_project_schedule(search_env::SearchEnv;kwargs...) = plot_project_schedule(get_schedule(search_env),get_cache(search_env);kwargs...)
+plot_project_schedule(search_env::SearchEnv;kwargs...) = plot_project_schedule(get_schedule(search_env);kwargs...)
 
 function print_project_schedule(filename::String,args...;kwargs...)
     plot_project_schedule(args...;kwargs...) |> Compose.SVG(string(filename,".svg"))
@@ -1524,7 +1526,6 @@ end
 
 function snapshot_color_func(env,t)
     sched = get_schedule(env)
-    cache = get_cache(env)
     active = Set(filter(v->get_t0(sched,v) <= t < get_tF(sched,v) + maximum(get_local_slack(sched,v)),vertices(sched)))
     for v in collect(active)
         setdiff!(active,outneighbors(get_graph(sched),v))
@@ -1538,7 +1539,7 @@ function snapshot_text_func(env,t;verbose = true)
     active, fixed = get_active_and_fixed_vtxs(sched,t)
     (G,v,x,y,r)->string(
     title_string(get_node_from_id(sched,get_vtx_id(sched, v)),verbose && (v in active)),
-    # "\n",show_times(cache,v)
+    "\n",show_times(sched,v)
     )
 end
 function plot_schedule_snapshot(env,t;

@@ -111,11 +111,23 @@ end
 
 export handle_disturbance!
 
-function remove_vtxs(sched,cache,remove_set::Set{A}) where {A<:AbstractID}
-    remove_vtxs(sched,cache,Set{Int}(get_vtx(sched,id) for id in remove_set))
+function remove_vtxs(sched,remove_set::Set{A}) where {A<:AbstractID}
+    remove_vtxs(sched,Set{Int}(get_vtx(sched,id) for id in remove_set))
 end
-function remove_vtxs(sched,cache,remove_set)
+function remove_vtxs!(sched,remove_set)
+    new_sched = sched
+    delete_nodes!(new_sched,remove_set)
+    set_leaf_operation_vtxs!(new_sched)
+    process_schedule!(new_sched)
+    new_sched
+end
+function remove_vtxs(sched,remove_set)
     # Construct new graph
+    # new_sched = sched
+    # delete_nodes!(new_sched,remove_set)
+    # set_leaf_operation_vtxs!(new_sched)
+    # process_schedule!(new_sched)
+
     new_sched = OperatingSchedule()
     keep_vtxs = setdiff(Set{Int}(collect(vertices(sched))), remove_set)
     # add all non-deleted nodes to new project schedule
@@ -130,13 +142,95 @@ function remove_vtxs(sched,cache,remove_set)
         add_edge!(new_sched, get_vtx_id(sched, e.src), get_vtx_id(sched, e.dst))
     end
     set_leaf_operation_vtxs!(new_sched)
-    G = get_graph(new_sched)
-    # init planning cache with the existing solution
     process_schedule!(new_sched)
-    new_cache = initialize_planning_cache(new_sched)
     # @assert sanity_check(new_sched)
-    new_sched, new_cache
+    new_sched
 end
+
+"""
+    get_delivery_task_vtxs(sched::OperatingSchedule,o::ObjectID)
+
+Return all vertices that correspond to the delivery task
+(`COLLECT` → `CARRY` → `DEPOSIT`) of object `o`.
+"""
+function get_delivery_task_vtxs(sched::OperatingSchedule,o::ObjectID)
+    v = get_vtx(sched,o)
+    vtxs = collect(capture_connected_nodes(sched,v,
+        v->check_object_id(get_node_from_vtx(sched,v),o)))
+    setdiff!(vtxs,v)
+    return vtxs
+end
+"""
+    isolate_delivery_task_vtxs(sched,o,vtxs=get_delivery_task_vtxs(sched,o))
+
+Returns:
+- incoming: a set of all incoming Action ScheduleNodes
+- outgoing: a set of all outgoing Action ScheduleNodes
+- op: the target Operation
+"""
+function isolate_delivery_task_vtxs(sched::OperatingSchedule,o::ObjectID,
+        vtxs=get_delivery_task_vtxs(sched,o)
+    )
+    node_ids = Set{AbstractID}(get_vtx_id(sched,v) for v in vtxs)
+    # incoming and outgoing robot nodes -- for single and team robot tasks
+    in_edges = exclusive_edge_cover(sched,vtxs,:in)
+    incoming = filter(node->matches_template(AbstractRobotAction,node),
+        map(e->get_schedule_node(sched,e.src),collect(in_edges)))
+    out_edges = exclusive_edge_cover(sched,vtxs,:out)
+    outgoing = filter(node->matches_template(AbstractRobotAction,node),
+        map(e->get_schedule_node(sched,e.dst),collect(out_edges)))
+    # target operation node
+    op = filter(node->matches_template(Operation,node),
+        map(e->get_schedule_node(sched,e.dst),collect(out_edges)))[1]
+    return incoming, outgoing, op
+end
+
+"""
+    stitch_disjoint_node_sets!(sched,incoming,outgoing)
+
+Finds and adds the appropriate edges between two sets of nodes. It is assumed
+that `size(incoming) == size(outgoing)`, that each node in `incoming` has
+exactly one feasible successor in `outgoing`, and that each node in `outgoing`
+has exactly one feasible predecessor in `incoming`.
+"""
+function stitch_disjoint_node_sets!(sched,incoming,outgoing,env_state)
+    @assert length(incoming) == length(outgoing)
+    out_idxs = collect(1:length(outgoing))
+    for node1 in incoming
+        r = get_robot_id(node1)
+        for i in 1:length(outgoing)
+            idx = out_idxs[i]
+            node2 = outgoing[idx]
+            node2 = outgoing[i]
+            if get_robot_id(node2) == r
+                x = get_location_id(robot_positions(env_state)[r])
+                add_edge!(sched,node1,node2)
+                n1 = BOT_GO(r,get_initial_location_id(node1),x)
+                n2 = BOT_GO(r,x,get_destination_location_id(node2))
+                @log_info(-1,0,"connecting ",string(n1)," → ",string(n2))
+                replace_in_schedule!(sched,n1,node1.id)
+                replace_in_schedule!(sched,n2,node2.id)
+                deleteat!(out_idxs,i)
+                # deleteat!(outgoing,i)
+                break
+            end
+        end
+    end
+    @assert length(out_idxs) == 0
+    # @assert length(outgoing) == 0
+    return sched
+end
+
+"""
+    handle_disturbance!(solver,prob,env,d::DroppedObject,t,env_state=get_env_state(env,t))
+
+Returns a new `SearchEnv` with a modified `OperatingSchedule`. The new schedule
+replaces the previous delivery task (`OBJECT_AT(o,old_x)` → `COLLECT` → `CARRY`
+→ `DEPOSIT`) with a new `CleanUpBot` delivery task (`OBJECT_AT(o,new_x)` →
+`CUB_COLLECT` → `CUB_CARRY` → `CUB_DEPOSIT`).
+It is assumed that the time `t` corresponds to a moment when the object referred
+to by `d.id` is being `CARRIED`.
+"""
 function handle_disturbance!(solver,prob,env::SearchEnv,d::DroppedObject,t,
         env_state = get_env_state(env,t),
         )
@@ -145,52 +239,23 @@ function handle_disturbance!(solver,prob,env::SearchEnv,d::DroppedObject,t,
     # - replace with equivalent CleanUpBot Delivery Task: OBJECT_AT(o,new_x) -> BOT_COLLECT{CleanUpBot} -> CARRY -> DEPOSIT
     sched = get_schedule(env)
     o = ObjectID(d.id)
-    v = get_vtx(sched,o)
-    vtxs = collect(capture_connected_nodes(get_graph(sched),v,
-        v->check_object_id(get_node_from_vtx(sched,v),o)))
-    setdiff!(vtxs,v)
-    node_ids = Set{AbstractID}(get_vtx_id(sched,v) for v in vtxs)
+    vtxs = get_delivery_task_vtxs(sched,o)
     # incoming and outgoing robot nodes -- for single and team robot tasks
-    in_vtxs = setdiff(map(e->e.dst,collect(edge_cover(sched,vtxs,:in))),vtxs)
-    in_ids = filter(id->isa(id,ActionID),
-        map(v->get_vtx_id(sched,v),collect(in_vtxs)))
-    out_vtxs = setdiff(map(e->e.src,collect(edge_cover(sched,vtxs,:out))),vtxs)
-    out_ids = filter(id->isa(id,ActionID),
-        map(v->get_vtx_id(sched,v),collect(out_vtxs)))
-    # id of target operation node -- needed to add new delivery task
-    op_id = filter(id->isa(id,OperationID),
-        map(v->get_vtx_id(sched,v),collect(out_vtxs)))[1]
+    incoming, outgoing, op = isolate_delivery_task_vtxs(sched,o,vtxs)
     # Add GO->GO edges for affected robot(s), as if they were never assigned
-    for id1 in in_ids
-        node1 = get_node_from_id(sched,id1)
-        r = get_robot_id(node1)
-        for i in 1:length(out_ids)
-            id2 = out_ids[i]
-            node2 = get_node_from_id(sched,id2)
-            if get_robot_id(node2) == r
-                x = get_location_id(robot_positions(env_state)[r])
-                add_edge!(sched,id1,id2)
-                n1 = BOT_GO(r,get_initial_location_id(node1),x)
-                n2 = BOT_GO(r,x,get_destination_location_id(node2))
-                @log_info(-1,0,"connecting ",string(n1)," → ",string(n2))
-                replace_in_schedule!(sched,n1,id1)
-                replace_in_schedule!(sched,n2,id2)
-                deleteat!(out_ids,i)
-                break
-            end
-        end
-    end
-    @assert length(out_ids) == 0
+    stitch_disjoint_node_sets!(sched,incoming,outgoing,env_state)
     # remove old nodes
-    new_sched, new_cache = remove_vtxs(sched,get_cache(env),vtxs)
+    new_sched = remove_vtxs(sched,vtxs)
+    # new_sched = remove_vtxs!(sched,vtxs)
     # add new CleanUpBot task nodes
     x = get_location_ids(object_position(env_state,o))
     replace_in_schedule!(new_sched,OBJECT_AT(o,x),o)
     set_t0!(new_sched,o,t)
     add_headless_delivery_task!(
-        new_sched,get_problem_spec(env,:CleanUpBot),o,op_id,CleanUpBot;
+        new_sched,get_problem_spec(env,:CleanUpBot),o,op.id,CleanUpBot;
         t0=t
     )
+    process_schedule!(new_sched)
     construct_search_env(
         solver,
         new_sched,

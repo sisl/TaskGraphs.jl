@@ -1,6 +1,6 @@
 using TaskGraphs, CRCBS, GraphUtils, LightGraphs, SparseArrays
 using Test
-include(joinpath(pathof(TaskGraphs),"..","helpers/render_tools.jl"))
+Revise.includet(joinpath(pathof(TaskGraphs),"..","helpers/render_tools.jl"))
 
 vtx_grid = initialize_dense_vtx_grid(4,4)
 #  1   2   3   4
@@ -27,9 +27,21 @@ reset_solver!(solver)
 base_env, cost = solve!(solver,s_prob.prob)
 new_env = deepcopy(base_env)
 new_env = handle_disturbance!(solver,s_prob,new_env,DroppedObject(1),2)
+
+t = 2
+env_state = get_env_state(new_env,t)
+sched = new_env.schedule
+o = ObjectID(1)
+vtxs = TaskGraphs.get_delivery_task_vtxs(sched,o)
+incoming,outgoing,op = TaskGraphs.isolate_delivery_task_vtxs(sched,o)
+TaskGraphs.stitch_disjoint_node_sets!(sched,incoming,outgoing,env_state)
+process_schedule!(sched)
+
+plot_project_schedule(new_env)
+
 reset_solver!(solver)
 # set_verbosity!(solver,3)
-env, cost = solve!(solver,PC_TAPF(base_env))
+env, cost = solve!(solver,PC_TAPF(new_env))
 
 plot_project_schedule(env)
 

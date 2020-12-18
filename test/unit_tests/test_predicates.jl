@@ -103,6 +103,29 @@ let
     end
 end
 let
+    for (T,nodes) in [
+        AbstractPlanningPredicate=>[OBJECT_AT(1,2),ROBOT_AT(1,2),GO(),COLLECT(),CARRY(),DEPOSIT(),Operation()],
+        AbstractSingleRobotAction=>[GO(),COLLECT(),CARRY(),DEPOSIT()],
+        AbstractSingleRobotAction=>[CUB_GO(),CUB_COLLECT(),CUB_CARRY(),CUB_DEPOSIT()],
+        ]
+        for node in nodes
+            @test matches_template(T,node)
+            @test matches_template(T,typeof(node))
+            @test matches_template((T,T),typeof(node))
+            @test matches_template(node,node)
+            @test matches_template((node,node),node)
+            @test matches_template((node,GO()),node)
+            @test matches_template(typeof(node),node)
+            @test matches_template((typeof(node),typeof(node)),node)
+            @test matches_template(T,ScheduleNode(RobotID(-1),node,PathSpec()))
+
+            @test !matches_template(1,node)
+            @test !matches_template((1,2),node)
+            @test !matches_template(1,ScheduleNode(RobotID(-1),node,PathSpec()))
+        end
+    end
+end
+let
     @test split_node(GO(1,2,3),LocationID(4))[1] == GO(1,2,4)
     @test split_node(GO(1,2,3),LocationID(4))[2] == GO(1,4,3)
     @test split_node(CARRY(1,1,2,3),LocationID(4))[1] == CARRY(1,1,2,4)

@@ -692,7 +692,6 @@ function replan!(solver, replan_model, search_env, request;
     splice_schedules!(new_sched,next_sched)
     process_schedule!(new_sched)
     @assert sanity_check(new_sched," after splice_schedules!()")
-    # NOTE: better performance is obtained when t_commit is the default t0 (tighter constraint on milp)
     base_search_env = construct_search_env(
         solver,
         new_sched,
@@ -700,9 +699,7 @@ function replan!(solver, replan_model, search_env, request;
         initialize_planning_cache(new_sched)
         )
     base_route_plan = initialize_route_plan(search_env,get_cost_model(base_search_env))
-    # @log_info(3,solver,"Previous route plan: \n",sprint_route_plan(route_plan))
     trimmed_route_plan = trim_route_plan(base_search_env, base_route_plan, t_commit)
-    # @log_info(3,solver,"Trimmed route plan: \n",sprint_route_plan(trimmed_route_plan))
     SearchEnv(base_search_env, route_plan=trimmed_route_plan)
 end
 # replan!(solver, replan_model::NullReplanner, search_env, args...;kwargs...) = search_env
