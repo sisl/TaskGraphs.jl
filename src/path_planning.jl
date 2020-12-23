@@ -204,9 +204,6 @@ export
 """
     get_env_snapshot(route_plan::S,t)
 """
-# function get_env_snapshot(route_plan::S,t) where {S<:LowLevelSolution}
-#     Dict(RobotID(i)=>ROBOT_AT(i, get_sp(get_path_node(path,t)).vtx) for (i,path) in enumerate(get_paths(route_plan)))
-# end
 function get_env_snapshot(env::SearchEnv,t)
     sched = get_schedule(env)
     route_plan = get_route_plan(env)

@@ -47,9 +47,8 @@ Encodes the the relaxed PC-TAPF problem that ignores collision-avoidance
 constraints.
 
 Elements:
-- N::Int - num robots
-- M::Int - num tasks
 - graph::G - task graph
+- D::T - a distance matrix (or environment) that implements get_distance(D,x1,x2,args...)
 - Δt::Vector{Float64}  - durations of operations
 - tr0_::Dict{Int,Float64} - robot start times
 - to0_::Dict{Int,Float64} - object start times
@@ -70,7 +69,7 @@ Elements:
     terminal_vtxs::Vector{Set{Int}} = [get_all_terminal_nodes(graph)]
     weights::Dict{Int,Float64} = Dict{Int,Float64}(v=>1.0 for v in 1:length(terminal_vtxs))
     cost_function::F        = SumOfMakeSpans()
-    r0::Vector{Int}         = Int[]
+    r0::Vector{Int}         = Int[] # initial robot conditions
     s0::Vector{Int}         = Int[] # pickup stations for each task
     sF::Vector{Int}         = Int[] # delivery station for each task
     Δt_collect::Vector{Float64} = zeros(length(s0)) # duration of COLLECT operations
@@ -187,7 +186,6 @@ function add_operation!(spec::ProjectSpec, op::Operation)
         object_id = get_id(get_object_id(pred))
         set_initial_condition!(spec,object_id,pred)
         set_final_condition!(spec,object_id,get_final_condition(spec,object_id))
-        # object[id] is a product of operation[op_id]
         add_pre_dep!(spec, object_id, op_id)
         for op0_id in get_post_deps(spec, object_id)
             add_edge!(G, op_id, op0_id) # for each operation that requires object[id]
@@ -197,14 +195,12 @@ function add_operation!(spec::ProjectSpec, op::Operation)
         object_id = get_id(get_object_id(pred))
         set_initial_condition!(spec,object_id,get_initial_condition(spec,object_id))
         set_final_condition!(spec,object_id,pred)
-        # object[id] is a prereq for operation[op_id]
         spec.final_conditions[spec.object_id_to_idx[object_id]]
         add_post_dep!(spec, object_id, op_id)
         for op0_id in get_pre_deps(spec, object_id)
             add_edge!(G, op0_id, op_id) # for each (1) operation that generates object[id]
         end
     end
-    # set spec.terminal_vtxs = get_all_terminal_nodes(spec.graph)
     union!(spec.terminal_vtxs, get_all_terminal_nodes(spec.graph))
     intersect!(spec.terminal_vtxs, get_all_terminal_nodes(spec.graph))
     validate(spec,op)
@@ -446,8 +442,6 @@ const path_spec_mutator_interface = [
     :set_local_slack!,
     :set_tF!,
     ]
-
-
 
 export
     ScheduleNode,
@@ -743,6 +737,7 @@ function validate(spec::ProjectSpec,op)
     for pred in postconditions(op)
         @assert get_initial_condition(spec,get_object_id(pred)) == pred
     end
+    return true
 end
 function validate(sched::OperatingSchedule)
     try
@@ -784,68 +779,49 @@ function validate(sched::OperatingSchedule)
     return true
 end
 function validate(node::ScheduleNode,paths::Vector{Vector{Int}})
-    agent_id = get_id(get_default_robot_id(node))
-    if agent_id != -1
-        path = paths[agent_id]
-        start_vtx = get_id(get_initial_location_id(node))
-        final_vtx = get_id(get_destination_location_id(node))
-        try
-            @assert(length(path) > get_t0(node), string("length(path) == $(length(path)), should be greater than get_t0(sched,v) == $(get_t0(sched,v)) in node ",string(node)))
-            @assert(length(path) > get_tF(node), string("length(path) == $(length(path)), should be greater than get_t0(sched,v) == $(get_t0(sched,v)) in node ",string(node)))
-            if start_vtx != -1
-                if length(path) > get_t0(node)
-                    @assert(path[get_t0(node) + 1] == start_vtx, string("node: ",string(node), ", start_vtx: ",start_vtx, ", t0+1: ",get_t0(node)+1,", path[get_t0(sched,v) + 1] = ",path[get_t0(node) + 1],", path: ", path))
+    if matches_template(TEAM_ACTION,node)
+        for n in sub_nodes(node)
+            sub_node = ScheduleNode(node.id,n,node.spec)
+            if !validate(sub_node,paths)
+                return false
+            end
+        end
+    else
+        agent_id = get_id(get_default_robot_id(node))
+        if agent_id != -1
+            path = paths[agent_id]
+            start_vtx = get_id(get_initial_location_id(node))
+            final_vtx = get_id(get_destination_location_id(node))
+            try
+                @assert(length(path) > get_t0(node), string("length(path) == $(length(path)), should be greater than get_t0(node) == $(get_t0(node)) in node ",string(node)))
+                @assert(length(path) > get_tF(node), string("length(path) == $(length(path)), should be greater than get_t0(node) == $(get_t0(node)) in node ",string(node)))
+                if start_vtx != -1
+                    if length(path) > get_t0(node)
+                        @assert(path[get_t0(node) + 1] == start_vtx, string("node: ",string(node), ", start_vtx: ",start_vtx, ", t0+1: ",get_t0(node)+1,", path[get_t0(node) + 1] = ",path[get_t0(node) + 1],", path: ", path))
+                    end
                 end
-            end
-            if final_vtx != -1
-                if length(path) > get_tF(node)
-                    @assert(path[get_tF(node) + 1] == final_vtx, string("node: ",string(node), ", final vtx: ",final_vtx, ", tF+1: ",get_tF(node)+1,", path[get_tF(sched,v) + 1] = ",path[get_tF(node) + 1],", path: ", path))
+                if final_vtx != -1
+                    if length(path) > get_tF(node)
+                        @assert(path[get_tF(node) + 1] == final_vtx, string("node: ",string(node), ", final vtx: ",final_vtx, ", tF+1: ",get_tF(node)+1,", path[get_tF(node) + 1] = ",path[get_tF(node) + 1],", path: ", path))
+                    end
                 end
+            catch e
+                if typeof(e) <: AssertionError
+                    print(e.msg)
+                else
+                    throw(e)
+                end
+                return false
             end
-        catch e
-            if typeof(e) <: AssertionError
-                print(e.msg)
-            else
-                throw(e)
-            end
-            return false
         end
     end
+    return true
 end
 function validate(sched::OperatingSchedule,paths::Vector{Vector{Int}})
     for v in vertices(sched)
-        node = get_node_from_vtx(sched, v)
-        nodes = isa(node,TEAM_ACTION) ? sub_nodes(node) : [node]
-        for n in nodes
-            agent_id = get_id(get_default_robot_id(n))
-            if agent_id != -1
-                path = paths[agent_id]
-                start_vtx = get_id(get_initial_location_id(n))
-                final_vtx = get_id(get_destination_location_id(n))
-                # start_vtx = path_spec.start_vtx
-                # final_vtx = path_spec.final_vtx
-                try
-                    @assert(length(path) > get_t0(sched,v), string("length(path) == $(length(path)), should be greater than get_t0(sched,v) == $(get_t0(sched,v)) in node ",string(node)))
-                    @assert(length(path) > get_tF(sched,v), string("length(path) == $(length(path)), should be greater than get_t0(sched,v) == $(get_t0(sched,v)) in node ",string(node)))
-                    if start_vtx != -1
-                        if length(path) > get_t0(sched,v)
-                            @assert(path[get_t0(sched,v) + 1] == start_vtx, string("node: ",string(node), ", start_vtx: ",start_vtx, ", t0+1: ",get_t0(sched,v)+1,", path[get_t0(sched,v) + 1] = ",path[get_t0(sched,v) + 1],", path: ", path))
-                        end
-                    end
-                    if final_vtx != -1
-                        if length(path) > get_tF(sched,v)
-                            @assert(path[get_tF(sched,v) + 1] == final_vtx, string("node: ",string(node), ", final vtx: ",final_vtx, ", tF+1: ",get_tF(sched,v)+1,", path[get_tF(sched,v) + 1] = ",path[get_tF(sched,v) + 1],", path: ", path))
-                        end
-                    end
-                catch e
-                    if typeof(e) <: AssertionError
-                        print(e.msg)
-                    else
-                        throw(e)
-                    end
-                    return false
-                end
-            end
+        node = get_node(sched,v)
+        if !validate(node,paths)
+            return false
         end
     end
     return true

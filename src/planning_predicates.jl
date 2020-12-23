@@ -747,6 +747,7 @@ const predicate_accessor_interface = [
 	:get_object_id,
 	:has_object_id,
 	:has_robot_id,
+	:sub_nodes,
 	:required_successors,
 	:required_predecessors,
 	:eligible_successors,
