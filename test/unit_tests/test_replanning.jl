@@ -24,7 +24,7 @@ let
     remap_object_id(ScheduleNode(
         ObjectID(1),
         OBJECT_AT(1,1),
-        PathSpec(object_id=1)
+        PathSpec()
         ),2)
     prob = pctapf_problem_1(NBSSolver())
     sched = get_schedule(prob.env)

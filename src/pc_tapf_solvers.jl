@@ -178,14 +178,11 @@ export
 """
     update_route_plan!()
 """
-function update_route_plan!(solver,pc_mapf::AbstractPC_MAPF,env,v,path,cost,schedule_node,
-    agent_id = get_id(get_path_spec(get_schedule(env), v).agent_id))
-    # add to solution
-    # @log_info(3,solver,string("agent_path = ", convert_to_vertex_lists(path)))
-    # @log_info(3,solver,string("cost = ", get_cost(path)))
+function update_route_plan!(solver,pc_mapf::AbstractPC_MAPF,env,v,path,cost,node,
+    agent_id=get_id(get_default_robot_id(node)))
     set_solution_path!(env, path, agent_id)
     set_path_cost!(env, cost, agent_id)
-    update_env!(solver,env,v,path)
+    update_env!(solver,env,v,path,agent_id)
     set_cost!(env,aggregate_costs(get_cost_model(env),get_path_costs(env)))
     return env
 end
@@ -199,16 +196,7 @@ function update_route_plan!(solver,pc_mapf::C_PC_MAPF,env,v,meta_path,meta_cost,
     for (new_path, sub_node) in zip(paths, sub_nodes(schedule_node))
         agent_id = get_id(get_robot_id(sub_node))
         path = new_path
-        # path = get_paths(env)[agent_id]
-        # for p in new_path.path_nodes
-        #     push!(path, p)
-        #     # path.cost = accumulate_cost(cbs_env, get_cost(path), get_transition_cost(cbs_env, p.s, p.a, p.sp))
-        # end
-        # set_cost!(path,get_cost(new_path))
         update_route_plan!(solver,PC_MAPF(get_env(pc_mapf)),env,v,path,get_cost(path),sub_node,agent_id)
-        # update_env!(solver,env,route_plan,v,path,agent_id)
-        # Print for debugging
-        # @show agent_id
         @log_info(3,solver,"agent_id = ", agent_id)
         @log_info(3,solver,string("agent_path = ", convert_to_vertex_lists(path)))
         @log_info(3,solver,string("cost = ", get_cost(new_path)))
@@ -607,7 +595,6 @@ to being resolved.
 """
 function formulate_assignment_problem(solver,prob;
         kwargs...)
-    # TODO needs to pass in base_env--not just the schedule
     formulate_milp(solver,get_env(prob);
         cost_model=get_problem_spec(get_env(prob)).cost_function,
         kwargs...)

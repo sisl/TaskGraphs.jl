@@ -78,6 +78,7 @@ Elements:
     @assert length(s0) == length(sF) == length(Δt_collect) == length(Δt_deliver) # == M
 end
 TaskGraphs.get_distance(spec::ProblemSpec,args...) = get_distance(spec.D,args...)
+TaskGraphs.get_distance(spec::ProblemSpec,a::LocationID,b::LocationID,args...) = get_distance(spec.D,get_id(a),get_id(b),args...)
 
 export
     ProjectSpec,
@@ -409,7 +410,7 @@ Fields:
 @with_kw mutable struct PathSpec
     node_type       ::Symbol            = :EMPTY
     agent_id        ::BotID             = RobotID()
-    object_id       ::ObjectID          = ObjectID()
+    # object_id       ::ObjectID          = ObjectID()
     # spatial
     start_vtx       ::Int               = -1
     final_vtx       ::Int               = -1
@@ -451,6 +452,58 @@ const path_spec_mutator_interface = [
     :set_local_slack!,
     :set_tF!,
     ]
+
+# Defining default node parameters
+is_tight(p) = false
+is_tight(::BOT_GO) = true
+is_free(p) = false
+is_free(p::BOT_GO) = !is_valid(get_destination_location_id(p))
+is_static(p) = false
+is_static(p::Union{BOT_COLLECT,BOT_DEPOSIT}) = true
+is_static(p::TEAM_ACTION) = is_static(p.instructions[1])
+needs_path(p) = false
+needs_path(p::Union{BOT_AT,AbstractRobotAction}) = true
+duration_lower_bound(args...) = 0
+duration_lower_bound(p::BOT_COLLECT,spec) = get(spec.Δt_collect,get_id(get_object_id(p)),0)
+duration_lower_bound(p::BOT_DEPOSIT,spec) = get(spec.Δt_deliver,get_id(get_object_id(p)),0)
+function duration_lower_bound(p::Union{BOT_AT,AbstractRobotAction},spec)
+    x1 = get_initial_location_id(p)
+    x2 = get_destination_location_id(p)
+    return get_distance(spec,x1,x2)
+end
+function duration_lower_bound(p::TEAM_ACTION,spec)
+    x1 = get_initial_location_id(pred.instructions[1])
+    x2 = get_destination_location_id(pred.instructions[1])
+    return get_distance(spec,x1,x2,team_configuration(pred))
+end
+
+# """
+#     generate_path_spec(schedule,spec,node)
+#
+# Generates a `PathSpec` struct that encodes information about the path to be
+# planned for `node`.
+#
+# Arguments:
+# * spec::ProblemSpec
+# * node::T <: AbstractPlanningPredicate
+# """
+# function generate_path_spec(spec::ProblemSpec,a) where {P<:OperatingSchedule}
+#     path_spec = PathSpec()
+#     path_spec.agent_id = has_robot_id(a) ? get_robot_id(a) : path_spec.agent_id
+#
+#     s0 = get_id(get_initial_location_id(a))
+#     s = get_id(get_destination_location_id(a))
+#     r = get_robot_id(a)
+#     path_spec = PathSpec(
+#         node_type=Symbol(typeof(a)),
+#         start_vtx=s0,
+#         final_vtx=s,
+#         min_duration=get_distance(spec.D,s0,s), # ProblemSpec distance matrix
+#         agent_id=r,
+#         tight=true,
+#         free = (s==-1) # if destination is -1, there is no goal location
+#         )
+# end
 
 export
     ScheduleNode,
@@ -549,17 +602,17 @@ for op in schedule_node_mutator_interface
 end
 
 
-"""
-    generate_path_spec(schedule,spec,node)
-
-Generates a `PathSpec` struct that encodes information about the path to be
-planned for `node`.
-
-Arguments:
-* schedule::P OperatingSchedule
-* spec::ProblemSpec
-* node::T <: AbstractPlanningPredicate
-"""
+# """
+#     generate_path_spec(schedule,spec,node)
+#
+# Generates a `PathSpec` struct that encodes information about the path to be
+# planned for `node`.
+#
+# Arguments:
+# * schedule::P OperatingSchedule
+# * spec::ProblemSpec
+# * node::T <: AbstractPlanningPredicate
+# """
 function generate_path_spec(sched::P,spec::T,a::BOT_GO) where {P<:OperatingSchedule,T<:ProblemSpec}
     s0 = get_id(get_initial_location_id(a))
     s = get_id(get_destination_location_id(a))
@@ -585,7 +638,7 @@ function generate_path_spec(sched::P,spec::T,a::BOT_CARRY) where {P<:OperatingSc
         final_vtx=s,
         min_duration=get_distance(spec.D,s0,s), # ProblemSpec distance matrix
         agent_id=r,
-        object_id = o
+        # object_id = o
         )
 end
 function generate_path_spec(sched::P,spec::T,a::BOT_COLLECT) where {P<:OperatingSchedule,T<:ProblemSpec}
@@ -599,7 +652,7 @@ function generate_path_spec(sched::P,spec::T,a::BOT_COLLECT) where {P<:Operating
         final_vtx=s,
         min_duration=get(spec.Δt_collect,o,0),
         agent_id=r,
-        object_id = o,
+        # object_id = o,
         static=true
         )
 end
@@ -614,7 +667,7 @@ function generate_path_spec(sched::P,spec::T,a::BOT_DEPOSIT) where {P<:Operating
         final_vtx=s,
         min_duration=get(spec.Δt_deliver,o,0),
         agent_id=r,
-        object_id = o,
+        # object_id = o,
         static=true
         )
 end
@@ -623,9 +676,8 @@ function generate_path_spec(sched::P,spec::T,pred::OBJECT_AT) where {P<:Operatin
         node_type=Symbol(typeof(pred)),
         start_vtx=get_id(get_location_id(pred)),
         final_vtx=get_id(get_location_id(pred)),
-        min_duration=0,
         plan_path = false,
-        object_id = get_id(get_object_id(pred))
+        # object_id = get_id(get_object_id(pred))
         )
 end
 function generate_path_spec(sched::P,spec::T,pred::BOT_AT) where {P<:OperatingSchedule,T<:ProblemSpec}
@@ -634,7 +686,6 @@ function generate_path_spec(sched::P,spec::T,pred::BOT_AT) where {P<:OperatingSc
         node_type=Symbol(typeof(pred)),
         start_vtx=get_id(get_location_id(pred)),
         final_vtx=get_id(get_location_id(pred)),
-        min_duration=0,
         agent_id=r,
         free=true
         )
@@ -642,8 +693,6 @@ end
 function generate_path_spec(sched::P,spec::T,op::Operation) where {P<:OperatingSchedule,T<:ProblemSpec}
     path_spec = PathSpec(
         node_type=Symbol(typeof(op)),
-        start_vtx = -1,
-        final_vtx = -1,
         plan_path = false,
         min_duration=duration(op)
         )
@@ -653,7 +702,6 @@ function generate_path_spec(sched::P,spec::T,pred::TEAM_ACTION) where {P<:Operat
     s = get_id(get_destination_location_id(pred.instructions[1]))
     path_spec = PathSpec(
         node_type=Symbol(typeof(pred)),
-        # min_duration = maximum(map(a->generate_path_spec(sched,spec,a).min_duration, pred.instructions)),
         min_duration = get_distance(spec.D,s0,s,team_configuration(pred)),
         plan_path = true,
         static = (team_action_type(pred) <: Union{COLLECT,DEPOSIT})
@@ -852,35 +900,68 @@ function validate(sched::OperatingSchedule)
     end
     return true
 end
+function validate(node::ScheduleNode,paths::Vector{Vector{Int}})
+    agent_id = get_id(get_default_robot_id(node))
+    if agent_id != -1
+        path = paths[agent_id]
+        start_vtx = get_id(get_initial_location_id(node))
+        final_vtx = get_id(get_destination_location_id(node))
+        try
+            @assert(length(path) > get_t0(node), string("length(path) == $(length(path)), should be greater than get_t0(sched,v) == $(get_t0(sched,v)) in node ",string(node)))
+            @assert(length(path) > get_tF(node), string("length(path) == $(length(path)), should be greater than get_t0(sched,v) == $(get_t0(sched,v)) in node ",string(node)))
+            if start_vtx != -1
+                if length(path) > get_t0(node)
+                    @assert(path[get_t0(node) + 1] == start_vtx, string("node: ",string(node), ", start_vtx: ",start_vtx, ", t0+1: ",get_t0(node)+1,", path[get_t0(sched,v) + 1] = ",path[get_t0(node) + 1],", path: ", path))
+                end
+            end
+            if final_vtx != -1
+                if length(path) > get_tF(node)
+                    @assert(path[get_tF(node) + 1] == final_vtx, string("node: ",string(node), ", final vtx: ",final_vtx, ", tF+1: ",get_tF(node)+1,", path[get_tF(sched,v) + 1] = ",path[get_tF(node) + 1],", path: ", path))
+                end
+            end
+        catch e
+            if typeof(e) <: AssertionError
+                print(e.msg)
+            else
+                throw(e)
+            end
+            return false
+        end
+    end
+end
 function validate(sched::OperatingSchedule,paths::Vector{Vector{Int}})
     for v in vertices(sched)
         node = get_node_from_vtx(sched, v)
-        path_spec = get_path_spec(sched, v)
-        agent_id = get_id(path_spec.agent_id)
-        if agent_id != -1
-            path = paths[agent_id]
-            start_vtx = path_spec.start_vtx
-            final_vtx = path_spec.final_vtx
-            try
-                @assert(length(path) > get_t0(sched,v), string("length(path) == $(length(path)), should be greater than get_t0(sched,v) == $(get_t0(sched,v)) in node ",string(node)))
-                @assert(length(path) > get_tF(sched,v), string("length(path) == $(length(path)), should be greater than get_t0(sched,v) == $(get_t0(sched,v)) in node ",string(node)))
-                if start_vtx != -1
-                    if length(path) > get_t0(sched,v)
-                        @assert(path[get_t0(sched,v) + 1] == start_vtx, string("node: ",string(node), ", start_vtx: ",start_vtx, ", t0+1: ",get_t0(sched,v)+1,", path[get_t0(sched,v) + 1] = ",path[get_t0(sched,v) + 1],", path: ", path))
+        nodes = isa(node,TEAM_ACTION) ? sub_nodes(node) : [node]
+        for n in nodes
+            agent_id = get_id(get_default_robot_id(n))
+            if agent_id != -1
+                path = paths[agent_id]
+                start_vtx = get_id(get_initial_location_id(n))
+                final_vtx = get_id(get_destination_location_id(n))
+                # start_vtx = path_spec.start_vtx
+                # final_vtx = path_spec.final_vtx
+                try
+                    @assert(length(path) > get_t0(sched,v), string("length(path) == $(length(path)), should be greater than get_t0(sched,v) == $(get_t0(sched,v)) in node ",string(node)))
+                    @assert(length(path) > get_tF(sched,v), string("length(path) == $(length(path)), should be greater than get_t0(sched,v) == $(get_t0(sched,v)) in node ",string(node)))
+                    if start_vtx != -1
+                        if length(path) > get_t0(sched,v)
+                            @assert(path[get_t0(sched,v) + 1] == start_vtx, string("node: ",string(node), ", start_vtx: ",start_vtx, ", t0+1: ",get_t0(sched,v)+1,", path[get_t0(sched,v) + 1] = ",path[get_t0(sched,v) + 1],", path: ", path))
+                        end
                     end
-                end
-                if final_vtx != -1
-                    if length(path) > get_tF(sched,v)
-                        @assert(path[get_tF(sched,v) + 1] == final_vtx, string("node: ",string(node), ", final vtx: ",final_vtx, ", tF+1: ",get_tF(sched,v)+1,", path[get_tF(sched,v) + 1] = ",path[get_tF(sched,v) + 1],", path: ", path))
+                    if final_vtx != -1
+                        if length(path) > get_tF(sched,v)
+                            @assert(path[get_tF(sched,v) + 1] == final_vtx, string("node: ",string(node), ", final vtx: ",final_vtx, ", tF+1: ",get_tF(sched,v)+1,", path[get_tF(sched,v) + 1] = ",path[get_tF(sched,v) + 1],", path: ", path))
+                        end
                     end
+                catch e
+                    if typeof(e) <: AssertionError
+                        print(e.msg)
+                    else
+                        throw(e)
+                    end
+                    return false
                 end
-            catch e
-                if typeof(e) <: AssertionError
-                    print(e.msg)
-                else
-                    throw(e)
-                end
-                return false
             end
         end
     end

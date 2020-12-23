@@ -342,7 +342,7 @@ function visualize_env(search_env::S,vtxs,pickup_vtxs,dropoff_vtxs,t=0;
             node = get_node_from_id(sched,vtx_id)
             if (get_t0(sched,v) <= t) && (get_tF(sched,v) >= t)
                 spec = get_path_spec(sched, v)
-                agent_id = get_id(spec.agent_id)
+                agent_id = get_id(get_robot_id(node))
                 agent_path = robot_paths[agent_id]
                 p = agent_path[max(1,min(t1+1,get_tF(sched,v)+1)):get_tF(sched,v)+1]
                 if length(p) > 0
@@ -1508,7 +1508,8 @@ function plot_project_schedule(sched::OperatingSchedule;
             )
         )
     rg = get_display_metagraph(sched;
-        f=(v,p)->string(v,",",get_id(get_path_spec(sched,v).agent_id)))
+        f=(v,p)->string(v,",",get_id(get_default_robot_id(get_node(sched,v)))
+        )
     plot_graph_bfs(rg;
         mode=mode,
         shape_function=shape_function,

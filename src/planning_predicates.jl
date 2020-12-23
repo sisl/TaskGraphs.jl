@@ -385,8 +385,9 @@ function check_object_id(node,o)
     return false
 end
 
-export has_robot_id
+export has_robot_id, get_default_robot_id
 has_robot_id(a) = robot_type(a) == Nothing ? false : true
+get_default_robot_id(a) = has_robot_id(a) ? get_robot_id(a) : RobotID()
 
 export
 	replace_robot_id,
@@ -737,6 +738,7 @@ const predicate_accessor_interface = [
 	:get_initial_location_id,
 	:get_destination_location_id,
 	:get_robot_id,
+	:get_default_robot_id,
 	:get_object_id,
 	:has_object_id,
 	:has_robot_id,

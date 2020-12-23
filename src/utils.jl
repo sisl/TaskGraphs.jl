@@ -83,7 +83,7 @@ export
 # utilities for remapping object ids
 remap_object_id(x,args...) = x
 remap_object_id(id::ObjectID,max_obj_id)    = ObjectID(get_id(id) + max_obj_id)
-remap_object_id(spec::PathSpec,max_obj_id)  = PathSpec(spec,object_id=spec.object_id + max_obj_id)
+# remap_object_id(spec::PathSpec,max_obj_id)  = PathSpec(spec,object_id=spec.object_id + max_obj_id)
 remap_object_id(node::OBJECT_AT,args...)    = OBJECT_AT(remap_object_id(get_object_id(node),args...), get_initial_location_id(node))
 remap_object_id(node::A,args...) where {A<:Union{COLLECT,DEPOSIT}} = A(o=remap_object_id(get_object_id(node),args...),r=get_robot_id(node),x=get_location_id(node))
 remap_object_id(node::A,args...) where {A<:CARRY} = A(o=remap_object_id(get_object_id(node),args...),r=node.r,x1=node.x1,x2=node.x2)
