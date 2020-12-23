@@ -171,7 +171,7 @@ function CRCBS.get_start(env::SearchEnv,v::Int)
     start_vtx = get_id(get_default_initial_location_id(node))
     # start_vtx   = get_path_spec(get_schedule(env),v).start_vtx
     start_time  = get_t0(env,v)
-    State(start_vtx,start_time)
+    state_type(env)(start_vtx,start_time)
 end
 CRCBS.num_agents(env::SearchEnv) = env.num_agents
 for op in [
@@ -521,8 +521,8 @@ function update_planning_cache!(solver,env)
             s = get_final_state(path)
             t = get_t(s)
             goal_vtx = get_id(get_destination_location_id(n))
-            # d = get_distance(env,s,State(path_spec.final_vtx,-1))
-            d = get_distance(env,s,State(goal_vtx,-1))
+            goal_state = state_type(env)(goal_vtx,-1)
+            d = get_distance(env,s,goal_state)
             set_tF!(env,v,max(get_tF(env,v),t+d))
         end
     end
@@ -596,16 +596,17 @@ function construct_search_env(
         extra_T=extra_T,
         )
     layers = construct_environment_layer_dict(sched,env_graph,problem_spec)
-    route_plan = initialize_route_plan(sched,cost_model)
-    N = length(get_paths(route_plan))
+    # route_plan = initialize_route_plan(sched,cost_model)
+    # N = length(get_paths(route_plan))
     search_env = SearchEnv(
         schedule=sched,
         cache=cache,
         env_layers=layers,
         cost_model=cost_model,
         heuristic_model=heuristic_model,
-        num_agents=N,
-        route_plan=route_plan)
+        # num_agents=N,
+        # route_plan=route_plan,
+        )
     return search_env
 end
 """
@@ -813,7 +814,7 @@ function CRCBS.build_env(
         node_id     = get_vtx_id(get_schedule(env),v),
         agent_idx   = agent_id, # this is only used for the HardConflictTable, which can be updated via the combined search node
         constraints = get_constraints(constraint_node, agent_id), # agent_id represents the whole path
-        goal        = State(goal_vtx,goal_time),
+        goal        = state_type(env)(goal_vtx,goal_time),
         )
     # update deadline in DeadlineCost
     set_deadline!(get_cost_model(cbs_env),deadline)

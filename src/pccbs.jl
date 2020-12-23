@@ -11,10 +11,16 @@
 ############################### ENVIRONMENT DEF ################################
 ################################################################################
 const State = CRCBS.GraphState
+# struct State{N} <: CRCBS.GraphState
+#     vtx::Int
+#     t::Int
+#     node::N
+# end
 const Action = CRCBS.GraphAction
 
 export PCCBSEnv
 
+# @with_kw_noshow struct PCCBSEnv{E,N,I,T,C<:AbstractCostModel,H<:AbstractCostModel} <: GraphEnv{State{N},Action,C}
 @with_kw_noshow struct PCCBSEnv{E,N,I,T,C<:AbstractCostModel,H<:AbstractCostModel} <: GraphEnv{State,Action,C}
     search_env::E                   = nothing
     schedule_node::N                = nothing
@@ -27,11 +33,7 @@ export PCCBSEnv
     heuristic::H                    = get_heuristic_model(search_env)
 end
 CRCBS.get_cost_model(env::PCCBSEnv)       = get_cost_model(env.search_env)
-# CRCBS.get_agent_id(env::PCCBSEnv)         = env.agent_idx
-# CRCBS.get_constraints(env::PCCBSEnv)      = env.constraints
-# CRCBS.get_goal(env::PCCBSEnv)             = env.goal
 CRCBS.get_heuristic_model(env::PCCBSEnv)  = get_heuristic_model(env.search_env)
-# get_node(env::PCCBSEnv)          = env.schedule_node
 GraphUtils.get_node(env::PCCBSEnv)        = env.schedule_node
 GraphUtils.get_graph(env::PCCBSEnv)       = get_graph(env.search_env,graph_key(get_node(env))) #graph
 
@@ -44,6 +46,8 @@ end
 
 CRCBS.get_next_state(s::State,a::Action)    = State(get_e(a).dst,get_t(s)+get_dt(a))
 CRCBS.get_next_state(env::PCCBSEnv,s,a)  = get_next_state(s,a)
+# CRCBS.get_next_state(s::State,a::Action)    = State(get_e(a).dst,get_t(s)+get_dt(a),s.node)
+# CRCBS.get_next_state(env::PCCBSEnv,s,a)  = State(get_e(a).dst,get_t(s)+get_dt(a),env.schedule_node)
 CRCBS.wait(env::PCCBSEnv,s)              = Action(e=Edge(get_vtx(s),get_vtx(s)))
 
 CRCBS.get_possible_actions(env::PCCBSEnv,s::State) = get_possible_actions(get_node(env),env,s)
