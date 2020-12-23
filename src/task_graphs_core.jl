@@ -408,12 +408,6 @@ Fields:
     solution.
 """
 @with_kw mutable struct PathSpec
-    node_type       ::Symbol            = :EMPTY
-    agent_id        ::BotID             = RobotID()
-    # object_id       ::ObjectID          = ObjectID()
-    # spatial
-    start_vtx       ::Int               = -1
-    final_vtx       ::Int               = -1
     # temporal
     t0              ::Int               = 0
     min_duration    ::Int               = 0
@@ -453,57 +447,7 @@ const path_spec_mutator_interface = [
     :set_tF!,
     ]
 
-# Defining default node parameters
-is_tight(p) = false
-is_tight(::BOT_GO) = true
-is_free(p) = false
-is_free(p::BOT_GO) = !is_valid(get_destination_location_id(p))
-is_static(p) = false
-is_static(p::Union{BOT_COLLECT,BOT_DEPOSIT}) = true
-is_static(p::TEAM_ACTION) = is_static(p.instructions[1])
-needs_path(p) = false
-needs_path(p::Union{BOT_AT,AbstractRobotAction}) = true
-duration_lower_bound(args...) = 0
-duration_lower_bound(p::BOT_COLLECT,spec) = get(spec.Δt_collect,get_id(get_object_id(p)),0)
-duration_lower_bound(p::BOT_DEPOSIT,spec) = get(spec.Δt_deliver,get_id(get_object_id(p)),0)
-function duration_lower_bound(p::Union{BOT_AT,AbstractRobotAction},spec)
-    x1 = get_initial_location_id(p)
-    x2 = get_destination_location_id(p)
-    return get_distance(spec,x1,x2)
-end
-function duration_lower_bound(p::TEAM_ACTION,spec)
-    x1 = get_initial_location_id(pred.instructions[1])
-    x2 = get_destination_location_id(pred.instructions[1])
-    return get_distance(spec,x1,x2,team_configuration(pred))
-end
 
-# """
-#     generate_path_spec(schedule,spec,node)
-#
-# Generates a `PathSpec` struct that encodes information about the path to be
-# planned for `node`.
-#
-# Arguments:
-# * spec::ProblemSpec
-# * node::T <: AbstractPlanningPredicate
-# """
-# function generate_path_spec(spec::ProblemSpec,a) where {P<:OperatingSchedule}
-#     path_spec = PathSpec()
-#     path_spec.agent_id = has_robot_id(a) ? get_robot_id(a) : path_spec.agent_id
-#
-#     s0 = get_id(get_initial_location_id(a))
-#     s = get_id(get_destination_location_id(a))
-#     r = get_robot_id(a)
-#     path_spec = PathSpec(
-#         node_type=Symbol(typeof(a)),
-#         start_vtx=s0,
-#         final_vtx=s,
-#         min_duration=get_distance(spec.D,s0,s), # ProblemSpec distance matrix
-#         agent_id=r,
-#         tight=true,
-#         free = (s==-1) # if destination is -1, there is no goal location
-#         )
-# end
 
 export
     ScheduleNode,
@@ -540,7 +484,6 @@ const schedule_node_mutator_interface = [
     :set_path_spec!]
 
 matches_node_type(n::ScheduleNode,b::Type{B}) where {B} = matches_node_type(n.node,b)
-
 
 export
     OperatingSchedule,
@@ -601,115 +544,55 @@ for op in schedule_node_mutator_interface
     end
 end
 
+# Defining default node parameters
+is_tight(p) = false
+is_tight(::BOT_GO) = true
+is_free(p) = false
+is_free(p::BOT_AT) = true
+is_free(p::BOT_GO) = !is_valid(get_destination_location_id(p))
+is_static(p) = false
+is_static(p::Union{BOT_COLLECT,BOT_DEPOSIT}) = true
+for op in [:is_free,:is_static,:is_tight]
+    @eval $op(p::TEAM_ACTION) = $op(sub_nodes(p)[1])
+end
+needs_path(p) = false
+needs_path(p::Union{BOT_AT,AbstractRobotAction}) = true
+duration_lower_bound(args...) = 0
+duration_lower_bound(op::Operation,spec) = duration(op)
+duration_lower_bound(p::BOT_COLLECT,spec) = get(spec.Δt_collect,get_id(get_object_id(p)),0)
+duration_lower_bound(p::BOT_DEPOSIT,spec) = get(spec.Δt_deliver,get_id(get_object_id(p)),0)
+function duration_lower_bound(p::Union{BOT_AT,AbstractRobotAction},spec)
+    x1 = get_initial_location_id(p)
+    x2 = get_destination_location_id(p)
+    return get_distance(spec,x1,x2)
+end
+function duration_lower_bound(p::TEAM_ACTION,spec)
+    x1 = get_initial_location_id(p.instructions[1])
+    x2 = get_destination_location_id(p.instructions[1])
+    return get_distance(spec,x1,x2,team_configuration(p))
+end
 
-# """
-#     generate_path_spec(schedule,spec,node)
-#
-# Generates a `PathSpec` struct that encodes information about the path to be
-# planned for `node`.
-#
-# Arguments:
-# * schedule::P OperatingSchedule
-# * spec::ProblemSpec
-# * node::T <: AbstractPlanningPredicate
-# """
-function generate_path_spec(sched::P,spec::T,a::BOT_GO) where {P<:OperatingSchedule,T<:ProblemSpec}
-    s0 = get_id(get_initial_location_id(a))
-    s = get_id(get_destination_location_id(a))
-    r = get_robot_id(a)
-    path_spec = PathSpec(
-        node_type=Symbol(typeof(a)),
-        start_vtx=s0,
-        final_vtx=s,
-        min_duration=get_distance(spec.D,s0,s), # ProblemSpec distance matrix
-        agent_id=r,
-        tight=true,
-        free = (s==-1) # if destination is -1, there is no goal location
+"""
+    generate_path_spec(spec,node)
+
+Generates a `PathSpec` struct that encodes information about the path to be
+planned for `node`.
+
+Arguments:
+* spec::ProblemSpec
+* node::T <: AbstractPlanningPredicate
+"""
+function generate_path_spec(spec::ProblemSpec,a)
+    PathSpec(
+        min_duration=duration_lower_bound(a,spec),
+        tight=is_tight(a),
+        static=is_static(a),
+        free=is_free(a),
+        plan_path=needs_path(a)
         )
 end
-function generate_path_spec(sched::P,spec::T,a::BOT_CARRY) where {P<:OperatingSchedule,T<:ProblemSpec}
-    s0 = get_id(get_initial_location_id(a))
-    s = get_id(get_destination_location_id(a))
-    r = get_robot_id(a)
-    o = get_id(get_object_id(a))
-    path_spec = PathSpec(
-        node_type=Symbol(typeof(a)),
-        start_vtx=s0,
-        final_vtx=s,
-        min_duration=get_distance(spec.D,s0,s), # ProblemSpec distance matrix
-        agent_id=r,
-        # object_id = o
-        )
-end
-function generate_path_spec(sched::P,spec::T,a::BOT_COLLECT) where {P<:OperatingSchedule,T<:ProblemSpec}
-    s0 = get_id(get_initial_location_id(a))
-    s = get_id(get_destination_location_id(a))
-    r = get_robot_id(a)
-    o = get_id(get_object_id(a))
-    path_spec = PathSpec(
-        node_type=Symbol(typeof(a)),
-        start_vtx=s0,
-        final_vtx=s,
-        min_duration=get(spec.Δt_collect,o,0),
-        agent_id=r,
-        # object_id = o,
-        static=true
-        )
-end
-function generate_path_spec(sched::P,spec::T,a::BOT_DEPOSIT) where {P<:OperatingSchedule,T<:ProblemSpec}
-    s0 = get_id(get_initial_location_id(a))
-    s = get_id(get_destination_location_id(a))
-    r = get_robot_id(a)
-    o = get_id(get_object_id(a))
-    path_spec = PathSpec(
-        node_type=Symbol(typeof(a)),
-        start_vtx=s0,
-        final_vtx=s,
-        min_duration=get(spec.Δt_deliver,o,0),
-        agent_id=r,
-        # object_id = o,
-        static=true
-        )
-end
-function generate_path_spec(sched::P,spec::T,pred::OBJECT_AT) where {P<:OperatingSchedule,T<:ProblemSpec}
-    path_spec = PathSpec(
-        node_type=Symbol(typeof(pred)),
-        start_vtx=get_id(get_location_id(pred)),
-        final_vtx=get_id(get_location_id(pred)),
-        plan_path = false,
-        # object_id = get_id(get_object_id(pred))
-        )
-end
-function generate_path_spec(sched::P,spec::T,pred::BOT_AT) where {P<:OperatingSchedule,T<:ProblemSpec}
-    r = get_robot_id(pred)
-    path_spec = PathSpec(
-        node_type=Symbol(typeof(pred)),
-        start_vtx=get_id(get_location_id(pred)),
-        final_vtx=get_id(get_location_id(pred)),
-        agent_id=r,
-        free=true
-        )
-end
-function generate_path_spec(sched::P,spec::T,op::Operation) where {P<:OperatingSchedule,T<:ProblemSpec}
-    path_spec = PathSpec(
-        node_type=Symbol(typeof(op)),
-        plan_path = false,
-        min_duration=duration(op)
-        )
-end
-function generate_path_spec(sched::P,spec::T,pred::TEAM_ACTION) where {P<:OperatingSchedule,T<:ProblemSpec}
-    s0 = get_id(get_initial_location_id(pred.instructions[1]))
-    s = get_id(get_destination_location_id(pred.instructions[1]))
-    path_spec = PathSpec(
-        node_type=Symbol(typeof(pred)),
-        min_duration = get_distance(spec.D,s0,s,team_configuration(pred)),
-        plan_path = true,
-        static = (team_action_type(pred) <: Union{COLLECT,DEPOSIT})
-        )
-end
-function generate_path_spec(sched::P,pred) where {P<:OperatingSchedule}
-    generate_path_spec(sched,ProblemSpec(),pred)
-end
+generate_path_spec(sched::OperatingSchedule,spec::ProblemSpec,pred) = generate_path_spec(spec,pred)
+generate_path_spec(sched::OperatingSchedule,pred) = generate_path_spec(sched,ProblemSpec(),pred)
 
 """
     replace_in_schedule!(schedule::OperatingSchedule,path_spec::T,pred,id::ID) where {T<:PathSpec,ID<:AbstractID}
@@ -790,13 +673,13 @@ export backtrack_node
 Find the closest ancestor of `v` with overlapping `RobotID`s.
 """
 function backtrack_node(sched::OperatingSchedule,v::Int)
-    robot_ids = get_robot_ids(sched,get_vtx_id(sched,v),v)
+    robot_ids = get_valid_robot_ids(sched,get_vtx_id(sched,v),v)
     vtxs = Int[]
     if isempty(robot_ids)
         return vtxs
     end
     for vp in inneighbors(sched,v)
-        if !isempty(intersect(get_robot_ids(sched,vp),robot_ids))
+        if !isempty(intersect(get_valid_robot_ids(sched,vp),robot_ids))
             push!(vtxs,vp)
         end
     end

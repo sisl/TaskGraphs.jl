@@ -95,7 +95,73 @@ let
     end
 end
 let
-    PathSpec()
+    solver = NBSSolver()
+    prob = pctapf_problem_1(solver)
+    env = get_env(prob)
+    sched = get_schedule(env)
+    spec = get_problem_spec(env)
+    n = OBJECT_AT(1,1)
+    s = generate_path_spec(sched,spec,n)
+    @test s.plan_path == false
+    n = ROBOT_AT(1,1)
+    s = generate_path_spec(sched,spec,n)
+    @test s.plan_path == true
+    @test s.min_duration == 0
+    @test s.free         == true
+    n = GO(1,1,2)
+    s = generate_path_spec(sched,spec,n)
+    @test s.plan_path == true
+    @test s.min_duration == 1
+    @test s.tight        == true
+    @test s.free         == false
+    n = GO(1,1,-1)
+    s = generate_path_spec(sched,spec,n)
+    @test s.plan_path == true
+    @test s.min_duration == 0
+    @test s.tight        == true
+    @test s.free         == true
+    n = CARRY(1,1,1,2)
+    s = generate_path_spec(sched,spec,n)
+    @test s.plan_path == true
+    @test s.min_duration == 1
+    @test s.tight == false
+    @test s.free  == false
+    n = COLLECT(1,1,1)
+    s = generate_path_spec(sched,spec,n)
+    @test s.plan_path == true
+    @test s.tight == false
+    @test s.free  == false
+    @test s.static == true
+    n = DEPOSIT(1,1,1)
+    s = generate_path_spec(sched,spec,n)
+    @test s.plan_path == true
+    @test s.tight == false
+    @test s.free  == false
+    @test s.static == true
+    n = Operation(Δt=4)
+    s = generate_path_spec(sched,spec,n)
+    @test s.plan_path == false
+    @test s.min_duration == duration(n)
+    n = TEAM_ACTION{DeliveryBot,GO}(instructions=[GO(1,1,2)])
+    s = generate_path_spec(sched,spec,n)
+    @test s.plan_path == true
+    @test s.free      == false
+    @test s.static    == false
+    @test s.tight     == true
+    @test s.min_duration == 1
+    n = TEAM_ACTION{DeliveryBot,CARRY}(instructions=[CARRY(1,1,1,2)])
+    s = generate_path_spec(sched,spec,n)
+    @test s.plan_path == true
+    @test s.free      == false
+    @test s.tight     == false
+    @test s.static    == false
+    @test s.min_duration == 1
+    n = TEAM_ACTION{DeliveryBot,COLLECT}(instructions=[COLLECT(1,1,1)])
+    s = generate_path_spec(sched,spec,n)
+    @test s.plan_path == true
+    @test s.free      == false
+    @test s.tight     == false
+    @test s.static    == true
 end
 let
     sched = OperatingSchedule()
@@ -187,7 +253,7 @@ let
         TOML.print(io, TOML.parse(project_spec))
     end
     project_spec_mod = read_project_spec(filename)
-    @show project_spec_mod.object_id_to_idx
+    # @show project_spec_mod.object_id_to_idx
     # run(`rm $filename`)
 
     r0 = [get_id(get_initial_location_id(robot_ICs[k])) for k in sort(collect(keys(robot_ICs)))]
@@ -256,11 +322,11 @@ let
     for (robot_ids, node, node_id) in [
         ([1],ROBOT_AT(1,1),RobotID(1)),
         ([1],GO(1,1,2),ActionID(1)),
-        ([-1],GO(-1,1,2),ActionID(2)),
+        # ([-1],GO(-1,1,2),ActionID(2)),
         ([],OBJECT_AT(1,2),ObjectID(1)),
         ([1,2],TEAM_CARRY(instructions=[CARRY(1,1,2,3),CARRY(2,1,3,4)]),ActionID(3))
         ]
         add_to_schedule!(sched,node,node_id)
-        @test get_robot_ids(sched,node_id) == map(i->RobotID(i),robot_ids)
+        @test get_valid_robot_ids(sched,node_id) == map(i->RobotID(i),robot_ids)
     end
 end

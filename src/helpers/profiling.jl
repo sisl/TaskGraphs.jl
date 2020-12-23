@@ -20,20 +20,20 @@ extract_object_data(node::OBJECT_AT,t0,tF) = Dict{Symbol,Union{Vector{Int},Int}}
 extract_object_data(node::COLLECT,t0,tF) = Dict{Symbol,Union{Vector{Int},Int}}(
     :object_id=>get_id(get_object_id(node)),
     :start_vtx=>get_id(get_initial_location_id(node)),
-    :robot_ids=>map(get_id,get_robot_ids(node)),
+    :robot_ids=>map(get_id,get_valid_robot_ids(node)),
     :collect_time=>tF,
     )
 extract_object_data(node::CARRY,t0,tF) = Dict{Symbol,Union{Vector{Int},Int}}(
     :object_id=>get_id(get_object_id(node)),
     :start_vtx=>get_id(get_initial_location_id(node)),
     :end_vtx=>get_id(get_destination_location_id(node)),
-    :robot_ids=>map(get_id,get_robot_ids(node)),
+    :robot_ids=>map(get_id,get_valid_robot_ids(node)),
     :collect_time=>t0,
     )
 extract_object_data(node::DEPOSIT,t0,tF) = Dict{Symbol,Union{Vector{Int},Int}}(
     :object_id=>get_id(get_object_id(node)),
     :end_vtx=>get_id(get_destination_location_id(node)),
-    :robot_ids=>map(get_id,get_robot_ids(node)),
+    :robot_ids=>map(get_id,get_valid_robot_ids(node)),
     :deposit_time=>tF,
     )
 function get_object_path_summaries(env::SearchEnv)

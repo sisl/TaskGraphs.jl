@@ -385,9 +385,16 @@ function check_object_id(node,o)
     return false
 end
 
-export has_robot_id, get_default_robot_id
+export
+	has_robot_id,
+	get_default_robot_id,
+	get_default_initial_location_id,
+	get_default_final_location_id
+
 has_robot_id(a) = robot_type(a) == Nothing ? false : true
 get_default_robot_id(a) = has_robot_id(a) ? get_robot_id(a) : RobotID()
+get_default_initial_location_id(a) = has_robot_id(a) ? get_initial_location_id(a) : LocationID()
+get_default_destination_location_id(a) = has_robot_id(a) ? get_destination_location_id(a) : LocationID()
 
 export
 	replace_robot_id,
@@ -402,10 +409,6 @@ for T in [:BOT_AT,:BOT_GO,:BOT_COLLECT,:BOT_CARRY,:BOT_DEPOSIT]
 end
 function replace_robot_id(node::A,id) where {A<:TEAM_ACTION}
 	return A(node,instructions=map(n->replace_robot_id(n,id), sub_nodes(node)))
-	# for i in 1:length(sub_nodes(node))
-	# 	n = sub_nodes(node)[i]
-	# 	sub_nodes(node)[i] = replace_robot_id(node,RobotID(-1))
-	# end
 end
 for T in [:BOT_GO,:BOT_CARRY]
 	@eval replace_destination(node::$T,id) = $T(node,x2=id)
@@ -739,6 +742,8 @@ const predicate_accessor_interface = [
 	:get_destination_location_id,
 	:get_robot_id,
 	:get_default_robot_id,
+	:get_default_initial_location_id,
+	:get_default_final_location_id,
 	:get_object_id,
 	:has_object_id,
 	:has_robot_id,

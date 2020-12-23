@@ -131,37 +131,36 @@ function remap_object_ids!(new_schedule::OperatingSchedule,old_schedule::Operati
     remap_object_ids!(new_schedule,max_obj_id)
 end
 
-export get_robot_ids
+export get_valid_robot_ids
 
 """
-    get_robot_ids(sched::OperatingSchedule,node_id::AbstractID)
+    get_valid_robot_ids(sched::OperatingSchedule,node_id::AbstractID)
 
 Returns vector of all robot ids associated with the schedule node referenced by
 node_id.
 """
-function get_robot_ids(sched::OperatingSchedule,node_id::A,v=get_vtx(sched,node_id)) where {A<:Union{ActionID,BotID}}
+function get_valid_robot_ids(sched::OperatingSchedule,node_id::A,v=get_vtx(sched,node_id)) where {A<:Union{ActionID,BotID}}
     ids = Vector{BotID}()
-    robot_id = get_path_spec(sched,v).agent_id
-    node = get_node_from_id(sched,node_id)
-    if isa(node,TEAM_ACTION)
-        for n in node.instructions
+    node = get_node(sched,node_id).node
+    if matches_template(TEAM_ACTION,node)
+        for n in sub_nodes(node)
             r = get_robot_id(n)
             if get_id(r) != -1
                 push!(ids,r)
             end
         end
     else
-        push!(ids,robot_id)
+        push!(ids,get_default_robot_id(node))
     end
-    return ids
+    return filter(is_valid,ids)
 end
-function get_robot_ids(sched::OperatingSchedule,node_id::A,v=get_vtx(sched,node_id)) where {A<:Union{ObjectID,OperationID}}
+function get_valid_robot_ids(sched::OperatingSchedule,node_id::A,v=get_vtx(sched,node_id)) where {A<:Union{ObjectID,OperationID}}
     return Vector{BotID}()
 end
-get_robot_ids(s::OperatingSchedule,v::Int) = get_robot_ids(s,get_vtx_id(s,v),v)
-get_robot_ids(node) = BotID[]
-get_robot_ids(node::AbstractRobotAction) = [get_robot_id(node)]
-get_robot_ids(node::TEAM_ACTION) = map(n->get_robot_id(n),node.instructions)
+get_valid_robot_ids(s::OperatingSchedule,v::Int) = get_valid_robot_ids(s,get_vtx_id(s,v),v)
+get_valid_robot_ids(node) = BotID[]
+get_valid_robot_ids(node::Union{BOT_AT,AbstractRobotAction}) = [get_robot_id(node)]
+get_valid_robot_ids(node::TEAM_ACTION) = filter(is_valid,map(n->get_robot_id(n),sub_nodes(node)))
 
 export robot_tip_map
 
@@ -175,7 +174,7 @@ function robot_tip_map(sched::OperatingSchedule,vtxs=get_all_terminal_nodes(sche
     robot_tips = Dict{BotID,AbstractID}()
     for v in vtxs
         node_id = get_vtx_id(sched,v)
-        for robot_id in get_robot_ids(sched,node_id,v)
+        for robot_id in get_valid_robot_ids(sched,node_id,v)
             if get_id(robot_id) != -1
                 @assert !haskey(robot_tips,robot_id)
                 robot_tips[robot_id] = node_id

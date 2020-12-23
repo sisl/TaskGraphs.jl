@@ -167,7 +167,9 @@ for op in path_spec_mutator_interface
 end
 
 function CRCBS.get_start(env::SearchEnv,v::Int)
-    start_vtx   = get_path_spec(get_schedule(env),v).start_vtx
+    node = get_node(get_schedule(env),v)
+    start_vtx = get_id(get_default_initial_location_id(node))
+    # start_vtx   = get_path_spec(get_schedule(env),v).start_vtx
     start_time  = get_t0(env,v)
     State(start_vtx,start_time)
 end
@@ -287,12 +289,12 @@ function get_env_state(env,t)
                     map(n->get_location_id(n),sub_nodes(node))
                     )
             elseif t >= get_t0(env,v_collect)
-                r_ids = get_robot_ids(node)
+                r_ids = get_valid_robot_ids(node)
                 object_positions[o] = OBJECT_AT(o,
                     map(r->get_location_id(robot_positions[r]),r_ids)
                     )
             # else
-            #     r_ids = get_robot_ids(node)
+            #     r_ids = get_valid_robot_ids(node)
             #     @show object_positions[o] = OBJECT_AT(o,
             #         map(r->get_location_id(robot_positions[r]),r_ids)
             #         )
@@ -516,12 +518,14 @@ function update_planning_cache!(solver,env)
     for v in collect(cache.active_set)
         n = get_node(sched,v)
         agent_id = get_id(get_default_robot_id(n))
-        path_spec = get_path_spec(sched,v)
+        # path_spec = get_path_spec(sched,v)
         if 1 <= agent_id <= num_agents(env)
             path = get_paths(env)[agent_id]
             s = get_final_state(path)
             t = get_t(s)
-            d = get_distance(env,s,State(path_spec.final_vtx,-1))
+            goal_vtx = get_id(get_destination_location_id(n))
+            # d = get_distance(env,s,State(path_spec.final_vtx,-1))
+            d = get_distance(env,s,State(goal_vtx,-1))
             set_tF!(env,v,max(get_tF(env,v),t+d))
         end
     end
@@ -774,8 +778,9 @@ function CRCBS.build_env(
         heuristic = get_heuristic_model(env),
         cost_model = get_cost_model(env)
     ) where {T}
-    agent_id = get_id(get_default_robot_id(node))
-    goal_vtx = path_spec.final_vtx
+    agent_id= get_id(get_default_robot_id(node))
+    # goal_vtx = path_spec.final_vtx
+    goal_vtx = has_robot_id(node) ? get_id(get_destination_location_id(node)) : -1
     goal_time = get_tF(env,v) # time after which goal can be satisfied
     deadline = get_tF(env,v) .+ get_slack(env,v)         # deadline for DeadlineCost
     # Adjust deadlines if necessary:

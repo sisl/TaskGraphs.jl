@@ -340,7 +340,7 @@ function remove_robot!(env::SearchEnv,id::BotID,t::Int)
         node_id = get_vtx_id(sched,v)
         if isa(node_id,ActionID)
             node = get_node_from_id(sched,node_id)
-            @assert !(get_id(id) in get_robot_ids(node)) "Robot id $(string(id)) should be wiped from schedule, but is present in $(string(node))"
+            @assert !(get_id(id) in get_valid_robot_ids(node)) "Robot id $(string(id)) should be wiped from schedule, but is present in $(string(node))"
         end
     end
     # Remap other robots' IDs? TODO refactor OperatinSchedule and RoutePlan so that I don't have to remap ids? i.e., have both uids and idxs?
