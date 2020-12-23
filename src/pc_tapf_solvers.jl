@@ -131,9 +131,7 @@ search!
 function construct_cost_model(trait::NonPrioritized,
         solver, sched, cache, problem_spec, env_graph, primary_objective=SumOfMakeSpans();
         extra_T::Int=400)
-    # N = problem_spec.N
     N = length(get_robot_ICs(sched))
-    # @assert problem_spec.N == length(get_robot_ICs(schedule))
     @assert N > 0 "num_robots should be > 0. We need at least one robot!"
     cost_model = construct_composite_cost_model(
         typeof(primary_objective)(sched,cache),
