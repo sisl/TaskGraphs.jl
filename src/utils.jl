@@ -152,7 +152,7 @@ function get_valid_robot_ids(sched::OperatingSchedule,node_id::A,v=get_vtx(sched
     else
         push!(ids,get_default_robot_id(node))
     end
-    return filter(is_valid,ids)
+    return filter(CRCBS.is_valid,ids)
 end
 function get_valid_robot_ids(sched::OperatingSchedule,node_id::A,v=get_vtx(sched,node_id)) where {A<:Union{ObjectID,OperationID}}
     return Vector{BotID}()
@@ -160,7 +160,7 @@ end
 get_valid_robot_ids(s::OperatingSchedule,v::Int) = get_valid_robot_ids(s,get_vtx_id(s,v),v)
 get_valid_robot_ids(node) = BotID[]
 get_valid_robot_ids(node::Union{BOT_AT,AbstractRobotAction}) = [get_robot_id(node)]
-get_valid_robot_ids(node::TEAM_ACTION) = filter(is_valid,map(n->get_robot_id(n),sub_nodes(node)))
+get_valid_robot_ids(node::TEAM_ACTION) = filter(CRCBS.is_valid,map(n->get_robot_id(n),sub_nodes(node)))
 
 export robot_tip_map
 

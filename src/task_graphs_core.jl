@@ -543,7 +543,7 @@ is_tight(p) = false
 is_tight(::BOT_GO) = true
 is_free(p) = false
 is_free(p::BOT_AT) = true
-is_free(p::BOT_GO) = !is_valid(get_destination_location_id(p))
+is_free(p::BOT_GO) = !CRCBS.is_valid(get_destination_location_id(p))
 is_static(p) = false
 is_static(p::Union{BOT_COLLECT,BOT_DEPOSIT}) = true
 for op in [:is_free,:is_static,:is_tight]
@@ -942,8 +942,7 @@ function add_single_robot_delivery_task!(
         # robot_id::BotID{R}=RobotID(-1)
     ) where {R<:AbstractRobotType}
     add_headless_delivery_task!(sched,spec,object_id,op_id,R,x1,x2)
-
-    # if !is_valid(pred_id)
+    # if !CRCBS.is_valid(pred_id)
     #     pred = get_node_from_id(sched,pred_id)
     #     action_id = get_unique_action_id()
     #     add_to_schedule!(sched,BOT_GO(robot_id,get_destination_location_id(pred),x1),action_id)
