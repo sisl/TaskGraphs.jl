@@ -110,7 +110,7 @@ function update_envs!(solver,search_env,envs,paths)
         t_arrival = max(cache.tF[v], s.t + get_distance(get_graph(search_env).dist_function,s.vtx,env.goal.vtx))
         if is_goal(envs[i],s)
             if t_arrival > cache.tF[v] && env.goal.vtx != -1
-                @log_info(-1,solver,"DFS update_envs!(): extending tF[v] from $(cache.tF[v]) to $t_arrival in ",string(get_node(env)),", s = ",string(s))
+                @log_info(-1,verbosity(solver),"DFS update_envs!(): extending tF[v] from $(cache.tF[v]) to $t_arrival in ",string(get_node(env)),", s = ",string(s))
                 cache.tF[v] = t_arrival
                 up_to_date = false
             end
@@ -177,7 +177,7 @@ function update_envs!(solver,search_env,envs,paths)
                 i -= 1
             else
                 node_string = string(get_node_from_id(get_schedule(search_env),node_id))
-                @log_info(4,solver,"cannot update environment for agent $i because next node ",node_string," not in cache.active_set")
+                @log_info(4,verbosity(solver),"cannot update environment for agent $i because next node ",node_string," not in cache.active_set")
             end
         end
     end
@@ -207,7 +207,7 @@ function select_action_dfs!(solver,envs,states,actions,i,ordering,idxs,search_st
                 return true
             end
         end
-        @log_info(4,solver,"action vector $(map(a->string(a),actions)) not eligible")
+        @log_info(4,verbosity(solver),"action vector $(map(a->string(a),actions)) not eligible")
         return false
     elseif !(ordering[i] in idxs)
         return select_action_dfs!(solver,envs,states,actions,i+1,ordering,idxs,search_state)
@@ -223,7 +223,7 @@ function select_action_dfs!(solver,envs,states,actions,i,ordering,idxs,search_st
             c0 = get_transition_cost(env,s,a)
             if (i >= search_state.reset_i) || (i < search_state.pickup_i && a == ai) || ((c >= c0 || is_valid(env,a)) && a != ai)
                 actions[idx] = ai
-                @log_info(5,solver,"$(repeat(" ",i))i = $i, trying a=",string(ai)," from s = ",string(s),"for env ",string(get_node(env)), " with env.goal = ",string(env.goal))
+                @log_info(5,verbosity(solver),"$(repeat(" ",i))i = $i, trying a=",string(ai)," from s = ",string(s),"for env ",string(get_node(env)), " with env.goal = ",string(env.goal))
                 k = get_conflict_idx(envs,states,actions,i,ordering,idxs)
                 # @assert k < i "should only check for conflicts with 1:$i, but found conflict with $k"
                 if k <= 0
@@ -235,7 +235,7 @@ function select_action_dfs!(solver,envs,states,actions,i,ordering,idxs,search_st
                     # break
                     # return false
                 else
-                    @log_info(5,solver,"--- conflict betweeh $i and $k")
+                    @log_info(5,verbosity(solver),"--- conflict betweeh $i and $k")
                     j = max(k,j)
                 end
             end
@@ -284,7 +284,7 @@ function prioritized_dfs_search(solver,search_env,envs,paths;
              end
              t += 1
              search_state = DFS_SearchState()
-             @log_info(3,solver,"stepping forward, t = $t")
+             @log_info(3,verbosity(solver),"stepping forward, t = $t")
          else
              # step backward in search
              all(tip_times .> t) == 0 ? break : nothing
@@ -298,7 +298,7 @@ function prioritized_dfs_search(solver,search_env,envs,paths;
              idxs    = Set(findall(tip_times .<= t))
               # start new search where previous search left off
              search_state = DFS_SearchState(pickup_i = maximum(idxs))
-             @log_info(-1,solver,"stepping backward, t = $t")
+             @log_info(-1,verbosity(solver),"stepping backward, t = $t")
          end
          states     = map(path->get_s(get_path_node(path,t+1)), paths)
          actions    = map(path->get_a(get_path_node(path,t+1)), paths)
@@ -332,7 +332,7 @@ function CRCBS.solve!(
         max_iters = solver.cbs_model.max_iters
     )
     if validate(get_schedule(search_env),convert_to_vertex_lists(route_plan),get_cache(search_env).t0,get_cache(search_env).tF)
-        @log_info(0,solver,"DFS: Succeeded in finding a valid route plan!")
+        @log_info(0,verbosity(solver),"DFS: Succeeded in finding a valid route plan!")
     else
         # throw(SolverCBSMaxOutException("ERROR in DFS! Failed to find a valid route plan!"))
         # DUMP
@@ -340,11 +340,11 @@ function CRCBS.solve!(
         mkpath(DEBUG_PATH)
         for env in envs
             v = get_vtx(get_schedule(search_env),env.node_id)
-            @log_info(-1,solver,"node ",string(get_node(env))," t0=$(get_t0(search_env,v)), tF=$(get_tF(search_env,v)), closed=$(v in get_cache(search_env).closed_set),")
+            @log_info(-1,verbosity(solver),"node ",string(get_node(env))," t0=$(get_t0(search_env,v)), tF=$(get_tF(search_env,v)), closed=$(v in get_cache(search_env).closed_set),")
         end
         robot_paths = convert_to_vertex_lists(route_plan)
         object_paths, object_intervals, object_ids, path_idxs = get_object_paths(route_plan,search_env)
-        @log_info(-1,solver,"Dumping DFS route plan to $filename")
+        @log_info(-1,verbosity(solver),"Dumping DFS route plan to $filename")
         @save filename robot_paths object_paths object_intervals object_ids path_idxs
 
         throw(AssertionError("ERROR in DFS! Failed to find a valid route plan!"))

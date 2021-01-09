@@ -320,7 +320,7 @@ let
                 # set_verbosity!(solver,4)
                 env, cost = solve!(solver,c_pc_tapf)
                 paths = convert_to_vertex_lists(get_route_plan(env))
-                @log_info(-1,solver,sprint_route_plan(get_route_plan(env)))
+                @log_info(-1,verbosity(solver),sprint_route_plan(get_route_plan(env)))
                 # @show paths
                 @test cost == expected_cost
                 for (expected_path, path) in zip(expected_paths,paths)

@@ -466,7 +466,7 @@ end
 for op in predicate_accessor_interface
     @eval $op(node::ScheduleNode) = $op(node.node)
 end
-for op in [:matches_template]
+for op in [:(GraphUtils.matches_template)]
     @eval $op(template::Type{T},node::ScheduleNode) where {T} = $op(template,node.node)
 end
 
@@ -505,9 +505,9 @@ constraints between them. Each `ScheduleNode` has a corresponding vertex index
 and an `AbstractID`. An edge from node1 to node2 indicates a precedence
 constraint between them.
 """
-@with_kw struct OperatingSchedule <: AbstractCustomDiGraph{ScheduleNode,AbstractID}
+@with_kw struct OperatingSchedule <: AbstractCustomNDiGraph{ScheduleNode,AbstractID}
     graph               ::DiGraph               = DiGraph()
-    nodes      ::Vector{ScheduleNode}  = Vector{ScheduleNode}()
+    nodes               ::Vector{ScheduleNode}  = Vector{ScheduleNode}()
     vtx_map             ::Dict{AbstractID,Int}  = Dict{AbstractID,Int}()
     vtx_ids             ::Vector{AbstractID}    = Vector{AbstractID}() # maps vertex uid to actual graph node
     terminal_vtxs       ::Vector{Int}           = Vector{Int}() # list of "project heads"
@@ -515,6 +515,7 @@ constraint between them.
 end
 get_terminal_vtxs(sched::P) where {P<:OperatingSchedule}     = sched.terminal_vtxs
 get_root_node_weights(sched::P) where {P<:OperatingSchedule} = sched.weights
+# Base.convert(::Type{OperatingSchedule},s::OperatingSchedule) = s
 
 GraphUtils.get_vtx(sched::OperatingSchedule,node::ScheduleNode) = get_vtx(sched,node.id)
 get_node_from_id(sched::OperatingSchedule,id) = get_node(sched,id).node

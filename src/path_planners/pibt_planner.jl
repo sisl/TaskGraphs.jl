@@ -82,7 +82,7 @@ function pibt_info_strings(cache)
     return info_strings
 end
 function CRCBS.pibt_update_envs!(solver,pc_mapf::PC_MAPF,cache)
-    @log_info(2,solver,"PIBT iteration $(iterations(solver)) PRE UPDATE:\n",
+    @log_info(2,verbosity(solver),"PIBT iteration $(iterations(solver)) PRE UPDATE:\n",
         pibt_info_strings(cache)...)
     solution = CRCBS.get_solution(cache)
     node = initialize_root_node(solver,pc_mapf)
@@ -113,7 +113,7 @@ function CRCBS.pibt_update_envs!(solver,pc_mapf::PC_MAPF,cache)
         sweeps += 1
         done ? break : nothing
     end
-    @log_info(2,solver,"PIBT iteration $(iterations(solver)) POST UPDATE:\n",
+    @log_info(2,verbosity(solver),"PIBT iteration $(iterations(solver)) POST UPDATE:\n",
         pibt_info_strings(cache)...)
     return cache
 end

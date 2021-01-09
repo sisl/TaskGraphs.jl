@@ -343,144 +343,38 @@ split_node(node::BOT_CARRY,x::LocationID) = BOT_CARRY(node, x2=x), BOT_CARRY(nod
 split_node(node::BOT_COLLECT,x::LocationID) = BOT_COLLECT(node, x=x), BOT_COLLECT(node, x=x)
 split_node(node::BOT_DEPOSIT,x::LocationID) = BOT_DEPOSIT(node, x=x), BOT_DEPOSIT(node, x=x)
 
-
 get_object_id(a::TEAM_ACTION) = get_object_id(get(sub_nodes(a),1,OBJECT_AT(-1,-1)))
 
-export
-	required_predecessors,
-	required_successors,
-	num_required_predecessors,
-	num_required_successors,
-    eligible_successors,
-    eligible_predecessors,
-	num_eligible_predecessors,
-	num_eligible_successors,
-	matches_template,
-    resources_reserved,
-	align_with_predecessor,
-	align_with_successor
+GraphUtils.required_predecessors(node::BOT_GO{R}) where {R} 		= Dict((BOT_GO{R},BOT_AT{R},BOT_DEPOSIT{R},TEAM_ACTION{R,BOT_DEPOSIT{R}})=>1)
+GraphUtils.required_successors(node::BOT_GO{R}) where {R}       	= Dict()
+GraphUtils.required_predecessors(node::BOT_COLLECT{R}) where {R} 	= Dict(OBJECT_AT=>1,BOT_GO{R}=>1)
+GraphUtils.required_successors(node::BOT_COLLECT{R}) where {R} 	= Dict(BOT_CARRY{R}=>1)
+GraphUtils.required_predecessors(node::BOT_CARRY{R}) where {R} 	= Dict(BOT_COLLECT{R}=>1)
+GraphUtils.required_successors(node::BOT_CARRY{R}) where {R} 		= Dict(BOT_DEPOSIT{R}=>1)
+GraphUtils.required_predecessors(node::BOT_DEPOSIT{R}) where {R} 	= Dict(BOT_CARRY{R}=>1)
+GraphUtils.required_successors(node::BOT_DEPOSIT{R}) where {R} 	= Dict(Operation=>1,BOT_GO{R}=>1)
+GraphUtils.required_predecessors(node::Operation)  				= Dict((BOT_DEPOSIT{DeliveryBot},OBJECT_AT)=>length(node.pre))
+GraphUtils.required_successors(node::Operation)    				= Dict(OBJECT_AT=>length(node.post))
+GraphUtils.required_predecessors(node::OBJECT_AT)  				= Dict()
+GraphUtils.required_successors(node::OBJECT_AT)    				= Dict(BOT_COLLECT{DeliveryBot}=>1)
+GraphUtils.required_predecessors(node::BOT_AT{R}) where {R}   		= Dict()
+GraphUtils.required_successors(node::BOT_AT{R}) where {R}     		= Dict(BOT_GO{R}=>1)
 
-"""
-	required_predecessors(node)
+GraphUtils.required_predecessors(node::TEAM_ACTION{R,GO}) where {R} 		= Dict(GO=>length(node.instructions))
+GraphUtils.required_predecessors(node::TEAM_ACTION{R,COLLECT}) where {R} 	= Dict(GO=>length(node.instructions),OBJECT_AT=>1)
+GraphUtils.required_predecessors(node::TEAM_ACTION{R,CARRY}) where {R} 	= Dict(TEAM_ACTION{R,COLLECT}=>1)
+GraphUtils.required_predecessors(node::TEAM_ACTION{R,DEPOSIT}) where {R} 	= Dict(TEAM_ACTION{R,CARRY}=>1)
 
-Identifies the types (and how many) of required predecessors to `node`
+GraphUtils.required_successors(node::TEAM_ACTION{R,GO}) where {R}        	= Dict(TEAM_ACTION{R,COLLECT}=>1)
+GraphUtils.required_successors(node::TEAM_ACTION{R,COLLECT}) where {R}   	= Dict(TEAM_ACTION{R,CARRY}=>1)
+GraphUtils.required_successors(node::TEAM_ACTION{R,CARRY}) where {R}     	= Dict(TEAM_ACTION{R,DEPOSIT}=>1)
+GraphUtils.required_successors(node::TEAM_ACTION{R,DEPOSIT}) where {R}   	= Dict(GO=>length(node.instructions),Operation=>1)
 
-Example:
-	`required_predecessors(node::COLLECT) = Dict(OBJECT_AT=>1,GO=>1)`
-"""
-function required_predecessors end
+GraphUtils.eligible_predecessors(node) 			= required_predecessors(node)
+GraphUtils.eligible_successors(node) 				= required_successors(node)
+GraphUtils.eligible_successors(node::BOT_GO{R}) where {R} = Dict((BOT_GO{R},TEAM_ACTION{R,BOT_COLLECT{R}},TEAM_ACTION{R,BOT_GO{R}},BOT_COLLECT{R})=>1)
+GraphUtils.eligible_predecessors(node::OBJECT_AT)  = Dict(Operation=>1)
 
-"""
-	required_successors(node)
-
-Identifies the types (and how many) of required successors to `node`
-
-Example:
-	`required_successors(node::COLLECT) = Dict(CARRY=>1)`
-"""
-function required_successors end
-
-"""
-	eligible_predecessors(node)
-
-Identifies the types (and how many) of eligible predecessors to `node`
-
-Example:
-	`eligible_predecessors(node::OBJECT_AT) = Dict(Operation=>1)`
-"""
-function eligible_predecessors end
-
-"""
-	eligible_successors(node)
-
-Identifies the types (and how many) of eligible successors to `node`
-
-Example:
-	`eligible_successors(node::GO) = Dict((GO,TEAM_COLLECT,TEAM_GO,COLLECT)=>1)`
-"""
-function eligible_successors end
-
-required_predecessors(node::BOT_GO{R}) where {R} 		= Dict((BOT_GO{R},BOT_AT{R},BOT_DEPOSIT{R},TEAM_ACTION{R,BOT_DEPOSIT{R}})=>1)
-required_successors(node::BOT_GO{R}) where {R}       	= Dict()
-required_predecessors(node::BOT_COLLECT{R}) where {R} 	= Dict(OBJECT_AT=>1,BOT_GO{R}=>1)
-required_successors(node::BOT_COLLECT{R}) where {R} 	= Dict(BOT_CARRY{R}=>1)
-required_predecessors(node::BOT_CARRY{R}) where {R} 	= Dict(BOT_COLLECT{R}=>1)
-required_successors(node::BOT_CARRY{R}) where {R} 		= Dict(BOT_DEPOSIT{R}=>1)
-required_predecessors(node::BOT_DEPOSIT{R}) where {R} 	= Dict(BOT_CARRY{R}=>1)
-required_successors(node::BOT_DEPOSIT{R}) where {R} 	= Dict(Operation=>1,BOT_GO{R}=>1)
-required_predecessors(node::Operation)  				= Dict((BOT_DEPOSIT{DeliveryBot},OBJECT_AT)=>length(node.pre))
-required_successors(node::Operation)    				= Dict(OBJECT_AT=>length(node.post))
-required_predecessors(node::OBJECT_AT)  				= Dict()
-required_successors(node::OBJECT_AT)    				= Dict(BOT_COLLECT{DeliveryBot}=>1)
-required_predecessors(node::BOT_AT{R}) where {R}   		= Dict()
-required_successors(node::BOT_AT{R}) where {R}     		= Dict(BOT_GO{R}=>1)
-
-required_predecessors(node::TEAM_ACTION{R,GO}) where {R} 		= Dict(GO=>length(node.instructions))
-required_predecessors(node::TEAM_ACTION{R,COLLECT}) where {R} 	= Dict(GO=>length(node.instructions),OBJECT_AT=>1)
-required_predecessors(node::TEAM_ACTION{R,CARRY}) where {R} 	= Dict(TEAM_ACTION{R,COLLECT}=>1)
-required_predecessors(node::TEAM_ACTION{R,DEPOSIT}) where {R} 	= Dict(TEAM_ACTION{R,CARRY}=>1)
-
-required_successors(node::TEAM_ACTION{R,GO}) where {R}        	= Dict(TEAM_ACTION{R,COLLECT}=>1)
-required_successors(node::TEAM_ACTION{R,COLLECT}) where {R}   	= Dict(TEAM_ACTION{R,CARRY}=>1)
-required_successors(node::TEAM_ACTION{R,CARRY}) where {R}     	= Dict(TEAM_ACTION{R,DEPOSIT}=>1)
-required_successors(node::TEAM_ACTION{R,DEPOSIT}) where {R}   	= Dict(GO=>length(node.instructions),Operation=>1)
-
-eligible_predecessors(node) 			= required_predecessors(node)
-eligible_successors(node) 				= required_successors(node)
-eligible_successors(node::BOT_GO{R}) where {R} = Dict((BOT_GO{R},TEAM_ACTION{R,BOT_COLLECT{R}},TEAM_ACTION{R,BOT_GO{R}},BOT_COLLECT{R})=>1)
-eligible_predecessors(node::OBJECT_AT)  = Dict(Operation=>1)
-
-"""
-	num_required_predecessors(node)
-
-Returns the total number of required predecessors to `node`.
-"""
-function num_required_predecessors(node)
-	n = 1
-	for (key,val) in required_predecessors(node)
-		n += val
-	end
-	n
-end
-
-"""
-	num_required_successors(node)
-
-Returns the total number of required successors to `node`.
-"""
-function num_required_successors(node)
-	n = 1
-	for (key,val) in required_successors(node)
-		n += val
-	end
-	n
-end
-
-"""
-	num_eligible_predecessors(node)
-
-Returns the total number of eligible predecessors to `node`.
-"""
-function num_eligible_predecessors(node)
-	n = 1
-	for (key,val) in eligible_predecessors(node)
-		n += val
-	end
-	n
-end
-
-"""
-	num_eligible_successors(node)
-
-Returns the total number of eligible successors to `node`.
-"""
-function num_eligible_successors(node)
-	n = 1
-	for (key,val) in eligible_successors(node)
-		n += val
-	end
-	n
-end
 
 export robot_ids_match
 
@@ -499,22 +393,10 @@ function robot_ids_match(node,node2)
 	return true
 end
 
-"""
-	matches_template(template,node)
-
-Checks if a candidate `node` satisfies the criteria encoded by `template`.
-"""
-# matches_template(template,node) = false
-# matches_template(template::T,node::T) where {T} = true
-# matches_template(template::T,node::S) where {T,S} = S<:T
-# matches_template(template::DataType,node::DataType) = template == node
-matches_template(template::Type{T},node::Type{S}) where {T,S} = S<:T
-matches_template(template::Type{T},node::S) where {T,S} = S<:T
-matches_template(template,node) = matches_template(typeof(template),node)
-# matches_template(template::T,node::DataType) where {T<:Tuple} = (node in template)
-# matches_template(template::T,node::Type{S}) where {T<:Tuple,S} = (S in template)
-matches_template(template::Tuple,node) = any(map(t->matches_template(t,node), template))
-# matches_template(template::T,node) where {T<:Tuple} = matches_template(template, typeof(node))
+export
+	resources_reserved,
+	align_with_predecessor,
+	align_with_successor
 
 """
 	resouces_reserved(node)
@@ -527,7 +409,7 @@ resources_reserved(node::BOT_COLLECT)       = AbstractID[get_location_id(node)]
 resources_reserved(node::BOT_DEPOSIT)       = AbstractID[get_location_id(node)]
 resources_reserved(node::TEAM_ACTION)	= union(map(pred->resources_reserved(pred), node.instructions)...)
 
-CRCBS.is_valid(id::A) where {A<:AbstractID} = get_id(id) != -1
+CRCBS.is_valid(id::A) where {A<:AbstractID} = valid_id(id) #get_id(id) != -1
 first_valid(a,b) = CRCBS.is_valid(a) ? a : b
 
 """
@@ -594,30 +476,17 @@ align_with_successor(node::BOT_GO,succ::BOT_COLLECT) 			= BOT_GO(first_valid(nod
 align_with_successor(node::BOT_GO,succ::BOT_GO) 				= BOT_GO(first_valid(node.r,succ.r), node.x1, first_valid(node.x2,succ.x1))
 
 
-export
-	validate_edge
-
-"""
-	validate_edge(n1,n2)
-
-For an edge (n1) --> (n2), checks whether the edge is legal and the nodes
-"agree". For example,
-
-`validate_edge(n1::BOT_AT, n2::BOT_GO) = (n1.x == n2.x1) && (n1.r == n2.r)`
-
-meaning that the robot ids and the initial initial locations must match.
-"""
-validate_edge(n1,n2) = true
-validate_edge(n1::N1,n2::N2) where {N1<:Union{BOT_AT,OBJECT_AT},N2<:Union{BOT_AT,OBJECT_AT}} = false
-validate_edge(n1::BOT_AT,		n2::BOT_GO			) = (n1.x 	== n2.x1) && (n1.r == n2.r)
-validate_edge(n1::BOT_GO,			n2::BOT_GO			) = (n1.x2 	== n2.x1) && (n1.r == n2.r)
-validate_edge(n1::BOT_GO,			n2::BOT_COLLECT		) = (n1.x2 	== n2.x ) && (n1.r == n2.r)
-validate_edge(n1::BOT_COLLECT,		n2::BOT_CARRY		) = (n1.x 	== n2.x1) && (n1.o == n2.o)
-validate_edge(n1::BOT_CARRY,		n2::BOT_COLLECT		) = false
-validate_edge(n1::BOT_CARRY,		n2::BOT_DEPOSIT		) = (n1.x2 	== n2.x) && (n1.o == n2.o)
-validate_edge(n1::BOT_DEPOSIT,		n2::BOT_CARRY		) = false
-validate_edge(n1::BOT_DEPOSIT,		n2::BOT_GO			) = (n1.x 	== n2.x1)
-validate_edge(n1::N,n2::N) where {N<:Union{BOT_COLLECT,BOT_DEPOSIT}} = (n1.x == n2.x) # job shop edges are valid
+GraphUtils.validate_edge(n1,n2) = true
+GraphUtils.validate_edge(n1::N1,n2::N2) where {N1<:Union{BOT_AT,OBJECT_AT},N2<:Union{BOT_AT,OBJECT_AT}} = false
+GraphUtils.validate_edge(n1::BOT_AT,		n2::BOT_GO			) = (n1.x 	== n2.x1) && (n1.r == n2.r)
+GraphUtils.validate_edge(n1::BOT_GO,			n2::BOT_GO			) = (n1.x2 	== n2.x1) && (n1.r == n2.r)
+GraphUtils.validate_edge(n1::BOT_GO,			n2::BOT_COLLECT		) = (n1.x2 	== n2.x ) && (n1.r == n2.r)
+GraphUtils.validate_edge(n1::BOT_COLLECT,		n2::BOT_CARRY		) = (n1.x 	== n2.x1) && (n1.o == n2.o)
+GraphUtils.validate_edge(n1::BOT_CARRY,		n2::BOT_COLLECT		) = false
+GraphUtils.validate_edge(n1::BOT_CARRY,		n2::BOT_DEPOSIT		) = (n1.x2 	== n2.x) && (n1.o == n2.o)
+GraphUtils.validate_edge(n1::BOT_DEPOSIT,		n2::BOT_CARRY		) = false
+GraphUtils.validate_edge(n1::BOT_DEPOSIT,		n2::BOT_GO			) = (n1.x 	== n2.x1)
+GraphUtils.validate_edge(n1::N,n2::N) where {N<:Union{BOT_COLLECT,BOT_DEPOSIT}} = (n1.x == n2.x) # job shop edges are valid
 
 
 Base.string(pred::OBJECT_AT)	=  string("O(",get_id(get_object_id(pred)),",",map(x->get_id(x), get_location_ids(pred)),")")
@@ -658,20 +527,20 @@ const predicate_accessor_interface = [
 	:has_object_id,
 	:has_robot_id,
 	:sub_nodes,
-	:required_successors,
-	:required_predecessors,
-	:eligible_successors,
-	:eligible_predecessors,
-	:num_required_successors,
-	:num_required_predecessors,
-	:num_eligible_successors,
-	:num_eligible_predecessors,
+	:(GraphUtils.required_successors),
+	:(GraphUtils.required_predecessors),
+	:(GraphUtils.eligible_successors),
+	:(GraphUtils.eligible_predecessors),
+	:(GraphUtils.num_required_successors),
+	:(GraphUtils.num_required_predecessors),
+	:(GraphUtils.num_eligible_successors),
+	:(GraphUtils.num_eligible_predecessors),
 	:resources_reserved,
 	:title_string
 ]
 const predicate_comparison_interface = [
-	:matches_template,
-	:validate_edge,
+	:(GraphUtils.matches_template),
+	:(GraphUtils.validate_edge),
 ]
 
 abstract type PredicateTrait end

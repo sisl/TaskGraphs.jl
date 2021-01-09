@@ -1142,7 +1142,7 @@ struct GreedyLowerBoundCost <: GreedyCost end
     "open" sets of vertices: one containing vertices that are eligible for a
 """
 @with_kw struct GreedyAssignment{C,M} <: TaskGraphsMILP
-    schedule::OperatingSchedule   = OperatingSchedule()
+    schedule::OperatingSchedule = OperatingSchedule()
     problem_spec::ProblemSpec   = ProblemSpec()
     cost_model::C               = SumOfMakeSpans()
     greedy_cost::M              = GreedyPathLengthCost()
@@ -1398,7 +1398,7 @@ Returns `false` if the new edges cause cycles in the project graph.
 function update_project_schedule!(solver,sched::OperatingSchedule,problem_spec,adj_matrix)
     mtx = adjacency_matrix(sched)
     val = update_project_schedule!(sched,problem_spec,adj_matrix)
-    @log_info(1,solver,"Assignment: Adding edges \n",
+    @log_info(1,verbosity(solver),"Assignment: Adding edges \n",
         map(idx->string("\t",
                 string(get_node_from_vtx(sched,idx.I[1]))," → ",
                 string(get_node_from_vtx(sched,idx.I[2])),"\n"

@@ -120,9 +120,9 @@ let
         initialize_planning_cache(new_sched,t0,tF)
         )
     base_route_plan = initialize_route_plan(search_env,get_cost_model(base_search_env))
-    # @log_info(3,solver,"Previous route plan: \n",sprint_route_plan(route_plan))
+    # @log_info(3,verbosity(solver),"Previous route plan: \n",sprint_route_plan(route_plan))
     trimmed_route_plan = trim_route_plan(base_search_env, base_route_plan, t_commit)
-    # @log_info(3,solver,"Trimmed route plan: \n",sprint_route_plan(trimmed_route_plan))
+    # @log_info(3,verbosity(solver),"Trimmed route plan: \n",sprint_route_plan(trimmed_route_plan))
     SearchEnv(base_search_env, route_plan=trimmed_route_plan)
 
 end

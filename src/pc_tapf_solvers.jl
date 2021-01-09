@@ -61,7 +61,7 @@ function CRCBS.logger_step_a_star!(solver::AStarSC, env, base_path, s, q_cost)
         #     # Dump env to JLD2 environment
         #     filename = joinpath(DEBUG_PATH,string("A_star_dump_",get_debug_file_id(),".jld2"))
         #     mkpath(DEBUG_PATH)
-        #     @log_info(-1,solver,"Dumping A* env to $filename")
+        #     @log_info(-1,verbosity(solver),"Dumping A* env to $filename")
         #     agent_id = env.agent_idx
         #     history = map(s->(s.vtx,s.t),solver.search_history)
         #     start   = (get_final_state(base_path).vtx,get_final_state(base_path).t)
@@ -75,7 +75,7 @@ function CRCBS.logger_step_a_star!(solver::AStarSC, env, base_path, s, q_cost)
         # end
         # throw(SolverAstarMaxOutException(string("# MAX OUT: A* limit of ",solver.LIMIT_A_star_iterations," exceeded.")))
     end
-    @log_info(2,solver,"A* iter $(iterations(solver)): s = $(string(s)), q_cost = $q_cost")
+    @log_info(2,verbosity(solver),"A* iter $(iterations(solver)): s = $(string(s)), q_cost = $q_cost")
 end
 
 export DefaultAStarSC
@@ -197,9 +197,9 @@ function update_route_plan!(solver,pc_mapf::C_PC_MAPF,env,v,meta_path,meta_cost,
         agent_id = get_id(get_robot_id(sub_node))
         path = new_path
         update_route_plan!(solver,PC_MAPF(get_env(pc_mapf)),env,v,path,get_cost(path),sub_node,agent_id)
-        @log_info(3,solver,"agent_id = ", agent_id)
-        @log_info(3,solver,string("agent_path = ", convert_to_vertex_lists(path)))
-        @log_info(3,solver,string("cost = ", get_cost(new_path)))
+        @log_info(3,verbosity(solver),"agent_id = ", agent_id)
+        @log_info(3,verbosity(solver),string("agent_path = ", convert_to_vertex_lists(path)))
+        @log_info(3,verbosity(solver),string("cost = ", get_cost(new_path)))
     end
     return env
 end
@@ -231,7 +231,7 @@ function plan_path!(solver::AStarSC, pc_mapf::AbstractPC_MAPF, env::SearchEnv, n
     @assert get_cost(path) == cost
     if cost == get_infeasible_cost(cbs_env)
         if solver.replan == true
-            @log_info(-1,solver,"A*: replanning without conflict cost", string(schedule_node))
+            @log_info(-1,verbosity(solver),"A*: replanning without conflict cost", string(schedule_node))
             reset_solver!(solver)
             cost_model, _ = construct_cost_model(solver, env;
                 primary_objective=get_problem_spec(env).cost_function)
@@ -240,30 +240,30 @@ function plan_path!(solver::AStarSC, pc_mapf::AbstractPC_MAPF, env::SearchEnv, n
             path, cost = path_finder(solver, cbs_env, base_path)
         end
         if cost == get_infeasible_cost(cbs_env)
-            @log_info(-1,solver,"A*: returned infeasible path for node ", string(schedule_node))
+            @log_info(-1,verbosity(solver),"A*: returned infeasible path for node ", string(schedule_node))
             return false
         end
     end
     # solver.DEBUG ? validate(path,v,cbs_env) : nothing
     #####################
-    @log_info(2,solver,string("A* iterations = ",iterations(solver)))
+    @log_info(2,verbosity(solver),string("A* iterations = ",iterations(solver)))
     # Make sure every robot sticks around for the entire time horizon
     if is_terminal_node(get_graph(get_schedule(env)),v)
-        @log_info(2,solver,"ISPS: length(path) = ",length(path),
+        @log_info(2,verbosity(solver),"ISPS: length(path) = ",length(path),
         ". Extending terminal node ", string(schedule_node),
         " to ",makespan(get_schedule(env)))
         # extend_path!(cbs_env,path,maximum(cache.tF))
         extend_path!(cbs_env,path,makespan(get_schedule(env)))
-        @log_info(2,solver,"ISPS: length(path) = ",length(path),
+        @log_info(2,verbosity(solver),"ISPS: length(path) = ",length(path),
         ". maximum(cache.tF) = ",makespan(get_schedule(env)))
         # solver.DEBUG ? validate(path,v) : nothing
     end
     # add to solution
     update_route_plan!(solver,pc_mapf,env,v,path,cost,schedule_node)
-    @log_info(2,solver,"ISPS: after update_route_plan! maximum(cache.tF) = ",
+    @log_info(2,verbosity(solver),"ISPS: after update_route_plan! maximum(cache.tF) = ",
         makespan(get_schedule(env)))
     if get_cost(node) >= best_cost(solver)
-        @log_info(0,solver,"ISPS: get_cost(node) (",get_cost(node),
+        @log_info(0,verbosity(solver),"ISPS: get_cost(node) (",get_cost(node),
             ") >= best_cost(solver)",best_cost(solver)," ... Exiting early")
         return false
     end
@@ -325,8 +325,8 @@ function plan_next_path!(solver::ISPS, pc_mapf::AbstractPC_MAPF, env::SearchEnv,
         schedule_node = get_node_from_id(get_schedule(env),node_id)
         if get_path_spec(get_schedule(env), v).plan_path == true
             try
-                @log_info(2,solver,sprint(show,env))
-                @log_info(2,solver,
+                @log_info(2,verbosity(solver),sprint(show,env))
+                @log_info(2,verbosity(solver),
                 """
                 ISPS:
                     schedule_node: $(string(schedule_node))
@@ -334,7 +334,7 @@ function plan_next_path!(solver::ISPS, pc_mapf::AbstractPC_MAPF, env::SearchEnv,
                     maximum(get_cache(env).tF): $(makespan(get_schedule(env)))
                 """)
                 valid_flag = plan_path!(low_level(solver),pc_mapf,env,node,schedule_node,v)
-                @log_info(2,solver,"""
+                @log_info(2,verbosity(solver),"""
                 ISPS:
                     routes:
                 """,
@@ -347,7 +347,7 @@ function plan_next_path!(solver::ISPS, pc_mapf::AbstractPC_MAPF, env::SearchEnv,
             catch e
                 if isa(e, SolverException)
                     handle_solver_exception(solver,e)
-                    @log_info(-1,solver,"Exiting ISPS with failed status")
+                    @log_info(-1,verbosity(solver),"Exiting ISPS with failed status")
                     valid_flag = false
                     # return valid_flag
                     return false
@@ -374,9 +374,9 @@ function compute_route_plan!(solver::ISPS, pc_mapf::AbstractPC_MAPF, node::N, en
 
     while length(get_cache(env).node_queue) > 0
         status = plan_next_path!(solver,pc_mapf,env,node)
-        # @log_info(-1,solver,"ISPS status = ",status)
+        # @log_info(-1,verbosity(solver),"ISPS status = ",status)
         # if status == false
-        #     @log_info(-1,solver,"Exiting ISPS with failed status")
+        #     @log_info(-1,verbosity(solver),"Exiting ISPS with failed status")
         #     return false
         # end
         status ? nothing : return false
@@ -410,7 +410,7 @@ function CRCBS.low_level_search!(solver::ISPS, pc_mapf::AbstractPC_MAPF,
         reset_route_plan!(node,get_route_plan(get_env(pc_mapf)))
         valid_flag = compute_route_plan!(solver, pc_mapf, node)
         if valid_flag == false
-            @log_info(0,solver,"ISPS: failed on ",i,"th repair iteration.")
+            @log_info(0,verbosity(solver),"ISPS: failed on ",i,"th repair iteration.")
             break
         end
     end
@@ -560,7 +560,7 @@ function CRCBS.solve!(solver::NBSSolver, prob::E;kwargs...) where {E<:AbstractPC
             end
             increment_iteration_count!(solver)
             if check_iterations(solver)
-                @log_info(1,solver,
+                @log_info(1,verbosity(solver),
                     "NBS: Reached $(iteration_limit(solver))-iteration limit.")
                 break
             end

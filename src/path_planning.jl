@@ -480,8 +480,8 @@ function update_planning_cache!(solver,env::SearchEnv,v::Int,t::Int=-1)
     for v2 in active_set
         node_queue[v2] = isps_queue_cost(sched,v2)
     end
-    @log_info(2,solver,"moved ",v," to closed set, moved ",activated_vtxs," to active set")
-    @log_info(3,solver,string("get_tF(sched,v) = ",get_tF(sched,v)))
+    @log_info(2,verbosity(solver),"moved ",v," to closed set, moved ",activated_vtxs," to active set")
+    @log_info(3,verbosity(solver),string("get_tF(sched,v) = ",get_tF(sched,v)))
     return cache
 end
 """
@@ -739,18 +739,18 @@ function tighten_gaps!(solver, pc_mapf::AbstractPC_MAPF, env::SearchEnv, constra
         gap = evaluate_path_gap(env,path,v)
         if gap > 0
             t0 = get_t0(env,v)
-            @log_info(2, solver, "tighten_gaps!: base path for ",
+            @log_info(2, verbosity(solver), "tighten_gaps!: base path for ",
                 string(get_node_from_vtx(sched,v)),
                 ", v = ",v," ends at t=",get_end_index(path),
                 " but should end at t=",t0," (gap = ", gap,").")
             vtxs = backtrack_node(sched,v)
             for vp in vtxs
                 if get_tF(env,vp) < t0
-                    @log_info(2,solver," Re-launching planner on ",string(get_node_from_vtx(sched,vp))," (v = ",v,")"," with extended horizon ",t0," ...")
+                    @log_info(2,verbosity(solver)," Re-launching planner on ",string(get_node_from_vtx(sched,vp))," (v = ",v,")"," with extended horizon ",t0," ...")
                     if replan_path!(solver, pc_mapf, env, constraint_node, VtxID(vp),t0)
-                        @log_info(2,solver,"tightening succeeded on ",string(get_node_from_vtx(sched,vp))," (v = ",v,")"," with extended horizon ",t0)
+                        @log_info(2,verbosity(solver),"tightening succeeded on ",string(get_node_from_vtx(sched,vp))," (v = ",v,")"," with extended horizon ",t0)
                     else
-                        @log_info(2,solver,"tightening failed on ",string(get_node_from_vtx(sched,vp))," (v = ",v,")"," with extended horizon ",t0)
+                        @log_info(2,verbosity(solver),"tightening failed on ",string(get_node_from_vtx(sched,vp))," (v = ",v,")"," with extended horizon ",t0)
                         return false
                     end
                 end
@@ -791,7 +791,7 @@ function CRCBS.build_env(
             for c in sorted_state_constraints(env,get_constraints(constraint_node, agent_id)) #.sorted_state_constraints
                 if get_sp(get_path_node(c)).vtx == goal_vtx
                     if 0 < get_time_of(c) - goal_time < duration_next
-                        @log_info(1,solver,"extending goal_time for node ",v,
+                        @log_info(1,verbosity(solver),"extending goal_time for node ",v,
                             " from ",goal_time," to ",get_time_of(c),
                             " to avoid constraints")
                         goal_time = max(goal_time, get_time_of(c))
@@ -804,7 +804,7 @@ function CRCBS.build_env(
         goal_time = makespan(get_schedule(env))
         goal_vtx = -1
         # deadline = Inf # already taken care of, perhaps?
-        @log_info(3,solver,string("BUILD ENV: ",string(node),
+        @log_info(3,verbosity(solver),string("BUILD ENV: ",string(node),
             " - setting goal_vtx = ",goal_vtx,", t = maximum(cache.tF) = ",goal_time))
     end
     @assert goal_time != Inf "goal time set to $goal_time for node $(string(node))"
@@ -818,7 +818,7 @@ function CRCBS.build_env(
         )
     # update deadline in DeadlineCost
     set_deadline!(get_cost_model(cbs_env),deadline)
-    @log_info(3,solver,"build_env: ",string(node),
+    @log_info(3,verbosity(solver),"build_env: ",string(node),
         ", goal_time=",goal_time,", deadline=",deadline)
     return cbs_env
 end
