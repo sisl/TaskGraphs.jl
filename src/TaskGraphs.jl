@@ -1,6 +1,5 @@
 module TaskGraphs
 
-using Reexport
 using Parameters
 using LightGraphs, MetaGraphs
 using GraphUtils
@@ -12,7 +11,7 @@ using Gurobi
 using TOML
 using CRCBS
 using SparseArrays
-# using JLD2, FileIO
+using Reexport
 
 export
     DEBUG_PATH,
@@ -30,8 +29,6 @@ global RESULTS_DIR      = joinpath(EXPERIMENT_DIR,"results")
 global VIDEO_DIR        = joinpath(EXPERIMENT_DIR,"videos")
 
 include("planning_predicates.jl")
-# @reexport using TaskGraphs.PlanningPredicates
-# include("pccbs.jl")
 include("task_graphs_core.jl")
 include("utils.jl")
 include("task_assignment_solvers.jl")
@@ -39,12 +36,12 @@ include("path_planning.jl")
 include("pc_tapf_solvers.jl")
 include("milp_formulation.jl")
 include("disturbances.jl")
-# include("path_planners/dfs_planner.jl")
 include("path_planners/pibt_planner.jl")
 include("replanning.jl")
 include("helpers/problem_instances.jl")
 include("helpers/profiling.jl")
 include("experiments/replanning_experiments.jl")
-# @reexport using TaskGraphs.SolverProfiling
+
+@reexport using CRCBS   
 
 end

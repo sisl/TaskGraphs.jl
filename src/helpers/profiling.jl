@@ -195,6 +195,9 @@ end
 function is_problem_file(loader::PCTA_Loader,path)
     isfile(joinpath(path,"problem.toml")) && isfile(joinpath(path,"config.toml"))
 end
+function is_problem_file(loader::PCTAPF_Loader,path)
+    isfile(joinpath(path,"problem.toml")) && isfile(joinpath(path,"config.toml"))
+end
 
 
 CRCBS.extract_feature(solver,::SolutionCost,  mapf,solution::OperatingSchedule,timer_results) = best_cost(solver)

@@ -1,8 +1,0 @@
-edge_list = [[25, 1], [38, 2], [14, 3], [15, 4], [32, 5], [3, 6], [2, 7], [11, 8], [1, 9], [34, 10]]
-cost = 100
-time = 0.015559382
-optimality_gap = 0
-size_j = 10
-size_i = 50
-optimal = true
-feasible = true

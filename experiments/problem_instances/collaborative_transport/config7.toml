@@ -1,7 +1,0 @@
-min_process_time = 0
-max_parents = 3
-M = 12
-N = 24
-max_process_time = 0
-env_id = 2
-depth_bias = 0.1

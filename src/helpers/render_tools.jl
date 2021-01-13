@@ -71,7 +71,7 @@ function record_video(outfile_name,render_function,
         save_function(t,filename,s)# |> PNG(filename, s[1], s[2])
     end
     outfile = outfile_name
-    run(pipeline(`ffmpeg -y -r $fps -f image2 -i $tmpdir/%d.$ext -crf 20 $outfile`, stdout=devnull, stderr=devnull))
+    run(pipeline(`ffmpeg -y -r $fps -f image2 -i $tmpdir/%d.$ext -crf 20 -s $res $outfile`, stdout=devnull, stderr=devnull))
     run(pipeline(`rm -rf $tmpdir`, stdout=devnull, stderr=devnull))
 end
 
@@ -105,11 +105,34 @@ function SolutionSummary(env::SearchEnv)
     object_paths = Dict(
         get_id(id)=>map(s->get_id(get_location_id(get(object_positions(s),id,OBJECT_AT(id,-1)))),
         history) for id in object_ids)
-    objects_active = Dict(
+    active_objects = Dict(
         get_id(id)=>map(s->get(objects_active(s),id,false),history) for id in object_ids)
     object_intervals = Dict(
-        k=>(findfirst(v)-1,findlast(v)-1) for (k,v) in objects_active)
+        k=>(findfirst(v)-1,findlast(v)-1) for (k,v) in active_objects)
     SolutionSummary(robot_paths,object_paths,object_intervals)
+end
+function get_robot_positions(env,env_summary,t)
+    vec = Vector{Point3{Float64}}()
+    for (i,p) in enumerate(env_summary.robot_paths)
+        if length(p) > 0
+            x,y = interp_position(p,get_vtxs(env),t)
+            push!(vec,Point(x,y,0.0))
+        end
+    end
+    return vec
+end
+function get_object_positions(env,env_summary,t)
+    object_paths = env_summary.object_paths
+    object_intervals = env_summary.object_intervals
+    vec = Vector{Point3{Float64}}()
+    for (i,k) in enumerate(sort(collect(keys(object_paths)))) # dictionary
+        p = object_paths[k]
+        if length(p) > 0
+            x,y = interp_position(p,get_vtxs(env),t)
+            push!(vec,Point(x,y,0.0))
+        end
+    end
+    return vec
 end
 
 abstract type RenderModel end
@@ -617,12 +640,10 @@ function visualize_env(env::GridFactoryEnvironment,t=0;kwargs...)
     visualize_env(get_vtxs(env),get_pickup_vtxs(env),get_dropoff_vtxs(env),t;kwargs...)
 end
 
-
 render_env(t) = visualize_env(factory_env,t;robot_vtxs=r0,object_vtxs=s0,paths=paths,search_patterns=[],goals=[])
 render_paths(t,factory_env,robot_paths,object_paths=[];kwargs...) = visualize_env(factory_env,t;robot_paths=robot_paths,object_paths=object_paths,kwargs...)
 render_both(t,paths1,paths2) = hstack(render_paths(t,paths1),render_paths(t,paths2))
 render_search(t_start,factory_env;kwargs...) = visualize_env(factory_env,t_start;show_search_paths=true,kwargs...)
-
 
 # Plotting results
 function preprocess_results!(df)
@@ -1508,7 +1529,7 @@ function plot_project_schedule(sched::OperatingSchedule;
             )
         )
     rg = get_display_metagraph(sched;
-        f=(v,p)->string(v,",",get_id(get_default_robot_id(get_node(sched,v)))
+        # f=(v,p)->string(v,",",get_id(get_default_robot_id(get_node(sched,v)))
         )
     plot_graph_bfs(rg;
         mode=mode,

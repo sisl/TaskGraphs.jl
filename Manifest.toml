@@ -75,10 +75,10 @@ uuid = "324d7699-5711-5eae-9e2f-1d82baa6b597"
 version = "0.9.0"
 
 [[ChainRulesCore]]
-deps = ["LinearAlgebra", "MuladdMacro", "SparseArrays"]
-git-tree-sha1 = "15081c431bb25848ad9b0d172a65794f3a3e197a"
+deps = ["LinearAlgebra", "SparseArrays"]
+git-tree-sha1 = "0acfdec745cb4cb38ad23c8668a1b7e58b42594a"
 uuid = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
-version = "0.9.24"
+version = "0.9.25"
 
 [[CodecBzip2]]
 deps = ["Bzip2_jll", "Libdl", "TranscodingStreams"]
@@ -487,11 +487,6 @@ git-tree-sha1 = "614e8d77264d20c1db83661daadfab38e8e4b77e"
 uuid = "e94cdb99-869f-56ef-bcf0-1ae2bcbe0389"
 version = "0.2.4"
 
-[[MuladdMacro]]
-git-tree-sha1 = "c6190f9a7fc5d9d5915ab29f2134421b12d24a68"
-uuid = "46d2c3a1-f734-5fdb-9937-b9b9aeba4221"
-version = "0.2.2"
-
 [[MutableArithmetics]]
 deps = ["LinearAlgebra", "SparseArrays", "Test"]
 git-tree-sha1 = "90c8d17c4120915732fd2c4c2e80078206a1296e"
@@ -711,9 +706,9 @@ uuid = "3bb67fe8-82b1-5028-8e26-92a6c54297fa"
 version = "0.9.5"
 
 [[URIs]]
-git-tree-sha1 = "bc331715463c41d601cf8bfd38ca70a490af5c5b"
+git-tree-sha1 = "7855809b88d7b16e9b029afd17880930626f54a2"
 uuid = "5c2747f8-b7ea-4ff2-ba2e-563bfd36b1d4"
-version = "1.1.0"
+version = "1.2.0"
 
 [[UUIDs]]
 deps = ["Random", "SHA"]

@@ -476,7 +476,7 @@ align_with_successor(node::BOT_GO,succ::BOT_COLLECT) 			= BOT_GO(first_valid(nod
 align_with_successor(node::BOT_GO,succ::BOT_GO) 				= BOT_GO(first_valid(node.r,succ.r), node.x1, first_valid(node.x2,succ.x1))
 
 
-GraphUtils.validate_edge(n1,n2) = true
+GraphUtils.validate_edge(n1::AbstractPlanningPredicate,n2::AbstractPlanningPredicate) = true
 GraphUtils.validate_edge(n1::N1,n2::N2) where {N1<:Union{BOT_AT,OBJECT_AT},N2<:Union{BOT_AT,OBJECT_AT}} = false
 GraphUtils.validate_edge(n1::BOT_AT,		n2::BOT_GO			) = (n1.x 	== n2.x1) && (n1.r == n2.r)
 GraphUtils.validate_edge(n1::BOT_GO,			n2::BOT_GO			) = (n1.x2 	== n2.x1) && (n1.r == n2.r)
