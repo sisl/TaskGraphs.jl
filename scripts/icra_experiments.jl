@@ -43,7 +43,7 @@ size_configs = [Dict(:M => m, :N => n) for (n,m) in Base.Iterators.product(
 )][:]
 problem_configs = map(d->merge(d,base_config), size_configs)
 
-# loader = PCTA_Loader()
+# loader = PCTA_Loader() # to test task assignment only
 loader = PCTAPF_Loader()
 add_env!(loader,"env_2",init_env_2())
 write_problems!(loader,problem_configs,problem_dir)
