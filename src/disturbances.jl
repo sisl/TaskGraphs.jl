@@ -116,7 +116,7 @@ function remove_vtxs(sched,remove_set::Set{A}) where {A<:AbstractID}
 end
 function remove_vtxs!(sched,remove_set)
     new_sched = sched
-    delete_nodes!(new_sched,remove_set)
+    rem_nodes!(new_sched,remove_set)
     set_leaf_operation_vtxs!(new_sched)
     process_schedule!(new_sched)
     new_sched
@@ -124,7 +124,7 @@ end
 function remove_vtxs(sched,remove_set)
     # Construct new graph
     # new_sched = sched
-    # delete_nodes!(new_sched,remove_set)
+    # rem_nodes!(new_sched,remove_set)
     # set_leaf_operation_vtxs!(new_sched)
     # process_schedule!(new_sched)
 
@@ -330,7 +330,7 @@ function remove_robot!(env::SearchEnv,id::BotID,t::Int)
         end
     end
     for node_id in to_remove
-        delete_node!(sched,node_id)
+        rem_node!(sched,node_id)
     end
     # Verify that the robot is no longer in schedule
     for v in vertices(G)

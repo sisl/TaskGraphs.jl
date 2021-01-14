@@ -166,8 +166,8 @@ end
 let
     sched = OperatingSchedule()
     node = OBJECT_AT(1,1)
-    add_to_schedule!(sched,node,get_object_id(node))
-    replace_in_schedule!(sched,node,get_object_id(node))
+    add_to_schedule!(sched,make_node(sched,node)) 
+    replace_in_schedule!(sched,make_node(sched,node)) 
     get_path_spec(sched,1)
     set_path_spec!(sched,1,get_path_spec(sched,1))
     for pred in [
@@ -214,9 +214,9 @@ let
     sched = OperatingSchedule()
     nodes = [OBJECT_AT(1,1),OBJECT_AT(2,2),OBJECT_AT(3,3)]
     for node in nodes
-        add_to_schedule!(sched,node,get_object_id(node))
+        add_to_schedule!(sched,make_node(sched,node)) 
     end
-    delete_nodes!(sched,[1,2])
+    rem_nodes!(sched,[1,2])
     @test get_node_from_vtx(sched,1) == OBJECT_AT(3,3)
 end
 # Test process_schedule
@@ -277,56 +277,49 @@ let
 end
 let
     sched = OperatingSchedule()
-    add_to_schedule!(sched,ROBOT_AT(1,1),RobotID(1))
-    add_to_schedule!(sched,ROBOT_AT(2,5),RobotID(2))
-    add_to_schedule!(sched,GO(1,1,2),ActionID(1))
-    add_to_schedule!(sched,OBJECT_AT(1,2),ObjectID(1))
-    add_to_schedule!(sched,COLLECT(1,1,2),ActionID(2))
-    add_to_schedule!(sched,CARRY(1,1,2,3),ActionID(3))
-    add_edge!(sched,RobotID(1),ActionID(1))
-    add_edge!(sched,ActionID(1),ActionID(2))
-    add_edge!(sched,ObjectID(1),ActionID(2))
-    add_edge!(sched,ActionID(2),ActionID(3))
-    for (id,vtxs) in [
-        (ActionID(3),[get_vtx(sched,ActionID(2))]),
-        (ActionID(2),[get_vtx(sched,ActionID(1))]),
-        (ActionID(1),[get_vtx(sched,RobotID(1))]),
-        (ObjectID(1),Int[]),
+    r1 = add_to_schedule!(sched, make_node(sched,ROBOT_AT(1,1), ))
+    r2 = add_to_schedule!(sched, make_node(sched,ROBOT_AT(2,5), ))
+    n1 = add_to_schedule!(sched, make_node(sched,GO(1,1,2),     ))
+    o1 = add_to_schedule!(sched, make_node(sched,OBJECT_AT(1,2),))
+    n2 = add_to_schedule!(sched, make_node(sched,COLLECT(1,1,2),))
+    n3 = add_to_schedule!(sched, make_node(sched,CARRY(1,1,2,3),))
+    add_edge!(sched,r1,n1) 
+    add_edge!(sched,n1,n2) 
+    add_edge!(sched,o1,n2) 
+    add_edge!(sched,n2,n3) 
+    for (n,vtxs) in [
+        (n3,[get_vtx(sched,n2)]),
+        (n2,[get_vtx(sched,n1)]),
+        (n1,[get_vtx(sched,r1)]),
+        (o1,Int[]),
         ]
-        v = get_vtx(sched,id)
+        v = get_vtx(sched,n)
         @test vtxs == backtrack_node(sched,v)
     end
     tips = robot_tip_map(sched)
-    @test tips[RobotID(1)] == ActionID(3)
-    @test tips[RobotID(2)] == RobotID(2)
-end
-let
-    sched = OperatingSchedule()
-    add_to_schedule!(sched,ROBOT_AT(1,1),RobotID(1))
-    add_to_schedule!(sched,ROBOT_AT(2,2),RobotID(2))
-    add_to_schedule!(sched,OBJECT_AT(1,2),ObjectID(1))
-    add_to_schedule!(sched,GO(1,1,2),ActionID(1))
-    add_to_schedule!(sched,GO(2,2,3),ActionID(2))
-    add_to_schedule!(sched,TEAM_COLLECT(instructions=[COLLECT(1,1,2),COLLECT(2,1,3),]),ActionID(3))
-    add_edge!(sched,RobotID(1),ActionID(1))
-    add_edge!(sched,RobotID(2),ActionID(2))
-    add_edge!(sched,RobotID(2),ActionID(2))
-    add_edge!(sched,ActionID(1),ActionID(3))
-    add_edge!(sched,ActionID(2),ActionID(3))
+    @test tips[r1.id] == n3.id
+    @test tips[r2.id] == r2.id
+    # test tips for team
+    n4 = add_to_schedule!(sched, make_node(sched,GO(2,5,3)))
+    add_edge!(sched,r2,n4)
+    n5 = add_to_schedule!(sched, make_node(sched,GO(1,3,2)))
+    add_edge!(sched,n3,n5)
+    n6 = add_to_schedule!(sched,make_node(sched,TEAM_COLLECT(instructions=[COLLECT(1,1,2),COLLECT(2,1,3),]))) #,ActionID(3))
+    add_edge!(sched,n4,n6)
+    add_edge!(sched,n5,n6)
     tips = robot_tip_map(sched)
-    @test tips[RobotID(1)] == ActionID(3)
-    @test tips[RobotID(2)] == ActionID(3)
+    @test tips[r1.id] == n6.id
+    @test tips[r2.id] == n6.id
 end
 let
     sched = OperatingSchedule()
-    for (robot_ids, node, node_id) in [
-        ([1],ROBOT_AT(1,1),RobotID(1)),
-        ([1],GO(1,1,2),ActionID(1)),
-        # ([-1],GO(-1,1,2),ActionID(2)),
-        ([],OBJECT_AT(1,2),ObjectID(1)),
-        ([1,2],TEAM_CARRY(instructions=[CARRY(1,1,2,3),CARRY(2,1,3,4)]),ActionID(3))
+    for (robot_ids, node) in [
+        ([1],ROBOT_AT(1,1)),
+        ([1],GO(1,1,2)),
+        ([],OBJECT_AT(1,2)),
+        ([1,2],TEAM_CARRY(instructions=[CARRY(1,1,2,3),CARRY(2,1,3,4)]))
         ]
-        add_to_schedule!(sched,node,node_id)
-        @test get_valid_robot_ids(sched,node_id) == map(i->RobotID(i),robot_ids)
+        n = add_to_schedule!(sched,make_node(sched,node))
+        @test get_valid_robot_ids(sched,n.id) == map(i->RobotID(i),robot_ids)
     end
 end

@@ -37,20 +37,13 @@ end
 # Test break_assignments(...)
 let
     sched = OperatingSchedule()
-    prev_id = ActionID()
-    for (id,n) in [
-            (ActionID(1),GO(1,1,1)),
-            (ActionID(2),GO(1,1,2)),
-            (ActionID(3),COLLECT(1,1,2))
-            ]
-        add_to_schedule!(sched,n,id)
-        add_edge!(sched,prev_id,id)
-        prev_id = id
-    end
+    n1 = add_to_schedule!(sched,make_node(sched,GO(1,1,1)))
+    n2 = add_child!(sched,n1.id,make_node(sched,GO(1,1,2)))
+    n3 = add_child!(sched,n2.id,make_node(sched,COLLECT(1,1,2)))
     # Break assignments should only remove BOT_GO-->BOT_COLLECT edges
     break_assignments!(sched,ProblemSpec())
-    @test has_edge(sched,ActionID(1),ActionID(2))
-    @test !has_edge(sched,ActionID(2),ActionID(3))
+    @test has_edge(sched,n1,n2)
+    @test !has_edge(sched,n2,n3)
 end
 let
     planner = FullReplanner(

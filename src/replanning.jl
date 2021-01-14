@@ -112,10 +112,10 @@ get_fixed_vtxs(sched,t) = get_active_and_fixed_vtxs(sched,t)[2]
 function split_action_node!(sched::OperatingSchedule,problem_spec::ProblemSpec,node::ScheduleNode,x,t)
     @assert isa(node.id,ActionID)
     pred1,pred2 = split_node(node.node,x)
-    node1 = replace_in_schedule!(sched,problem_spec,pred1,node.id)
+    node1 = replace_in_schedule!(sched,make_node(sched,pred1,problem_spec),node.id)
     set_t0!(node1,get_t0(node))
     set_tF!(node1,t)
-    node2 = add_to_schedule!(sched,problem_spec,pred1,get_unique_action_id())
+    node2 = add_to_schedule!(sched,make_node(sched,pred1,problem_spec))
     set_t0!(node2,t)
     # set_tF!(sched,id2,get_tF(node))
     for v in outneighbors(sched,get_vtx(sched,node1.id))
@@ -279,10 +279,10 @@ function prune_schedule(sched::OperatingSchedule,
             input_ids = Set(map(v2->get_object_id(get_node_from_vtx(new_sched,v2)), inneighbors(new_sched,v)))
             for o in preconditions(pred)
                 if !(get_object_id(o) in input_ids)
-                    add_to_schedule!(new_sched,o,get_object_id(o))
-                    set_t0!(new_sched,get_object_id(o),get_t0(node))
-                    set_tF!(new_sched,get_object_id(o),get_t0(node))
-                    add_edge!(new_sched, get_object_id(o), node)
+                    o_node = add_to_schedule!(new_sched,make_node(sched,o,problem_spec)) 
+                    add_edge!(new_sched, o_node.id, node)
+                    set_t0!(o_node,get_t0(node))
+                    set_tF!(o_node,get_t0(node))
                 end
             end
         end
@@ -326,7 +326,6 @@ Merge next_sched into sched
 function splice_schedules!(sched::P,next_sched::P,enforce_unique=true) where {P<:OperatingSchedule}
     for v in vertices(next_sched)
         node = get_node(next_sched,v)
-        # node_id = get_vtx_id(next_sched, v)
         if !has_vertex(sched,node)
             add_to_schedule!(sched, node)
         elseif enforce_unique
