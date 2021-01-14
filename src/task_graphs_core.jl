@@ -589,22 +589,22 @@ function replace_in_schedule!(sched::P,pred,id::ID) where {P<:OperatingSchedule,
     replace_in_schedule!(sched,ProblemSpec(),pred,id)
 end
 
-"""
-    add_to_schedule!(sched::OperatingSchedule,path_spec::T,pred,id::ID) where {T<:PathSpec,ID<:AbstractID}
+# """
+#     add_node!(sched::OperatingSchedule,path_spec::T,pred,id::ID) where {T<:PathSpec,ID<:AbstractID}
 
-Add `ScheduleNode` pred to `sched` with associated `AbstractID` `id` and
-`PathSpec` `path_spec`.
-"""
-add_to_schedule!(sched::OperatingSchedule,node::ScheduleNode) = add_node!(sched,node,node.id)
-function add_to_schedule!(sched::P,path_spec::T,pred,id::ID) where {P<:OperatingSchedule,T<:PathSpec,ID<:AbstractID}
-    add_to_schedule!(sched,ScheduleNode(id,pred,path_spec))
-end
-function add_to_schedule!(sched::P,spec::T,pred,id::ID) where {P<:OperatingSchedule,T<:ProblemSpec,ID<:AbstractID}
-    add_to_schedule!(sched,generate_path_spec(sched,spec,pred),pred,id)
-end
-function add_to_schedule!(sched::P,pred,id::ID) where {P<:OperatingSchedule,ID<:AbstractID}
-    add_to_schedule!(sched,ProblemSpec(),pred,id)
-end
+# Add `ScheduleNode` pred to `sched` with associated `AbstractID` `id` and
+# `PathSpec` `path_spec`.
+# """
+GraphUtils.add_node!(sched::OperatingSchedule,node::ScheduleNode) = add_node!(sched,node,node.id)
+# function add_node!(sched::P,path_spec::T,pred,id::ID) where {P<:OperatingSchedule,T<:PathSpec,ID<:AbstractID}
+#     add_node!(sched,ScheduleNode(id,pred,path_spec))
+# end
+# function add_node!(sched::P,spec::T,pred,id::ID) where {P<:OperatingSchedule,T<:ProblemSpec,ID<:AbstractID}
+#     add_node!(sched,generate_path_spec(sched,spec,pred),pred,id)
+# end
+# function add_node!(sched::P,pred,id::ID) where {P<:OperatingSchedule,ID<:AbstractID}
+#     add_node!(sched,ProblemSpec(),pred,id)
+# end
 function GraphUtils.make_node(g::OperatingSchedule,pred::AbstractPlanningPredicate,spec::ProblemSpec)
    make_node(g,pred,generate_path_spec(g,spec,pred))
 end
@@ -840,7 +840,7 @@ function add_headless_delivery_task!(
         BOT_DEPOSIT(robot_id, object_id, dropoff_station_id),
         BOT_GO(robot_id, dropoff_station_id,LocationID(-1)),
         ]
-        node = add_to_schedule!(sched, make_node(sched, p, problem_spec))
+        node = add_node!(sched, make_node(sched, p, problem_spec))
         set_t0!(sched,node.id,t0)
         add_edge!(sched, prev_id, node.id)
         if matches_node_type(node,BOT_DEPOSIT)
@@ -882,18 +882,18 @@ function add_headless_team_delivery_task!(
             shape=shape
             )
         ]
-        node = add_to_schedule!(sched, make_node(sched,team_action,problem_spec))
+        node = add_node!(sched, make_node(sched,team_action,problem_spec))
         add_edge!(sched,prev_id,node.id)
         prev_id = node.id
         if matches_node_type(node,TEAM_COLLECT)
             for x in pickup_station_ids
-                subnode = add_to_schedule!(sched,make_node(sched,BOT_GO(robot_id,x,x),problem_spec))
+                subnode = add_node!(sched,make_node(sched,BOT_GO(robot_id,x,x),problem_spec))
                 add_edge!(sched,subnode.id,node.id)
             end
         elseif matches_node_type(node,TEAM_DEPOSIT)
             add_edge!(sched,node.id,op_id)
             for x in dropoff_station_ids
-                subnode = add_to_schedule!(sched,make_node(sched,BOT_GO(robot_id,x,-1),problem_spec))
+                subnode = add_node!(sched,make_node(sched,BOT_GO(robot_id,x,-1),problem_spec))
                 add_edge!(sched, node.id, subnode.id)
             end
         end
@@ -921,9 +921,9 @@ export
     construct_partial_project_schedule
 
 function add_new_robot_to_schedule!(sched,pred::BOT_AT,problem_spec=ProblemSpec())
-    n1 = add_to_schedule!(sched, make_node(sched,pred,problem_spec)) #, pred, robot_id)
+    n1 = add_node!(sched, make_node(sched,pred,problem_spec)) #, pred, robot_id)
     action = BOT_GO(r=get_robot_id(pred),x1=get_location_id(pred))
-    n2 = add_to_schedule!(sched, make_node(sched,action,problem_spec)) #, action, action_id)
+    n2 = add_node!(sched, make_node(sched,action,problem_spec)) #, action, action_id)
     add_edge!(sched, n1.id, n2.id)
     return sched
 end
@@ -945,10 +945,10 @@ function construct_partial_project_schedule(
     # Construct Partial Project Schedule
     sched = OperatingSchedule()
     for op in operations
-        add_to_schedule!(sched, make_node(sched,op,problem_spec))
+        add_node!(sched, make_node(sched,op,problem_spec))
     end
     for pred in object_ICs
-        add_to_schedule!(sched, make_node(sched,pred,problem_spec)) #, pred, get_object_id(pred))
+        add_node!(sched, make_node(sched,pred,problem_spec)) #, pred, get_object_id(pred))
     end
     for pred in robot_ICs
         add_new_robot_to_schedule!(sched,pred,problem_spec)
@@ -987,8 +987,8 @@ function construct_partial_project_schedule(
         if indegree(get_graph(sched),v) == 0
             op_id = get_unique_operation_id()
             op = Operation(post=Set{OBJECT_AT}([pred]),id=op_id)
-            # add_to_schedule!(sched,op,op_id)
-            add_to_schedule!(sched,make_node(sched,op,problem_spec))
+            # add_node!(sched,op,op_id)
+            add_node!(sched,make_node(sched,op,problem_spec))
             add_edge!(sched,op_id,ObjectID(id))
         end
     end

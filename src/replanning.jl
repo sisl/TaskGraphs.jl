@@ -115,7 +115,7 @@ function split_action_node!(sched::OperatingSchedule,problem_spec::ProblemSpec,n
     node1 = replace_in_schedule!(sched,make_node(sched,pred1,problem_spec),node.id)
     set_t0!(node1,get_t0(node))
     set_tF!(node1,t)
-    node2 = add_to_schedule!(sched,make_node(sched,pred1,problem_spec))
+    node2 = add_node!(sched,make_node(sched,pred1,problem_spec))
     set_t0!(node2,t)
     # set_tF!(sched,id2,get_tF(node))
     for v in outneighbors(sched,get_vtx(sched,node1.id))
@@ -257,7 +257,7 @@ function prune_schedule(sched::OperatingSchedule,
     keep_vtxs = setdiff(Set{Int}(collect(vertices(G))), remove_set)
     # add all non-deleted nodes to new project schedule
     for v in keep_vtxs
-        add_to_schedule!(new_sched,get_node(sched,v))
+        add_node!(new_sched,get_node(sched,v))
     end
     # add all edges between nodes that still exist
     for e in edges(get_graph(sched))
@@ -279,7 +279,7 @@ function prune_schedule(sched::OperatingSchedule,
             input_ids = Set(map(v2->get_object_id(get_node_from_vtx(new_sched,v2)), inneighbors(new_sched,v)))
             for o in preconditions(pred)
                 if !(get_object_id(o) in input_ids)
-                    o_node = add_to_schedule!(new_sched,make_node(sched,o,problem_spec)) 
+                    o_node = add_node!(new_sched,make_node(sched,o,problem_spec)) 
                     add_edge!(new_sched, o_node.id, node)
                     set_t0!(o_node,get_t0(node))
                     set_tF!(o_node,get_t0(node))
@@ -327,7 +327,7 @@ function splice_schedules!(sched::P,next_sched::P,enforce_unique=true) where {P<
     for v in vertices(next_sched)
         node = get_node(next_sched,v)
         if !has_vertex(sched,node)
-            add_to_schedule!(sched, node)
+            add_node!(sched, node)
         elseif enforce_unique
             throw(ErrorException(string("Vertex ",v," = ",
                 string(node.node),

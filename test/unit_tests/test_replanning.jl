@@ -37,7 +37,7 @@ end
 # Test break_assignments(...)
 let
     sched = OperatingSchedule()
-    n1 = add_to_schedule!(sched,make_node(sched,GO(1,1,1)))
+    n1 = add_node!(sched,make_node(sched,GO(1,1,1)))
     n2 = add_child!(sched,n1.id,make_node(sched,GO(1,1,2)))
     n3 = add_child!(sched,n2.id,make_node(sched,COLLECT(1,1,2)))
     # Break assignments should only remove BOT_GO-->BOT_COLLECT edges
