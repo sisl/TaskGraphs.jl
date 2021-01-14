@@ -4,10 +4,182 @@
 
 export
     AbstractPlanningPredicate,
-    OBJECT_AT,
-    ROBOT_AT
+    AbstractRobotAction,
+	AbstractSingleRobotAction,
+    get_object_id,
+    get_location_id,
+    get_location_ids,
+	get_robot_id,
+	get_initial_location_id,
+	get_destination_location_id,
+	robot_type,
+	graph_key,
+	has_object_id,
+	check_object_id,
+	has_robot_id,
+	get_default_robot_id,
+	robot_ids_match,
+	get_default_initial_location_id,
+	get_default_final_location_id,
+	replace_robot_id,
+	replace_destination,
+	replace_initial_location,
+	resources_reserved,
+	align_with_predecessor,
+	align_with_successor,
+	split_node,
+	matches_node_type,
+	id_type,
+	title_string
+
 
 abstract type AbstractPlanningPredicate end
+abstract type AbstractRobotAction{R<:AbstractRobotType} <: AbstractPlanningPredicate end
+abstract type AbstractSingleRobotAction{R<:AbstractRobotType} <: AbstractRobotAction{R} end
+abstract type AbstractTeamRobotAction{R<:AbstractRobotType} <: AbstractRobotAction{R} end
+
+function get_object_id end
+function get_robot_id end
+function get_initial_location_id end
+function get_destination_location_id end
+function get_location_id end
+function get_location_ids end
+
+robot_type(a::AbstractRobotAction{R}) where {R} = R
+robot_type(a) = Nothing
+graph_key() = Symbol(DefaultRobotType)
+function graph_key(a)
+	if robot_type(a) == Nothing
+		return graph_key()
+	else
+		return Symbol(robot_type(a))
+	end
+end
+
+has_object_id(a) = false
+
+"""
+    Check if a node is associated with objectid
+"""
+function check_object_id(node,o)
+    if has_object_id(node)
+        if get_object_id(node) == o
+            return true
+        end
+    end
+    return false
+end
+
+has_robot_id(a) = robot_type(a) == Nothing ? false : true
+get_default_robot_id(a) = has_robot_id(a) ? get_robot_id(a) : RobotID()
+get_default_initial_location_id(a) = has_robot_id(a) ? get_initial_location_id(a) : LocationID()
+get_default_destination_location_id(a) = has_robot_id(a) ? get_destination_location_id(a) : LocationID()
+
+"""
+	robot_ids_match(node,node2)
+
+Checks if robot_ids match between the nodes
+"""
+function robot_ids_match(node,node2)
+	if has_robot_id(node) && has_robot_id(node2)
+		if get_id(get_robot_id(node)) != -1 && get_id(get_robot_id(node2)) != -1
+			status = (get_robot_id(node) == get_robot_id(node2)) ? true : false
+			return status
+		end
+	end
+	return true
+end
+
+function replace_robot_id end
+function replace_destination end
+function replace_initial_location end
+
+"""
+	resources_reserved(node)
+
+Identifies the resources reserved by a particular `node` for its duration.
+For example, `resources_reserved(node::COLLECT) = AbstractID[get_location_id(node)]`
+"""
+resources_reserved(node) = AbstractID[]
+
+"""
+	align_with_predecessor(node,succ)
+
+Modifies a node to match the information encoded by its predecessor. This is
+how e.g., robot ids are propagated through an existing operating schedule
+after assignments (or re-assignments) have been made.
+"""
+align_with_predecessor(node,pred) = node
+
+CRCBS.is_valid(id::A) where {A<:AbstractID} = valid_id(id) #get_id(id) != -1
+first_valid(a,b) = CRCBS.is_valid(a) ? a : b
+
+"""
+	align_with_successor(node,succ)
+
+Modifies a node to match the information encoded by its successor. This is
+how e.g., robot ids are propagated through an existing operating schedule
+after assignments (or re-assignments) have been made.
+"""
+align_with_successor(node,succ) = node
+
+"""
+	split_node(node::N,x::LocationID)
+
+Creates two new nodes of type `N`, where the destination of the first node
+and the starting location of the second node are both set to `x`.
+"""
+function split_node end
+
+"""
+    matches_node_type(::A,::Type{B}) where {A<:AbstractPlanningPredicate,B}
+
+Returns true if {A <: B}
+"""
+matches_node_type(::A,::Type{B}) where {A,B} = A <: B
+
+title_string(a) = string(a)
+
+const predicate_accessor_interface = [
+	:get_initial_location_id,
+	:get_destination_location_id,
+	:get_robot_id,
+	:get_default_robot_id,
+	:get_default_initial_location_id,
+	:get_default_final_location_id,
+	:get_object_id,
+	:has_object_id,
+	:has_robot_id,
+	:sub_nodes,
+	:(GraphUtils.required_successors),
+	:(GraphUtils.required_predecessors),
+	:(GraphUtils.eligible_successors),
+	:(GraphUtils.eligible_predecessors),
+	:(GraphUtils.num_required_successors),
+	:(GraphUtils.num_required_predecessors),
+	:(GraphUtils.num_eligible_successors),
+	:(GraphUtils.num_eligible_predecessors),
+	:resources_reserved,
+	:id_type,
+	:title_string
+]
+const predicate_comparison_interface = [
+	:(GraphUtils.matches_template),
+	:(GraphUtils.validate_edge),
+]
+
+abstract type PredicateTrait end
+struct HasObject <: PredicateTrait end
+struct HasRobot <: PredicateTrait end
+
+# single robot actions: BOT_GO, BOT_COLLECT, BOT_CARRY, BOT_DEPOSIT
+# initial condition preds: OBJECT_AT, ROBOT_AT
+# event preds: Operation
+
+export
+	OBJECT_AT,
+	BOT_AT,
+    ROBOT_AT
 
 """
 	OBJECT_AT <: AbstractPlanningPredicate
@@ -22,8 +194,11 @@ struct OBJECT_AT <: AbstractPlanningPredicate
 end
 OBJECT_AT(o,x) = OBJECT_AT(o,x,(1,1))
 OBJECT_AT(o,x::Union{Int,LocationID},args...) = OBJECT_AT(o,[x],args...)
+get_object_id(pred::OBJECT_AT) = pred.o
+get_location_id(pred::OBJECT_AT) = pred.x[1]
+get_location_ids(pred::OBJECT_AT) = pred.x
 
-export BOT_AT
+
 """
 	BOT_AT <: AbstractPlanningPredicate
 
@@ -33,22 +208,11 @@ struct BOT_AT{R<:AbstractRobotType} <: AbstractPlanningPredicate
     r::BotID{R}
     x::LocationID
 end
+robot_type(a::BOT_AT{R}) where {R} = R
+get_location_id(pred::BOT_AT) 	= pred.x
+get_robot_id(pred::BOT_AT) 		= pred.r
 
-export ROBOT_AT
 const ROBOT_AT = BOT_AT{DeliveryBot}
-
-
-export
-    get_object_id,
-    get_location_id,
-    get_location_ids,
-    get_robot_id
-
-get_object_id(pred::OBJECT_AT) = pred.o
-get_location_id(pred::BOT_AT) = pred.x
-get_location_id(pred::OBJECT_AT) = pred.x[1]
-get_location_ids(pred::OBJECT_AT) = pred.x
-get_robot_id(pred::BOT_AT) = pred.r
 
 export
     Operation,
@@ -99,17 +263,15 @@ function get_dropoffs(op::Operation,o::ObjectID)
 	return [LocationID()]
 end
 
+id_type(::BOT_AT{R}) where {R} = BotID{R} 
+id_type(::AbstractRobotAction{R}) where {R} = ActionID
+id_type(::OBJECT_AT) = ObjectID
+id_type(::Operation) = OperationID
+
 export
-    AbstractRobotAction,
-    AbstractSingleRobotAction,
+	BOT_GO,BOT_CARRY,BOT_COLLECT,BOT_DEPOSIT,
     GO,COLLECT,CARRY,DEPOSIT
 
-abstract type AbstractRobotAction{R<:AbstractRobotType} <: AbstractPlanningPredicate end
-abstract type AbstractSingleRobotAction{R<:AbstractRobotType} <: AbstractRobotAction{R} end
-abstract type AbstractTeamRobotAction{R<:AbstractRobotType} <: AbstractRobotAction{R} end
-
-
-export BOT_GO
 """
 	BOT_GO <: AbstractRobotAction
 
@@ -122,7 +284,6 @@ Encodes the event "robot `r` goes from `x1` to `x2`"
 end
 const GO = BOT_GO{DeliveryBot}
 
-export BOT_CARRY
 """
 	BOT_CARRY <: AbstractRobotAction
 
@@ -136,7 +297,6 @@ Encodes the event "robot `r` carries object `o` from `x1` to `x2`"
 end
 const CARRY = BOT_CARRY{DeliveryBot}
 
-export BOT_COLLECT
 """
 	BOT_COLLECT <: AbstractRobotAction
 
@@ -149,7 +309,6 @@ Encodes the event "robot `r` collects object `o` from `x`
 end
 const COLLECT = BOT_COLLECT{DeliveryBot}
 
-export BOT_DEPOSIT
 """
 	BOT_DEPOSIT <: AbstractRobotAction
 
@@ -169,8 +328,15 @@ export
 	CUB_GO,
 	CLEAN_UP
 
+"""
+	CleanUpBot <: AbstractRobotType
+
+A robot type for picking up dropped objects, cleaning up spills, and taking 
+care of dead robots
+"""
 struct CleanUpBot <: AbstractRobotType end
 const CleanUpBotID = BotID{CleanUpBot}
+
 export
 	CUB_AT,
 	CUB_GO,
@@ -180,7 +346,6 @@ export
 
 const CUB_AT = BOT_AT{CleanUpBot}
 const CUB_GO = BOT_GO{CleanUpBot}
-# For handling dropped objects
 const CUB_COLLECT = BOT_COLLECT{CleanUpBot}
 const CUB_CARRY = BOT_CARRY{CleanUpBot}
 const CUB_DEPOSIT = BOT_DEPOSIT{CleanUpBot}
@@ -220,10 +385,6 @@ export
 For collaborative tasks.
 
 [GO, ...] -> TEAM_COLLECT -> TEAM_CARRY -> TEAM_DEPOSIT -> [GO, ...]
-- there should be a way to prove that the milp assignment (if each robot is actually
-    assigned to a particular spot in the configuration) can be realized if all conflicts
-    (except between collaborating team members) are ignored for a TEAM_GO task. This is
-    because of the "push-and-rotate" thing once they reach the goal vertices.
 """
 @with_kw struct TEAM_ACTION{R,A<:AbstractRobotAction{R}} <: AbstractTeamRobotAction{R}
     instructions::Vector{A} = Vector{A}()
@@ -248,72 +409,17 @@ const TEAM_COLLECT= TEAM_ACTION{DeliveryBot,COLLECT}
 const TEAM_CARRY= TEAM_ACTION{DeliveryBot,CARRY}
 const TEAM_DEPOSIT= TEAM_ACTION{DeliveryBot,DEPOSIT}
 
-export
-	robot_type,
-	graph_key
-
-robot_type(a::AbstractRobotAction{R}) where {R} = R
-# robot_type(n::TEAM_ACTION{R,A}) where {R,A} = R
-robot_type(a::BOT_AT{R}) where {R} = R
-robot_type(a) = Nothing
-graph_key() = Symbol(DefaultRobotType)
-function graph_key(a)
-	if robot_type(a) == Nothing
-		return graph_key()
-	else
-		return Symbol(robot_type(a))
-	end
-end
-
-export
-	get_initial_location_id,
-	get_destination_location_id
-
+get_location_id(a::A) where {A<:Union{BOT_COLLECT,BOT_DEPOSIT}}             				= a.x
 get_initial_location_id(a::A) where {A<:Union{BOT_GO,BOT_CARRY}}        					= a.x1
 get_destination_location_id(a::A) where {A<:Union{BOT_GO,BOT_CARRY}}    					= a.x2
-get_location_id(a::A) where {A<:Union{BOT_COLLECT,BOT_DEPOSIT}}             					= a.x
-get_initial_location_id(a::A) where {A<:Union{BOT_COLLECT,BOT_DEPOSIT,BOT_AT,OBJECT_AT}}     	= get_location_id(a)
-get_destination_location_id(a::A) where {A<:Union{BOT_COLLECT,BOT_DEPOSIT,BOT_AT,OBJECT_AT}} 	= get_location_id(a)
-get_object_id(a::A) where {A<:Union{BOT_CARRY,BOT_COLLECT,BOT_DEPOSIT}}         					= a.o
-get_robot_id(a::A) where {A<:AbstractRobotAction} 										= a.r
+get_initial_location_id(a::A) where {A<:Union{BOT_COLLECT,BOT_DEPOSIT,BOT_AT,OBJECT_AT}}    = get_location_id(a)
+get_destination_location_id(a::A) where {A<:Union{BOT_COLLECT,BOT_DEPOSIT,BOT_AT,OBJECT_AT}}= get_location_id(a)
+get_object_id(a::A) where {A<:Union{BOT_CARRY,BOT_COLLECT,BOT_DEPOSIT}}         			= a.o
+get_robot_id(a::A) where {A<:AbstractRobotAction} 											= a.r
 
-export has_object_id
-has_object_id(a) = false
 has_object_id(a::Union{OBJECT_AT,BOT_COLLECT,BOT_CARRY,BOT_DEPOSIT}) = true
 has_object_id(a::TEAM_ACTION{R,A} where {R,A<:Union{BOT_COLLECT,BOT_CARRY,BOT_DEPOSIT}}) = true
 
-export check_object_id
-"""
-    Check if a node is associated with objectid
-"""
-function check_object_id(node,o)
-    if has_object_id(node)
-        if get_object_id(node) == o
-            return true
-        end
-    end
-    return false
-end
-
-export
-	has_robot_id,
-	get_default_robot_id,
-	get_default_initial_location_id,
-	get_default_final_location_id
-
-has_robot_id(a) = robot_type(a) == Nothing ? false : true
-get_default_robot_id(a) = has_robot_id(a) ? get_robot_id(a) : RobotID()
-get_default_initial_location_id(a) = has_robot_id(a) ? get_initial_location_id(a) : LocationID()
-get_default_destination_location_id(a) = has_robot_id(a) ? get_destination_location_id(a) : LocationID()
-
-export
-	replace_robot_id,
-	replace_destination,
-	replace_initial_location
-
-function replace_robot_id end
-function replace_destination end
-function replace_initial_location end
 for T in [:BOT_AT,:BOT_GO,:BOT_COLLECT,:BOT_CARRY,:BOT_DEPOSIT]
 	@eval replace_robot_id(node::$T,id) = $T(node,r=id)
 end
@@ -329,15 +435,6 @@ for T in [:BOT_AT,:BOT_COLLECT,:BOT_DEPOSIT]
 	@eval replace_initial_location(node::$T,id) = $T(node,x=id)
 end
 
-export
-	split_node
-
-"""
-	split_node(node::N,x::LocationID)
-
-Creates two new nodes of type `N`, where the destination of the first node
-and the starting location of the second node are both set to `x`.
-"""
 split_node(node::BOT_GO,x::LocationID) = BOT_GO(node, x2=x), BOT_GO(node, x1=x)
 split_node(node::BOT_CARRY,x::LocationID) = BOT_CARRY(node, x2=x), BOT_CARRY(node, x1=x)
 split_node(node::BOT_COLLECT,x::LocationID) = BOT_COLLECT(node, x=x), BOT_COLLECT(node, x=x)
@@ -376,58 +473,18 @@ GraphUtils.eligible_successors(node::BOT_GO{R}) where {R} = Dict((BOT_GO{R},TEAM
 GraphUtils.eligible_predecessors(node::OBJECT_AT)  = Dict(Operation=>1)
 
 
-export robot_ids_match
-
-"""
-	robot_ids_match(node,node2)
-
-Checks if robot_ids match between the nodes
-"""
-function robot_ids_match(node,node2)
-	if has_robot_id(node) && has_robot_id(node2)
-		if get_id(get_robot_id(node)) != -1 && get_id(get_robot_id(node2)) != -1
-			status = (get_robot_id(node) == get_robot_id(node2)) ? true : false
-			return status
-		end
-	end
-	return true
-end
-
-export
-	resources_reserved,
-	align_with_predecessor,
-	align_with_successor
-
-"""
-	resouces_reserved(node)
-
-Identifies the resources reserved by a particular `node` for its duration.
-For example, `resources_reserved(node::COLLECT) = AbstractID[get_location_id(node)]`
-"""
-resources_reserved(node)                = AbstractID[]
-resources_reserved(node::BOT_COLLECT)       = AbstractID[get_location_id(node)]
-resources_reserved(node::BOT_DEPOSIT)       = AbstractID[get_location_id(node)]
+resources_reserved(node::BOT_COLLECT)	= AbstractID[get_location_id(node)]
+resources_reserved(node::BOT_DEPOSIT)	= AbstractID[get_location_id(node)]
 resources_reserved(node::TEAM_ACTION)	= union(map(pred->resources_reserved(pred), node.instructions)...)
 
-CRCBS.is_valid(id::A) where {A<:AbstractID} = valid_id(id) #get_id(id) != -1
-first_valid(a,b) = CRCBS.is_valid(a) ? a : b
-
-"""
-	align_with_predecessor(node)
-
-Modifies a node to match the information encoded by its predecessor. This is
-how e.g., robot ids are propagated through an existing operating schedule
-after assignments (or re-assignments) have been made.
-"""
-align_with_predecessor(node,pred) 						= node
-align_with_predecessor(node::BOT_GO,pred::BOT_AT) 				= BOT_GO(first_valid(node.r,pred.r), first_valid(node.x1,pred.x), node.x2)
-align_with_predecessor(node::BOT_GO,pred::BOT_GO) 				= BOT_GO(first_valid(node.r,pred.r), first_valid(node.x1,pred.x2), node.x2)
-align_with_predecessor(node::BOT_GO,pred::BOT_DEPOSIT) 			= BOT_GO(first_valid(node.r,pred.r), first_valid(node.x1,pred.x), node.x2)
-align_with_predecessor(node::BOT_COLLECT,pred::OBJECT_AT) 	= BOT_COLLECT(node.r, first_valid(node.o,pred.o), node.x) # NOTE: Because the object could occupy multiple vertices, we do not want to dispatch first_valid between BOT_COLLECT.x and OBJECT_AT.x
-align_with_predecessor(node::BOT_COLLECT,pred::BOT_GO) 			= BOT_COLLECT(first_valid(node.r,pred.r), node.o, first_valid(node.x,pred.x2))
-align_with_predecessor(node::BOT_CARRY,pred::BOT_COLLECT) 		= BOT_CARRY(first_valid(node.r,pred.r), first_valid(node.o,pred.o), first_valid(node.x1,pred.x), node.x2)
-align_with_predecessor(node::BOT_CARRY,pred::BOT_CARRY) 		= BOT_CARRY(first_valid(node.r,pred.r), first_valid(node.o,pred.o), first_valid(node.x1,pred.x2), node.x2)
-align_with_predecessor(node::BOT_DEPOSIT,pred::BOT_CARRY)		= BOT_DEPOSIT(first_valid(node.r,pred.r), first_valid(node.o,pred.o), first_valid(node.x,pred.x2))
+align_with_predecessor(node::BOT_GO,pred::BOT_AT)			= BOT_GO(first_valid(node.r,pred.r), first_valid(node.x1,pred.x), node.x2)
+align_with_predecessor(node::BOT_GO,pred::BOT_GO)			= BOT_GO(first_valid(node.r,pred.r), first_valid(node.x1,pred.x2), node.x2)
+align_with_predecessor(node::BOT_GO,pred::BOT_DEPOSIT)		= BOT_GO(first_valid(node.r,pred.r), first_valid(node.x1,pred.x), node.x2)
+align_with_predecessor(node::BOT_COLLECT,pred::OBJECT_AT)	= BOT_COLLECT(node.r, first_valid(node.o,pred.o), node.x) # NOTE: Because the object could occupy multiple vertices, we do not want to dispatch first_valid between BOT_COLLECT.x and OBJECT_AT.x
+align_with_predecessor(node::BOT_COLLECT,pred::BOT_GO)		= BOT_COLLECT(first_valid(node.r,pred.r), node.o, first_valid(node.x,pred.x2))
+align_with_predecessor(node::BOT_CARRY,pred::BOT_COLLECT)	= BOT_CARRY(first_valid(node.r,pred.r), first_valid(node.o,pred.o), first_valid(node.x1,pred.x), node.x2)
+align_with_predecessor(node::BOT_CARRY,pred::BOT_CARRY)		= BOT_CARRY(first_valid(node.r,pred.r), first_valid(node.o,pred.o), first_valid(node.x1,pred.x2), node.x2)
+align_with_predecessor(node::BOT_DEPOSIT,pred::BOT_CARRY)	= BOT_DEPOSIT(first_valid(node.r,pred.r), first_valid(node.o,pred.o), first_valid(node.x,pred.x2))
 
 # NOTE job shop constraints were wreaking havoc with id propagation between BOT_COLLECT nodes and BOT_DEPOSIT nodes! Hence the alignment functions have been removed
 # align_with_predecessor(node::BOT_COLLECT,pred::BOT_COLLECT) 	= BOT_COLLECT(node.r, node.o, first_valid(node.x,pred.x))
@@ -464,19 +521,11 @@ function align_with_predecessor(node::TEAM_ACTION,pred::TEAM_ACTION)
 	node
 end
 
-"""
-	align_with_successor(node)
+GraphUtils.validate_edge(n1::AbstractPlanningPredicate,n2::AbstractPlanningPredicate) = true
 
-Modifies a node to match the information encoded by its successor. This is
-how e.g., robot ids are propagated through an existing operating schedule
-after assignments (or re-assignments) have been made.
-"""
-align_with_successor(node,pred) 						= node
 align_with_successor(node::BOT_GO,succ::BOT_COLLECT) 			= BOT_GO(first_valid(node.r,succ.r), node.x1, first_valid(node.x2,succ.x))
 align_with_successor(node::BOT_GO,succ::BOT_GO) 				= BOT_GO(first_valid(node.r,succ.r), node.x1, first_valid(node.x2,succ.x1))
 
-
-GraphUtils.validate_edge(n1::AbstractPlanningPredicate,n2::AbstractPlanningPredicate) = true
 GraphUtils.validate_edge(n1::N1,n2::N2) where {N1<:Union{BOT_AT,OBJECT_AT},N2<:Union{BOT_AT,OBJECT_AT}} = false
 GraphUtils.validate_edge(n1::BOT_AT,		n2::BOT_GO			) = (n1.x 	== n2.x1) && (n1.r == n2.r)
 GraphUtils.validate_edge(n1::BOT_GO,			n2::BOT_GO			) = (n1.x2 	== n2.x1) && (n1.r == n2.r)
@@ -488,7 +537,6 @@ GraphUtils.validate_edge(n1::BOT_DEPOSIT,		n2::BOT_CARRY		) = false
 GraphUtils.validate_edge(n1::BOT_DEPOSIT,		n2::BOT_GO			) = (n1.x 	== n2.x1)
 GraphUtils.validate_edge(n1::N,n2::N) where {N<:Union{BOT_COLLECT,BOT_DEPOSIT}} = (n1.x == n2.x) # job shop edges are valid
 
-
 Base.string(pred::OBJECT_AT)	=  string("O(",get_id(get_object_id(pred)),",",map(x->get_id(x), get_location_ids(pred)),")")
 Base.string(pred::BOT_AT)  		=  string("R(",get_id(get_robot_id(pred)),",",get_id(get_location_id(pred)),")")
 Base.string(a::BOT_GO)        	=  string("GO(",get_id(get_robot_id(a)),",",get_id(get_initial_location_id(a)),"->",get_id(get_destination_location_id(a)),")")
@@ -498,9 +546,6 @@ Base.string(a::BOT_DEPOSIT)   	=  string("DEPOSIT(",get_id(get_robot_id(a)),",",
 Base.string(op::Operation)    	=  string("OP(",get_id(get_operation_id(op)),")")
 Base.string(a::TEAM_ACTION)   	=  string("TEAM_ACTION( ",map(i->string(string(i), ","), a.instructions)...," )")
 
-export
-    title_string
-
 title_string(pred::OBJECT_AT,verbose=true) = verbose ? string("O",get_id(get_object_id(pred)),"-",get_id(get_location_id(pred))) : string("O",get_id(get_object_id(pred)));
 title_string(pred::BOT_AT,verbose=true)  = verbose ? string("R",get_id(get_robot_id(pred)),"-",get_id(get_location_id(pred))) : string("R",get_id(get_robot_id(pred)));
 title_string(a::BOT_GO,verbose=true)        = verbose ? string("go\n",get_id(get_robot_id(a)),",",get_id(get_initial_location_id(a)),",",get_id(get_destination_location_id(a))) : "go";
@@ -509,40 +554,3 @@ title_string(a::BOT_CARRY,verbose=true)     = verbose ? string("carry\n",get_id(
 title_string(a::BOT_DEPOSIT,verbose=true)   = verbose ? string("deposit\n",get_id(get_robot_id(a)),",",get_id(get_object_id(a)),",",get_id(get_location_id(a))) : "deposit";
 title_string(op::Operation,verbose=true)= verbose ? string("op",get_id(get_operation_id(op))) : "op";
 title_string(a::TEAM_ACTION,verbose=true) where {R,A} = verbose ? string("T-", team_action_type(a), "\n","r: (",map(i->string(get_id(get_robot_id(i)), ","), a.instructions)...,")") : string("TEAM","\n",title_string(team_action_type(a)(),verbose)) #string("TEAM\n", string(team_action_type(a)))
-
-# end # module PlanningPredicates
-
-# single robot actions: BOT_GO, BOT_COLLECT, BOT_CARRY, BOT_DEPOSIT
-# initial condition preds: OBJECT_AT, ROBOT_AT
-# event preds: Operation
-
-const predicate_accessor_interface = [
-	:get_initial_location_id,
-	:get_destination_location_id,
-	:get_robot_id,
-	:get_default_robot_id,
-	:get_default_initial_location_id,
-	:get_default_final_location_id,
-	:get_object_id,
-	:has_object_id,
-	:has_robot_id,
-	:sub_nodes,
-	:(GraphUtils.required_successors),
-	:(GraphUtils.required_predecessors),
-	:(GraphUtils.eligible_successors),
-	:(GraphUtils.eligible_predecessors),
-	:(GraphUtils.num_required_successors),
-	:(GraphUtils.num_required_predecessors),
-	:(GraphUtils.num_eligible_successors),
-	:(GraphUtils.num_eligible_predecessors),
-	:resources_reserved,
-	:title_string
-]
-const predicate_comparison_interface = [
-	:(GraphUtils.matches_template),
-	:(GraphUtils.validate_edge),
-]
-
-abstract type PredicateTrait end
-struct HasObject <: PredicateTrait end
-struct HasRobot <: PredicateTrait end

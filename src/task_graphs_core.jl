@@ -12,13 +12,10 @@
 #
 # using ..TaskGraphs
 
-function TOML.print(io,dict::Dict{Symbol,A}) where {A}
-    TOML.print(io,Dict(string(k)=>v for (k,v) in dict))
-end
-
 export
     get_debug_file_id,
-    reset_debug_file_id!
+    reset_debug_file_id!,
+    validate
 
 DEBUG_ID_COUNTER = 0
 get_debug_file_id() = Int(global DEBUG_ID_COUNTER += 1)
@@ -26,16 +23,8 @@ function reset_debug_file_id!()
     global DEBUG_ID_COUNTER = 0
 end
 
-export validate
 function validate end
 
-# matches_node_type(::A,::B) where {A<:AbstractPlanningPredicate,B<:AbstractPlanningPredicate} = A <: B
-"""
-    matches_node_type(::A,::Type{B}) where {A<:AbstractPlanningPredicate,B}
-
-Returns true if {A <: B}
-"""
-matches_node_type(::A,::Type{B}) where {A,B} = A <: B
 
 export
     ProblemSpec
@@ -76,8 +65,8 @@ Elements:
     Δt_deliver::Vector{Float64} = zeros(length(s0)) # duration of DELIVER operations
     @assert length(s0) == length(sF) == length(Δt_collect) == length(Δt_deliver) # == M
 end
-TaskGraphs.get_distance(spec::ProblemSpec,args...) = get_distance(spec.D,args...)
-TaskGraphs.get_distance(spec::ProblemSpec,a::LocationID,b::LocationID,args...) = get_distance(spec.D,get_id(a),get_id(b),args...)
+GraphUtils.get_distance(spec::ProblemSpec,args...) = get_distance(spec.D,args...)
+GraphUtils.get_distance(spec::ProblemSpec,a::LocationID,b::LocationID,args...) = get_distance(spec.D,get_id(a),get_id(b),args...)
 
 export
     ProjectSpec,
@@ -165,8 +154,6 @@ get_initial_condition(spec,object_id) = get_condition(spec,object_id,spec.initia
 get_final_condition(spec,object_id) = get_condition(spec,object_id,spec.final_conditions)
 function construct_operation(spec::ProjectSpec, station_id, input_ids, output_ids, Δt, id=get_unique_operation_id())
     op = Operation(
-        # pre = Set{OBJECT_AT}(map(id->get(spec.final_conditions, spec.object_id_to_idx[id], OBJECT_AT(id,station_id)), input_ids)),
-        # post = Set{OBJECT_AT}(map(id->get(spec.initial_conditions, spec.object_id_to_idx[id], OBJECT_AT(id,station_id)), output_ids)),
         pre = Set{OBJECT_AT}(map(id->spec.final_conditions[spec.object_id_to_idx[id]], input_ids)),
         post = Set{OBJECT_AT}(map(id->spec.initial_conditions[spec.object_id_to_idx[id]], output_ids)),
         Δt = Δt,
@@ -211,13 +198,6 @@ export
     read_operation,
     read_project_spec
 
-# Some tools for writing and reading project specs
-# function TOML.parse(pred::OBJECT_AT)
-#     [get_id(get_object_id(pred)),get_id(get_location_id(pred))]
-# end
-# parse_object(arr,dict=Dict{String,Any}()) = merge!(dict,Dict("type"=>"OBJECT_AT","data"=>[arr[1],arr[2]]))
-# read_object(arr) = OBJECT_AT(arr[1],arr[2])
-
 parse_object(pred::OBJECT_AT,dict=Dict{String,Any}()) = merge!(dict,Dict("type"=>"OBJECT_AT","data"=>[get_id(get_object_id(pred)),get_id(get_location_id(pred))]))
 TOML.parse(pred::OBJECT_AT) = parse_object(pred)
 read_object(dict) = OBJECT_AT(dict["data"]...)
@@ -247,8 +227,6 @@ end
 function TOML.parse(project_spec::ProjectSpec)
     toml_dict = Dict()
     toml_dict["operations"] = map(op->TOML.parse(op),project_spec.operations)
-    # toml_dict["initial_conditions"] = Dict(string(k)=>TOML.parse(pred) for (k,pred) in project_spec.initial_conditions)
-    # toml_dict["final_conditions"] = Dict(string(k)=>TOML.parse(pred) for (k,pred) in project_spec.final_conditions)
     toml_dict["initial_conditions"] = map(pred->TOML.parse(pred), project_spec.initial_conditions)
     toml_dict["final_conditions"] = map(pred->TOML.parse(pred), project_spec.final_conditions)
     toml_dict
@@ -317,7 +295,6 @@ end
 export
     DeliveryTask,
     DeliveryGraph
-
 
 """
     DeliveryTask
@@ -515,11 +492,10 @@ constraint between them.
 end
 get_terminal_vtxs(sched::P) where {P<:OperatingSchedule}     = sched.terminal_vtxs
 get_root_node_weights(sched::P) where {P<:OperatingSchedule} = sched.weights
-# Base.convert(::Type{OperatingSchedule},s::OperatingSchedule) = s
 
 GraphUtils.get_vtx(sched::OperatingSchedule,node::ScheduleNode) = get_vtx(sched,node.id)
-get_node_from_id(sched::OperatingSchedule,id) = get_node(sched,id).node
-get_node_from_vtx(sched::OperatingSchedule,v) = get_node(sched,v).node
+get_node_from_id(sched::OperatingSchedule,id)                   = get_node(sched,id).node
+get_node_from_vtx(sched::OperatingSchedule,v)                   = get_node(sched,v).node
 
 get_object_ICs(sched::P) where {P<:OperatingSchedule}  = Dict(k=>v.node for (k,v) in get_nodes_of_type(sched,ObjectID))
 get_robot_ICs(sched::P) where {P<:OperatingSchedule}   = Dict(k=>v.node for (k,v) in get_nodes_of_type(sched,BotID))
@@ -618,13 +594,14 @@ end
 Add `ScheduleNode` pred to `sched` with associated `AbstractID` `id` and
 `PathSpec` `path_spec`.
 """
-function add_to_schedule!(sched::OperatingSchedule,node::ScheduleNode)
-    id = node.id
-    @assert get_vtx(sched, id) == -1 "Trying to add $(string(id)) => $(string(pred)) to schedule, but $(string(id)) => $(string(get_node_from_id(sched,id))) already exists"
-    add_vertex!(get_graph(sched))
-    insert_to_vtx_map!(sched,node,id,nv(get_graph(sched)))
-    node
-end
+add_to_schedule!(sched::OperatingSchedule,node::ScheduleNode) = add_node!(sched,node,node.id)
+# function add_to_schedule!(sched::OperatingSchedule,node::ScheduleNode)
+#     id = node.id
+#     @assert get_vtx(sched, id) == -1 "Trying to add $(string(id)) => $(string(pred)) to schedule, but $(string(id)) => $(string(get_node_from_id(sched,id))) already exists"
+#     add_vertex!(get_graph(sched))
+#     insert_to_vtx_map!(sched,node,id,nv(get_graph(sched)))
+#     node
+# end
 function add_to_schedule!(sched::P,path_spec::T,pred,id::ID) where {P<:OperatingSchedule,T<:PathSpec,ID<:AbstractID}
     add_to_schedule!(sched,ScheduleNode(id,pred,path_spec))
 end
@@ -633,6 +610,21 @@ function add_to_schedule!(sched::P,spec::T,pred,id::ID) where {P<:OperatingSched
 end
 function add_to_schedule!(sched::P,pred,id::ID) where {P<:OperatingSchedule,ID<:AbstractID}
     add_to_schedule!(sched,ProblemSpec(),pred,id)
+end
+function GraphUtils.make_node(g::OperatingSchedule,pred::AbstractPlanningPredicate,spec::ProblemSpec)
+   make_node(g,pred,generate_path_spec(g,spec,pred))
+end
+function GraphUtils.make_node(g::OperatingSchedule,pred::AbstractPlanningPredicate)
+   make_node(g,pred,PathSpec())
+end
+function GraphUtils.make_node(g::OperatingSchedule,pred::BOT_AT,spec::PathSpec)
+    ScheduleNode(get_robot_id(pred),pred,spec)
+end
+function GraphUtils.make_node(g::OperatingSchedule,pred::OBJECT_AT,spec::PathSpec)
+    ScheduleNode(get_object_id(pred),pred,spec)
+end
+function GraphUtils.make_node(g::OperatingSchedule,pred::AbstractRobotAction,spec::PathSpec)
+    ScheduleNode(get_unique_action_id(),pred,spec)
 end
 
 export
@@ -845,29 +837,21 @@ function add_headless_delivery_task!(
     ) where {R<:AbstractRobotType}
 
     robot_id = BotID{R}(-1)
-    action_id = get_unique_action_id()
-    add_to_schedule!(sched, problem_spec, BOT_COLLECT(robot_id, object_id, pickup_station_id), action_id)
-    set_t0!(sched,action_id,t0)
-    add_edge!(sched, object_id, action_id)
-
-    prev_action_id = action_id
-    action_id = get_unique_action_id()
-    add_to_schedule!(sched, problem_spec, BOT_CARRY(robot_id, object_id, pickup_station_id, dropoff_station_id), action_id)
-    set_t0!(sched,action_id,t0)
-    add_edge!(sched, prev_action_id, action_id)
-
-    prev_action_id = action_id
-    action_id = get_unique_action_id()
-    add_to_schedule!(sched, problem_spec, BOT_DEPOSIT(robot_id, object_id, dropoff_station_id), action_id)
-    set_t0!(sched,action_id,t0)
-    add_edge!(sched, action_id, op_id)
-    add_edge!(sched, prev_action_id, action_id)
-
-    prev_action_id = action_id
-    action_id = get_unique_action_id()
-    add_to_schedule!(sched, problem_spec, BOT_GO(robot_id, dropoff_station_id,LocationID(-1)), action_id)
-    set_t0!(sched,action_id,t0)
-    add_edge!(sched, prev_action_id, action_id)
+    prev_id = object_id
+    for p in [
+        BOT_COLLECT(robot_id, object_id, pickup_station_id),
+        BOT_CARRY(robot_id, object_id, pickup_station_id, dropoff_station_id),
+        BOT_DEPOSIT(robot_id, object_id, dropoff_station_id),
+        BOT_GO(robot_id, dropoff_station_id,LocationID(-1)),
+        ]
+        node = add_to_schedule!(sched, problem_spec, p, get_unique_action_id())
+        set_t0!(sched,node.id,t0)
+        add_edge!(sched, prev_id, node.id)
+        if matches_node_type(node,BOT_DEPOSIT)
+            add_edge!(sched, node.id, op_id)
+        end
+        prev_id = node.id
+    end
 
     return
 end
@@ -887,47 +871,87 @@ function add_headless_team_delivery_task!(
 
     object_node = get_node_from_id(sched,object_id)
     shape = object_node.shape
+    prev_id = object_id
+    
     # COLLABORATIVE COLLECT
-    team_action_id = get_unique_action_id()
     team_action = TEAM_COLLECT(
         instructions = map(x->BOT_COLLECT(robot_id, object_id, x), pickup_station_ids),
         shape=shape
         )
-    add_to_schedule!(sched, problem_spec, team_action, team_action_id)
+    # ScheduleNode(get_unique_action_id(),team_action,generate_path_spec(sched,problem_spec,team_action))
+    # node = add_to_schedule!(sched, problem_spec, team_action, get_unique_action_id())
+    node = add_to_schedule!(sched, make_node(sched,team_action,problem_spec))
     # Add Edge from object
-    add_edge!(sched,object_id,team_action_id)
+    add_edge!(sched,prev_id,node.id)
     # Add GO inputs to TEAM_COLLECT
     for x in pickup_station_ids
-        action_id = get_unique_action_id()
-        add_to_schedule!(sched,problem_spec,BOT_GO(robot_id,x,x),action_id)
-        add_edge!(sched,action_id,team_action_id)
+        subnode = add_to_schedule!(sched,problem_spec,BOT_GO(robot_id,x,x),get_unique_action_id())
+        add_edge!(sched,subnode.id,node.id)
     end
+    prev_id = node.id
     # Add TEAM_CARRY
-    prev_team_action_id = team_action_id
-    team_action_id = get_unique_action_id()
     team_action = TEAM_CARRY(
         instructions = [BOT_CARRY(robot_id, object_id, x1, x2) for (x1,x2) in zip(pickup_station_ids,dropoff_station_ids)],
         shape = shape
         )
-    add_to_schedule!(sched, problem_spec, team_action, team_action_id)
-    add_edge!(sched,prev_team_action_id,team_action_id)
+    node = add_to_schedule!(sched, problem_spec, team_action, get_unique_action_id())
+    add_edge!(sched,prev_id,node.id)
+    prev_id = node.id
     # TEAM_DEPOSIT
-    prev_team_action_id = team_action_id
-    team_action_id = get_unique_action_id()
     team_action = TEAM_DEPOSIT(
         instructions = map(x->BOT_DEPOSIT(robot_id, object_id, x), dropoff_station_ids),
         shape=shape
         )
-    add_to_schedule!(sched, problem_spec, team_action, team_action_id)
-    add_edge!(sched,prev_team_action_id,team_action_id)
+    node = add_to_schedule!(sched, problem_spec, team_action, get_unique_action_id())
+    add_edge!(sched,prev_id,node.id)
     # Edge to Operation
-    add_edge!(sched,team_action_id,op_id)
+    add_edge!(sched,node.id,op_id)
     # Individual GO nodes
     for x in dropoff_station_ids
-        action_id = get_unique_action_id()
-        add_to_schedule!(sched,problem_spec,BOT_GO(robot_id,x,-1),action_id)
-        add_edge!(sched, team_action_id, action_id)
+        subnode = add_to_schedule!(sched,problem_spec,BOT_GO(robot_id,x,-1),get_unique_action_id())
+        add_edge!(sched, node.id, subnode.id)
     end
+    # # COLLABORATIVE COLLECT
+    # team_action_id = get_unique_action_id()
+    # team_action = TEAM_COLLECT(
+    #     instructions = map(x->BOT_COLLECT(robot_id, object_id, x), pickup_station_ids),
+    #     shape=shape
+    #     )
+    # add_to_schedule!(sched, problem_spec, team_action, team_action_id)
+    # # Add Edge from object
+    # add_edge!(sched,object_id,team_action_id)
+    # # Add GO inputs to TEAM_COLLECT
+    # for x in pickup_station_ids
+    #     action_id = get_unique_action_id()
+    #     add_to_schedule!(sched,problem_spec,BOT_GO(robot_id,x,x),action_id)
+    #     add_edge!(sched,action_id,team_action_id)
+    # end
+    # # Add TEAM_CARRY
+    # prev_team_action_id = team_action_id
+    # team_action_id = get_unique_action_id()
+    # team_action = TEAM_CARRY(
+    #     instructions = [BOT_CARRY(robot_id, object_id, x1, x2) for (x1,x2) in zip(pickup_station_ids,dropoff_station_ids)],
+    #     shape = shape
+    #     )
+    # add_to_schedule!(sched, problem_spec, team_action, team_action_id)
+    # add_edge!(sched,prev_team_action_id,team_action_id)
+    # # TEAM_DEPOSIT
+    # prev_team_action_id = team_action_id
+    # team_action_id = get_unique_action_id()
+    # team_action = TEAM_DEPOSIT(
+    #     instructions = map(x->BOT_DEPOSIT(robot_id, object_id, x), dropoff_station_ids),
+    #     shape=shape
+    #     )
+    # add_to_schedule!(sched, problem_spec, team_action, team_action_id)
+    # add_edge!(sched,prev_team_action_id,team_action_id)
+    # # Edge to Operation
+    # add_edge!(sched,team_action_id,op_id)
+    # # Individual GO nodes
+    # for x in dropoff_station_ids
+    #     action_id = get_unique_action_id()
+    #     add_to_schedule!(sched,problem_spec,BOT_GO(robot_id,x,-1),action_id)
+    #     add_edge!(sched, team_action_id, action_id)
+    # end
     return
 end
 function add_single_robot_delivery_task!(

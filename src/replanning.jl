@@ -139,34 +139,11 @@ function split_active_vtxs!(sched::OperatingSchedule,problem_spec::ProblemSpec,t
     # identify nodes "cut" by timestep t
     active_vtxs, fixed_vtxs = get_active_and_fixed_vtxs(sched,t)
     # split active nodes
-    # t0 = deepcopy(get_t0(sched))
-    # tF = deepcopy(get_tF(sched))
     for v in active_vtxs
-        # node_id = get_vtx_id(sched,v)
-        # node = get_node_from_id(sched, node_id)
         node = get_node(sched,v)
         if isa(node,BOT_GO) # split TODO why aren't we splitting CARRY, COLLECT, and DEPOSIT as well?
             x = robot_positions[node.r].x
             node1,node2 = split_action_node!(sched,problem_spec,node,x,t)
-            # node1,node2 = split_node(node,x)
-            # replace_in_schedule!(sched,problem_spec,node1,node_id)
-            # set_t0!(sched,node_id,get_t0())
-            # node_id2 = get_unique_action_id()
-            # add_to_schedule!(sched,problem_spec,node2,node_id2)
-            # # remap edges
-            # v2 = get_vtx(sched, node_id2)
-            # for vp in outneighbors(G,v)
-            #     rem_edge!(G,v,vp)
-            #     add_edge!(G,v2,vp)
-            # end
-            # add_edge!(G,v,v2)
-            # # fix start and end times
-            # push!(t0,t)
-            # push!(tF,tF[v])
-            # tF[v] = t
-            # # reset path specs
-            # set_path_spec!(sched,v,PathSpec(get_path_spec(sched,v),fixed=true,plan_path=false,min_duration=tF[v]-t0[v]))
-            # set_path_spec!(sched,v2,PathSpec(get_path_spec(sched,v2),tight=true,min_duration=tF[v2]-t0[v2]))
             set_path_spec!(node1,PathSpec(get_path_spec(node1),fixed=true,plan_path=false))
             set_path_spec!(node2,PathSpec(get_path_spec(node1),tight=true))
         end
@@ -281,10 +258,6 @@ function prune_schedule(sched::OperatingSchedule,
     # add all non-deleted nodes to new project schedule
     for v in keep_vtxs
         add_to_schedule!(new_sched,get_node(sched,v))
-        # node_id = get_vtx_id(sched,v)
-        # node = get_node_from_id(sched, node_id)
-        # path_spec = get_path_spec(sched,v)
-        # add_to_schedule!(new_sched,path_spec,node,node_id)
     end
     # add all edges between nodes that still exist
     for e in edges(get_graph(sched))
@@ -293,8 +266,6 @@ function prune_schedule(sched::OperatingSchedule,
     # Initialize new cache
     # draw new ROBOT_AT -> GO edges where necessary
     for v in vertices(new_sched)
-        # node_id = get_vtx_id(new_sched,v)
-        # node = get_node_from_id(new_sched, node_id)
         node = get_node(new_sched, v)
         pred = node.node
         if isa(pred,BOT_GO) && indegree(new_sched,v) == 0
@@ -356,11 +327,7 @@ function splice_schedules!(sched::P,next_sched::P,enforce_unique=true) where {P<
     for v in vertices(next_sched)
         node = get_node(next_sched,v)
         # node_id = get_vtx_id(next_sched, v)
-        # if !has_vertex(sched,get_vtx(sched,node_id))
         if !has_vertex(sched,node)
-            # path_spec = get_path_spec(next_sched,v)
-            # node = get_node_from_id(next_sched, node_id)
-            # add_to_schedule!(sched, path_spec, node, node_id)
             add_to_schedule!(sched, node)
         elseif enforce_unique
             throw(ErrorException(string("Vertex ",v," = ",
@@ -370,9 +337,6 @@ function splice_schedules!(sched::P,next_sched::P,enforce_unique=true) where {P<
         end
     end
     for e in edges(get_graph(next_sched))
-        # node_id1 = get_vtx_id(next_sched, e.src)
-        # node_id2 = get_vtx_id(next_sched, e.dst)
-        # add_edge!(sched, node_id1, node_id2)
         node1 = get_node(next_sched, e.src)
         node2 = get_node(next_sched, e.dst)
         add_edge!(sched, node1, node2)
