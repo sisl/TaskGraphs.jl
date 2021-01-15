@@ -273,10 +273,16 @@ function formulate_optimization_problem(N,M,G,D,Δt,Δt_collect,Δt_deliver,to0_
     # Mm = sum([D[s1,s2] for s1 in r0 for s2 in s0]) + sum([D[s1,s2] for s1 in s0 for s2 in sF])
     )
 
-    model = Model(with_optimizer(optimizer,
-        TimeLimit=TimeLimit,
-        OutputFlag=OutputFlag,
-        Presolve=Presolve
+    # model = Model(with_optimizer(optimizer,
+    #     TimeLimit=TimeLimit,
+    #     OutputFlag=OutputFlag,
+    #     Presolve=Presolve
+    #     ))
+
+    model = Model(optimizer_with_attributes(optimizer,
+        "TimeLimit"=>TimeLimit,
+        "OutputFlag"=>OutputFlag,
+        "Presolve"=>Presolve
         ))
 
     r0 = vcat(r0,sF) # combine to get dummy robot ``spawn'' locations too
@@ -551,11 +557,18 @@ function formulate_schedule_milp(sched::OperatingSchedule,problem_spec::ProblemS
     # Δt = map(v->get_path_spec(sched, v).min_duration, vertices(G))
     Δt = get_min_duration(sched)
 
-    model = Model(with_optimizer(optimizer,
-        TimeLimit=TimeLimit,
-        OutputFlag=OutputFlag,
-        Presolve=Presolve
-        ));
+    # model = Model(with_optimizer(optimizer,
+    #     TimeLimit=TimeLimit,
+    #     OutputFlag=OutputFlag,
+    #     Presolve=Presolve
+    #     ));
+    
+    model = Model(optimizer_with_attributes(optimizer,
+        "TimeLimit"=>TimeLimit,
+        "OutputFlag"=>OutputFlag,
+        "Presolve"=>Presolve
+        ))
+    
     @variable(model, t0[1:nv(G)] >= 0.0); # initial times for all nodes
     @variable(model, tF[1:nv(G)] >= 0.0); # final times for all nodes
 
@@ -744,11 +757,17 @@ function formulate_milp(milp_model::SparseAdjacencyMILP,sched::OperatingSchedule
     )
 
     # println("NBS TIME LIMIT: TimeLimit = $TimeLimit")
-    model = Model(with_optimizer(optimizer,
-        TimeLimit=TimeLimit,
-        OutputFlag=OutputFlag,
-        Presolve=Presolve
-        ));
+    # model = Model(with_optimizer(optimizer,
+    #     TimeLimit=TimeLimit,
+    #     OutputFlag=OutputFlag,
+    #     Presolve=Presolve
+    #     ));
+        
+    model = Model(optimizer_with_attributes(optimizer,
+        "TimeLimit"=>TimeLimit,
+        "OutputFlag"=>OutputFlag,
+        "Presolve"=>Presolve
+        ))
 
     G = get_graph(sched);
     (missing_successors, missing_predecessors, n_eligible_successors,
@@ -890,11 +909,17 @@ function formulate_milp(milp_model::FastSparseAdjacencyMILP,sched::OperatingSche
         kwargs...
     )
 
-    model = Model(with_optimizer(optimizer,
-        TimeLimit=TimeLimit,
-        OutputFlag=OutputFlag,
-        Presolve=Presolve
-        ));
+    # model = Model(with_optimizer(optimizer,
+    #     TimeLimit=TimeLimit,
+    #     OutputFlag=OutputFlag,
+    #     Presolve=Presolve
+    #     ));
+    
+    model = Model(optimizer_with_attributes(optimizer,
+        "TimeLimit"=>TimeLimit,
+        "OutputFlag"=>OutputFlag,
+        "Presolve"=>Presolve
+        ))
 
     G = get_graph(sched);
     cache = preprocess_project_schedule(sched,true)

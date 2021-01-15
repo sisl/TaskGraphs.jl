@@ -259,8 +259,8 @@ let
     # run(`rm $filename`)
 
     r0 = [get_id(get_initial_location_id(robot_ICs[k])) for k in sort(collect(keys(robot_ICs)))]
-    s0 = map(pred->get_id(get_initial_location_id(pred)),project_spec.initial_conditions)
-    sF = map(pred->get_id(get_initial_location_id(pred)),project_spec.final_conditions)
+    s0 = map(pred->get_id(get_initial_location_id(pred)),TaskGraphs.initial_conditions_vector(project_spec))
+    sF = map(pred->get_id(get_initial_location_id(pred)),TaskGraphs.final_conditions_vector(project_spec))
     problem_def = SimpleProblemDef(project_spec,r0,s0,sF)
     filename = "/tmp/problem_def.toml"
     open(filename, "w") do io

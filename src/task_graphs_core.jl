@@ -136,7 +136,7 @@ end
 get_initial_nodes(spec::ProjectSpec) = get_all_root_nodes(spec)
 get_pre_deps(spec::ProjectSpec, op_id::OperationID) = Set{ObjectID}(map(v->get_vtx_id(spec,v),inneighbors(spec,op_id))) #get(spec.pre_deps, op_id, Set{Int}())
 get_post_deps(spec::ProjectSpec, op_id::OperationID) = Set{ObjectID}(map(v->get_vtx_id(spec,v),outneighbors(spec,op_id))) #get(spec.pre_deps, op_id, Set{Int}())
-get_operations(spec::ProjectSpec) = filter(n->isa(n,Operation), get_nodes(spec))
+get_operations(spec::ProjectSpec) = Vector{Operation}(filter(n->isa(n,Operation), get_nodes(spec)))
 get_num_delivery_tasks(spec::ProjectSpec) = length(get_nodes_of_type(spec,ObjectID))
 function get_terminal_operation_ids(spec::ProjectSpec)
     ops = Set{OperationID}()
@@ -259,8 +259,8 @@ end
 function TOML.parse(project_spec::ProjectSpec)
     toml_dict = Dict()
     toml_dict["operations"] = map(op->TOML.parse(op),get_operations(project_spec))
-    toml_dict["initial_conditions"] = map(pred->TOML.parse(pred), project_spec.initial_conditions)
-    toml_dict["final_conditions"] = map(pred->TOML.parse(pred), project_spec.final_conditions)
+    toml_dict["initial_conditions"] = map(pred->TOML.parse(pred), initial_conditions_vector(project_spec))
+    toml_dict["final_conditions"] = map(pred->TOML.parse(pred), final_conditions_vector(project_spec))
     toml_dict
 end
 function read_project_spec(toml_dict::Dict)
@@ -270,12 +270,16 @@ function read_project_spec(toml_dict::Dict)
     ics = isa(ics,Dict) ? collect(values(ics)) : ics
     fcs = isa(fcs,Dict) ? collect(values(fcs)) : fcs
     for arr in ics
-        push!(project_spec.initial_conditions, read_object(arr))
+        o = read_object(arr)
+        set_initial_condition!(project_spec,get_object_id(o),o)
+        # push!(project_spec.initial_conditions, read_object(arr))
     end
     for arr in fcs
-        push!(project_spec.final_conditions, read_object(arr))
+        o = read_object(arr)
+        set_final_condition!(project_spec,get_object_id(o),o)
+        # push!(project_spec.final_conditions, read_object(arr))
     end
-    object_ids = map(get_object_id, project_spec.initial_conditions)
+    # object_ids = map(get_object_id, project_spec.initial_conditions)
     # for (i, object_id) in enumerate(sort(object_ids))
     #     project_spec.object_id_to_idx[object_id] = i
     # end
@@ -1007,11 +1011,11 @@ function construct_partial_project_schedule(
 end
 function construct_partial_project_schedule(spec::ProjectSpec,problem_spec::ProblemSpec,robot_ICs=Vector{BOT_AT}())
     construct_partial_project_schedule(
-        spec.initial_conditions,
-        spec.final_conditions,
+        initial_conditions_vector(spec),
+        final_conditions_vector(spec),
         robot_ICs,
         get_operations(spec),# spec.operations,
-        get_terminal_operation_ids(spec),# map(op->op.id, spec.operations[collect(spec.terminal_vtxs)]),
+        sort(collect(get_terminal_operation_ids(spec))),# map(op->op.id, spec.operations[collect(spec.terminal_vtxs)]),
         problem_spec,
     )
 end
