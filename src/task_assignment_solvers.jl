@@ -101,10 +101,8 @@ JuMP.objective_function(model::M) where {M<:TaskGraphsMILP} = objective_function
 JuMP.objective_bound(model::M) where {M<:TaskGraphsMILP}    = objective_bound(model.model)
 JuMP.primal_status(model::M) where {M<:TaskGraphsMILP}      = primal_status(model.model)
 JuMP.dual_status(model::M) where {M<:TaskGraphsMILP}        = dual_status(model.model)
-# for op = (:optimize!, :termination_status, :objective_function)
-#     eval(quote
-#         JuMP.$op(model::M,args...) where {M<:TaskGraphsMILP} = $op(model.model,args...)
-#     end)
+# for op in (:optimize!, :termination_status, :objective_function)
+#     @eval JuMP.$op(model::M,args...) where {M<:TaskGraphsMILP} = $op(model.model,args...)
 # end
 
 export
@@ -215,14 +213,11 @@ function get_objective_expr(milp::AssignmentMILP, f::SumOfMakeSpans,model,termin
         end
     end
     cost1 = @expression(model, sum(map(i->T[i]*get(weights,i,0.0), 1:length(terminal_vtxs))))
-    # @objective(model, Min, sum(map(v->tof[v]*get(weights,v,0.0), terminal_vtxs)))
-    # model
 end
 function get_objective_expr(milp::AssignmentMILP, f::MakeSpan,model,terminal_vtxs,weights,tof,Δt)
     @variable(model, T)
     @constraint(model, T .>= tof .+ Δt)
     T
-    # @objective(model, Min, T)
 end
 
 """
@@ -372,21 +367,6 @@ function formulate_optimization_problem(N,M,G,D,Δt,Δt_collect,Δt_deliver,to0_
             end
         end
     end
-    # cost depends only on root node(s)
-    # if cost_model <: SumOfMakeSpans
-    #     @variable(model, T[1:length(terminal_vtxs)])
-    #     for (i,project_head) in enumerate(terminal_vtxs)
-    #         for v in project_head
-    #             @constraint(model, T[i] >= tof[v] + Δt[v])
-    #         end
-    #     end
-    #     @objective(model, Min, sum(map(i->T[i]*get(weights,i,0.0), 1:length(terminal_vtxs))))
-    #     # @objective(model, Min, sum(map(v->tof[v]*get(weights,v,0.0), terminal_vtxs)))
-    # elseif cost_model <: MakeSpan
-    #     @variable(model, T)
-    #     @constraint(model, T .>= tof .+ Δt)
-    #     @objective(model, Min, T)
-    # end
     milp = AssignmentMILP(model)
     cost1 = get_objective_expr(milp, cost_model, milp.model,terminal_vtxs,weights,tof,Δt)
     @objective(milp.model, Min, cost1)
@@ -739,24 +719,7 @@ function formulate_schedule_milp(sched::OperatingSchedule,problem_spec::ProblemS
     @variable(model, X[1:nv(G),1:nv(G)]); # Adjacency Matrix
     @constraint(model, X .== Xa .+ Xj)
 
-    # Formulate Objective
-    # if cost_model <: SumOfMakeSpans
-    #     terminal_vtxs = sched.terminal_vtxs
-    #     @variable(model, T[1:length(terminal_vtxs)])
-    #     for (i,project_head) in enumerate(terminal_vtxs)
-    #         for v in project_head
-    #             @constraint(model, T[i] >= tF[v])
-    #         end
-    #     end
-    #     cost1 = @expression(model, sum(map(v->tF[v]*get(sched.weights,v,0.0), terminal_vtxs)))
-    # elseif cost_model <: MakeSpan
-    #     @variable(model, T)
-    #     @constraint(model, T .>= tF)
-    #     cost1 = @expression(model, T)
-    # end
-    # sparsity_cost = @expression(model, (0.5/(nv(G)^2))*sum(Xa)) # cost term to encourage sparse X. Otherwise the solver may add pointless edges
     sparsity_cost = @expression(model, (0.5/(nv(G)^2))*sum(X)) # cost term to encourage sparse X. Otherwise the solver may add pointless edges
-    # @objective(model, Min, cost1 )
     milp = AdjacencyMILP(model=model) #, job_shop_variables
     cost1 = get_objective_expr(milp,cost_model,milp.model,sched,tF)
     @objective(milp.model, Min, cost1 + sparsity_cost)
@@ -909,25 +872,6 @@ function formulate_milp(milp_model::SparseAdjacencyMILP,sched::OperatingSchedule
     # Full adjacency matrix
     @expression(model, X, Xa .+ Xj) # Make X an expression rather than a variable
 
-    # Formulate Objective
-    # if cost_model <: SumOfMakeSpans
-    #     terminal_vtxs = sched.terminal_vtxs
-    #     @variable(model, T[1:length(terminal_vtxs)])
-    #     for (i,project_head) in enumerate(terminal_vtxs)
-    #         for v in project_head
-    #             @constraint(model, T[i] >= tF[v])
-    #         end
-    #     end
-    #     cost1 = @expression(model, sum(map(v->tF[v]*get(sched.weights,v,0.0), terminal_vtxs)))
-    # elseif cost_model <: MakeSpan
-    #     @variable(model, T)
-    #     @constraint(model, T .>= tF)
-    #     cost1 = @expression(model, T)
-    # end
-    # # sparsity_cost = @expression(model, (0.5/(nv(G)^2))*sum(Xa)) # cost term to encourage sparse X. Otherwise the solver may add pointless edges
-    # # sparsity_cost = @expression(model, (0.5/(nv(G)^2))*sum(X)) # cost term to encourage sparse X. Otherwise the solver may add pointless edges
-    # # @objective(model, Min, cost1 + sparsity_cost)
-    # @objective(model, Min, cost1)
     milp = SparseAdjacencyMILP(model,Xa,Xj, milp_model.job_shop) #, job_shop_variables
     cost1 = get_objective_expr(milp,cost_model,milp.model,sched,tF)
     @objective(milp.model, Min, cost1)
@@ -1089,25 +1033,6 @@ function formulate_milp(milp_model::FastSparseAdjacencyMILP,sched::OperatingSche
     # Full adjacency matrix
     @expression(model, X, Xa .+ Xj) # Make X an expression rather than a variable
 
-    # Formulate Objective
-    # if cost_model <: SumOfMakeSpans
-    #     terminal_vtxs = sched.terminal_vtxs
-    #     @variable(model, T[1:length(terminal_vtxs)])
-    #     for (i,project_head) in enumerate(terminal_vtxs)
-    #         for v in project_head
-    #             @constraint(model, T[i] >= tF[v])
-    #         end
-    #     end
-    #     cost1 = @expression(model, sum(map(v->tF[v]*get(sched.weights,v,0.0), terminal_vtxs)))
-    # elseif cost_model <: MakeSpan
-    #     @variable(model, T)
-    #     @constraint(model, T .>= tF)
-    #     cost1 = @expression(model, T)
-    # end
-    # # sparsity_cost = @expression(model, (0.5/(nv(G)^2))*sum(Xa)) # cost term to encourage sparse X. Otherwise the solver may add pointless edges
-    # # sparsity_cost = @expression(model, (0.5/(nv(G)^2))*sum(X)) # cost term to encourage sparse X. Otherwise the solver may add pointless edges
-    # # @objective(model, Min, cost1 + sparsity_cost)
-    # @objective(model, Min, cost1)
     milp = FastSparseAdjacencyMILP(model,Xa,Xj, milp_model.job_shop) #, job_shop_variables
     cost1 = get_objective_expr(milp,cost_model,milp.model,sched,tF)
     @objective(milp.model, Min, cost1)

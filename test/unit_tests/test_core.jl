@@ -33,16 +33,24 @@ let
     add_operation!(spec,op1)
     add_operation!(spec,op2)
     add_operation!(spec,op3)
-    @test has_edge(spec.graph, spec.op_id_to_vtx[get_id(op1)], spec.op_id_to_vtx[get_id(op2)])
-    @test has_edge(spec.graph, spec.op_id_to_vtx[get_id(op2)], spec.op_id_to_vtx[get_id(op3)])
+    @test has_edge(spec, get_operation_id(op1), ObjectID(1))
+    @test has_edge(spec, ObjectID(1), get_operation_id(op2))
+    @test has_edge(spec, get_operation_id(op2), ObjectID(2))
+    @test has_edge(spec, ObjectID(2), get_operation_id(op3))
+    # @test has_edge(spec.graph, spec.op_id_to_vtx[get_id(op1)], spec.op_id_to_vtx[get_id(op2)])
+    # @test has_edge(spec.graph, spec.op_id_to_vtx[get_id(op2)], spec.op_id_to_vtx[get_id(op3)])
 
     # now reset the spec to empty and see if the operations can be safely added
     spec = ProjectSpec()
     add_operation!(spec,op1)
     add_operation!(spec,op2)
     add_operation!(spec,op3)
-    @test has_edge(spec.graph, spec.op_id_to_vtx[get_id(op1)], spec.op_id_to_vtx[get_id(op2)])
-    @test has_edge(spec.graph, spec.op_id_to_vtx[get_id(op2)], spec.op_id_to_vtx[get_id(op3)])
+    @test has_edge(spec, get_operation_id(op1), ObjectID(1))
+    @test has_edge(spec, ObjectID(1), get_operation_id(op2))
+    @test has_edge(spec, get_operation_id(op2), ObjectID(2))
+    @test has_edge(spec, ObjectID(2), get_operation_id(op3))
+    # @test has_edge(spec.graph, spec.op_id_to_vtx[get_id(op1)], spec.op_id_to_vtx[get_id(op2)])
+    # @test has_edge(spec.graph, spec.op_id_to_vtx[get_id(op2)], spec.op_id_to_vtx[get_id(op3)])
 
 end
 let

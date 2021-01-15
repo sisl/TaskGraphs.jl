@@ -342,8 +342,7 @@ end
 
 export
     choose_random_object_sizes,
-    choose_and_shuffle_object_sizes,
-    convert_to_collaborative
+    choose_and_shuffle_object_sizes
 
 """
     Tool for randomly selecting how many robots (and in what configuration)
@@ -398,29 +397,6 @@ function choose_random_object_sizes(M,probs::Dict{Int,Float64}=Dict(1=>1.0,2=>0.
 end
 
 """
-    convert_to_collaborative(project_spec)
-"""
-function convert_to_collaborative(project_spec::ProjectSpec,new_starts::Dict{ObjectID,Vector{Int}},new_goals::Dict{ObjectID,Vector{Int}})
-    new_spec = ProjectSpec(
-        map(o->OBJECT_AT(get_object_id(o), new_starts[get_object_id(o)]), project_spec.initial_conditions),
-        map(o->OBJECT_AT(get_object_id(o), new_goals[get_object_id(o)]), project_spec.final_conditions),
-    )
-    for op in project_spec.operations
-        add_operation!(
-            new_spec,
-            construct_operation(
-                new_spec,
-                op.station_id,
-                map(o->get_id(get_object_id(o)), collect(op.pre)),
-                map(o->get_id(get_object_id(o)), collect(op.post)),
-                op.Δt
-            )
-        )
-    end
-    new_spec
-end
-
-"""
     `get_random_problem_instantiation`
 
     Args:
@@ -453,63 +429,11 @@ function construct_random_task_graphs_problem(N::Int,M::Int,
     construct_task_graphs_problem(project_spec,r0,s0,sF,dist_matrix;Δt_collect=Δt_collect,Δt_deliver=Δt_deliver)
 end
 
-export
-    initialize_test_problem
-
-function initialize_test_problem(N=8,M=12;env_id=2)
-    # experiment_dir = joinpath(dirname(pathof(WebotsSim)),"..","experiments")
-    filename = string(ENVIRONMENT_DIR,"/env_",env_id,".toml");
-    factory_env = read_env(filename);
-
-    project_spec, problem_spec, object_ICs, object_FCs, robot_ICs = construct_random_task_graphs_problem(
-        N,M,
-        get_pickup_zones(factory_env),
-        get_dropoff_zones(factory_env),
-        get_free_zones(factory_env),
-        get_dist_matrix(factory_env.graph));
-
-    project_spec, problem_spec, robot_ICs, factory_env
-end
-
-
-export
-    combine_project_specs
-
-"""
-    `combine_project_specs(specs::Vector{ProjectSpec})`
-
-    A helper for combining multiple `ProjectSpec`s into a single
-    ProjectSpec.
-"""
-function combine_project_specs(specs::Vector{P}) where {P<:ProjectSpec}
-    M = 0
-    new_spec = ProjectSpec(
-        vcat(map(spec->spec.initial_conditions, specs)...),
-        vcat(map(spec->spec.final_conditions, specs)...)
-        )
-    for spec in specs
-        # spec_M = length(spec.initial_conditions)
-        for op in spec.operations
-            new_op = Operation(station_id=op.station_id, Δt = op.Δt)
-            for pred in preconditions(op)
-                push!(new_op.pre, OBJECT_AT(get_object_id(pred), get_location_id(pred)))
-            end
-            for pred in postconditions(op)
-                push!(new_op.post, OBJECT_AT(get_object_id(pred), get_location_id(pred)))
-            end
-            add_operation!(new_spec, new_op)
-        end
-        # M = M + spec_M
-    end
-    new_spec
-end
-
 ################################################################################
 ################################### Rendering ##################################
 ################################################################################
 
 export
-    # title_string,
     get_display_metagraph
 
 
@@ -612,7 +536,7 @@ function Base.:(==)(spec1::ProjectSpec,spec2::ProjectSpec)
         @assert(spec1.terminal_vtxs == spec2.terminal_vtxs)
         @assert(spec1.weights == spec2.weights)
         @assert(spec1.weight == spec2.weight)
-        @assert(spec1.object_id_to_idx == spec2.object_id_to_idx)
+        # @assert(spec1.object_id_to_idx == spec2.object_id_to_idx)
     catch e
         if isa(e,AssertionError)
             # println(e.msg)

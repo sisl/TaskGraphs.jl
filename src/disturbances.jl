@@ -132,7 +132,11 @@ function remove_vtxs(sched,remove_set)
     keep_vtxs = setdiff(Set{Int}(collect(vertices(sched))), remove_set)
     # add all non-deleted nodes to new project schedule
     for v in keep_vtxs
-        add_node!(new_sched,get_node(sched,v))
+        # node_id = get_vtx_id(sched,v)
+        # node = get_node_from_id(sched, node_id)
+        # path_spec = get_path_spec(sched,v)
+        # add_to_schedule!(new_sched,path_spec,node,node_id)
+        add_to_schedule!(new_sched,get_node(sched,v))
     end
     # add all edges between nodes that still exist
     for e in edges(get_graph(sched))
@@ -330,7 +334,7 @@ function remove_robot!(env::SearchEnv,id::BotID,t::Int)
         end
     end
     for node_id in to_remove
-        rem_node!(sched,node_id)
+        delete_node!(sched,node_id)
     end
     # Verify that the robot is no longer in schedule
     for v in vertices(G)
