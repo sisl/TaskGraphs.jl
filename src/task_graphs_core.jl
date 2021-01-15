@@ -104,21 +104,16 @@ Elements:
     vtx_map             ::Dict{AbstractID,Int}  = Dict{AbstractID,Int}()
     vtx_ids             ::Vector{AbstractID}    = Vector{AbstractID}()
 
-    initial_conditions::Vector{OBJECT_AT} = Vector{OBJECT_AT}()
-    final_conditions::Vector{OBJECT_AT} = Vector{OBJECT_AT}()
-    # operations::Vector{Operation} = Vector{Operation}()
-    # pre_deps::Dict{Int,Set{Int}}  = Dict{Int,Set{Int}}() # id => (pre_conditions)
-    # post_deps::Dict{Int,Set{Int}} = Dict{Int,Set{Int}}()
-    # graph::CustomNGraph{DiGraph,Union{OBJECT_AT,Operation},AbstractID} = CustomNGraph{DiGraph,Union{OBJECT_AT,Operation},AbstractID}()
-    terminal_vtxs::Set{Int}       = Set{Int}()
-    weights::Dict{Int,Float64}    = Dict{Int,Float64}(v=>1.0 for v in terminal_vtxs)
-    weight::Float64               = 1.0
-    # M::Int                        = length(initial_conditions)
-    # object_id_to_idx::Dict{ObjectID,Int} = Dict{ObjectID,Int}(get_object_id(id)=>k for (k,id) in enumerate(initial_conditions))
-    # op_id_to_vtx::Dict{Int,Int}    = Dict{Int,Int}()
+    initial_conditions::Dict{ObjectID,OBJECT_AT} = Dict{ObjectID,OBJECT_AT}()
+    final_conditions::Dict{ObjectID,OBJECT_AT} = Dict{ObjectID,OBJECT_AT}()
+    terminal_vtxs::Set{Int}                     = Set{Int}()
+    weights::Dict{Int,Float64}                  = Dict{Int,Float64}(v=>1.0 for v in terminal_vtxs)
+    weight::Float64                             = 1.0
 end
 get_initial_conditions(spec::ProjectSpec)       = spec.initial_conditions
 get_final_conditions(spec::ProjectSpec)         = spec.final_conditions
+get_initial_condition(spec::ProjectSpec,id::ObjectID)   = get_initial_conditions(spec)[id]
+get_final_condition(spec::ProjectSpec,id::ObjectID)     = get_final_conditions(spec)[id]
 initial_conditions_vector(spec::ProjectSpec)    = sort(collect(values(spec.initial_conditions));by=get_object_id)
 final_conditions_vector(spec::ProjectSpec)      = sort(collect(values(spec.final_conditions));by=get_object_id)
 function set_initial_condition!(spec,object_id,pred)
@@ -128,25 +123,20 @@ function set_final_condition!(spec,object_id,pred)
     spec.final_conditions[object_id] = pred
 end
 function ProjectSpec(ics::V,fcs::V) where {V<:Vector{OBJECT_AT}}
-    # spec = ProjectSpec(initial_conditions=ics,final_conditions=fcs)
     spec = ProjectSpec(
         initial_conditions=Dict{ObjectID,OBJECT_AT}(get_object_id(p)=>p for p in ics),
         final_conditions=Dict{ObjectID,OBJECT_AT}(get_object_id(p)=>p for p in fcs),
         )
-    for o in spec.initial_conditions
+    for (k,o) in get_initial_conditions(spec)
         add_node!(spec,o,get_object_id(o))
         set_initial_condition!(spec,get_object_id(o),o)
     end
+    return spec
 end
-# get_initial_nodes(spec::ProjectSpec) = setdiff(
-#     Set(collect(vertices(spec.graph))),collect(keys(spec.pre_deps)))
 get_initial_nodes(spec::ProjectSpec) = get_all_root_nodes(spec)
-# get_pre_deps(spec::ProjectSpec, op_id::Int) = get(spec.pre_deps, op_id, Set{Int}())
 get_pre_deps(spec::ProjectSpec, op_id::OperationID) = Set{ObjectID}(map(v->get_vtx_id(spec,v),inneighbors(spec,op_id))) #get(spec.pre_deps, op_id, Set{Int}())
-# get_post_deps(spec::ProjectSpec, op_id::Int) = get(spec.post_deps, op_id, Set{Int}())
 get_post_deps(spec::ProjectSpec, op_id::OperationID) = Set{ObjectID}(map(v->get_vtx_id(spec,v),outneighbors(spec,op_id))) #get(spec.pre_deps, op_id, Set{Int}())
 get_operations(spec::ProjectSpec) = filter(n->isa(n,Operation), get_nodes(spec))
-# get_num_delivery_tasks(spec::ProjectSpec) = length(collect(union(map(op->union(get_input_ids(op),get_output_ids(op)),get_operations(spec))...)))
 get_num_delivery_tasks(spec::ProjectSpec) = length(get_nodes_of_type(spec,ObjectID))
 function get_terminal_operation_ids(spec::ProjectSpec)
     ops = Set{OperationID}()
@@ -167,19 +157,12 @@ function get_pickup_wait_time(spec::ProjectSpec,o::ObjectID)
     return 0.0
 end
 """
-    get_duration_vector(spec::P)
+    get_duration_vector(spec::ProjectSpec)
 
 Return a vector `Δt` such that `Δt[i]` is the amount of time that must elapse 
 before object `i` can be picked up after its parent operation is performed.
 """
-function get_duration_vector(spec::P) where {P<:ProjectSpec}
-    # Δt = zeros(get_num_delivery_tasks(spec))
-    # for op in get_operations(spec)
-    #     for id in get_output_ids(op)
-    #         Δt[get_id(id)] = duration(op)
-    #     end
-    # end
-    # Δt
+function get_duration_vector(spec::ProjectSpec)
     # Δt = Dict{ObjectID,Float64}()
     # for (v,n) in enumerate(get_nodes(spec))
     #     if isa(n,OBJECT_AT)
@@ -189,43 +172,19 @@ function get_duration_vector(spec::P) where {P<:ProjectSpec}
     # Δt
     map(n->get_pickup_wait_time(spec,get_object_id(n)), initial_conditions_vector(spec))
 end
-# function add_pre_dep!(spec::ProjectSpec, object_id::Int, op_id::Int)
-#     # operation[op_id] is a prereq of object[object_id]
-#     push!(get!(spec.pre_deps, object_id, Set{Int}()),op_id)
-# end
-# function add_post_dep!(spec::ProjectSpec, object_id::Int, op_id::Int)
-#     # operation[op_id] is a postreq of object[object_id]
-#     push!(get!(spec.post_deps, object_id, Set{Int}()),op_id)
-# end
-# function add_pre_dep!(spec::ProjectSpec, object_id::ObjectID, op_id::OperationID)
-#     add_edge!(spec,op_id,object_id)
-# end
-# function add_post_dep!(spec::ProjectSpec, object_id::ObjectID, op_id::OperationID)
-#     add_edge!(spec,object_id,op_id)
-# end
-# function set_condition!(spec,object_id,pred,array)
-#     idx = get!(spec.object_id_to_idx,object_id,length(spec.object_id_to_idx)+1)
-#     @assert haskey(spec.object_id_to_idx, object_id)
-#     while idx > length(array)
-#         push!(array,OBJECT_AT(-1,-1))
-#     end
-#     @assert idx <= length(array)
-#     array[idx] = pred
-#     array
-# end
-# set_condition!(spec,object_id,pred,spec.initial_conditions)
-# set_initial_condition!(spec,object_id,pred) = set_condition!(spec,object_id,pred,spec.initial_conditions)
-# set_final_condition!(spec,object_id,pred) = set_condition!(spec,object_id,pred,spec.final_conditions)
-# get_condition(spec,object_id,array) = get(array,get(spec.object_id_to_idx,object_id,-1),OBJECT_AT(object_id,-1))
-# get_initial_condition(spec,object_id) = get_condition(spec,object_id,spec.initial_conditions)
-# get_final_condition(spec,object_id) = get_condition(spec,object_id,spec.final_conditions)
+
 """
     construct_operation(spec::ProjectSpec, station_id, input_ids, output_ids, Δt, id=get_unique_operation_id())
 """
-function construct_operation(spec::ProjectSpec, station_id, input_ids, output_ids, Δt, id=get_unique_operation_id())
+function construct_operation(
+        spec::ProjectSpec, 
+        station_id::LocationID, 
+        input_ids::Vector{ObjectID}, 
+        output_ids::Vector{ObjectID},
+        Δt, 
+        id=get_unique_operation_id()
+        )
     op = Operation(
-        # pre = Set{OBJECT_AT}(map(id->spec.final_conditions[spec.object_id_to_idx[ObjectID(id)]], input_ids)),
-        # post = Set{OBJECT_AT}(map(id->spec.initial_conditions[spec.object_id_to_idx[ObjectID(id)]], output_ids)),
         pre = Set{OBJECT_AT}(map(id->get_final_condition(spec,id), input_ids)), #spec.final_conditions[spec.object_id_to_idx[ObjectID(id)]], input_ids)),
         post = Set{OBJECT_AT}(map(id->get_initial_condition(spec,id), output_ids)),
         Δt = Δt,
@@ -233,59 +192,21 @@ function construct_operation(spec::ProjectSpec, station_id, input_ids, output_id
         id = id
     )
 end
-# function add_operation!(spec::ProjectSpec, op::Operation)
-#     G = spec.graph
-#     ops = spec.operations
-#     add_vertex!(G)
-#     push!(ops, op)
-#     spec.op_id_to_vtx[get_id(op)] = nv(G)
-#     op_id = length(ops)
-#     @assert op_id == nv(G)
-#     for pred in postconditions(op)
-#         object_id = get_object_id(pred)
-#         set_initial_condition!(spec,object_id,pred)
-#         set_final_condition!(spec,object_id,get_final_condition(spec,object_id))
-#         add_pre_dep!(spec, object_id, op_id)
-#         for op0_id in get_post_deps(spec, object_id)
-#             add_edge!(G, op_id, op0_id) # for each operation that requires object[id]
-#         end
-#     end
-#     for pred in preconditions(op)
-#         object_id = get_object_id(pred)
-#         set_initial_condition!(spec,object_id,get_initial_condition(spec,object_id))
-#         set_final_condition!(spec,object_id,pred)
-#         spec.final_conditions[spec.object_id_to_idx[object_id]]
-#         add_post_dep!(spec, object_id, op_id)
-#         for op0_id in get_pre_deps(spec, object_id)
-#             add_edge!(G, op0_id, op_id) # for each (1) operation that generates object[id]
-#         end
-#     end
-#     union!(spec.terminal_vtxs, get_all_terminal_nodes(spec.graph))
-#     intersect!(spec.terminal_vtxs, get_all_terminal_nodes(spec.graph))
-#     validate(spec,op)
-#     spec
-# end
+construct_operation(
+        spec::ProjectSpec, 
+        station_id::Int, 
+        input_ids::Vector, 
+        output_ids::Vector,args...) = construct_operation(spec,LocationID(station_id),convert.(ObjectID,input_ids),convert.(ObjectID,output_ids),args...)
 function add_operation!(spec::ProjectSpec, op::Operation)
     add_node!(spec,op,get_operation_id(op))
     op_id = get_operation_id(op)
-    # G = spec.graph
-    # ops = spec.operations
-    # add_vertex!(G)
-    # push!(ops, op)
-    # spec.op_id_to_vtx[get_id(op)] = length(get_operations(spec))
     for pred in preconditions(op)
         object_id = get_object_id(pred)
         if !has_vertex(spec,object_id)
             add_node!(spec,pred,object_id)
         end
         add_edge!(spec, object_id, op_id)
-        # add_post_dep!(spec, object_id, op_id)
-        # set_initial_condition!(spec,object_id,get_initial_condition(spec,object_id))
         set_final_condition!(spec,object_id,pred)
-        # spec.final_conditions[spec.object_id_to_idx[object_id]]
-        # for op0_id in get_pre_deps(spec, object_id)
-        #     add_edge!(G, op0_id, op_id) # for each (1) operation that generates object[id]
-        # end
     end
     for pred in postconditions(op)
         object_id = get_object_id(pred)
@@ -296,15 +217,10 @@ function add_operation!(spec::ProjectSpec, op::Operation)
             replace_node!(spec,pred,object_id)
         end
         add_edge!(spec, op_id, object_id)
-        # add_pre_dep!(spec, object_id, op_id)
         set_initial_condition!(spec,object_id,pred)
-        # set_final_condition!(spec,object_id,get_final_condition(spec,object_id)) # TODO not sure if this belongs here
-        # for op0_id in get_post_deps(spec, object_id)
-        #     add_edge!(G, op_id, op0_id) # for each operation that requires object[id]
-        # end
     end
+    empty!(spec.terminal_vtxs)
     union!(spec.terminal_vtxs, get_all_terminal_nodes(spec.graph))
-    intersect!(spec.terminal_vtxs, get_all_terminal_nodes(spec.graph))
     validate(spec,op)
     spec
 end
@@ -416,9 +332,9 @@ export
     DeliveryTask
 """
 struct DeliveryTask
-    o::Int
-    s1::Int
-    s2::Int
+    o::ObjectID
+    s1::LocationID
+    s2::LocationID
 end
 
 """
@@ -444,13 +360,13 @@ function construct_delivery_graph(project_spec::ProjectSpec,M::Int)
     # for op in project_spec.operations
     for op in get_operations(project_spec)
         for pred in preconditions(op)
-            id = get_id(get_object_id(pred))
+            id = get_object_id(pred)
             idx = object_id_map[id]
             pre = get_initial_condition(project_spec,id)
             post = get_final_condition(project_spec,id)
-            push!(delivery_graph.tasks,DeliveryTask(id,get_id(get_location_id(pre)),get_id(get_location_id(post))))
+            push!(delivery_graph.tasks,DeliveryTask(id,get_location_id(pre),get_location_id(post)))
             for j in get_output_ids(op)
-                idx2 = object_id_map[get_id(j)]
+                idx2 = object_id_map[j]
                 add_edge!(delivery_graph.graph, idx, idx2)
             end
         end
@@ -1090,7 +1006,6 @@ function construct_partial_project_schedule(
     sched
 end
 function construct_partial_project_schedule(spec::ProjectSpec,problem_spec::ProblemSpec,robot_ICs=Vector{BOT_AT}())
-    # @assert length(robot_ICs) == problem_spec.N "length(robot_ICs) == $(length(robot_ICs)), should be $(problem_spec.N)"
     construct_partial_project_schedule(
         spec.initial_conditions,
         spec.final_conditions,

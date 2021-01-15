@@ -190,7 +190,7 @@ export construct_task_graphs_problem
     `construct_task_graphs_problem`
 """
 function construct_task_graphs_problem(
-        project_spec::P,
+        project_spec::ProjectSpec,
         r0::Vector{Int},
         s0::Vector{Int},
         sF::Vector{Int},
@@ -200,7 +200,7 @@ function construct_task_graphs_problem(
         cost_function=SumOfMakeSpans(),
         task_shapes=map(o->(1,1),s0),
         shape_dict=Dict{Int,Dict{Tuple{Int,Int},Vector{Int}}}(s=>Dict{Tuple{Int,Int},Vector{Int}}() for s in vcat(s0,sF))
-        ) where {P<:ProjectSpec}
+        ) 
     N = length(r0)
     M = length(s0)
     for j in 1:M
@@ -212,14 +212,14 @@ function construct_task_graphs_problem(
     object_ICs = [OBJECT_AT(j, get(shape_dict[x], s, x), s) for (j,(x,s)) in enumerate(zip(s0,task_shapes))] # initial object conditions
     object_FCs = [OBJECT_AT(j, get(shape_dict[x], s, x), s) for (j,(x,s)) in enumerate(zip(sF,task_shapes))] # initial object conditions
     new_project_spec = ProjectSpec(object_ICs,object_FCs)
-    for op in project_spec.operations
+    for op in get_operations(project_spec)
         add_operation!(
             new_project_spec,
             construct_operation(
                 new_project_spec,
                 op.station_id,
-                map(o->get_id(get_object_id(o)), collect(op.pre)),
-                map(o->get_id(get_object_id(o)), collect(op.post)),
+                map(get_object_id, collect(op.pre)),
+                map(get_object_id, collect(op.post)),
                 op.Δt
             )
         )
@@ -231,7 +231,17 @@ function construct_task_graphs_problem(
     # set initial conditions
     to0_ = Dict{Int,Float64}(v=>0.0 for v in get_all_root_nodes(G))
     tr0_ = Dict{Int,Float64}(i=>0.0 for i in 1:N)
-    root_node_groups = map(v->Set(get_id(id) for id in get_input_ids(new_project_spec.operations[v])),collect(new_project_spec.terminal_vtxs))
+    root_node_groups = Vector{Set{Int}}()
+    for v in get_all_terminal_nodes(new_project_spec)
+        n = get_node(new_project_spec,v)
+        if isa(n,Operation)
+            push!(root_node_groups,Set(map(get_id, get_input_ids(n))))
+        end
+    end
+    # root_node_groups = map(v->Set(
+    #     get_id(id) for id in get_input_ids(
+    #         new_project_spec.operations[v])),
+    #         collect(new_project_spec.terminal_vtxs))
     problem_spec = ProblemSpec(graph=G,D=dist_matrix,
         Δt=Δt,tr0_=tr0_,to0_=to0_,terminal_vtxs=root_node_groups,
         cost_function=cost_function,
@@ -294,6 +304,8 @@ function construct_random_project_spec(M::Int,object_ICs::Vector{OBJECT_AT},obje
         zone_map=Dict{Int,Vector{Int}}(), # maps vtx to vector of vtxs for collaborative tasks
     )
     project_spec = ProjectSpec(object_ICs,object_FCs)
+    @assert length(object_ICs) == M
+    object_map = map(get_object_id, initial_conditions_vector(project_spec))
     # fill with random operations going backwards
     i = M-1
     frontier = PriorityQueue{Int,Int}([M=>1])
@@ -318,17 +330,16 @@ function construct_random_project_spec(M::Int,object_ICs::Vector{OBJECT_AT},obje
         station_id = output_idx
         input_idxs = collect(max(1,1+i-rand(1:max_parents)):i)
         i = i - length(input_idxs)
-        # Δt = Δt_min + (Δt_max-Δt_min)*rand()
         Δt=rand(Δt_min:Δt_max)
-        input_ids = map(idx->get_id(get_object_id(project_spec.initial_conditions[idx])), input_idxs)
-        output_ids = map(idx->get_id(get_object_id(project_spec.initial_conditions[idx])), [output_idx])
+        input_ids = map(idx->object_map[idx], input_idxs)
+        output_ids = map(idx->object_map[idx], [output_idx])
         add_operation!(project_spec,construct_operation(project_spec, station_id, input_ids, output_ids, Δt))
         for idx in input_idxs
             enqueue!(frontier, idx=>M-i)
         end
     end
     Δt=0
-    final_idx = get_id(get_object_id(project_spec.initial_conditions[M]))
+    final_idx = object_map[M]
     add_operation!(project_spec,construct_operation(project_spec, -1, [final_idx], [], Δt))
     project_spec
 end
@@ -534,9 +545,6 @@ function Base.:(==)(spec1::ProjectSpec,spec2::ProjectSpec)
         @assert(spec1.pre_deps == spec2.pre_deps)
         @assert(spec1.graph == spec2.graph)
         @assert(spec1.terminal_vtxs == spec2.terminal_vtxs)
-        @assert(spec1.weights == spec2.weights)
-        @assert(spec1.weight == spec2.weight)
-        # @assert(spec1.object_id_to_idx == spec2.object_id_to_idx)
     catch e
         if isa(e,AssertionError)
             # println(e.msg)
@@ -552,7 +560,7 @@ end
 export
     get_object_paths
 
-function get_object_paths(solution,sched,cache)
+function get_object_paths(solution,sched)
     robot_paths = convert_to_vertex_lists(solution)
     tF = maximum(map(length, robot_paths))
     object_paths = Vector{Vector{Int}}()
@@ -590,9 +598,9 @@ function get_object_paths(solution,sched,cache)
     end
     object_paths, object_intervals, object_ids, path_idxs
 end
-function get_object_paths(solution,env)
-    get_object_paths(solution,get_schedule(env),get_cache(env))
-end
+# function get_object_paths(solution,env::SearchEnv)
+#     get_object_paths(solution,get_schedule(env))
+# end
 
 export
     fill_object_path_dicts!,
@@ -602,7 +610,7 @@ function fill_object_path_dicts!(solution,project_schedule,cache,
         object_path_dict = Dict{Int,Vector{Vector{Int}}}(),
         object_interval_dict = Dict{Int,Vector{Int}}()
     )
-    object_paths, object_intervals, object_ids, path_idxs = get_object_paths(solution,project_schedule,cache)
+    object_paths, object_intervals, object_ids, path_idxs = get_object_paths(solution,project_schedule)
     for (path,interval,id,idx) in zip(object_paths, object_intervals, object_ids, path_idxs)
         if !haskey(object_path_dict,id)
             object_path_dict[id] = Vector{Vector{Int}}()

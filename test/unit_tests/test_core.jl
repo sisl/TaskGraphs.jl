@@ -12,18 +12,16 @@ let
     spec = ProjectSpec()
     get_initial_nodes(spec)
 
-    TaskGraphs.set_initial_condition!(spec,1,OBJECT_AT(1,1))
-    @test TaskGraphs.get_initial_condition(spec,1) == OBJECT_AT(1,1)
-    TaskGraphs.set_initial_condition!(spec,1,OBJECT_AT(1,1))
-    @test TaskGraphs.get_initial_condition(spec,1) == OBJECT_AT(1,1)
-    TaskGraphs.set_initial_condition!(spec,2,OBJECT_AT(2,1))
-    @test TaskGraphs.get_initial_condition(spec,2) == OBJECT_AT(2,1)
-    TaskGraphs.set_final_condition!(spec,1,OBJECT_AT(1,2))
-    @test TaskGraphs.get_final_condition(spec,1) == OBJECT_AT(1,2)
-    TaskGraphs.set_final_condition!(spec,1,OBJECT_AT(1,3))
-    @test TaskGraphs.get_final_condition(spec,1) == OBJECT_AT(1,3)
-    TaskGraphs.set_final_condition!(spec,2,OBJECT_AT(2,3))
-    @test TaskGraphs.get_final_condition(spec,2) == OBJECT_AT(2,3)
+    TaskGraphs.set_initial_condition!(spec,ObjectID(1),OBJECT_AT(1,1))
+    @test TaskGraphs.get_initial_condition(spec,ObjectID(1)) == OBJECT_AT(1,1)
+    TaskGraphs.set_initial_condition!(spec,ObjectID(2),OBJECT_AT(2,1))
+    @test TaskGraphs.get_initial_condition(spec,ObjectID(2)) == OBJECT_AT(2,1)
+    TaskGraphs.set_final_condition!(spec,ObjectID(1),OBJECT_AT(1,2))
+    @test TaskGraphs.get_final_condition(spec,ObjectID(1)) == OBJECT_AT(1,2)
+    TaskGraphs.set_final_condition!(spec,ObjectID(1),OBJECT_AT(1,3))
+    @test TaskGraphs.get_final_condition(spec,ObjectID(1)) == OBJECT_AT(1,3)
+    TaskGraphs.set_final_condition!(spec,ObjectID(2),OBJECT_AT(2,3))
+    @test TaskGraphs.get_final_condition(spec,ObjectID(2)) == OBJECT_AT(2,3)
 
     # add operations to a ProjectSpec and test that the dependencies are
     # stored correctly
@@ -37,8 +35,6 @@ let
     @test has_edge(spec, ObjectID(1), get_operation_id(op2))
     @test has_edge(spec, get_operation_id(op2), ObjectID(2))
     @test has_edge(spec, ObjectID(2), get_operation_id(op3))
-    # @test has_edge(spec.graph, spec.op_id_to_vtx[get_id(op1)], spec.op_id_to_vtx[get_id(op2)])
-    # @test has_edge(spec.graph, spec.op_id_to_vtx[get_id(op2)], spec.op_id_to_vtx[get_id(op3)])
 
     # now reset the spec to empty and see if the operations can be safely added
     spec = ProjectSpec()
@@ -49,8 +45,6 @@ let
     @test has_edge(spec, ObjectID(1), get_operation_id(op2))
     @test has_edge(spec, get_operation_id(op2), ObjectID(2))
     @test has_edge(spec, ObjectID(2), get_operation_id(op3))
-    # @test has_edge(spec.graph, spec.op_id_to_vtx[get_id(op1)], spec.op_id_to_vtx[get_id(op2)])
-    # @test has_edge(spec.graph, spec.op_id_to_vtx[get_id(op2)], spec.op_id_to_vtx[get_id(op3)])
 
 end
 let
@@ -84,16 +78,16 @@ let
     let
         project_spec = ProjectSpec(object_ICs,object_FCs)
         add_operation!(project_spec,construct_operation(project_spec, 3, [1,2], [3], 1.0))
-        @test project_spec.terminal_vtxs == Set{Int}([1])
+        # @test project_spec.terminal_vtxs == Set{Int}([1])
         add_operation!(project_spec,construct_operation(project_spec, 6, [3], [], 0.0))
-        @test project_spec.terminal_vtxs == Set{Int}([2])
+        # @test project_spec.terminal_vtxs == Set{Int}([2])
     end
     let
         project_spec = ProjectSpec(object_ICs,object_FCs)
         add_operation!(project_spec,construct_operation(project_spec, 3, [1,2], [], 1.0))
-        @test project_spec.terminal_vtxs == Set{Int}([1])
+        # @test project_spec.terminal_vtxs == Set{Int}([1])
         add_operation!(project_spec,construct_operation(project_spec, 6, [3], [], 0.0))
-        @test project_spec.terminal_vtxs == Set{Int}([1,2])
+        # @test project_spec.terminal_vtxs == Set{Int}([1,2])
     end
     let
         project_spec = ProjectSpec(object_ICs,object_FCs)
