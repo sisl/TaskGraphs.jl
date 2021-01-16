@@ -437,7 +437,7 @@ function formulate_milp(milp_model::AssignmentMILP,sched::OperatingSchedule,prob
     Mm = 10000,
     kwargs...)
 
-    # setup
+    # SETUP
     # from OperatingSchedule
     robot_ids = Vector{BotID}(sort(collect(keys(get_robot_ICs(sched)))))
     robot_map = Dict{BotID,Int}(id=>k for (k,id) in enumerate(robot_ids))
@@ -475,7 +475,6 @@ function formulate_milp(milp_model::AssignmentMILP,sched::OperatingSchedule,prob
     @assert all(Δt_deliver .== problem_spec.Δt_deliver)
     @assert all(Δt .== problem_spec.Δt)
     # from ProblemSpec
-    # G = problem_spec.graph # delivery_graph
     terminal_vtxs = problem_spec.terminal_vtxs
     weights = problem_spec.weights
     D = problem_spec.D
