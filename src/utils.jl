@@ -238,15 +238,20 @@ function construct_task_graphs_problem(
             push!(root_node_groups,Set(map(get_id, get_input_ids(n))))
         end
     end
-    problem_spec = ProblemSpec(graph=G,D=dist_matrix,
-        Δt=Δt,tr0_=tr0_,to0_=to0_,terminal_vtxs=root_node_groups,
+    problem_spec = ProblemSpec(
+        # graph=G,
+        D=dist_matrix,
+        # Δt=Δt,tr0_=tr0_,to0_=to0_,
+        # terminal_vtxs=root_node_groups,
         cost_function=cost_function,
-        Δt_collect=Δt_collect,Δt_deliver=Δt_deliver,r0=r0,s0=s0,sF=sF)
+        Δt_collect=Δt_collect, Δt_deliver=Δt_deliver,
+        r0=r0,s0=s0,sF=sF,
+        )
 
     # problem_spec = ProblemSpec(D=dist_matrix,terminal_vtxs=root_node_groups)
-    # sched = construct_partial_project_schedule(new_project_spec,problem_spec,robot_ICs)
-    # return problem_spec, sched
-    return new_project_spec, problem_spec, object_ICs, object_FCs, robot_ICs
+    sched = construct_partial_project_schedule(new_project_spec,problem_spec,robot_ICs)
+    return sched, problem_spec
+    # return new_project_spec, problem_spec, object_ICs, object_FCs, robot_ICs
 end
 function construct_task_graphs_problem(
     def::SimpleProblemDef,

@@ -49,7 +49,7 @@ Elements:
     sF::Vector{Int}         = Int[] # delivery station for each task
     Δt_collect::Vector{Float64} = zeros(length(s0)) # duration of COLLECT operations
     Δt_deliver::Vector{Float64} = zeros(length(s0)) # duration of DELIVER operations
-    @assert length(s0) == length(sF) == length(Δt_collect) == length(Δt_deliver) # == M
+    # @assert length(s0) == length(sF) == length(Δt_collect) == length(Δt_deliver) # == M
 end
 GraphUtils.get_distance(spec::ProblemSpec,args...) = get_distance(spec.D,args...)
 GraphUtils.get_distance(spec::ProblemSpec,a::LocationID,b::LocationID,args...) = get_distance(spec.D,get_id(a),get_id(b),args...)

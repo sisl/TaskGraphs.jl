@@ -63,18 +63,18 @@ function get_zero_initial_conditions(G,N)
     return to0_, tr0_
 end
 
-function print_toy_problem_specs(prob_name,vtx_grid,r0,s0,sF,project_spec,delivery_graph=nothing)
-    println(prob_name)
-    display(vtx_grid)
-    print("\n\n")
-    @show r0
-    @show s0
-    @show sF
-    display(project_spec.operations)
-    print("\n\n")
-    display(delivery_graph.tasks)
-    print("\n\n")
-end
+# function print_toy_problem_specs(prob_name,vtx_grid,r0,s0,sF,project_spec,delivery_graph=nothing)
+#     println(prob_name)
+#     display(vtx_grid)
+#     print("\n\n")
+#     @show r0
+#     @show s0
+#     @show sF
+#     display(project_spec.operations)
+#     print("\n\n")
+#     display(delivery_graph.tasks)
+#     print("\n\n")
+# end
 
 
 function pctapf_problem(r0,config;Δt_op=0)
@@ -82,7 +82,7 @@ function pctapf_problem(r0,config;Δt_op=0)
     ops = config.ops
     s0 = map(t->t.first,tasks)
     sF = map(t->t.second,tasks)
-    project_spec, _ = pctapf_problem(r0,s0,sF)
+    project_spec, _ = empty_pctapf_problem(r0,s0,sF)
     for op in ops
         add_operation!(project_spec,construct_operation(project_spec,-1,
             op.inputs,op.outputs,Δt_op))
@@ -90,7 +90,7 @@ function pctapf_problem(r0,config;Δt_op=0)
     def = SimpleProblemDef(project_spec,r0,s0,sF,config.shapes)
 end
 
-function pctapf_problem(r0,s0,sF)
+function empty_pctapf_problem(r0,s0,sF)
     object_ICs = [OBJECT_AT(o,x) for (o,x) in enumerate(s0)] # initial_conditions
     object_FCs = [OBJECT_AT(o,x) for (o,x) in enumerate(sF)] # final conditions
     robot_ICs = [ROBOT_AT(r,x) for (r,x) in enumerate(r0)]
@@ -100,17 +100,18 @@ end
 
 function pctapf_problem(
         solver,
-        project_spec::ProjectSpec,
+        sched::OperatingSchedule,
+        # project_spec::ProjectSpec,
         problem_spec::ProblemSpec,
-        robot_ICs,
+        # robot_ICs,
         env_graph,
         args...
     )
-    sched = construct_partial_project_schedule(
-        project_spec,
-        problem_spec,
-        robot_ICs,
-        )
+    # sched = construct_partial_project_schedule(
+    #     project_spec,
+    #     problem_spec,
+    #     robot_ICs,
+    #     )
     env = construct_search_env(
         solver,
         sched,
@@ -120,29 +121,30 @@ function pctapf_problem(
     PC_TAPF(env)
 end
 function PC_TAPF(solver,def::SimpleProblemDef,env::GridFactoryEnvironment)
-    proj_spec, prob_spec, _, _, robot_ICs = construct_task_graphs_problem(def,env)
-    pctapf = pctapf_problem(solver,proj_spec,prob_spec,robot_ICs,env)
+    sched, prob_spec, env, _ = construct_task_graphs_problem(def,env)
+    pctapf = pctapf_problem(solver,sched,prob_spec,env)
     return pctapf
 end
 
 function pcta_problem(
-        project_spec::ProjectSpec,
+        # project_spec::ProjectSpec,
+        sched::OperatingSchedule,
         problem_spec::ProblemSpec,
-        robot_ICs,
+        # robot_ICs,
         env_graph,
         primary_objective = MakeSpan()
     )
-    project_schedule = construct_partial_project_schedule(
-        project_spec,
-        problem_spec,
-        robot_ICs,
-        )
-    cache=initialize_planning_cache(project_schedule)
-    cost_model = typeof(primary_objective)(project_schedule,cache)
+    # sched = construct_partial_project_schedule(
+    #     project_spec,
+    #     problem_spec,
+    #     robot_ICs,
+    #     )
+    cache=initialize_planning_cache(sched)
+    cost_model = typeof(primary_objective)(sched,cache)
     heuristic_model = NullHeuristic()
-    layers = construct_environment_layer_dict(project_schedule,env_graph,problem_spec)
+    layers = construct_environment_layer_dict(sched,env_graph,problem_spec)
     env = SearchEnv(
-        schedule=project_schedule,
+        schedule=sched,
         cache=cache,
         env_layers=layers,
         cost_model = cost_model,
@@ -151,9 +153,9 @@ function pcta_problem(
     PC_TA(env)
 end
 
-function PC_TA(def::SimpleProblemDef,env::GridFactoryEnvironment,objective)
-    proj_spec, prob_spec, _, _, robot_ICs = construct_task_graphs_problem(def,env)
-    pcta = pcta_problem(proj_spec,prob_spec,robot_ICs,env,objective)
+function PC_TA(def::SimpleProblemDef,env::GridFactoryEnvironment,objective=MakeSpan())
+    sched, prob_spec, env, _ = construct_task_graphs_problem(def,env)
+    pcta = pcta_problem(sched,prob_spec,env,objective)
 end
 # This is a place to put reusable problem initializers for testing
 """
@@ -176,25 +178,27 @@ function pctapf_problem_1(;cost_function=SumOfMakeSpans(),verbose=false,Δt_op=0
     env_graph = construct_factory_env_from_vtx_grid(
         vtx_grid;
     )
-    project_spec, robot_ICs = pctapf_problem(r0,s0,sF)
+    project_spec, robot_ICs = empty_pctapf_problem(r0,s0,sF)
     add_operation!(project_spec,construct_operation(project_spec,-1,[1,2],[3],Δt_op))
     add_operation!(project_spec,construct_operation(project_spec,-1,[3],  [], Δt_op))
     assignment_dict = Dict(1=>[1,3],2=>[2])
 
     def = SimpleProblemDef(project_spec,r0,s0,sF)
-    project_spec, problem_spec, _, _, robot_ICs = construct_task_graphs_problem(
+    sched, problem_spec = construct_task_graphs_problem(
         def,env_graph;cost_function=cost_function,Δt_collect=Δt_collect,Δt_deliver=Δt_deliver)
-    return project_spec, problem_spec, robot_ICs, env_graph, assignment_dict
+    return sched, problem_spec, env_graph, assignment_dict
 end
 
 """
-    In this problem robot 1 will first do [1-9-17], then [17-21-35]
-    robot 2 will do [4-12-32]. The key thing is that robot 1 will need to wait
-    until robot 2 is finished before robot 1 can do its second task.
+    pctapf_problem_2(;cost_function=SumOfMakeSpans(),verbose=false)
 
-    Optimal paths:
-    Optimal MakeSpan = 8
-    Optimal SumOfMakeSpans = 8
+In this problem robot 1 will first do [1-9-17], then [17-21-35]
+robot 2 will do [4-12-32]. The key thing is that robot 1 will need to wait
+until robot 2 is finished before robot 1 can do its second task.
+
+Optimal paths:
+Optimal MakeSpan = 8
+Optimal SumOfMakeSpans = 8
 """
 function pctapf_problem_2(;cost_function=SumOfMakeSpans(),verbose=false)
     N = 2                  # num robots
@@ -214,43 +218,29 @@ function pctapf_problem_2(;cost_function=SumOfMakeSpans(),verbose=false)
     env_graph = construct_factory_env_from_vtx_grid(
         vtx_grid;
     )
-    project_spec, robot_ICs = pctapf_problem(r0,s0,sF)
+    project_spec, robot_ICs = empty_pctapf_problem(r0,s0,sF)
 
     add_operation!(project_spec,construct_operation(project_spec,-1,[1,2],[3],0))
     add_operation!(project_spec,construct_operation(project_spec,-1,[3],  [], 0))
     assignment_dict = Dict(1=>[1,3],2=>[2])
 
     def = SimpleProblemDef(project_spec,r0,s0,sF)
-    project_spec, problem_spec, _, _, robot_ICs = construct_task_graphs_problem(
+    sched, problem_spec = construct_task_graphs_problem(
         def,env_graph;cost_function=cost_function)
-    if verbose
-        problem_description = """
-            TOY PROBLEM 2
-
-            In this problem robot 1 will need to wait while robot 2 finishes.
-            First operation:
-                robot 1 does [1-5-9]
-                robot 2 does [4-8-32]
-            Second operation:
-                robot 1 does [9-13-17]
-
-        """
-        print_toy_problem_specs(problem_description,vtx_grid,r0,s0,sF,project_spec)
-    end
-    return project_spec, problem_spec, robot_ICs, env_graph, assignment_dict
+    return sched, problem_spec, env_graph, assignment_dict
 end
 
 """
-    #### TOY PROBLEM 3 ####
+    pctapf_problem_3(;cost_function=SumOfMakeSpans(),verbose=false,Δt_op=0,Δt_collect=[0,0,0,0],Δt_deliver=[0,0,0,0])
 
-    In this problem robot 2 will need to yield to let robot 1 through.
-    First operation:
-        robot 1 does [2-2-30]
-    Second operation:
-        robot 1 does [30-30-32]
-        robot 2 does [5-7-8]
-    Third operation:
-        robot 2 does [8-12-16]
+In this problem robot 2 will need to yield to let robot 1 through.
+First operation:
+    robot 1 does [2-2-30]
+Second operation:
+    robot 1 does [30-30-32]
+    robot 2 does [5-7-8]
+Third operation:
+    robot 2 does [8-12-16]
 """
 function pctapf_problem_3(;cost_function=SumOfMakeSpans(),verbose=false,Δt_op=0,Δt_collect=[0,0,0,0],Δt_deliver=[0,0,0,0])
     N = 2                  # num robots
@@ -270,7 +260,7 @@ function pctapf_problem_3(;cost_function=SumOfMakeSpans(),verbose=false,Δt_op=0
     env_graph = construct_factory_env_from_vtx_grid(
         vtx_grid;
     )
-    project_spec, robot_ICs = pctapf_problem(r0,s0,sF)
+    project_spec, robot_ICs = empty_pctapf_problem(r0,s0,sF)
 
     add_operation!(project_spec,construct_operation(project_spec,-1,[1],[2],0.0))
     add_operation!(project_spec,construct_operation(project_spec,-1,[2,3],[4],0.0))
@@ -278,38 +268,22 @@ function pctapf_problem_3(;cost_function=SumOfMakeSpans(),verbose=false,Δt_op=0
     assignment_dict = Dict(1=>[1,2],2=>[3,4])
 
     def = SimpleProblemDef(project_spec,r0,s0,sF)
-    project_spec, problem_spec, _, _, robot_ICs = construct_task_graphs_problem(
+    sched, problem_spec = construct_task_graphs_problem(
         def,env_graph;cost_function=cost_function,Δt_collect=Δt_collect,Δt_deliver=Δt_deliver)
 
-    if verbose
-        problem_description = """
-
-        #### TOY PROBLEM 3 ####
-
-        In this problem robot 2 will need to yield to let robot 1 through.
-        First operation:
-            robot 1 does [2-2-30]
-        Second operation:
-            robot 1 does [30-30-32]
-            robot 2 does [5-7-8]
-        Third operation:
-            robot 2 does [8-12-16]
-        """
-        print_toy_problem_specs(problem_description,vtx_grid,r0,s0,sF,project_spec)
-    end
-    return project_spec, problem_spec, robot_ICs, env_graph, assignment_dict
+    return sched, problem_spec, env_graph, assignment_dict
 end
 
 
 """
-    #### TOY PROBLEM 4 ####
+    pctapf_problem_4(;cost_function=SumOfMakeSpans(),verbose=false)
 
-    In this problem the cost of the task assignment problem is lower than the
-    true cost (which requires that one of the robots is delayed by a single time
-    step)
-    First operation:
-        robot 1 does [2-2-8]
-        robot 2 does [4-4-6]
+In this problem the cost of the task assignment problem is lower than the
+true cost (which requires that one of the robots is delayed by a single time
+step)
+First operation:
+    robot 1 does [2-2-8]
+    robot 2 does [4-4-6]
 """
 function pctapf_problem_4(;cost_function=SumOfMakeSpans(),verbose=false)
     N = 2                  # num robots
@@ -325,46 +299,27 @@ function pctapf_problem_4(;cost_function=SumOfMakeSpans(),verbose=false)
         vtx_grid;
     )
 
-    project_spec, robot_ICs = pctapf_problem(r0,s0,sF)
+    project_spec, robot_ICs = empty_pctapf_problem(r0,s0,sF)
     add_operation!(project_spec,construct_operation(project_spec,-1,[1,2],[],0))
     assignment_dict = Dict(1=>[1],2=>[2])
 
     def = SimpleProblemDef(project_spec,r0,s0,sF)
-    project_spec, problem_spec, _, _, robot_ICs = construct_task_graphs_problem(
+    sched, problem_spec = construct_task_graphs_problem(
         def,env_graph;cost_function=cost_function)
 
-    if verbose
-        problem_description = """
-
-        #### TOY PROBLEM 4 ####
-
-        In this problem the cost of the task assignment problem is lower than the
-        true cost (which requires that one of the robots is delayed by a single time
-        step)
-        First operation:
-            robot 1 does [2-2-8]
-            robot 2 does [4-4-6]
-
-        As a result, the MILP solver will try switching assignment, see that the
-        cost of the switch is higher than the cost of the path planning for the
-        first assignment, and return with an optimality gap of -1.0.
-
-        """
-        print_toy_problem_specs(problem_description,vtx_grid,r0,s0,sF,project_spec)
-    end
-    return project_spec, problem_spec, robot_ICs, env_graph, assignment_dict
+    return sched, problem_spec, env_graph, assignment_dict
 end
 
 
 """
-    #### TOY PROBLEM 5 ####
+    pctapf_problem_5(;cost_function=SumOfMakeSpans(),verbose=false)
 
-    In this problem the robots try to pass through each other in such a way that
-    an edge conflict is generated.
+In this problem the robots try to pass through each other in such a way that
+an edge conflict is generated.
 
-    First operation:
-        robot 1 does [3-11]
-        robot 2 does [15-7]
+First operation:
+    robot 1 does [3-11]
+    robot 2 does [15-7]
 """
 function pctapf_problem_5(;cost_function=SumOfMakeSpans(),verbose=false)
     N = 2                  # num robots
@@ -381,38 +336,24 @@ function pctapf_problem_5(;cost_function=SumOfMakeSpans(),verbose=false)
         vtx_grid;
     )
 
-    project_spec, robot_ICs = pctapf_problem(r0,s0,sF)
+    project_spec, robot_ICs = empty_pctapf_problem(r0,s0,sF)
     add_operation!(project_spec,construct_operation(project_spec,-1,[1,2],[],0))
     assignment_dict = Dict(1=>[1],2=>[2])
 
     def = SimpleProblemDef(project_spec,r0,s0,sF)
-    project_spec, problem_spec, _, _, robot_ICs = construct_task_graphs_problem(
+    sched, problem_spec = construct_task_graphs_problem(
         def,env_graph;cost_function=cost_function)
 
-    if verbose
-        problem_description =
-        """
-
-        #### TOY PROBLEM 5 ####
-
-        In this problem the robots try to pass through each other in such a way that
-        an edge conflict is generated.
-
-        First operation:
-            robot 1 does [3-11]
-            robot 2 does [15-7]
-
-        """
-        print_toy_problem_specs(problem_description,vtx_grid,r0,s0,sF,project_spec)
-    end
-    return project_spec, problem_spec, robot_ICs, env_graph, assignment_dict
+    return sched, problem_spec, env_graph, assignment_dict
 end
 
 """
-    Identical to problem 2, but process time is non-zero.
-    In this problem robot 1 will first do [1-5-9], then [9-13-17]
-    robot 2 will do [4-8-32]. The key thing is that robot 1 will need to wait
-    until robot 2 is finished before robot 1 can do its second task
+    pctapf_problem_6(;cost_function=SumOfMakeSpans(),verbose=false,Δt_op=1,Δt_collect=[0,0,0],Δt_deliver=[0,0,0])
+
+Identical to `pctapf_problem_2`, but process time is non-zero.
+In this problem robot 1 will first do [1-5-9], then [9-13-17]
+robot 2 will do [4-8-32]. The key thing is that robot 1 will need to wait
+until robot 2 is finished before robot 1 can do its second task
 """
 function pctapf_problem_6(;cost_function=SumOfMakeSpans(),verbose=false,Δt_op=1,Δt_collect=[0,0,0],Δt_deliver=[0,0,0])
     N = 2                  # num robots
@@ -433,25 +374,24 @@ function pctapf_problem_6(;cost_function=SumOfMakeSpans(),verbose=false,Δt_op=1
         vtx_grid;
     )
 
-    project_spec, robot_ICs = pctapf_problem(r0,s0,sF)
+    project_spec, robot_ICs = empty_pctapf_problem(r0,s0,sF)
     add_operation!(project_spec,construct_operation(project_spec,-1,[1,2],[3],Δt_op))
     add_operation!(project_spec,construct_operation(project_spec,-1,[3],  [], Δt_op))
     assignment_dict = Dict(1=>[1,3],2=>[2])
 
     def = SimpleProblemDef(project_spec,r0,s0,sF)
-    project_spec, problem_spec, _, _, robot_ICs = construct_task_graphs_problem(
+    sched, problem_spec = construct_task_graphs_problem(
         def,env_graph;cost_function=cost_function,Δt_collect=Δt_collect,Δt_deliver=Δt_deliver)
 
-    if verbose
-        print_toy_problem_specs("TOY PROBLEM 6",vtx_grid,r0,s0,sF,project_spec)
-    end
-    return project_spec, problem_spec, robot_ICs, env_graph, assignment_dict
+    return sched, problem_spec, env_graph, assignment_dict
 end
 
 
 """
-    Robot 2 will have to sit and wait at the pickup station, meaning that robot 1 will have to go around
-    if robot 2 is on the critical path
+    pctapf_problem_7(;cost_function=SumOfMakeSpans(),verbose=false,Δt_op=0,Δt_collect=[0,4,0],Δt_deliver=[0,0,0])
+
+Robot 2 will have to sit and wait at the pickup station, meaning that robot 1 
+will have to go around if robot 2 is on the critical path
 """
 function pctapf_problem_7(;cost_function=SumOfMakeSpans(),verbose=false,Δt_op=0,Δt_collect=[0,4,0],Δt_deliver=[0,0,0])
     N = 2                  # num robots
@@ -468,26 +408,24 @@ function pctapf_problem_7(;cost_function=SumOfMakeSpans(),verbose=false,Δt_op=0
         vtx_grid;
     )
 
-    project_spec, robot_ICs = pctapf_problem(r0,s0,sF)
+    project_spec, robot_ICs = empty_pctapf_problem(r0,s0,sF)
     add_operation!(project_spec,construct_operation(project_spec,-1,[1,2],[3],Δt_op))
     add_operation!(project_spec,construct_operation(project_spec,-1,[3],  [], Δt_op))
     assignment_dict = Dict(1=>[1,3],2=>[2])
 
     def = SimpleProblemDef(project_spec,r0,s0,sF)
-    project_spec, problem_spec, _, _, robot_ICs = construct_task_graphs_problem(
+    sched, problem_spec = construct_task_graphs_problem(
         def,env_graph;cost_function=cost_function,Δt_collect=Δt_collect,Δt_deliver=Δt_deliver)
-
-    if verbose
-        print_toy_problem_specs("TOY PROBLEM 7",vtx_grid,r0,s0,sF,project_spec)
-    end
-    return project_spec, problem_spec, robot_ICs, env_graph, assignment_dict
+    return sched, problem_spec, env_graph, assignment_dict
 end
 
 """
-    two-headed project. Robot 1 does the first half of the first head, and
-    robot 2 handles the first half of the second head, and then they swap.
-    Optimal MakeSpan = 8
-    Optimal SumOfMakeSpans = 16
+    pctapf_problem_8(;cost_function=SumOfMakeSpans(),verbose=false,Δt_op=0,Δt_collect=[0,0,0,0],Δt_deliver=[0,0,0,0])
+
+Two-headed project. Robot 1 does the first half of the first head, and
+robot 2 handles the first half of the second head, and then they swap.
+Optimal MakeSpan = 8
+Optimal SumOfMakeSpans = 16
 """
 function pctapf_problem_8(;cost_function=SumOfMakeSpans(),verbose=false,Δt_op=0,Δt_collect=[0,0,0,0],Δt_deliver=[0,0,0,0])
     N = 2                  # num robots
@@ -508,7 +446,7 @@ function pctapf_problem_8(;cost_function=SumOfMakeSpans(),verbose=false,Δt_op=0
         vtx_grid;
     )
 
-    project_spec, robot_ICs = pctapf_problem(r0,s0,sF)
+    project_spec, robot_ICs = empty_pctapf_problem(r0,s0,sF)
     add_operation!(project_spec,construct_operation(project_spec,-1,[1],[4],Δt_op))
     add_operation!(project_spec,construct_operation(project_spec,-1,[2],[3],Δt_op))
     add_operation!(project_spec,construct_operation(project_spec,-1,[4],[],Δt_op))
@@ -516,20 +454,19 @@ function pctapf_problem_8(;cost_function=SumOfMakeSpans(),verbose=false,Δt_op=0
     assignment_dict = Dict(1=>[1,3],2=>[2,4])
 
     def = SimpleProblemDef(project_spec,r0,s0,sF)
-    project_spec, problem_spec, _, _, robot_ICs = construct_task_graphs_problem(
+    sched, problem_spec = construct_task_graphs_problem(
         def,env_graph;cost_function=cost_function,Δt_collect=Δt_collect,Δt_deliver=Δt_deliver)
 
-
-    if verbose
-        print_toy_problem_specs("TOY PROBLEM 8",vtx_grid,r0,s0,sF,project_spec)
-    end
-    return project_spec, problem_spec, robot_ICs, env_graph, assignment_dict
+    return sched, problem_spec, env_graph, assignment_dict
 end
 
 export pctapf_problem_9
 
 """
-    Project with station-sharing. Station 5 needs to accessed by both robots for picking up their objects.
+    pctapf_problem_9(;cost_function=SumOfMakeSpans(),verbose=false,Δt_op=0,Δt_collect=[0,0],Δt_deliver=[0,0])
+
+Project with station-sharing. Station 5 needs to accessed by both robots for 
+picking up their objects.
 """
 function pctapf_problem_9(;cost_function=SumOfMakeSpans(),verbose=false,Δt_op=0,Δt_collect=[0,0],Δt_deliver=[0,0])
     N = 2                  # num robots
@@ -546,34 +483,28 @@ function pctapf_problem_9(;cost_function=SumOfMakeSpans(),verbose=false,Δt_op=0
         vtx_grid;
     )
 
-    project_spec, robot_ICs = pctapf_problem(r0,s0,sF)
+    project_spec, robot_ICs = empty_pctapf_problem(r0,s0,sF)
     add_operation!(project_spec,construct_operation(project_spec,-1,[1],[],Δt_op))
     add_operation!(project_spec,construct_operation(project_spec,-1,[2],[],Δt_op))
     assignment_dict = Dict(1=>[1],2=>[2])
 
     def = SimpleProblemDef(project_spec,r0,s0,sF)
-    project_spec, problem_spec, _, _, robot_ICs = construct_task_graphs_problem(
+    sched, problem_spec = construct_task_graphs_problem(
         def,env_graph;cost_function=cost_function,Δt_collect=Δt_collect,Δt_deliver=Δt_deliver)
 
-    if verbose
-        print_toy_problem_specs("""
-            TOY PROBLEM 9
-
-            Project with station-sharing. Station 5 needs to accessed by both robots for picking up their objects.
-            """,vtx_grid,r0,s0,sF,project_spec,problem_spec.graph)
-    end
-    return project_spec, problem_spec, robot_ICs, env_graph, assignment_dict
+    return sched, problem_spec, env_graph, assignment_dict
 end
 
 export pctapf_problem_10
 
 """
-    Motivation for backtracking in ISPS
+    pctapf_problem_10(;cost_function=MakeSpan(),verbose=false,Δt_op=0,Δt_collect=[0,0,0,0,0,0],Δt_deliver=[0,0,0,0,0,0])
 
-    The makespan optimal solution is T = 8. However, the optimistic schedule
-    will always prioritize task route planning for tasks 1,2, and 3 before 4.
-    This leads to a double delay that will not be caught without backtracking
-    in ISPS. Hence, the solver will return a solution with T = 9.
+Motivation for backtracking in ISPS
+The makespan optimal solution is T = 8. However, the optimistic schedule
+will always prioritize task route planning for tasks 1,2, and 3 before 4.
+This leads to a double delay that will not be caught without backtracking
+in ISPS. Hence, the solver will return a solution with T = 9.
 """
 function pctapf_problem_10(;cost_function=MakeSpan(),verbose=false,Δt_op=0,Δt_collect=[0,0,0,0,0,0],Δt_deliver=[0,0,0,0,0,0])
     N = 4                  # num robots
@@ -613,7 +544,7 @@ function pctapf_problem_10(;cost_function=MakeSpan(),verbose=false,Δt_op=0,Δt_
         vtx_grid;
     )
 
-    project_spec, robot_ICs = pctapf_problem(r0,s0,sF)
+    project_spec, robot_ICs = empty_pctapf_problem(r0,s0,sF)
     add_operation!(project_spec,construct_operation(project_spec,-1,[1,2,3,6],[],Δt_op))
     # add_operation!(project_spec,construct_operation(project_spec,-1,[2],[],Δt_op))
     add_operation!(project_spec,construct_operation(project_spec,-1,[4],[5],Δt_op))
@@ -622,31 +553,20 @@ function pctapf_problem_10(;cost_function=MakeSpan(),verbose=false,Δt_op=0,Δt_
     assignment_dict = Dict(1=>[1],2=>[2],3=>[3],4=>[4,5,6])
 
     def = SimpleProblemDef(project_spec,r0,s0,sF)
-    project_spec, problem_spec, _, _, robot_ICs = construct_task_graphs_problem(
+    sched, problem_spec = construct_task_graphs_problem(
         def,env_graph;cost_function=cost_function,Δt_collect=Δt_collect,Δt_deliver=Δt_deliver)
 
-    if verbose
-        print_toy_problem_specs("""
-            TOY PROBLEM 10
-
-            The makespan optimal solution is T = 8. However, the optimistic schedule
-            will always prioritize task route planning for tasks 1,2, and 3 before 4.
-            This leads to a double delay that will not be caught without backtracking
-            in ISPS. Hence, the solver will return a solution with T = 9.
-            """,vtx_grid,r0,s0,sF,project_spec,problem_spec.graph)
-    end
-    return project_spec, problem_spec, robot_ICs, env_graph, assignment_dict
+    return sched, problem_spec, env_graph, assignment_dict
 end
 
 export pctapf_problem_11
 
 """
-    #### TOY PROBLEM 11 ####
+    pctapf_problem_11
 
-    Requires collaborative transport: Robots 1 and 2 transport object 1 while
-    robot 3 transports object 2. Robot 3 will need to move over to let the other
-    robots pass.
-
+Requires collaborative transport: Robots 1 and 2 transport object 1 while
+robot 3 transports object 2. Robot 3 will need to move over to let the other
+robots pass.
 """
 function pctapf_problem_11(;
         cost_function = SumOfMakeSpans(),
@@ -670,7 +590,7 @@ function pctapf_problem_11(;
     )
     shapes = [(1, 2), (1, 1), (1, 1)]
 
-    project_spec, robot_ICs = pctapf_problem(r0, s0, sF)
+    project_spec, robot_ICs = empty_pctapf_problem(r0, s0, sF)
     add_operation!(
         project_spec,
         construct_operation(project_spec, -1, [1, 2], [3], Δt_op),
@@ -682,16 +602,16 @@ function pctapf_problem_11(;
     assignment_dict = Dict(1 => [1,3], 2 => [1], 3 => [2])
 
     def = SimpleProblemDef(project_spec,r0,s0,sF,shapes)
-    project_spec, problem_spec, _, _, robot_ICs = construct_task_graphs_problem(
+    sched, problem_spec = construct_task_graphs_problem(
         def,env_graph;cost_function=cost_function,Δt_collect=Δt_collect,Δt_deliver=Δt_deliver)
 
-    return project_spec, problem_spec, robot_ICs, env_graph, assignment_dict
+    return sched, problem_spec, env_graph, assignment_dict
 end
 
 export pctapf_problem_12
 
 """
-    #### TOY PROBLEM 12 ####
+    pctapf_problem_12(;
 
 Robot 1 will plan a path first, but then that path will need to be extended by
 one time step because robot 2 will get delayed by robot 3, which is on the
@@ -719,19 +639,19 @@ function pctapf_problem_12(;
     config = (tasks=tasks,shapes=shapes,ops=ops)
     assignment_dict = Dict(1=>[1],2=>[2],3=>[3])
     def = pctapf_problem(r0,config)
-    project_spec, problem_spec, _, _, robot_ICs = construct_task_graphs_problem(
+    sched, problem_spec = construct_task_graphs_problem(
         def,env_graph;cost_function=cost_function)
 
-    return project_spec, problem_spec, robot_ICs, env_graph, assignment_dict
+    return sched, problem_spec, env_graph, assignment_dict
 end
 
 export pctapf_problem_13
 
 """
-    #### TOY PROBLEM 13 ####
+    pctapf_problem_13
 
-Same as problem 12, except that there is a 4th robot who must collect object 1
-with robot 1.
+Same as `pctapf_problem_12`, except that there is a 4th robot who must collect 
+object 1 with robot 1.
 """
 function pctapf_problem_13(;
         cost_function = MakeSpan(),
@@ -754,10 +674,10 @@ function pctapf_problem_13(;
     config = (tasks=tasks,shapes=shapes,ops=ops)
     assignment_dict = Dict(1=>[1],2=>[2],3=>[3],4=>[1])
     def = pctapf_problem(r0,config)
-    project_spec, problem_spec, _, _, robot_ICs = construct_task_graphs_problem(
+    sched, problem_spec = construct_task_graphs_problem(
         def,env_graph;cost_function=cost_function)
 
-    return project_spec, problem_spec, robot_ICs, env_graph, assignment_dict
+    return sched, problem_spec, env_graph, assignment_dict
 end
 
 
@@ -845,7 +765,7 @@ function replanning_problem(solver,r0,defs,env_graph;
     for (i,def) in enumerate(defs)
         s0 = map(i->i.first,def.tasks)
         sF = map(i->i.second,def.tasks)
-        spec, _ = pctapf_problem(r0,s0,sF)
+        spec, _ = empty_pctapf_problem(r0,s0,sF)
         for op in def.ops
             add_operation!(spec,construct_operation(spec,-1,op.inputs,op.outputs,Δt_op))
         end
@@ -1029,16 +949,16 @@ end
 #         tasks=[1=>4,8=>16],
 #         ops=[ (inputs=[1],outputs=[]), (inputs=[2],outputs=[]) ] )
 #     )
-#     project_spec, robot_ICs = pctapf_problem(r0,s0,sF)
+#     project_spec, robot_ICs = empty_pctapf_problem(r0,s0,sF)
 #
 #     add_operation!(project_spec,construct_operation(project_spec,-1,[1,2],[3],0))
 #     add_operation!(project_spec,construct_operation(project_spec,-1,[3],  [], 0))
 #     assignment_dict = Dict(1=>[1,3],2=>[2])
 #
 #     def = SimpleProblemDef(project_spec,r0,s0,sF)
-#     project_spec, problem_spec, _, _, robot_ICs = construct_task_graphs_problem(
+#     sched, problem_spec = construct_task_graphs_problem(
 #         def,env_graph;cost_function=cost_function)
-#     return project_spec, problem_spec, robot_ICs, env_graph, assignment_dict
+#     return sched, problem_spec, env_graph, assignment_dict
 # end
 
 

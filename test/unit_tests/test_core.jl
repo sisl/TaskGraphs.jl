@@ -219,9 +219,10 @@ end
 # Test process_schedule
 let
     solver = TaskGraphsMILPSolver(AssignmentMILP())
-    project_spec, problem_spec, robot_ICs, env_graph, _ = pctapf_problem_1()
+    # project_spec, problem_spec, robot_ICs, env_graph, _ = pctapf_problem_1()
+    sched, problem_spec, env_graph, _ = pctapf_problem_1()
 
-    sched = construct_partial_project_schedule(project_spec,problem_spec,robot_ICs)
+    # sched = construct_partial_project_schedule(project_spec,problem_spec,robot_ICs)
     model = formulate_milp(solver,sched,problem_spec;cost_model=MakeSpan())
     optimize!(model)
     @test termination_status(model) == MOI.OPTIMAL
@@ -243,7 +244,12 @@ let
     end
 end
 let
-    project_spec, problem_spec, robot_ICs, env_graph, _ = pctapf_problem_1()
+    r0 = [1,4]
+    s0 = [5,8,14]
+    sF = [13,12,15]
+    project_spec, robot_ICs = TaskGraphs.empty_pctapf_problem(r0,s0,sF)
+    add_operation!(project_spec,construct_operation(project_spec,-1,[1,2],[3],0))
+    add_operation!(project_spec,construct_operation(project_spec,-1,[3],  [], 0))
 
     filename = "/tmp/project_spec.toml"
     open(filename, "w") do io

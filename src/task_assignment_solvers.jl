@@ -468,15 +468,26 @@ function formulate_milp(milp_model::AssignmentMILP,sched::OperatingSchedule,prob
             Δt[object_map[id]] = get_min_duration(sched,parent)
         end
     end
-    @assert all(r0 .== problem_spec.r0)
-    @assert all(s0 .== problem_spec.s0)
-    @assert all(sF .== problem_spec.sF)
-    @assert all(Δt_collect .== problem_spec.Δt_collect)
-    @assert all(Δt_deliver .== problem_spec.Δt_deliver)
-    @assert all(Δt .== problem_spec.Δt)
+    # @assert all(r0 .== problem_spec.r0)
+    # @assert all(s0 .== problem_spec.s0)
+    # @assert all(sF .== problem_spec.sF)
+    # @assert all(Δt_collect .== problem_spec.Δt_collect)
+    # @assert all(Δt_deliver .== problem_spec.Δt_deliver)
+    # @assert all(Δt .== problem_spec.Δt)
     # from ProblemSpec
-    terminal_vtxs = problem_spec.terminal_vtxs
-    weights = problem_spec.weights
+    terminal_vtxs = Vector{Set{Int}}()
+    for (op_id,op) in get_operations(sched)
+        if is_terminal_node(sched,op_id)
+            s = Set{Int}()
+            for o in preconditions(op)
+                push!(s,object_map[get_object_id(o)])
+            end
+            push!(terminal_vtxs,s)
+        end
+    end
+    weights = map(s->1,terminal_vtxs)
+    # terminal_vtxs = problem_spec.terminal_vtxs
+    # weights = problem_spec.weights
     D = problem_spec.D
 
     # Define optimization model

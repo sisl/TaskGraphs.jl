@@ -20,16 +20,17 @@ let
                 TaskGraphsMILPSolver(GreedyAssignment()),
             ]
                     # MILP formulations alone
-                project_spec, problem_spec, robot_ICs, env_graph, _ = f(
+                # project_spec, problem_spec, robot_ICs, env_graph, _ = f(
+                sched, problem_spec, _, _ = f(
                     ;
                     cost_function = cost_model,
                     verbose = false,
                 )
-                sched = construct_partial_project_schedule(
-                    project_spec,
-                    problem_spec,
-                    robot_ICs
-                )
+                # sched = construct_partial_project_schedule(
+                #     project_spec,
+                #     problem_spec,
+                #     robot_ICs
+                # )
                 model = formulate_milp(
                     solver,
                     sched,
@@ -70,17 +71,13 @@ let
         ]
             for (i, cost_model) in enumerate([MakeSpan(), SumOfMakeSpans()])
                 let
-                    project_spec,
-                    problem_spec,
-                    robot_ICs,
-                    _,
-                    env_graph = f(; cost_function = cost_model, verbose = false)
+                    sched, problem_spec, env_graph, _ = f(; cost_function = cost_model, verbose = false)
                     let
-                        sched = construct_partial_project_schedule(
-                            project_spec,
-                            problem_spec,
-                            robot_ICs,
-                        )
+                        # sched = construct_partial_project_schedule(
+                        #     project_spec,
+                        #     problem_spec,
+                        #     robot_ICs,
+                        # )
                         model = formulate_milp(
                             solver,
                             sched,
@@ -110,11 +107,7 @@ let
                 (SumOfMakeSpans(), [7, 8, 9])
             ]
                 let
-                    project_spec,
-                    problem_spec,
-                    robot_ICs,
-                    _,
-                    env_graph = pctapf_problem_9(
+                    sched, problem_spec, env_graph, _ = pctapf_problem_9(
                         ;
                         cost_function = cost_model,
                         verbose = false,
@@ -122,11 +115,11 @@ let
                         Δt_collect = [dt, 0],
                         Δt_deliver = [0, 0],
                     )
-                    sched = construct_partial_project_schedule(
-                        project_spec,
-                        problem_spec,
-                        robot_ICs,
-                    )
+                    # sched = construct_partial_project_schedule(
+                    #     project_spec,
+                    #     problem_spec,
+                    #     robot_ICs,
+                    # )
                     model = formulate_milp(
                         solver,
                         sched,
@@ -146,12 +139,13 @@ let
 end
 # Job shop constraints
 let
-    project_spec, problem_spec, robot_ICs, env_graph, _ = pctapf_problem_9(;
+    # project_spec, problem_spec, robot_ICs, env_graph, _ = pctapf_problem_9(;
+    sched, problem_spec, env_graph, _ = pctapf_problem_9(;
         verbose=false,Δt_op=0,Δt_collect=[0,0],Δt_deliver=[0,0]
         );
     cost_model=SumOfMakeSpans()
     solver=TaskGraphsMILPSolver(AssignmentMILP())
-    sched = construct_partial_project_schedule(project_spec,problem_spec,robot_ICs)
+    # sched = construct_partial_project_schedule(project_spec,problem_spec,robot_ICs)
     model = formulate_milp(solver,sched,problem_spec;cost_model=cost_model)
     optimize!(model)
     @test termination_status(model) == MathOptInterface.OPTIMAL
