@@ -422,18 +422,19 @@ Keyword Args:
 Outputs:
     `model` - an optimization model of type `T`
 """
-function formulate_milp(milp_model::AssignmentMILP,sched::OperatingSchedule,problem_spec::ProblemSpec;
-    optimizer=Gurobi.Optimizer,
-    cost_model=problem_spec.cost_function,
-    kwargs...)
-    formulate_optimization_problem(problem_spec,optimizer;cost_model=cost_model,kwargs...)
-end
+# function formulate_milp(milp_model::AssignmentMILP,sched::OperatingSchedule,problem_spec::ProblemSpec;
+#     optimizer=Gurobi.Optimizer,
+#     cost_model=problem_spec.cost_function,
+#     kwargs...)
+#     formulate_optimization_problem(problem_spec,optimizer;cost_model=cost_model,kwargs...)
+# end
 function formulate_milp(milp_model::AssignmentMILP,sched::OperatingSchedule,problem_spec::ProblemSpec;
     optimizer=Gurobi.Optimizer,
     cost_model=problem_spec.cost_function,
     TimeLimit=100,
     OutputFlag=0,
     Presolve = -1, # automatic setting (-1), off (0), conservative (1), or aggressive (2)
+    Mm = 10000,
     kwargs...)
 
     # setup
@@ -442,20 +443,21 @@ function formulate_milp(milp_model::AssignmentMILP,sched::OperatingSchedule,prob
     robot_map = Dict{BotID,Int}(id=>k for (k,id) in enumerate(robot_ids))
     object_ids = Vector{ObjectID}(sort(collect(keys(get_object_ICs(sched)))))
     object_map = Dict{ObjectID,Int}(id=>k for (k,id) in enumerate(object_ids))
-    r0 = map(id->get_initial_location_id(sched,id),robot_ids) # initial robot locations
-    s0 = map(id->get_initial_location_id(sched,id),object_ids) # initial object locations
+    r0 = map(id->get_id(get_initial_location_id(get_node(sched,id))),robot_ids) # initial robot locations
+    s0 = map(id->get_id(get_initial_location_id(get_node(sched,id))),object_ids) # initial object locations
     N = length(r0) # number of robots
     M = length(s0) # number of delivery tasks
-    tr0_ = Dict{Int,Int}(i=>get_t0(sched,robot_ids[i]),1:N) # robot availability times
-    to0_ = Dict{Int,Int}(i=>get_t0(sched,object_ids[i]),1:M) # object availability times
+    tr0_ = Dict{Int,Int}(i=>get_t0(sched,id) for (i,id) in enumerate(robot_ids)) # robot availability times
+    to0_ = Dict{Int,Int}(i=>get_t0(sched,id) for (i,id) in enumerate(object_ids) if is_root_node(sched,id)) # initial object availability times
     Δt_collect = zeros(Int,M)
     Δt_deliver = zeros(Int,M)
-    Δt_parent_op = zeros(Int,M)
+    sF = zeros(Int,M)
     for (v,n) in enumerate(get_nodes(sched))
         if matches_node_type(n,BOT_COLLECT)
-            Δt_collect[object_map[get_object_id(n)]] = min_duration(n)
-        else if matches_node_type(n,BOT_DEPOSIT)
-            Δt_deposit[object_map[get_object_id(n)]] = min_duration(n)
+            Δt_collect[object_map[get_object_id(n)]] = get_min_duration(n)
+        elseif matches_node_type(n,BOT_DEPOSIT)
+            Δt_deliver[object_map[get_object_id(n)]] = get_min_duration(n)
+            sF[object_map[get_object_id(n)]] = get_id(get_destination_location_id(n))
         end
     end
     Δt = zeros(Int,M) # the (parent operation duration) for each object
@@ -463,15 +465,20 @@ function formulate_milp(milp_model::AssignmentMILP,sched::OperatingSchedule,prob
         if !is_root_node(sched,id)
             parent = get_node(sched,inneighbors(sched,id)[1])
             @assert matches_node_type(parent,Operation)
-            Δt[object_map[id]] = min_duration(sched,parent)
+            Δt[object_map[id]] = get_min_duration(sched,parent)
         end
     end
+    @assert all(r0 .== problem_spec.r0)
+    @assert all(s0 .== problem_spec.s0)
+    @assert all(sF .== problem_spec.sF)
+    @assert all(Δt_collect .== problem_spec.Δt_collect)
+    @assert all(Δt_deliver .== problem_spec.Δt_deliver)
+    @assert all(Δt .== problem_spec.Δt)
     # from ProblemSpec
-    G = problem_spec.graph # delivery_graph
-    # Δt = spec.Δt 
-    terminal_vtxs = spec.terminal_vtxs,
-    weights = spec.weights
-    D = spec.D
+    # G = problem_spec.graph # delivery_graph
+    terminal_vtxs = problem_spec.terminal_vtxs
+    weights = problem_spec.weights
+    D = problem_spec.D
 
     # Define optimization model
     model = Model(optimizer_with_attributes(optimizer,
@@ -500,22 +507,36 @@ function formulate_milp(milp_model::AssignmentMILP,sched::OperatingSchedule,prob
         # start time for task j (applies only to tasks with no prereqs)
         @constraint(model, to0[j] == t)
     end
-    # for (i,j) in assignments
-    #     @constraint(model, X[i,j] == 1)
-    # end
-    # constraints
-    for j in 1:M
-        # constraint on task start time
-        if !is_root_node(G,j)
-            for v in inneighbors(G,j)
-                @constraint(model, to0[j] >= tof[v] + Δt[j])
+    precedence_graph = CustomNDiGraph{Nothing,ObjectID}()
+    for id in object_ids
+        add_node!(precedence_graph,nothing,id)
+    end
+    # precedence constraints on task start time
+    for (op_id,op) in get_operations(sched)
+        for input in preconditions(op)
+            i = object_map[get_object_id(input)]
+            for output in postconditions(op)
+                j = object_map[get_object_id(output)]
+                @constraint(model, to0[j] >= tof[i] + duration(op))
+                add_edge!(precedence_graph,get_object_id(input),get_object_id(output))
             end
         end
+    end
+    # propagate upstream edges through precedence graph
+    for v in topological_sort_by_dfs(precedence_graph)
+        for v1 in inneighbors(precedence_graph,v)
+            for v2 in outneighbors(precedence_graph,v)
+                add_edge!(precedence_graph,v1,v2)
+            end
+        end
+        add_edge!(precedence_graph,v,v)
+    end
+    # constraints
+    for j in 1:M
         # constraint on dummy robot start time (corresponds to moment of object delivery)
         @constraint(model, tr0[j+N] == tof[j])
         # dummy robots can't do upstream jobs
-        upstream_jobs = [j, map(e->e.dst,collect(edges(bfs_tree(G,j;dir=:in))))...]
-        for v in upstream_jobs
+        for v in inneighbors(precedence_graph,j)
             @constraint(model, X[j+N,v] == 0)
         end
         # lower bound on task completion time (task can't start until it's available).
