@@ -761,7 +761,7 @@ function replanning_problem(solver,r0,defs,env_graph;
         )
     requests = Vector{ProjectRequest}()
     problem_spec = nothing
-    robot_ICs = nothing
+    robot_ICs = map(i->ROBOT_AT(i,r0[i]),1:length(r0))
     for (i,def) in enumerate(defs)
         s0 = map(i->i.first,def.tasks)
         sF = map(i->i.second,def.tasks)
@@ -771,16 +771,16 @@ function replanning_problem(solver,r0,defs,env_graph;
         end
         if i == 1
             problem_def = SimpleProblemDef(spec,r0,s0,sF)
-            _, problem_spec, _, _, robot_ICs = construct_task_graphs_problem(
+            _, problem_spec = construct_task_graphs_problem(
                 problem_def,env_graph;
                 cost_function=cost_function)
         end
-        project_schedule = construct_partial_project_schedule(
+        sched = construct_partial_project_schedule(
             spec,
             problem_spec,
             )
         t = t0+spacing*(i-1)
-        push!(requests,ProjectRequest(project_schedule,t,t))
+        push!(requests,ProjectRequest(sched,t,t))
     end
 
     base_schedule = construct_partial_project_schedule(
