@@ -273,12 +273,6 @@ function formulate_optimization_problem(N,M,G,D,Δt,Δt_collect,Δt_deliver,to0_
     # Mm = sum([D[s1,s2] for s1 in r0 for s2 in s0]) + sum([D[s1,s2] for s1 in s0 for s2 in sF])
     )
 
-    # model = Model(with_optimizer(optimizer,
-    #     TimeLimit=TimeLimit,
-    #     OutputFlag=OutputFlag,
-    #     Presolve=Presolve
-    #     ))
-
     model = Model(optimizer_with_attributes(optimizer,
         "TimeLimit"=>TimeLimit,
         "OutputFlag"=>OutputFlag,

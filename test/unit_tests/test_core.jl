@@ -10,7 +10,6 @@ let
 end
 let
     spec = ProjectSpec()
-    get_initial_nodes(spec)
 
     TaskGraphs.set_initial_condition!(spec,ObjectID(1),OBJECT_AT(1,1))
     @test TaskGraphs.get_initial_condition(spec,ObjectID(1)) == OBJECT_AT(1,1)
@@ -78,16 +77,12 @@ let
     let
         project_spec = ProjectSpec(object_ICs,object_FCs)
         add_operation!(project_spec,construct_operation(project_spec, 3, [1,2], [3], 1.0))
-        # @test project_spec.terminal_vtxs == Set{Int}([1])
         add_operation!(project_spec,construct_operation(project_spec, 6, [3], [], 0.0))
-        # @test project_spec.terminal_vtxs == Set{Int}([2])
     end
     let
         project_spec = ProjectSpec(object_ICs,object_FCs)
         add_operation!(project_spec,construct_operation(project_spec, 3, [1,2], [], 1.0))
-        # @test project_spec.terminal_vtxs == Set{Int}([1])
         add_operation!(project_spec,construct_operation(project_spec, 6, [3], [], 0.0))
-        # @test project_spec.terminal_vtxs == Set{Int}([1,2])
     end
     let
         project_spec = ProjectSpec(object_ICs,object_FCs)

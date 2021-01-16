@@ -238,15 +238,10 @@ function construct_task_graphs_problem(
             push!(root_node_groups,Set(map(get_id, get_input_ids(n))))
         end
     end
-    # root_node_groups = map(v->Set(
-    #     get_id(id) for id in get_input_ids(
-    #         new_project_spec.operations[v])),
-    #         collect(new_project_spec.terminal_vtxs))
     problem_spec = ProblemSpec(graph=G,D=dist_matrix,
         Δt=Δt,tr0_=tr0_,to0_=to0_,terminal_vtxs=root_node_groups,
         cost_function=cost_function,
         Δt_collect=Δt_collect,Δt_deliver=Δt_deliver,r0=r0,s0=s0,sF=sF)
-    # @show problem_spec.terminal_vtxs
     return new_project_spec, problem_spec, object_ICs, object_FCs, robot_ICs
 end
 function construct_task_graphs_problem(
@@ -541,10 +536,6 @@ function Base.:(==)(spec1::ProjectSpec,spec2::ProjectSpec)
     try
         @assert(spec1.initial_conditions == spec2.initial_conditions)
         @assert(spec1.final_conditions == spec2.final_conditions)
-        @assert(spec1.operations == spec2.operations)
-        @assert(spec1.pre_deps == spec2.pre_deps)
-        @assert(spec1.graph == spec2.graph)
-        @assert(spec1.terminal_vtxs == spec2.terminal_vtxs)
     catch e
         if isa(e,AssertionError)
             # println(e.msg)

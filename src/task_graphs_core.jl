@@ -1,17 +1,3 @@
-# module TaskGraphsCore
-
-# using Parameters
-# using LightGraphs, MetaGraphs
-# using GraphUtils
-# using DataStructures
-# using JuMP
-# using Gurobi
-# using TOML
-# using CRCBS
-# using SparseArrays
-#
-# using ..TaskGraphs
-
 export
     get_debug_file_id,
     reset_debug_file_id!,
@@ -70,7 +56,6 @@ GraphUtils.get_distance(spec::ProblemSpec,a::LocationID,b::LocationID,args...) =
 
 export
     ProjectSpec,
-    get_initial_nodes,
     add_operation!,
     set_initial_condition!,
     set_final_condition!,
@@ -80,35 +65,23 @@ export
     construct_operation
 
 """
-    ProjectSpec{G}
+    ProjectSpec <: AbstractCustomNDiGraph{Union{OBJECT_AT,Operation},AbstractID}
 
-Encodes a list of operations that must be performed in order to complete a
-specific project, in addition to the dependencies between those operations.
+Encodes a set of operations and the prescribed initial and final locations 
+of the objects that form the inputs and outputs of those operations.
 
 Elements:
-- initial_conditions::Vector{OBJECT_AT} - maps object id to initial condition predicate
-- final_conditions::Vector{OBJECT_AT} - maps object id to final condition predicate
-- operations::Vector{Operation} - list of manufacturing operations
-- pre_deps::Dict{Int,Set{Int}} - maps object id to ids of operations that are required to produce that object
-- post_deps::Dict{Int,Set{Int}} - maps object id to ids of operations that depend on that object
-- graph::G
-- terminal_vtxs::Set{Int}
-- weights::Dict{Int,Float64}
-- M::Int
-- weight::Float64
-- object_id_to_idx::Dict{Int,Int}
+- all standard fields of a concrete `GraphUtils.CustomNDiGraph` type
+- initial_conditions::Dict{ObjectID,OBJECT_AT}
+- final_conditions::Dict{ObjectID,OBJECT_AT}
 """
 @with_kw struct ProjectSpec <: AbstractCustomNDiGraph{Union{OBJECT_AT,Operation},AbstractID}
     graph               ::DiGraph               = DiGraph()
     nodes               ::Vector{Union{OBJECT_AT,Operation}} = Vector{Union{OBJECT_AT,Operation}}()
     vtx_map             ::Dict{AbstractID,Int}  = Dict{AbstractID,Int}()
     vtx_ids             ::Vector{AbstractID}    = Vector{AbstractID}()
-
-    initial_conditions::Dict{ObjectID,OBJECT_AT} = Dict{ObjectID,OBJECT_AT}()
-    final_conditions::Dict{ObjectID,OBJECT_AT} = Dict{ObjectID,OBJECT_AT}()
-    terminal_vtxs::Set{Int}                     = Set{Int}()
-    weights::Dict{Int,Float64}                  = Dict{Int,Float64}(v=>1.0 for v in terminal_vtxs)
-    weight::Float64                             = 1.0
+    initial_conditions  ::Dict{ObjectID,OBJECT_AT} = Dict{ObjectID,OBJECT_AT}()
+    final_conditions    ::Dict{ObjectID,OBJECT_AT} = Dict{ObjectID,OBJECT_AT}()
 end
 get_initial_conditions(spec::ProjectSpec)       = spec.initial_conditions
 get_final_conditions(spec::ProjectSpec)         = spec.final_conditions
@@ -133,7 +106,6 @@ function ProjectSpec(ics::V,fcs::V) where {V<:Vector{OBJECT_AT}}
     end
     return spec
 end
-get_initial_nodes(spec::ProjectSpec) = get_all_root_nodes(spec)
 get_pre_deps(spec::ProjectSpec, op_id::OperationID) = Set{ObjectID}(map(v->get_vtx_id(spec,v),inneighbors(spec,op_id))) #get(spec.pre_deps, op_id, Set{Int}())
 get_post_deps(spec::ProjectSpec, op_id::OperationID) = Set{ObjectID}(map(v->get_vtx_id(spec,v),outneighbors(spec,op_id))) #get(spec.pre_deps, op_id, Set{Int}())
 get_operations(spec::ProjectSpec) = Vector{Operation}(filter(n->isa(n,Operation), get_nodes(spec)))
@@ -185,7 +157,7 @@ function construct_operation(
         id=get_unique_operation_id()
         )
     op = Operation(
-        pre = Set{OBJECT_AT}(map(id->get_final_condition(spec,id), input_ids)), #spec.final_conditions[spec.object_id_to_idx[ObjectID(id)]], input_ids)),
+        pre = Set{OBJECT_AT}(map(id->get_final_condition(spec,id), input_ids)), 
         post = Set{OBJECT_AT}(map(id->get_initial_condition(spec,id), output_ids)),
         Δt = Δt,
         station_id = LocationID(station_id),
@@ -219,8 +191,8 @@ function add_operation!(spec::ProjectSpec, op::Operation)
         add_edge!(spec, op_id, object_id)
         set_initial_condition!(spec,object_id,pred)
     end
-    empty!(spec.terminal_vtxs)
-    union!(spec.terminal_vtxs, get_all_terminal_nodes(spec.graph))
+    # empty!(spec.terminal_vtxs)
+    # union!(spec.terminal_vtxs, get_all_terminal_nodes(spec.graph))
     validate(spec,op)
     spec
 end
@@ -272,17 +244,11 @@ function read_project_spec(toml_dict::Dict)
     for arr in ics
         o = read_object(arr)
         set_initial_condition!(project_spec,get_object_id(o),o)
-        # push!(project_spec.initial_conditions, read_object(arr))
     end
     for arr in fcs
         o = read_object(arr)
         set_final_condition!(project_spec,get_object_id(o),o)
-        # push!(project_spec.final_conditions, read_object(arr))
     end
-    # object_ids = map(get_object_id, project_spec.initial_conditions)
-    # for (i, object_id) in enumerate(sort(object_ids))
-    #     project_spec.object_id_to_idx[object_id] = i
-    # end
     for op_dict in toml_dict["operations"]
         op = read_operation(op_dict)
         add_operation!(project_spec, op)
@@ -625,7 +591,6 @@ end
 GraphUtils.add_node!(sched::OperatingSchedule,node::ScheduleNode) = add_node!(sched,node,node.id)
 
 function GraphUtils.make_node(g::OperatingSchedule,pred::AbstractPlanningPredicate,args...)
-   # make_node(g,ProblemSpec(),pred)
    make_node(g,PathSpec(),pred,args...)
 end
 function GraphUtils.make_node(g::OperatingSchedule,spec::ProblemSpec,pred,args...)
@@ -966,7 +931,7 @@ function construct_partial_project_schedule(
         add_node!(sched, make_node(sched,problem_spec,op))
     end
     for pred in object_ICs
-        add_node!(sched, make_node(sched,problem_spec,pred)) #, pred, get_object_id(pred))
+        add_node!(sched, make_node(sched,problem_spec,pred)) 
     end
     for pred in robot_ICs
         add_new_robot_to_schedule!(sched,pred,problem_spec)
@@ -1014,8 +979,8 @@ function construct_partial_project_schedule(spec::ProjectSpec,problem_spec::Prob
         initial_conditions_vector(spec),
         final_conditions_vector(spec),
         robot_ICs,
-        get_operations(spec),# spec.operations,
-        sort(collect(get_terminal_operation_ids(spec))),# map(op->op.id, spec.operations[collect(spec.terminal_vtxs)]),
+        get_operations(spec),
+        sort(collect(get_terminal_operation_ids(spec))),
         problem_spec,
     )
 end
@@ -1169,5 +1134,3 @@ function get_assignment_dict(assignment_matrix,N,M)
     end
     assignment_dict
 end
-
-# end # module TaskGraphCore
