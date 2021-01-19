@@ -244,7 +244,8 @@ function construct_task_graphs_problem(
         # Δt=Δt,tr0_=tr0_,to0_=to0_,
         # terminal_vtxs=root_node_groups,
         cost_function=cost_function,
-        Δt_collect=Δt_collect, Δt_deliver=Δt_deliver,
+        Δt_collect=Δt_collect, 
+        Δt_deliver=Δt_deliver,
         r0=r0,s0=s0,sF=sF,
         )
 

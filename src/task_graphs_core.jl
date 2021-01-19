@@ -921,7 +921,7 @@ function construct_partial_project_schedule(
     object_FCs::Vector{OBJECT_AT},
     robot_ICs::Vector{R},
     operations::Vector{Operation},
-    root_ops::Vector{OperationID},
+    terminal_ops::Vector{OperationID},
     problem_spec::ProblemSpec,
     ) where {R<:BOT_AT}
 
@@ -937,7 +937,7 @@ function construct_partial_project_schedule(
         add_new_robot_to_schedule!(sched,pred,problem_spec)
     end
     # add root nodes
-    for op_id in root_ops
+    for op_id in terminal_ops
         v = get_vtx(sched, op_id)
         push!(sched.terminal_vtxs, v)
         sched.weights[v] = 1.0

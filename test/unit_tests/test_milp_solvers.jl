@@ -19,18 +19,12 @@ let
                 TaskGraphsMILPSolver(SparseAdjacencyMILP()),
                 TaskGraphsMILPSolver(GreedyAssignment()),
             ]
-                    # MILP formulations alone
-                # project_spec, problem_spec, robot_ICs, env_graph, _ = f(
+                # MILP formulations alone
                 sched, problem_spec, _, _ = f(
                     ;
                     cost_function = cost_model,
                     verbose = false,
                 )
-                # sched = construct_partial_project_schedule(
-                #     project_spec,
-                #     problem_spec,
-                #     robot_ICs
-                # )
                 model = formulate_milp(
                     solver,
                     sched,
@@ -152,6 +146,6 @@ let
     assignment_matrix = get_assignment_matrix(model);
     update_project_schedule!(solver,model,sched,problem_spec,assignment_matrix)
     n_edges = ne(get_graph(sched))
-    add_job_shop_constraints!(model,sched,problem_spec,model.model)
+    add_job_shop_constraints!(model,sched,problem_spec)
     @test ne(get_graph(sched)) > n_edges
 end

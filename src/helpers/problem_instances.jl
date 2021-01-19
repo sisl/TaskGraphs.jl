@@ -788,7 +788,6 @@ function replanning_problem(solver,r0,defs,env_graph;
         problem_spec,
         robot_ICs
         )
-    # base_schedule = requests[1].schedule
     base_env = construct_search_env(solver,base_schedule,problem_spec,env_graph)
     return RepeatedPC_TAPF(base_env,requests)
 end

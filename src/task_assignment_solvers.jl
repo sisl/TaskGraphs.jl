@@ -24,8 +24,30 @@ use of these dummy robot variables allows the sequential assignment problem to
 be posed as a one-off assignment problem with inter-task constraints.
 """
 @with_kw struct AssignmentMILP <: TaskGraphsMILP
-    model::JuMP.Model = Model()
+    model::JuMP.Model                   = Model()
+    sched::OperatingSchedule            = OperatingSchedule()
+    robot_ics  ::Vector{Pair{RobotID,ScheduleNode}} = sort(collect(get_nodes_of_type(sched,BotID));by=p->p.first)
+    object_ics ::Vector{Pair{ObjectID,ScheduleNode}} = sort(collect(get_nodes_of_type(sched,ObjectID));by=p->p.first)
+    operations ::Vector{Pair{OperationID,ScheduleNode}} = sort(collect(get_nodes_of_type(sched,OperationID));by=p->p.first)
+    robot_map    ::Dict{BotID,Int}      = Dict{BotID,Int}(p.first=>k for (k,p) in enumerate(robot_ics))
+    object_map   ::Dict{ObjectID,Int}   = Dict{ObjectID,Int}(p.first=>k for (k,p) in enumerate(object_ics))
+    operation_map::Dict{OperationID,Int}= Dict{OperationID,Int}(p.first=>k for (k,p) in enumerate(operations))
+    # robot_ids::Vector{BotID}            = Vector{BotID}() # ids of all robots
+    # robot_map::Dict{BotID,Int}          = Dict{BotID,Int}(id=>k for (k,id) in enumerate(robot_ids)) # robot id to idx
+    # object_ids::Vector{ObjectID}        = Vector{ObjectID}()
+    # object_map::Dict{ObjectID,Int}      = Dict{ObjectID,Int}(id=>k for (k,id) in enumerate(object_ids))
+    # r0::Vector{Int}                     = Vector{Int}()
+    # s0::Vector{Int}                     = Vector{Int}()
+    # tr0_::Dict{Int,Int}                 = Dict{Int,Int}()
+    # to0_::Dict{Int,Int}                 = Dict{Int,Int}()
+    # Δt_collect::Vector{Int}             = zeros(Int,length(object_ids))
+    # Δt_deliver::Vector{Int}             = zeros(Int,length(object_ids))
+    # sF::Vector{Int}                     = -1.0*zeros(Int,length(s0))
+    # Δt::Vector{Int}                     = zeros(Int,length(s0)) # the (parent operation duration) for each object
+    # terminal_vtxs::Vector{Set{Int}}     = Vector{Set{Int}}()
+    # weights::Vector{Int}                = map(s->1.0,terminal_vtxs) 
 end
+AssignmentMILP(model::JuMP.Model) = AssignmentMILP(model=model)
 
 """
     adj_mat_from_assignment_mat(sched,assignment_matrix)
@@ -151,52 +173,54 @@ export
     formulate_milp,
     update_project_schedule!
 
-function add_job_shop_constraints!(schedule::P,spec::T,model::JuMP.Model) where {P<:OperatingSchedule,T<:ProblemSpec}
-    # M = spec.M
-    M = length(get_object_ICs(schedule))
+"""
+    add_job_shop_constraints!(milp_model::AssignmentMILP,sched::OperatingSchedule,spec::ProblemSpec) #,model::JuMP.Model)
+
+After an `AssignmentMILP` has been optimized, add in any edges that result from
+an active ``job shop'' constraint (where two robots require the same resource).
+"""
+function add_job_shop_constraints!(milp_model::AssignmentMILP,sched::OperatingSchedule,spec::ProblemSpec) #,model::JuMP.Model)
+    M = length(get_object_ICs(sched))
     s0 = spec.s0
     sF = spec.sF
-    tor = Int.(round.(value.(model[:tor]))) # collect begin time
-    toc = Int.(round.(value.(model[:toc]))) # collect end time
-    tod = Int.(round.(value.(model[:tod]))) # deposit begin time
-    tof = Int.(round.(value.(model[:tof]))) # deposit end time
+    tor = Int.(round.(value.(milp_model.model[:tor]))) # collect begin time
+    toc = Int.(round.(value.(milp_model.model[:toc]))) # collect end time
+    tod = Int.(round.(value.(milp_model.model[:tod]))) # deposit begin time
+    tof = Int.(round.(value.(milp_model.model[:tof]))) # deposit end time
     for j in 1:M
         for j2 in j+1:M
             if (s0[j] == s0[j2]) || (s0[j] == sF[j2]) || (sF[j] == s0[j2]) || (sF[j] == sF[j2])
                 if s0[j] == s0[j2]
-                    id1, n1 = get_collect_node(schedule, ObjectID(j))
-                    id2, n2 = get_collect_node(schedule, ObjectID(j2))
+                    id1, n1 = get_collect_node(sched, ObjectID(j))
+                    id2, n2 = get_collect_node(sched, ObjectID(j2))
                     t1 = [tor[j], toc[j]]
                     t2 = [tor[j2], toc[j2]]
                 elseif s0[j] == sF[j2]
-                    id1, n1 = get_collect_node(schedule, ObjectID(j))
-                    id2, n2 = get_deposit_node(schedule, ObjectID(j2))
+                    id1, n1 = get_collect_node(sched, ObjectID(j))
+                    id2, n2 = get_deposit_node(sched, ObjectID(j2))
                     t1 = [tor[j], toc[j]]
                     t2 = [tod[j2], tof[j2]]
                 elseif sF[j] == s0[j2]
-                    id1, n1 = get_deposit_node(schedule, ObjectID(j))
-                    id2, n2 = get_collect_node(schedule, ObjectID(j2))
+                    id1, n1 = get_deposit_node(sched, ObjectID(j))
+                    id2, n2 = get_collect_node(sched, ObjectID(j2))
                     t1 = [tod[j], tof[j]]
                     t2 = [tor[j2], toc[j2]]
                 elseif sF[j] == sF[j2]
-                    id1, n1 = get_deposit_node(schedule, ObjectID(j))
-                    id2, n2 = get_deposit_node(schedule, ObjectID(j2))
+                    id1, n1 = get_deposit_node(sched, ObjectID(j))
+                    id2, n2 = get_deposit_node(sched, ObjectID(j2))
                     t1 = [tod, tof[j]]
                     t2 = [tod, tof[j2]]
                 end
                 if t1[2] < t2[1]
-                    add_edge!(schedule, id1, id2)
+                    add_edge!(sched, id1, id2)
                 elseif t2[2] < t1[1]
-                    add_edge!(schedule, id2, id1)
+                    add_edge!(sched, id2, id1)
                 else
                     throw(ErrorException("JOB SHOP CONSTRAINT VIOLATED"))
                 end
             end
         end
     end
-end
-function add_job_shop_constraints!(milp_model::AssignmentMILP,schedule::OperatingSchedule,spec::ProblemSpec,model::JuMP.Model)
-    add_job_shop_constraints!(schedule,spec,model)
 end
 
 
@@ -205,194 +229,206 @@ end
 
 Helper for setting the objective function for a milp model
 """
-function get_objective_expr(milp::AssignmentMILP, f::SumOfMakeSpans,model,terminal_vtxs,weights,tof,Δt)
-    @variable(model, T[1:length(terminal_vtxs)])
-    for (i,project_head) in enumerate(terminal_vtxs)
-        for v in project_head
-            @constraint(model, T[i] >= tof[v] + Δt[v])
+function get_objective_expr(milp::AssignmentMILP, f::SumOfMakeSpans)
+    @unpack model, sched, operations, object_map = milp
+    terminal_ops = map(p->p.second.node, filter(p->is_terminal_node(sched,p.first),operations))
+    tof = model[:tof]
+    @variable(model, T[1:length(terminal_ops)])
+    for (i,op) in enumerate(terminal_ops)
+        for o in preconditions(op)
+            @constraint(model, T[i] >= tof[object_map[get_object_id(o)]] + duration(op))
         end
     end
-    cost1 = @expression(model, sum(map(i->T[i]*get(weights,i,0.0), 1:length(terminal_vtxs))))
+    weights = map(i->1.0,1:length(terminal_ops))
+    cost = @expression(model, sum(map(i->T[i]*weights[i],1:length(terminal_ops))))
+    return cost
 end
-function get_objective_expr(milp::AssignmentMILP, f::MakeSpan,model,terminal_vtxs,weights,tof,Δt)
-    @variable(model, T)
-    @constraint(model, T .>= tof .+ Δt)
-    T
-end
-
-"""
-    formulate_optimization_problem()
-
-Express the TaskGraphs assignment problem as a MILP using the JuMP optimization
-framework.
-
-Inputs:
-    `G` - graph with inverted tree structure that encodes dependencies
-        between tasks
-    `D` - D[s₁,s₂] is distance from position s₁ to position s₂
-    `Δt` - Δt[j] is the duraction of time that must elapse after all prereqs
-        of task j have been satisfied before task j becomes available
-    `Δt_collect` - Δt_collect[j] is the time required for a robot to pick up
-        object j
-    `Δt_deliver` - Δt_deliver[j] is the time required for a robot to set
-        down object j
-    `to0_` - a `Dict`, where `to0_[j]` gives the start time for task j
-        (applies to leaf tasks only)
-    `tr0_` - a `Dict`, where `tr0_[i]` gives the start time for robot i
-        (applies to non-dummy robots only)
-    `terminal_vtxs` - a vector of integers specfying the graph vertices that
-        are roots of the project
-    `weights` - a vector of weights that determines the contribution of each
-        root_node to the objective
-    `s0` - pickup stations for the tasks
-    `sF` - dropoff stations for the tasks
-    `optimizer` - a JuMP optimizer (e.g., Gurobi.optimizer)
-
-Keyword Args:
-    `TimeLimit=100`
-    `OutputFlag=0`
-    `assignments=Dict{Int64,Int64}()` - maps robot id to assignment that must be
-        enforced
-    `cost_model=:MakeSpan` - optimization objective, either `:MakeSpan` or
-        `:SumOfMakeSpans`
-
-Outputs:
-    `model` - the optimization model
-"""
-function formulate_optimization_problem(N,M,G,D,Δt,Δt_collect,Δt_deliver,to0_,tr0_,terminal_vtxs,weights,r0,s0,sF,optimizer;
-    TimeLimit=100,
-    OutputFlag=0,
-    Presolve = -1, # automatic setting (-1), off (0), conservative (1), or aggressive (2)
-    # assignments=Dict{Int64,Int64}(),
-    cost_model=MakeSpan(),
-    # t0_ = Dict(), # TODO start times for objects
-    # tF_ = Dict(), # TODO end times for objects
-    Mm = 10000,
-    # Mm = sum([D[s1,s2] for s1 in r0 for s2 in s0]) + sum([D[s1,s2] for s1 in s0 for s2 in sF])
-    kwargs...
-    )
-
-    model = Model(optimizer_with_attributes(optimizer,
-        "TimeLimit"=>TimeLimit,
-        "OutputFlag"=>OutputFlag,
-        "Presolve"=>Presolve
-        ))
-
-    r0 = vcat(r0,sF) # combine to get dummy robot ``spawn'' locations too
-    @variable(model, to0[1:M] >= 0.0) # object availability time
-    @variable(model, tor[1:M] >= 0.0) # object robot arrival time
-    @variable(model, toc[1:M] >= 0.0) # object collection complete time
-    @variable(model, tod[1:M] >= 0.0) # object deliver begin time
-    @variable(model, tof[1:M] >= 0.0) # object termination time
-    @variable(model, tr0[1:N+M] >= 0.0) # robot availability time
-
-    # Assignment matrix x
-    @variable(model, X[1:N+M,1:M], binary = true) # X[i,j] ∈ {0,1}
-    @constraint(model, X * ones(M) .<= 1)         # each robot may have no more than 1 task
-    @constraint(model, X' * ones(N+M) .== 1)     # each task must have exactly 1 assignment
-    for (i,t) in tr0_
-        # start time for robot i
-        @constraint(model, tr0[i] == t)
-    end
-    for (j,t) in to0_
-        # start time for task j (applies only to tasks with no prereqs)
-        @constraint(model, to0[j] == t)
-    end
-    # for (i,j) in assignments
-    #     @constraint(model, X[i,j] == 1)
-    # end
-    # constraints
-    for j in 1:M
-        # constraint on task start time
-        if !is_root_node(G,j)
-            for v in inneighbors(G,j)
-                @constraint(model, to0[j] >= tof[v] + Δt[j])
-            end
-        end
-        # constraint on dummy robot start time (corresponds to moment of object delivery)
-        @constraint(model, tr0[j+N] == tof[j])
-        # dummy robots can't do upstream jobs
-        upstream_jobs = [j, map(e->e.dst,collect(edges(bfs_tree(G,j;dir=:in))))...]
-        for v in upstream_jobs
-            @constraint(model, X[j+N,v] == 0)
-        end
-        # lower bound on task completion time (task can't start until it's available).
-        @constraint(model, tor[j] >= to0[j])
-        for i in 1:N+M
-            @constraint(model, tor[j] - (tr0[i] + D[r0[i],s0[j]]) >= -Mm*(1 - X[i,j]))
-        end
-        @constraint(model, toc[j] == tor[j] + Δt_collect[j])
-        @constraint(model, tod[j] == toc[j] + D[s0[j],sF[j]])
-        @constraint(model, tof[j] == tod[j] + Δt_deliver[j])
-        # "Job-shop" constraints specifying that no station may be double-booked. A station
-        # can only support a single COLLECT or DEPOSIT operation at a time, meaning that all
-        # the windows for these operations cannot overlap. In the constraints below, t1 and t2
-        # represent the intervals for the COLLECT or DEPOSIT operations of tasks j and j2,
-        # respectively. If eny of the operations for these two tasks require use of the same
-        # station, we introduce a 2D binary variable y. if y = [1,0], the operation for task
-        # j must occur before the operation for task j2. The opposite is true for y == [0,1].
-        # We use the big M method here as well to tightly enforce the binary constraints.
-        for j2 in j+1:M
-            if (s0[j] == s0[j2]) || (s0[j] == sF[j2]) || (sF[j] == s0[j2]) || (sF[j] == sF[j2])
-                # @show j, j2
-                if s0[j] == s0[j2]
-                    t1 = [tor[j], toc[j]]
-                    t2 = [tor[j2], toc[j2]]
-                elseif s0[j] == sF[j2]
-                    t1 = [tor[j], toc[j]]
-                    t2 = [tod[j2], tof[j2]]
-                elseif sF[j] == s0[j2]
-                    t1 = [tod[j], tof[j]]
-                    t2 = [tor[j2], toc[j2]]
-                elseif sF[j] == sF[j2]
-                    t1 = [tod, tof[j]]
-                    t2 = [tod, tof[j2]]
-                end
-                tmax = @variable(model)
-                tmin = @variable(model)
-                y = @variable(model, binary=true)
-                @constraint(model, tmax >= t1[1])
-                @constraint(model, tmax >= t2[1])
-                @constraint(model, tmin <= t1[2])
-                @constraint(model, tmin <= t2[2])
-
-                @constraint(model, tmax - t2[1] <= (1 - y)*Mm)
-                @constraint(model, tmax - t1[1] <= y*Mm)
-                @constraint(model, tmin - t1[2] >= (1 - y)*-Mm)
-                @constraint(model, tmin - t2[2] >= y*-Mm)
-                # @constraint(model, tmin + 1 <= tmax)
-                @constraint(model, tmin + 1 - X[j+N,j2] - X[j2+N,j] <= tmax) # NOTE +1 not necessary if the same robot is doing both
-            end
+function get_objective_expr(milp::AssignmentMILP, f::MakeSpan)
+    @unpack model, sched, operations, object_map = milp
+    tof = model[:tof]
+    terminal_ops = map(p->p.second.node, filter(p->is_terminal_node(sched,p.first),operations))
+    @variable(model, cost)
+    for (i,op) in enumerate(terminal_ops)
+        for o in preconditions(op)
+            @constraint(model, cost >= tof[object_map[get_object_id(o)]] + duration(op))
         end
     end
-    milp = AssignmentMILP(model)
-    cost1 = get_objective_expr(milp, cost_model, milp.model,terminal_vtxs,weights,tof,Δt)
-    @objective(milp.model, Min, cost1)
-    milp
+    return cost
 end
-function formulate_optimization_problem(spec::T,optimizer;
-    kwargs...
-    ) where {T<:ProblemSpec}
-    formulate_optimization_problem(
-        length(spec.r0),
-        length(spec.s0),
-        spec.graph,
-        spec.D,
-        spec.Δt,
-        spec.Δt_collect,
-        spec.Δt_deliver,
-        spec.to0_,
-        spec.tr0_,
-        spec.terminal_vtxs,
-        spec.weights,# # # #
-        spec.r0,
-        spec.s0,
-        spec.sF,
-        optimizer;
-        # cost_model=spec.cost_function,
-        kwargs...
-        )
-end
+
+# """
+#     formulate_optimization_problem()
+
+# Express the TaskGraphs assignment problem as a MILP using the JuMP optimization
+# framework.
+
+# Inputs:
+#     `G` - graph with inverted tree structure that encodes dependencies
+#         between tasks
+#     `D` - D[s₁,s₂] is distance from position s₁ to position s₂
+#     `Δt` - Δt[j] is the duraction of time that must elapse after all prereqs
+#         of task j have been satisfied before task j becomes available
+#     `Δt_collect` - Δt_collect[j] is the time required for a robot to pick up
+#         object j
+#     `Δt_deliver` - Δt_deliver[j] is the time required for a robot to set
+#         down object j
+#     `to0_` - a `Dict`, where `to0_[j]` gives the start time for task j
+#         (applies to leaf tasks only)
+#     `tr0_` - a `Dict`, where `tr0_[i]` gives the start time for robot i
+#         (applies to non-dummy robots only)
+#     `terminal_vtxs` - a vector of integers specfying the graph vertices that
+#         are roots of the project
+#     `weights` - a vector of weights that determines the contribution of each
+#         root_node to the objective
+#     `s0` - pickup stations for the tasks
+#     `sF` - dropoff stations for the tasks
+#     `optimizer` - a JuMP optimizer (e.g., Gurobi.optimizer)
+
+# Keyword Args:
+#     `TimeLimit=100`
+#     `OutputFlag=0`
+#     `assignments=Dict{Int64,Int64}()` - maps robot id to assignment that must be
+#         enforced
+#     `cost_model=:MakeSpan` - optimization objective, either `:MakeSpan` or
+#         `:SumOfMakeSpans`
+
+# Outputs:
+#     `model` - the optimization model
+# """
+# function formulate_optimization_problem(N,M,G,D,Δt,Δt_collect,Δt_deliver,to0_,tr0_,terminal_vtxs,weights,r0,s0,sF,optimizer;
+#     TimeLimit=100,
+#     OutputFlag=0,
+#     Presolve = -1, # automatic setting (-1), off (0), conservative (1), or aggressive (2)
+#     # assignments=Dict{Int64,Int64}(),
+#     cost_model=MakeSpan(),
+#     # t0_ = Dict(), # TODO start times for objects
+#     # tF_ = Dict(), # TODO end times for objects
+#     Mm = 10000,
+#     # Mm = sum([D[s1,s2] for s1 in r0 for s2 in s0]) + sum([D[s1,s2] for s1 in s0 for s2 in sF])
+#     kwargs...
+#     )
+
+#     model = Model(optimizer_with_attributes(optimizer,
+#         "TimeLimit"=>TimeLimit,
+#         "OutputFlag"=>OutputFlag,
+#         "Presolve"=>Presolve
+#         ))
+
+#     r0 = vcat(r0,sF) # combine to get dummy robot ``spawn'' locations too
+#     @variable(model, to0[1:M] >= 0.0) # object availability time
+#     @variable(model, tor[1:M] >= 0.0) # object robot arrival time
+#     @variable(model, toc[1:M] >= 0.0) # object collection complete time
+#     @variable(model, tod[1:M] >= 0.0) # object deliver begin time
+#     @variable(model, tof[1:M] >= 0.0) # object termination time
+#     @variable(model, tr0[1:N+M] >= 0.0) # robot availability time
+
+#     # Assignment matrix x
+#     @variable(model, X[1:N+M,1:M], binary = true) # X[i,j] ∈ {0,1}
+#     @constraint(model, X * ones(M) .<= 1)         # each robot may have no more than 1 task
+#     @constraint(model, X' * ones(N+M) .== 1)     # each task must have exactly 1 assignment
+#     for (i,t) in tr0_
+#         # start time for robot i
+#         @constraint(model, tr0[i] == t)
+#     end
+#     for (j,t) in to0_
+#         # start time for task j (applies only to tasks with no prereqs)
+#         @constraint(model, to0[j] == t)
+#     end
+#     # for (i,j) in assignments
+#     #     @constraint(model, X[i,j] == 1)
+#     # end
+#     # constraints
+#     for j in 1:M
+#         # constraint on task start time
+#         if !is_root_node(G,j)
+#             for v in inneighbors(G,j)
+#                 @constraint(model, to0[j] >= tof[v] + Δt[j])
+#             end
+#         end
+#         # constraint on dummy robot start time (corresponds to moment of object delivery)
+#         @constraint(model, tr0[j+N] == tof[j])
+#         # dummy robots can't do upstream jobs
+#         upstream_jobs = [j, map(e->e.dst,collect(edges(bfs_tree(G,j;dir=:in))))...]
+#         for v in upstream_jobs
+#             @constraint(model, X[j+N,v] == 0)
+#         end
+#         # lower bound on task completion time (task can't start until it's available).
+#         @constraint(model, tor[j] >= to0[j])
+#         for i in 1:N+M
+#             @constraint(model, tor[j] - (tr0[i] + D[r0[i],s0[j]]) >= -Mm*(1 - X[i,j]))
+#         end
+#         @constraint(model, toc[j] == tor[j] + Δt_collect[j])
+#         @constraint(model, tod[j] == toc[j] + D[s0[j],sF[j]])
+#         @constraint(model, tof[j] == tod[j] + Δt_deliver[j])
+#         # "Job-shop" constraints specifying that no station may be double-booked. A station
+#         # can only support a single COLLECT or DEPOSIT operation at a time, meaning that all
+#         # the windows for these operations cannot overlap. In the constraints below, t1 and t2
+#         # represent the intervals for the COLLECT or DEPOSIT operations of tasks j and j2,
+#         # respectively. If eny of the operations for these two tasks require use of the same
+#         # station, we introduce a 2D binary variable y. if y = [1,0], the operation for task
+#         # j must occur before the operation for task j2. The opposite is true for y == [0,1].
+#         # We use the big M method here as well to tightly enforce the binary constraints.
+#         for j2 in j+1:M
+#             if (s0[j] == s0[j2]) || (s0[j] == sF[j2]) || (sF[j] == s0[j2]) || (sF[j] == sF[j2])
+#                 # @show j, j2
+#                 if s0[j] == s0[j2]
+#                     t1 = [tor[j], toc[j]]
+#                     t2 = [tor[j2], toc[j2]]
+#                 elseif s0[j] == sF[j2]
+#                     t1 = [tor[j], toc[j]]
+#                     t2 = [tod[j2], tof[j2]]
+#                 elseif sF[j] == s0[j2]
+#                     t1 = [tod[j], tof[j]]
+#                     t2 = [tor[j2], toc[j2]]
+#                 elseif sF[j] == sF[j2]
+#                     t1 = [tod, tof[j]]
+#                     t2 = [tod, tof[j2]]
+#                 end
+#                 tmax = @variable(model)
+#                 tmin = @variable(model)
+#                 y = @variable(model, binary=true)
+#                 @constraint(model, tmax >= t1[1])
+#                 @constraint(model, tmax >= t2[1])
+#                 @constraint(model, tmin <= t1[2])
+#                 @constraint(model, tmin <= t2[2])
+
+#                 @constraint(model, tmax - t2[1] <= (1 - y)*Mm)
+#                 @constraint(model, tmax - t1[1] <= y*Mm)
+#                 @constraint(model, tmin - t1[2] >= (1 - y)*-Mm)
+#                 @constraint(model, tmin - t2[2] >= y*-Mm)
+#                 # @constraint(model, tmin + 1 <= tmax)
+#                 @constraint(model, tmin + 1 - X[j+N,j2] - X[j2+N,j] <= tmax) # NOTE +1 not necessary if the same robot is doing both
+#             end
+#         end
+#     end
+#     milp = AssignmentMILP(model)
+#     cost1 = get_objective_expr(milp, cost_model, milp.model,terminal_vtxs,weights,tof,Δt)
+#     @objective(milp.model, Min, cost1)
+#     milp
+# end
+# function formulate_optimization_problem(spec::T,optimizer;
+#     kwargs...
+#     ) where {T<:ProblemSpec}
+#     formulate_optimization_problem(
+#         length(spec.r0),
+#         length(spec.s0),
+#         spec.graph,
+#         spec.D,
+#         spec.Δt,
+#         spec.Δt_collect,
+#         spec.Δt_deliver,
+#         spec.to0_,
+#         spec.tr0_,
+#         spec.terminal_vtxs,
+#         spec.weights,# # # #
+#         spec.r0,
+#         spec.s0,
+#         spec.sF,
+#         optimizer;
+#         # cost_model=spec.cost_function,
+#         kwargs...
+#         )
+# end
 
 """
     formulate_milp(milp_model::AssignmentMILP,sched,problem_spec;kwargs...)
@@ -422,12 +458,6 @@ Keyword Args:
 Outputs:
     `model` - an optimization model of type `T`
 """
-# function formulate_milp(milp_model::AssignmentMILP,sched::OperatingSchedule,problem_spec::ProblemSpec;
-#     optimizer=Gurobi.Optimizer,
-#     cost_model=problem_spec.cost_function,
-#     kwargs...)
-#     formulate_optimization_problem(problem_spec,optimizer;cost_model=cost_model,kwargs...)
-# end
 function formulate_milp(milp_model::AssignmentMILP,sched::OperatingSchedule,problem_spec::ProblemSpec;
     optimizer=Gurobi.Optimizer,
     cost_model=problem_spec.cost_function,
@@ -438,19 +468,23 @@ function formulate_milp(milp_model::AssignmentMILP,sched::OperatingSchedule,prob
     kwargs...)
 
     # SETUP
-    # from OperatingSchedule
-    robot_ids = Vector{BotID}(sort(collect(keys(get_robot_ICs(sched)))))
-    robot_map = Dict{BotID,Int}(id=>k for (k,id) in enumerate(robot_ids))
-    object_ids = Vector{ObjectID}(sort(collect(keys(get_object_ICs(sched)))))
-    object_map = Dict{ObjectID,Int}(id=>k for (k,id) in enumerate(object_ids))
-    r0 = map(id->get_id(get_initial_location_id(get_node(sched,id))),robot_ids) # initial robot locations
-    s0 = map(id->get_id(get_initial_location_id(get_node(sched,id))),object_ids) # initial object locations
-    N = length(r0) # number of robots
-    M = length(s0) # number of delivery tasks
-    tr0_ = Dict{Int,Int}(i=>get_t0(sched,id) for (i,id) in enumerate(robot_ids)) # robot availability times
-    to0_ = Dict{Int,Int}(i=>get_t0(sched,id) for (i,id) in enumerate(object_ids) if is_root_node(sched,id)) # initial object availability times
+    # Define optimization model
+    milp = AssignmentMILP(
+        model=Model(optimizer_with_attributes(optimizer,
+        "TimeLimit"=>TimeLimit,
+        "OutputFlag"=>OutputFlag,
+        "Presolve"=>Presolve
+        )),
+        sched=sched
+        )
+    @unpack model,robot_ics,object_ics,operations,robot_map,object_map,operation_map = milp
+
+    N = length(robot_ics) # number of robots
+    M = length(object_ics) # number of delivery tasks
     Δt_collect = zeros(Int,M)
     Δt_deliver = zeros(Int,M)
+    r0 = map(p->get_id(get_initial_location_id(p.second.node)),robot_ics) # initial robot locations
+    s0 = map(p->get_id(get_initial_location_id(p.second.node)),object_ics) # initial object locations
     sF = zeros(Int,M)
     for (v,n) in enumerate(get_nodes(sched))
         if matches_node_type(n,BOT_COLLECT)
@@ -460,44 +494,9 @@ function formulate_milp(milp_model::AssignmentMILP,sched::OperatingSchedule,prob
             sF[object_map[get_object_id(n)]] = get_id(get_destination_location_id(n))
         end
     end
-    Δt = zeros(Int,M) # the (parent operation duration) for each object
-    for id in object_ids
-        if !is_root_node(sched,id)
-            parent = get_node(sched,inneighbors(sched,id)[1])
-            @assert matches_node_type(parent,Operation)
-            Δt[object_map[id]] = get_min_duration(sched,parent)
-        end
-    end
-    # @assert all(r0 .== problem_spec.r0)
-    # @assert all(s0 .== problem_spec.s0)
-    # @assert all(sF .== problem_spec.sF)
-    # @assert all(Δt_collect .== problem_spec.Δt_collect)
-    # @assert all(Δt_deliver .== problem_spec.Δt_deliver)
-    # @assert all(Δt .== problem_spec.Δt)
     # from ProblemSpec
-    terminal_vtxs = Vector{Set{Int}}()
-    for (op_id,op) in get_operations(sched)
-        if is_terminal_node(sched,op_id)
-            s = Set{Int}()
-            for o in preconditions(op)
-                push!(s,object_map[get_object_id(o)])
-            end
-            push!(terminal_vtxs,s)
-        end
-    end
-    weights = map(s->1,terminal_vtxs)
-    # terminal_vtxs = problem_spec.terminal_vtxs
-    # weights = problem_spec.weights
     D = problem_spec.D
-
-    # Define optimization model
-    model = Model(optimizer_with_attributes(optimizer,
-        "TimeLimit"=>TimeLimit,
-        "OutputFlag"=>OutputFlag,
-        "Presolve"=>Presolve
-        ))
     
-    r0 = vcat(r0,sF) # combine to get dummy robot ``spawn'' locations too
     @variable(model, to0[1:M] >= 0.0) # object availability time
     @variable(model, tor[1:M] >= 0.0) # object robot arrival time
     @variable(model, toc[1:M] >= 0.0) # object collection complete time
@@ -509,20 +508,20 @@ function formulate_milp(milp_model::AssignmentMILP,sched::OperatingSchedule,prob
     @variable(model, X[1:N+M,1:M], binary = true) # X[i,j] ∈ {0,1}
     @constraint(model, X * ones(M) .<= 1)         # each robot may have no more than 1 task
     @constraint(model, X' * ones(N+M) .== 1)     # each task must have exactly 1 assignment
-    for (i,t) in tr0_
-        # start time for robot i
-        @constraint(model, tr0[i] == t)
+    for (id,node) in robot_ics # robot start times
+        @constraint(model, tr0[robot_map[id]] == get_t0(node))
     end
-    for (j,t) in to0_
-        # start time for task j (applies only to tasks with no prereqs)
-        @constraint(model, to0[j] == t)
+    for (id,node) in object_ics # task start times
+        if is_root_node(sched,id) # only applies to root tasks (with no prereqs)
+            @constraint(model, to0[object_map[id]] == get_t0(node))
+        end
     end
     precedence_graph = CustomNDiGraph{Nothing,ObjectID}()
-    for id in object_ids
+    for (id,_) in object_ics
         add_node!(precedence_graph,nothing,id)
     end
-    # precedence constraints on task start time
-    for (op_id,op) in get_operations(sched)
+    for (op_id,node) in operations #get_operations(sched) # precedence constraints on task start time
+        op = node.node
         for input in preconditions(op)
             i = object_map[get_object_id(input)]
             for output in postconditions(op)
@@ -542,6 +541,7 @@ function formulate_milp(milp_model::AssignmentMILP,sched::OperatingSchedule,prob
         add_edge!(precedence_graph,v,v)
     end
     # constraints
+    r0 = vcat(r0,sF) # combine to get dummy robot ``spawn'' locations too
     for j in 1:M
         # constraint on dummy robot start time (corresponds to moment of object delivery)
         @constraint(model, tr0[j+N] == tof[j])
@@ -554,6 +554,9 @@ function formulate_milp(milp_model::AssignmentMILP,sched::OperatingSchedule,prob
         for i in 1:N+M
             @constraint(model, tor[j] - (tr0[i] + D[r0[i],s0[j]]) >= -Mm*(1 - X[i,j]))
         end
+        # for i in 1:M # dummy robot i appears at sF[i]
+        #     @constraint(model, tor[j] - (tr0[i+N] + D[sF[i],s0[j]]) >= -Mm*(1 - X[i+N,j]))
+        # end
         @constraint(model, toc[j] == tor[j] + Δt_collect[j])
         @constraint(model, tod[j] == toc[j] + D[s0[j],sF[j]])
         @constraint(model, tof[j] == tod[j] + Δt_deliver[j])
@@ -598,9 +601,8 @@ function formulate_milp(milp_model::AssignmentMILP,sched::OperatingSchedule,prob
             end
         end
     end
-    milp = AssignmentMILP(model)
-    cost1 = get_objective_expr(milp, cost_model, milp.model,terminal_vtxs,weights,tof,Δt)
-    @objective(milp.model, Min, cost1)
+    cost = get_objective_expr(milp, cost_model)
+    @objective(model, Min, cost)
     milp
 end
 
