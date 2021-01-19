@@ -196,7 +196,7 @@ function construct_task_graphs_problem(
         sF::Vector{Int},
         dist_matrix;
         Δt_collect=zeros(length(s0)),
-        Δt_deliver=zeros(length(sF)),
+        Δt_deposit=zeros(length(sF)),
         cost_function=SumOfMakeSpans(),
         task_shapes=map(o->(1,1),s0),
         shape_dict=Dict{Int,Dict{Tuple{Int,Int},Vector{Int}}}(s=>Dict{Tuple{Int,Int},Vector{Int}}() for s in vcat(s0,sF))
@@ -239,20 +239,28 @@ function construct_task_graphs_problem(
         end
     end
     problem_spec = ProblemSpec(
-        # graph=G,
         D=dist_matrix,
-        # Δt=Δt,tr0_=tr0_,to0_=to0_,
-        # terminal_vtxs=root_node_groups,
         cost_function=cost_function,
-        Δt_collect=Δt_collect, 
-        Δt_deliver=Δt_deliver,
-        r0=r0,s0=s0,sF=sF,
+        Δt_collect = Dict{ObjectID,Int}(
+            get_object_id(n)=>t for (n,t) in zip(object_ICs,Δt_collect)),
+        Δt_deposit = Dict{ObjectID,Int}(
+            get_object_id(n)=>t for (n,t) in zip(object_ICs,Δt_deposit)),
         )
 
-    # problem_spec = ProblemSpec(D=dist_matrix,terminal_vtxs=root_node_groups)
     sched = construct_partial_project_schedule(new_project_spec,problem_spec,robot_ICs)
+    # set Δt_collect and Δt_deposit
+    # for (tc,td,o) in zip(Δt_collect,Δt_deposit,object_ICs)
+    #     node = get_node(sched,get_object_id(o))
+    #     c_id, c_node = get_collect_node(sched,node.id)
+    #     @log_info(-1,0,string(c_node.node)," $(get_min_duration(c_node)) → ", tc)
+    #     set_min_duration!(c_node,tc)
+    #     @log_info(-1,0,string(c_node.node)," $(get_min_duration(c_node))")
+    #     d_id, d_node = get_deposit_node(sched,node.id)
+    #     @log_info(-1,0,string(d_node.node)," $(get_min_duration(d_node)) → ", td)
+    #     set_min_duration!(d_node,td)
+    #     @log_info(-1,0,string(d_node.node)," $(get_min_duration(d_node))")
+    # end
     return sched, problem_spec
-    # return new_project_spec, problem_spec, object_ICs, object_FCs, robot_ICs
 end
 function construct_task_graphs_problem(
     def::SimpleProblemDef,
@@ -436,13 +444,13 @@ end
 function construct_random_task_graphs_problem(N::Int,M::Int,
     pickup_vtxs::Vector{Int},dropoff_vtxs::Vector{Int},free_vtxs::Vector{Int},dist_matrix,
     Δt_collect::Vector{Float64}=zeros(M),
-    Δt_deliver::Vector{Float64}=zeros(M)
+    Δt_deposit::Vector{Float64}=zeros(M)
     )
     # select subset of pickup, dropoff and free locations to instantiate objects and robots
     r0,s0,sF        = get_random_problem_instantiation(N,M,pickup_vtxs,dropoff_vtxs,free_vtxs)
     project_spec    = construct_random_project_spec(M,s0,sF;max_parents=3,depth_bias=1.0,Δt_min=0,Δt_max=0)
 
-    construct_task_graphs_problem(project_spec,r0,s0,sF,dist_matrix;Δt_collect=Δt_collect,Δt_deliver=Δt_deliver)
+    construct_task_graphs_problem(project_spec,r0,s0,sF,dist_matrix;Δt_collect=Δt_collect,Δt_deposit=Δt_deposit)
 end
 
 ################################################################################

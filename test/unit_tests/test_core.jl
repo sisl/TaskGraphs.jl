@@ -222,7 +222,6 @@ let
     # project_spec, problem_spec, robot_ICs, env_graph, _ = pctapf_problem_1()
     sched, problem_spec, env_graph, _ = pctapf_problem_1()
 
-    # sched = construct_partial_project_schedule(project_spec,problem_spec,robot_ICs)
     model = formulate_milp(solver,sched,problem_spec;cost_model=MakeSpan())
     optimize!(model)
     @test termination_status(model) == MOI.OPTIMAL

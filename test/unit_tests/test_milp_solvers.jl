@@ -67,11 +67,6 @@ let
                 let
                     sched, problem_spec, env_graph, _ = f(; cost_function = cost_model, verbose = false)
                     let
-                        # sched = construct_partial_project_schedule(
-                        #     project_spec,
-                        #     problem_spec,
-                        #     robot_ICs,
-                        # )
                         model = formulate_milp(
                             solver,
                             sched,
@@ -107,13 +102,8 @@ let
                         verbose = false,
                         Δt_op = 0,
                         Δt_collect = [dt, 0],
-                        Δt_deliver = [0, 0],
+                        Δt_deposit = [0, 0],
                     )
-                    # sched = construct_partial_project_schedule(
-                    #     project_spec,
-                    #     problem_spec,
-                    #     robot_ICs,
-                    # )
                     model = formulate_milp(
                         solver,
                         sched,
@@ -133,13 +123,11 @@ let
 end
 # Job shop constraints
 let
-    # project_spec, problem_spec, robot_ICs, env_graph, _ = pctapf_problem_9(;
     sched, problem_spec, env_graph, _ = pctapf_problem_9(;
-        verbose=false,Δt_op=0,Δt_collect=[0,0],Δt_deliver=[0,0]
+        verbose=false,Δt_op=0,Δt_collect=[0,0],Δt_deposit=[0,0]
         );
     cost_model=SumOfMakeSpans()
     solver=TaskGraphsMILPSolver(AssignmentMILP())
-    # sched = construct_partial_project_schedule(project_spec,problem_spec,robot_ICs)
     model = formulate_milp(solver,sched,problem_spec;cost_model=cost_model)
     optimize!(model)
     @test termination_status(model) == MathOptInterface.OPTIMAL

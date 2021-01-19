@@ -107,11 +107,6 @@ function pctapf_problem(
         env_graph,
         args...
     )
-    # sched = construct_partial_project_schedule(
-    #     project_spec,
-    #     problem_spec,
-    #     robot_ICs,
-    #     )
     env = construct_search_env(
         solver,
         sched,
@@ -134,11 +129,6 @@ function pcta_problem(
         env_graph,
         primary_objective = MakeSpan()
     )
-    # sched = construct_partial_project_schedule(
-    #     project_spec,
-    #     problem_spec,
-    #     robot_ICs,
-    #     )
     cache=initialize_planning_cache(sched)
     cost_model = typeof(primary_objective)(sched,cache)
     heuristic_model = NullHeuristic()
@@ -157,14 +147,15 @@ function PC_TA(def::SimpleProblemDef,env::GridFactoryEnvironment,objective=MakeS
     sched, prob_spec, env, _ = construct_task_graphs_problem(def,env)
     pcta = pcta_problem(sched,prob_spec,env,objective)
 end
-# This is a place to put reusable problem initializers for testing
+
+# Reusable problem initializers for testing
 """
     pctapf_problem_1
 
 Optimal MakeSpan = 5
 Optimal SumOfMakeSpans = 5
 """
-function pctapf_problem_1(;cost_function=SumOfMakeSpans(),verbose=false,Δt_op=0,Δt_collect=[0,0,0],Δt_deliver=[0,0,0])
+function pctapf_problem_1(;cost_function=SumOfMakeSpans(),verbose=false,Δt_op=0,Δt_collect=[0,0,0],Δt_deposit=[0,0,0])
     N = 2                  # num robots
     M = 3                  # num delivery tasks
     vtx_grid = initialize_dense_vtx_grid(4,4)
@@ -185,7 +176,7 @@ function pctapf_problem_1(;cost_function=SumOfMakeSpans(),verbose=false,Δt_op=0
 
     def = SimpleProblemDef(project_spec,r0,s0,sF)
     sched, problem_spec = construct_task_graphs_problem(
-        def,env_graph;cost_function=cost_function,Δt_collect=Δt_collect,Δt_deliver=Δt_deliver)
+        def,env_graph;cost_function=cost_function,Δt_collect=Δt_collect,Δt_deposit=Δt_deposit)
     return sched, problem_spec, env_graph, assignment_dict
 end
 
@@ -231,7 +222,7 @@ function pctapf_problem_2(;cost_function=SumOfMakeSpans(),verbose=false)
 end
 
 """
-    pctapf_problem_3(;cost_function=SumOfMakeSpans(),verbose=false,Δt_op=0,Δt_collect=[0,0,0,0],Δt_deliver=[0,0,0,0])
+    pctapf_problem_3(;cost_function=SumOfMakeSpans(),verbose=false,Δt_op=0,Δt_collect=[0,0,0,0],Δt_deposit=[0,0,0,0])
 
 In this problem robot 2 will need to yield to let robot 1 through.
 First operation:
@@ -242,7 +233,7 @@ Second operation:
 Third operation:
     robot 2 does [8-12-16]
 """
-function pctapf_problem_3(;cost_function=SumOfMakeSpans(),verbose=false,Δt_op=0,Δt_collect=[0,0,0,0],Δt_deliver=[0,0,0,0])
+function pctapf_problem_3(;cost_function=SumOfMakeSpans(),verbose=false,Δt_op=0,Δt_collect=[0,0,0,0],Δt_deposit=[0,0,0,0])
     N = 2                  # num robots
     M = 4                  # num delivery tasks
     vtx_grid = initialize_dense_vtx_grid(8,4)
@@ -269,7 +260,7 @@ function pctapf_problem_3(;cost_function=SumOfMakeSpans(),verbose=false,Δt_op=0
 
     def = SimpleProblemDef(project_spec,r0,s0,sF)
     sched, problem_spec = construct_task_graphs_problem(
-        def,env_graph;cost_function=cost_function,Δt_collect=Δt_collect,Δt_deliver=Δt_deliver)
+        def,env_graph;cost_function=cost_function,Δt_collect=Δt_collect,Δt_deposit=Δt_deposit)
 
     return sched, problem_spec, env_graph, assignment_dict
 end
@@ -348,14 +339,14 @@ function pctapf_problem_5(;cost_function=SumOfMakeSpans(),verbose=false)
 end
 
 """
-    pctapf_problem_6(;cost_function=SumOfMakeSpans(),verbose=false,Δt_op=1,Δt_collect=[0,0,0],Δt_deliver=[0,0,0])
+    pctapf_problem_6(;cost_function=SumOfMakeSpans(),verbose=false,Δt_op=1,Δt_collect=[0,0,0],Δt_deposit=[0,0,0])
 
 Identical to `pctapf_problem_2`, but process time is non-zero.
 In this problem robot 1 will first do [1-5-9], then [9-13-17]
 robot 2 will do [4-8-32]. The key thing is that robot 1 will need to wait
 until robot 2 is finished before robot 1 can do its second task
 """
-function pctapf_problem_6(;cost_function=SumOfMakeSpans(),verbose=false,Δt_op=1,Δt_collect=[0,0,0],Δt_deliver=[0,0,0])
+function pctapf_problem_6(;cost_function=SumOfMakeSpans(),verbose=false,Δt_op=1,Δt_collect=[0,0,0],Δt_deposit=[0,0,0])
     N = 2                  # num robots
     M = 3                  # num delivery tasks
     vtx_grid = initialize_dense_vtx_grid(8,4)
@@ -381,19 +372,19 @@ function pctapf_problem_6(;cost_function=SumOfMakeSpans(),verbose=false,Δt_op=1
 
     def = SimpleProblemDef(project_spec,r0,s0,sF)
     sched, problem_spec = construct_task_graphs_problem(
-        def,env_graph;cost_function=cost_function,Δt_collect=Δt_collect,Δt_deliver=Δt_deliver)
+        def,env_graph;cost_function=cost_function,Δt_collect=Δt_collect,Δt_deposit=Δt_deposit)
 
     return sched, problem_spec, env_graph, assignment_dict
 end
 
 
 """
-    pctapf_problem_7(;cost_function=SumOfMakeSpans(),verbose=false,Δt_op=0,Δt_collect=[0,4,0],Δt_deliver=[0,0,0])
+    pctapf_problem_7(;cost_function=SumOfMakeSpans(),verbose=false,Δt_op=0,Δt_collect=[0,4,0],Δt_deposit=[0,0,0])
 
 Robot 2 will have to sit and wait at the pickup station, meaning that robot 1 
 will have to go around if robot 2 is on the critical path
 """
-function pctapf_problem_7(;cost_function=SumOfMakeSpans(),verbose=false,Δt_op=0,Δt_collect=[0,4,0],Δt_deliver=[0,0,0])
+function pctapf_problem_7(;cost_function=SumOfMakeSpans(),verbose=false,Δt_op=0,Δt_collect=[0,4,0],Δt_deposit=[0,0,0])
     N = 2                  # num robots
     M = 3                  # num delivery tasks
     vtx_grid = initialize_dense_vtx_grid(4,4)
@@ -415,19 +406,19 @@ function pctapf_problem_7(;cost_function=SumOfMakeSpans(),verbose=false,Δt_op=0
 
     def = SimpleProblemDef(project_spec,r0,s0,sF)
     sched, problem_spec = construct_task_graphs_problem(
-        def,env_graph;cost_function=cost_function,Δt_collect=Δt_collect,Δt_deliver=Δt_deliver)
+        def,env_graph;cost_function=cost_function,Δt_collect=Δt_collect,Δt_deposit=Δt_deposit)
     return sched, problem_spec, env_graph, assignment_dict
 end
 
 """
-    pctapf_problem_8(;cost_function=SumOfMakeSpans(),verbose=false,Δt_op=0,Δt_collect=[0,0,0,0],Δt_deliver=[0,0,0,0])
+    pctapf_problem_8(;cost_function=SumOfMakeSpans(),verbose=false,Δt_op=0,Δt_collect=[0,0,0,0],Δt_deposit=[0,0,0,0])
 
 Two-headed project. Robot 1 does the first half of the first head, and
 robot 2 handles the first half of the second head, and then they swap.
 Optimal MakeSpan = 8
 Optimal SumOfMakeSpans = 16
 """
-function pctapf_problem_8(;cost_function=SumOfMakeSpans(),verbose=false,Δt_op=0,Δt_collect=[0,0,0,0],Δt_deliver=[0,0,0,0])
+function pctapf_problem_8(;cost_function=SumOfMakeSpans(),verbose=false,Δt_op=0,Δt_collect=[0,0,0,0],Δt_deposit=[0,0,0,0])
     N = 2                  # num robots
     M = 4                  # num delivery tasks
     vtx_grid = initialize_dense_vtx_grid(8,4)
@@ -455,7 +446,7 @@ function pctapf_problem_8(;cost_function=SumOfMakeSpans(),verbose=false,Δt_op=0
 
     def = SimpleProblemDef(project_spec,r0,s0,sF)
     sched, problem_spec = construct_task_graphs_problem(
-        def,env_graph;cost_function=cost_function,Δt_collect=Δt_collect,Δt_deliver=Δt_deliver)
+        def,env_graph;cost_function=cost_function,Δt_collect=Δt_collect,Δt_deposit=Δt_deposit)
 
     return sched, problem_spec, env_graph, assignment_dict
 end
@@ -463,12 +454,12 @@ end
 export pctapf_problem_9
 
 """
-    pctapf_problem_9(;cost_function=SumOfMakeSpans(),verbose=false,Δt_op=0,Δt_collect=[0,0],Δt_deliver=[0,0])
+    pctapf_problem_9(;cost_function=SumOfMakeSpans(),verbose=false,Δt_op=0,Δt_collect=[0,0],Δt_deposit=[0,0])
 
 Project with station-sharing. Station 5 needs to accessed by both robots for 
 picking up their objects.
 """
-function pctapf_problem_9(;cost_function=SumOfMakeSpans(),verbose=false,Δt_op=0,Δt_collect=[0,0],Δt_deliver=[0,0])
+function pctapf_problem_9(;cost_function=SumOfMakeSpans(),verbose=false,Δt_op=0,Δt_collect=[0,0],Δt_deposit=[0,0])
     N = 2                  # num robots
     M = 2                  # num delivery tasks
     vtx_grid = initialize_dense_vtx_grid(4,4)
@@ -490,7 +481,7 @@ function pctapf_problem_9(;cost_function=SumOfMakeSpans(),verbose=false,Δt_op=0
 
     def = SimpleProblemDef(project_spec,r0,s0,sF)
     sched, problem_spec = construct_task_graphs_problem(
-        def,env_graph;cost_function=cost_function,Δt_collect=Δt_collect,Δt_deliver=Δt_deliver)
+        def,env_graph;cost_function=cost_function,Δt_collect=Δt_collect,Δt_deposit=Δt_deposit)
 
     return sched, problem_spec, env_graph, assignment_dict
 end
@@ -498,7 +489,7 @@ end
 export pctapf_problem_10
 
 """
-    pctapf_problem_10(;cost_function=MakeSpan(),verbose=false,Δt_op=0,Δt_collect=[0,0,0,0,0,0],Δt_deliver=[0,0,0,0,0,0])
+    pctapf_problem_10(;cost_function=MakeSpan(),verbose=false,Δt_op=0,Δt_collect=[0,0,0,0,0,0],Δt_deposit=[0,0,0,0,0,0])
 
 Motivation for backtracking in ISPS
 The makespan optimal solution is T = 8. However, the optimistic schedule
@@ -506,7 +497,7 @@ will always prioritize task route planning for tasks 1,2, and 3 before 4.
 This leads to a double delay that will not be caught without backtracking
 in ISPS. Hence, the solver will return a solution with T = 9.
 """
-function pctapf_problem_10(;cost_function=MakeSpan(),verbose=false,Δt_op=0,Δt_collect=[0,0,0,0,0,0],Δt_deliver=[0,0,0,0,0,0])
+function pctapf_problem_10(;cost_function=MakeSpan(),verbose=false,Δt_op=0,Δt_collect=[0,0,0,0,0,0],Δt_deposit=[0,0,0,0,0,0])
     N = 4                  # num robots
     M = 4                  # num delivery tasks
     vtx_grid = initialize_dense_vtx_grid(13,11)
@@ -554,7 +545,7 @@ function pctapf_problem_10(;cost_function=MakeSpan(),verbose=false,Δt_op=0,Δt_
 
     def = SimpleProblemDef(project_spec,r0,s0,sF)
     sched, problem_spec = construct_task_graphs_problem(
-        def,env_graph;cost_function=cost_function,Δt_collect=Δt_collect,Δt_deliver=Δt_deliver)
+        def,env_graph;cost_function=cost_function,Δt_collect=Δt_collect,Δt_deposit=Δt_deposit)
 
     return sched, problem_spec, env_graph, assignment_dict
 end
@@ -573,7 +564,7 @@ function pctapf_problem_11(;
         verbose = false,
         Δt_op=0,
         Δt_collect=[0,0,0],
-        Δt_deliver=[0,0,0],
+        Δt_deposit=[0,0,0],
     )
     N = 3                  # num robots
     M = 3                  # num delivery tasks
@@ -603,7 +594,7 @@ function pctapf_problem_11(;
 
     def = SimpleProblemDef(project_spec,r0,s0,sF,shapes)
     sched, problem_spec = construct_task_graphs_problem(
-        def,env_graph;cost_function=cost_function,Δt_collect=Δt_collect,Δt_deliver=Δt_deliver)
+        def,env_graph;cost_function=cost_function,Δt_collect=Δt_collect,Δt_deposit=Δt_deposit)
 
     return sched, problem_spec, env_graph, assignment_dict
 end
@@ -784,9 +775,8 @@ function replanning_problem(solver,r0,defs,env_graph;
     end
 
     base_schedule = construct_partial_project_schedule(
-        ProjectSpec(),
+        robot_ICs,
         problem_spec,
-        robot_ICs
         )
     base_env = construct_search_env(solver,base_schedule,problem_spec,env_graph)
     return RepeatedPC_TAPF(base_env,requests)

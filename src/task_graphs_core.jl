@@ -35,21 +35,11 @@ Elements:
 - sF::Vector{Int} - delivery station for each task
 - nR::Vector{Int} - num robots required for each task (>1 => collaborative task)
 """
-@with_kw struct ProblemSpec{G,F,T}
-    graph::G                = DiGraph() # delivery graph
+@with_kw struct ProblemSpec{T,F}
     D::T                    = zeros(0,0) # full distance matrix
-    Δt::Vector{Float64}     = Vector{Float64}() # durations of operations
-    tr0_::Dict{Int,Float64} = Dict{Int,Float64}() # robot start times
-    to0_::Dict{Int,Float64} = Dict{Int,Float64}() # object start times
-    terminal_vtxs::Vector{Set{Int}} = [get_all_terminal_nodes(graph)]
-    weights::Dict{Int,Float64} = Dict{Int,Float64}(v=>1.0 for v in 1:length(terminal_vtxs))
     cost_function::F        = SumOfMakeSpans()
-    r0::Vector{Int}         = Int[] # initial robot conditions
-    s0::Vector{Int}         = Int[] # pickup stations for each task
-    sF::Vector{Int}         = Int[] # delivery station for each task
-    Δt_collect::Vector{Float64} = zeros(length(s0)) # duration of COLLECT operations
-    Δt_deliver::Vector{Float64} = zeros(length(s0)) # duration of DELIVER operations
-    # @assert length(s0) == length(sF) == length(Δt_collect) == length(Δt_deliver) # == M
+    Δt_collect::Dict{ObjectID,Int} = Dict{ObjectID,Int}() # duration of COLLECT operations
+    Δt_deposit::Dict{ObjectID,Int} = Dict{ObjectID,Int}() # duration of DELIVER operations
 end
 GraphUtils.get_distance(spec::ProblemSpec,args...) = get_distance(spec.D,args...)
 GraphUtils.get_distance(spec::ProblemSpec,a::LocationID,b::LocationID,args...) = get_distance(spec.D,get_id(a),get_id(b),args...)
@@ -536,8 +526,8 @@ needs_path(p) = false
 needs_path(p::Union{BOT_AT,AbstractRobotAction}) = true
 duration_lower_bound(args...) = 0
 duration_lower_bound(op::Operation,spec) = duration(op)
-duration_lower_bound(p::BOT_COLLECT,spec) = get(spec.Δt_collect,get_id(get_object_id(p)),0)
-duration_lower_bound(p::BOT_DEPOSIT,spec) = get(spec.Δt_deliver,get_id(get_object_id(p)),0)
+duration_lower_bound(p::BOT_COLLECT,spec) = get(spec.Δt_collect,get_object_id(p),0)
+duration_lower_bound(p::BOT_DEPOSIT,spec) = get(spec.Δt_deposit,get_object_id(p),0)
 function duration_lower_bound(p::Union{BOT_AT,AbstractRobotAction},spec)
     x1 = get_initial_location_id(p)
     x2 = get_destination_location_id(p)
@@ -916,14 +906,11 @@ end
 
 Constructs a partial project graph
 """
-function construct_partial_project_schedule(
-    object_ICs::Vector{OBJECT_AT},
-    object_FCs::Vector{OBJECT_AT},
-    robot_ICs::Vector{R},
-    operations::Vector{Operation},
-    terminal_ops::Vector{OperationID},
-    problem_spec::ProblemSpec,
-    ) where {R<:BOT_AT}
+function construct_partial_project_schedule(spec::ProjectSpec,problem_spec::ProblemSpec,robot_ICs=Vector{BOT_AT}())
+    object_ICs = initial_conditions_vector(spec)
+    object_FCs = final_conditions_vector(spec)
+    operations = get_operations(spec)
+    terminal_ops = sort(collect(get_terminal_operation_ids(spec)))
 
     # Construct Partial Project Schedule
     sched = OperatingSchedule()
@@ -974,27 +961,11 @@ function construct_partial_project_schedule(
     process_schedule!(sched)
     sched
 end
-function construct_partial_project_schedule(spec::ProjectSpec,problem_spec::ProblemSpec,robot_ICs=Vector{BOT_AT}())
-    construct_partial_project_schedule(
-        initial_conditions_vector(spec),
-        final_conditions_vector(spec),
-        robot_ICs,
-        get_operations(spec),
-        sort(collect(get_terminal_operation_ids(spec))),
-        problem_spec,
-    )
-end
-function construct_partial_project_schedule(robot_ICs::Vector{R},prob_spec=
-        ProblemSpec(N=length(robot_ICs))
+function construct_partial_project_schedule(
+        robot_ICs::Vector{R},
+        prob_spec::ProblemSpec=ProblemSpec(),
         ) where {R<:BOT_AT}
-    construct_partial_project_schedule(
-        Vector{OBJECT_AT}(),
-        Vector{OBJECT_AT}(),
-        robot_ICs,
-        Vector{Operation}(),
-        Vector{OperationID}(),
-        prob_spec
-    )
+    construct_partial_project_schedule(ProjectSpec(),prob_spec,robot_ICs)
 end
 
 """
@@ -1091,24 +1062,17 @@ export
     get_collect_node,
     get_deposit_node
 
-function get_collect_node(sched::P,id::ObjectID) where {P<:OperatingSchedule}
-    current_id = id
-    node = get_node_from_id(sched,current_id)
-    while typeof(node) != COLLECT
-        current_id = get_vtx_id(sched, outneighbors(get_graph(sched),get_vtx(sched,current_id))[1])
-        node = get_node_from_id(sched, current_id)
+function forward_search(sched,v,f)
+    id = v
+    node = get_node(sched,v)
+    while !f(node)
+        id = get_vtx_id(sched, outneighbors(sched,id)[1])
+        node = get_node(sched, id)
     end
-    return current_id, node
+    return id, node
 end
-function get_deposit_node(sched::P,id::ObjectID) where {P<:OperatingSchedule}
-    current_id = id
-    node = get_node_from_id(sched,current_id)
-    while typeof(node) != DEPOSIT
-        current_id = get_vtx_id(sched, outneighbors(get_graph(sched),get_vtx(sched,current_id))[1])
-        node = get_node_from_id(sched, current_id)
-    end
-    return current_id, node
-end
+get_collect_node(sched::OperatingSchedule,id::ObjectID) = forward_search(sched,id,n->matches_node_type(n,BOT_COLLECT))
+get_deposit_node(sched::OperatingSchedule,id::ObjectID) = forward_search(sched,id,n->matches_node_type(n,BOT_DEPOSIT))
 
 export get_assignment_dict
 

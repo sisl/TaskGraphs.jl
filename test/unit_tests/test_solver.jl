@@ -285,7 +285,7 @@ let
     and deposit time are non-zero.
     """
     println("Test non-zero collection time:")
-    Δt_deliver_1 = 1
+    Δt_deposit_1 = 1
     for (Δt_collect_2, true_cost) in zip([0,1,2,3,4],[6,7,8,8,8])
         solver = NBSSolver()
         cost_model = MakeSpan()
@@ -294,7 +294,7 @@ let
             verbose=false,
             Δt_op=0,
             Δt_collect=[0,Δt_collect_2,0],
-            Δt_deliver=[Δt_deliver_1,0,0]
+            Δt_deposit=[Δt_deposit_1,0,0]
             );
         env, cost = solve!(solver,pc_tapf)
         paths = convert_to_vertex_lists(get_route_plan(env))

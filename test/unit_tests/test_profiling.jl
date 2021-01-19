@@ -154,7 +154,7 @@ let
                     ],
                 num_trials=16,
                 Δt_collect=0,
-                Δt_deliver=0,
+                Δt_deposit=0,
                 # milp_model = milp_model,
                 problem_dir = problem_dir,
                 results_dir = results_dir,

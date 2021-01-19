@@ -31,10 +31,11 @@ function stochastic_problem(ptype::Type{P},solver,prob,clean_up_bot_ICS,disturba
         add_new_robot_to_schedule!(sched,pred,get_problem_spec(env))
     end
     robot_ICs = get_robot_ICs(sched)
-    prob_spec = ProblemSpec(
-        get_problem_spec(env),
-        r0=[get_id(get_location_id(robot_ICs[k])) for k in sort(collect(keys(robot_ICs)))],
-        )
+    # prob_spec = ProblemSpec(
+    #     get_problem_spec(env),
+    #     # r0=[get_id(get_location_id(robot_ICs[k])) for k in sort(collect(keys(robot_ICs)))],
+    #     )
+    prob_spec = get_problem_spec(env)
     # populate_environment_dict_layers!(env.env_layers,sched,env_graph,prob_spec)
     new_prob = P(prob,construct_search_env(solver,sched,prob_spec,env_graph,cache))
     StochasticProblem(new_prob,disturbances)

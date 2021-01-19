@@ -439,7 +439,7 @@ function profile_replanning(replan_model, fallback_model, solver, fallback_solve
     def = project_list[idx]
     project_spec, problem_spec, _, _, robot_ICs = construct_task_graphs_problem(def, env_graph;
         Δt_collect=map(i->get(problem_config,:dt_collect,0), def.s0),
-        Δt_deliver=map(i->get(problem_config,:dt_deliver,0), def.s0),
+        Δt_deposit=map(i->get(problem_config,:dt_deliver,0), def.s0),
         cost_function=primary_objective,
         task_shapes=def.shapes,
         shape_dict=env_graph.expanded_zones,
@@ -478,7 +478,7 @@ function profile_replanning(replan_model, fallback_model, solver, fallback_solve
         def = project_list[idx]
         project_spec, problem_spec, _, _, _ = construct_task_graphs_problem(def, dist_matrix;
             Δt_collect=map(i->get(problem_config,:dt_collect,0), def.s0),
-            Δt_deliver=map(i->get(problem_config,:dt_deliver,0), def.s0),
+            Δt_deposit=map(i->get(problem_config,:dt_deliver,0), def.s0),
             cost_function=primary_objective,
             task_shapes=def.shapes,
             shape_dict=env_graph.expanded_zones
@@ -621,7 +621,7 @@ function run_profiling(solver,MODE=:nothing;
                     problem_def,
                     factory_env;
                     Δt_collect=map(i->get(problem_config,:dt_collect,0), problem_def.s0),
-                    Δt_deliver=map(i->get(problem_config,:dt_deliver,0), problem_def.s0),
+                    Δt_deposit=map(i->get(problem_config,:dt_deliver,0), problem_def.s0),
                     cost_function=primary_objective,
                     );
 
