@@ -289,14 +289,13 @@ function formulate_big_milp(prob::PC_TAPF,T_MAX,model = JuMP.Model())
     # precedence constraints
     for op in values(get_operations(sched))
         Δt = duration(op)
-        for o2 in postconditions(op)
-            id2 = get_object_id(o2)
+        for (id1,o2) in postconditions(op)
             outflow = object_flows[id2]
             start = get_id(get_initial_location_id(o2))
             @assert get_id(get_destination_location_id(object_ICs[id2])) == start
-            for o1 in preconditions(op)
+            for (id1,o1) in preconditions(op)
                 # makespans
-                id1 = get_object_id(o1)
+                # id1 = get_object_id(o1)
                 inflow = object_flows[id1]
                 goal = get_id(get_destination_location_id(o1))
                 # @assert get_id(get_destination_location_id(get_object_FCs(sched)[id1])) == goal
@@ -306,9 +305,9 @@ function formulate_big_milp(prob::PC_TAPF,T_MAX,model = JuMP.Model())
     end
     # Objective
     for op in values(get_operations(sched))
-        for o in preconditions(op)
+        for (id,o) in preconditions(op)
             # makespans
-            id = get_object_id(o)
+            # id = get_object_id(o)
             object_flow = object_flows[id]
             goal = get_id(get_destination_location_id(o))
             @show o, goal

@@ -36,11 +36,6 @@ function TOML.parse(mat::SparseMatrixCSC{T,Int64}) where {T}
         "size_i" => size(mat,1),
         "size_j" => size(mat,2)
         )
-    # toml_dict = Dict(
-    #     "edge_list" => map(idx->[idx[1],idx[2]], findall(!iszero, mat)),
-    #     "size_i" => size(mat,1),
-    #     "size_j" => size(mat,2)
-    #     )
 end
 function read_sparse_matrix(toml_dict::Dict)
     edge_list   = toml_dict["edge_list"]
@@ -105,13 +100,9 @@ function remap_object_ids!(dict::Dict,args...)
     dict
 end
 function remap_object_ids!(node::Operation,args...)
-    new_pre = Set([remap_object_id(o,args...) for o in node.pre])
-    empty!(node.pre)
-    union!(node.pre, new_pre)
-    new_post = Set([remap_object_id(o,args...) for o in node.post])
-    empty!(node.post)
-    union!(node.post, new_post)
-    node
+    remap_object_ids!(preconditions(node),args...)
+    remap_object_ids!(postconditions(node),args...)
+    return node
 end
 remap_object_id(node::Operation,args...)    = remap_object_ids!(deepcopy(node),args...)
 function remap_object_ids!(sched::OperatingSchedule,args...)
@@ -194,7 +185,7 @@ function construct_task_graphs_problem(
         r0::Vector{Int},
         s0::Vector{Int},
         sF::Vector{Int},
-        dist_matrix;
+        env;
         Δt_collect=zeros(length(s0)),
         Δt_deposit=zeros(length(sF)),
         cost_function=SumOfMakeSpans(),
@@ -218,28 +209,15 @@ function construct_task_graphs_problem(
             construct_operation(
                 new_project_spec,
                 op.station_id,
-                map(get_object_id, collect(op.pre)),
-                map(get_object_id, collect(op.post)),
-                op.Δt
+                collect(keys(preconditions(op))),
+                collect(keys(postconditions(op))),
+                duration(op)
             )
         )
     end
 
-    delivery_graph = construct_delivery_graph(new_project_spec,M)
-    G = delivery_graph.graph
-    Δt = get_duration_vector(project_spec) # initialize vector of operation times
-    # set initial conditions
-    to0_ = Dict{Int,Float64}(v=>0.0 for v in get_all_root_nodes(G))
-    tr0_ = Dict{Int,Float64}(i=>0.0 for i in 1:N)
-    root_node_groups = Vector{Set{Int}}()
-    for v in get_all_terminal_nodes(new_project_spec)
-        n = get_node(new_project_spec,v)
-        if isa(n,Operation)
-            push!(root_node_groups,Set(map(get_id, get_input_ids(n))))
-        end
-    end
     problem_spec = ProblemSpec(
-        D=dist_matrix,
+        D=env,
         cost_function=cost_function,
         Δt_collect = Dict{ObjectID,Int}(
             get_object_id(n)=>t for (n,t) in zip(object_ICs,Δt_collect)),
@@ -248,23 +226,11 @@ function construct_task_graphs_problem(
         )
 
     sched = construct_partial_project_schedule(new_project_spec,problem_spec,robot_ICs)
-    # set Δt_collect and Δt_deposit
-    # for (tc,td,o) in zip(Δt_collect,Δt_deposit,object_ICs)
-    #     node = get_node(sched,get_object_id(o))
-    #     c_id, c_node = get_collect_node(sched,node.id)
-    #     @log_info(-1,0,string(c_node.node)," $(get_min_duration(c_node)) → ", tc)
-    #     set_min_duration!(c_node,tc)
-    #     @log_info(-1,0,string(c_node.node)," $(get_min_duration(c_node))")
-    #     d_id, d_node = get_deposit_node(sched,node.id)
-    #     @log_info(-1,0,string(d_node.node)," $(get_min_duration(d_node)) → ", td)
-    #     set_min_duration!(d_node,td)
-    #     @log_info(-1,0,string(d_node.node)," $(get_min_duration(d_node))")
-    # end
     return sched, problem_spec
 end
 function construct_task_graphs_problem(
     def::SimpleProblemDef,
-    dist_matrix;
+    env::GridFactoryEnvironment;
     task_shapes = def.shapes,
     kwargs...,
 )
@@ -273,20 +239,8 @@ function construct_task_graphs_problem(
         def.r0,
         def.s0,
         def.sF,
-        dist_matrix;
+        env;
         task_shapes = task_shapes,
-        kwargs...,
-    )
-end
-function construct_task_graphs_problem(
-    def::SimpleProblemDef,
-    env::GridFactoryEnvironment;
-    kwargs...,
-)
-    construct_task_graphs_problem(
-        def,
-        get_dist_matrix(env);
-        task_shapes = def.shapes,
         shape_dict = env.expanded_zones,
         kwargs...,
     )
@@ -536,8 +490,8 @@ function Base.:(==)(o1::OBJECT_AT,o2::OBJECT_AT)
 end
 function Base.:(==)(op1::Operation,op2::Operation)
     try
-        @assert(op1.pre == op2.pre)
-        @assert(op1.post == op2.post)
+        @assert(preconditions(op1) == preconditions(op2))
+        @assert(postconditions(op1) == postconditions(op2))
         @assert(op1.Δt == op2.Δt)
         @assert(op1.station_id == op2.station_id)
     catch e

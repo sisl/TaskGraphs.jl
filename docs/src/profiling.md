@@ -1,3 +1,9 @@
+# Profiling
+
+To run the suite of experiments described in the [ICRA paper](https://arxiv.org/abs/2006.08845), run the following code:
+
+```julia
+# copied from TaskGraphs/scripts/icra_experiments.jl
 using TaskGraphs 
 
 ## ICRA experiments
@@ -53,3 +59,4 @@ for solver_config in solver_configs
     warmup(loader,solver_config,problem_dir)
     run_profiling(loader,solver_config,problem_dir)
 end
+```

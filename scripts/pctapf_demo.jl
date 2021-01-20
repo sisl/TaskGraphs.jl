@@ -1,36 +1,3 @@
-# Getting Started
-
-## Installation
-
-To install
-[TaskGraphs.jl](https://github.com/kylejbrown17/TaskGraphs.jl), start up
-Julia and type the following code-snipped into the REPL.
-
-```julia
-julia> ] # enter package mode by typing "]"
-
-(@v1.4) pkg> add https://github.com/kylejbrown17/TaskGraphs.jl.git
-```
-To take full advantage of the package, you will also need to install 
-[Gurobi](https://www.gurobi.com/downloads/).
-
-## Example
-
-To construct and solve a predefined **precedence-constrained multi agent task** 
-**assignment and pathfinding** (PC-TAPF) problem.
-
-```@repl
-using TaskGraphs
-solver = NBSSolver() # initialize a solver
-prob = pctapf_problem_1(solver) # initialize the problem
-solution, cost = solve!(solver,prob) # solve it
-optimal_status(solver) # check the solution status
-```
-
-If you want to build your own PC_TAPF problem from scratch:
-
-```julia
-# copied from TaskGraphs/scripts/pctapf_demo.jl
 using TaskGraphs
 
 ## set up the environment
@@ -75,4 +42,3 @@ solution, cost = solve!(solver,prob)
 # check if the problem was solved to optimality
 @show feasible_status(solver)
 @show optimal_status(solver)
-```

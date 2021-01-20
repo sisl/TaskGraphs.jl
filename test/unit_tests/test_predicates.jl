@@ -29,7 +29,7 @@ let
 end
 let
     op = Operation()
-    push!(op.pre,OBJECT_AT(1,2))
+    set_precondition!(op,OBJECT_AT(1,2))
     @test TaskGraphs.get_dropoff(op,ObjectID(1)) == LocationID(2)
     get_location_id(op)
     get_operation_id(op)
@@ -38,8 +38,6 @@ let
     duration(op)
     preconditions(op)
     postconditions(op)
-    add_conditions(op)
-    delete_conditions(op)
     get_id(op)
 end
 let

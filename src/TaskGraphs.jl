@@ -28,6 +28,7 @@ global PROBLEM_DIR      = joinpath(EXPERIMENT_DIR,"problem_instances")
 global RESULTS_DIR      = joinpath(EXPERIMENT_DIR,"results")
 global VIDEO_DIR        = joinpath(EXPERIMENT_DIR,"videos")
 
+include("JuMP_interface.jl")
 include("planning_predicates.jl")
 include("task_graphs_core.jl")
 include("utils.jl")
@@ -42,6 +43,10 @@ include("helpers/problem_instances.jl")
 include("helpers/profiling.jl")
 include("experiments/replanning_experiments.jl")
 
-@reexport using CRCBS   
+@reexport using CRCBS
+
+# set Gurobi as the default optimizer
+set_default_milp_optimizer!(Gurobi.Optimizer)
+set_default_optimizer_attributes!(MOI.TimeLimitSec()=>100, MOI.Silent()=>true)
 
 end

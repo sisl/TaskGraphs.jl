@@ -98,7 +98,6 @@ function read_simple_repeated_problem_def(path)
 end
 function RepeatedPC_TAPF(simple_def::SimpleRepeatedProblemDef,solver,loader::ReplanningProblemLoader)
     env         = loader.envs[simple_def.env_id]
-    # prob_spec   = ProblemSpec(loader.prob_specs[simple_def.env_id],r0=simple_def.r0)
     prob_spec   = loader.prob_specs[simple_def.env_id]
     sched = construct_partial_project_schedule(
         [ROBOT_AT(r,x) for (r,x) in enumerate(simple_def.r0)],prob_spec)

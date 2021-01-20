@@ -135,7 +135,6 @@ function construct_cost_model(trait::NonPrioritized,
     @assert N > 0 "num_robots should be > 0. We need at least one robot!"
     cost_model = construct_composite_cost_model(
         typeof(primary_objective)(sched,cache),
-        # HardConflictCost(env_graph,maximum(cache.tF)+extra_T, N),
         HardConflictCost(env_graph,makespan(sched)+extra_T, N),
         SumOfTravelDistance(),
         FullCostModel(sum,NullCost()), # SumOfTravelTime(),
@@ -454,9 +453,11 @@ TaskGraphsMILPSolver(milp) = TaskGraphsMILPSolver(milp,SolverLogger{Int}())
 get_assignment_matrix(solver::TaskGraphsMILPSolver) = get_assignment_matrix(solver.milp)
 
 function formulate_milp(solver::TaskGraphsMILPSolver,args...;kwargs...)
-    formulate_milp(solver.milp,args...;
-        TimeLimit=max(0,min(runtime_limit(solver),deadline(solver)-time())),
+    milp = formulate_milp(solver.milp,args...;
         kwargs...)
+    set_optimizer_attributes(milp,default_optimizer_attributes()...)
+    set_time_limit_sec(milp, max(0,time_to_deadline(solver)))
+    milp
 end
 
 
@@ -624,6 +625,9 @@ A helper method for updating an instance of an assignment problem. In the case
 """
 function update_assignment_problem!(solver, model::T, base_prob) where {T<:TaskGraphsMILP}
     exclude_solutions!(model) # exclude most recent solution in order to get next best solution
+    # Trying this
+    set_time_limit_sec(model, max(0,time_to_deadline(solver)))
+    model
 end
 
 export
@@ -637,12 +641,11 @@ wherein we ignore collisions--using the algorithm encoded by solver.
 """
 function solve_assignment_problem!(solver::TaskGraphsMILPSolver, model, prob)
     l_bound = lower_bound(solver)
+    set_time_limit_sec(model, max(0,time_to_deadline(solver)))
     optimize!(model)
     if primal_status(model) != MOI.FEASIBLE_POINT
         throw(SolverException("Assignment problem is infeasible -- in `solve_assignment_problem!()`"))
     end
-    # set_lower_bound!(solver, Int(round(value(objective_bound(model)))) )
-    # set_best_cost!(solver, Int(round(value(objective_function(model)))) )
     set_lower_bound!(solver, Int(round(value(objective_bound(model)))) )
     set_best_cost!(solver, Int(round(value(objective_function(model)))) )
     if termination_status(model) == MOI.OPTIMAL

@@ -112,7 +112,8 @@ function construct_environment_layer(env::GridFactoryEnvironment,problem_spec::P
     env_graph = GridFactoryEnvironment(env, graph=deepcopy(env.graph),
         dist_function=deepcopy(get_dist_matrix(env))
         )
-    prob_spec = ProblemSpec(problem_spec, D=get_dist_matrix(env_graph))
+    # prob_spec = ProblemSpec(problem_spec, D=get_dist_matrix(env_graph))
+    prob_spec = ProblemSpec(problem_spec, D=env_graph)
     EnvironmentLayer(env_graph,prob_spec)
 end
 
@@ -132,6 +133,12 @@ function construct_environment_layer_dict(args...)
     populate_environment_layer_dict!(layers,args...)
 end
 
+"""
+    SearchEnv{C,H,S} <: GraphEnv{State,Action,C}
+
+Contains all of the information needed to fully define `PC_TAPF` and related 
+problems.
+"""
 @with_kw_noshow struct SearchEnv{C,H,S} <: GraphEnv{State,Action,C}
     schedule::OperatingSchedule     = OperatingSchedule()
     cache::PlanningCache            = PlanningCache()
@@ -218,6 +225,7 @@ export
 
 """
     EnvState
+
 Reflects the state of the SearchEnv environment at a given time step.
 """
 @with_kw_noshow struct EnvState
@@ -349,7 +357,7 @@ and Path-Finding problems are concrete subtypes.
 abstract type AbstractPC_TAPF <: AbstractPC_MAPF end
 
 """
-    PC_TAPF{E<:SearchEnv}
+    PC_TAPF
 
 Precedence-Constrained Multi-Agent Task Assignment and Path-Finding problem.
 """
@@ -358,7 +366,7 @@ struct PC_TAPF{E<:SearchEnv} <: AbstractPC_TAPF
 end
 
 """
-    PC_TA{E<:SearchEnv}
+    PC_TA
 
 Precedence-Constrained Multi-Agent Task Assignment problem (no route planning).
 """
@@ -367,7 +375,7 @@ struct PC_TA{E<:SearchEnv} <: AbstractPC_TAPF
 end
 
 """
-    `PC_MAPF`
+    PC_MAPF
 
 A precedence-constrained multi-agent path-finding problem (no task assignment).
 """
@@ -377,7 +385,7 @@ end
 construct_routing_problem(prob::PC_TAPF,env) = PC_MAPF(env)
 
 """
-    `C_PC_MAPF`
+    C_PC_MAPF
 
 A collaborative precedence-constrained multi-agent path-finding problem. All
 agents have assigned tasks, there are precedence constraints between tasks, and
@@ -388,7 +396,7 @@ struct C_PC_MAPF{E<:SearchEnv} <: AbstractPC_MAPF
 end
 
 """
-    C_PC_TAPF{L<:LowLevelSolution}
+    C_PC_TAPF
 
 Defines an instance of a Collaborative Precedence-Constrained Multi-Agent Task
     Assignment and Path-Finding problem, where agents must sometimes transport
@@ -596,16 +604,12 @@ function construct_search_env(
         extra_T=extra_T,
         )
     layers = construct_environment_layer_dict(sched,env_graph,problem_spec)
-    # route_plan = initialize_route_plan(sched,cost_model)
-    # N = length(get_paths(route_plan))
     search_env = SearchEnv(
         schedule=sched,
         cache=cache,
         env_layers=layers,
         cost_model=cost_model,
         heuristic_model=heuristic_model,
-        # num_agents=N,
-        # route_plan=route_plan,
         )
     return search_env
 end
@@ -650,6 +654,35 @@ function construct_search_env(
         heuristic_model=heuristic_model,
         num_agents=N,
         route_plan=route_plan)
+end
+
+"""
+    function construct_search_env(solver, env::SearchEnv, ... )
+
+Construct a new SearchEnv, with cost_model and heuristic_model defined by the 
+solver type.
+"""
+function construct_search_env(solver,
+    env::SearchEnv,
+    sched=get_schedule(env),
+    cache=get_cache(env),
+    env_graph=get_graph(env),
+    prob_spec=get_problem_spec(env),
+    primary_objective = problem_spec.cost_function,
+    ;
+    kwargs...
+    )
+    cost_model, heuristic_model = construct_cost_model(
+        solver, sched, cache, prob_spec, env_graph, primary_objective;kwargs...
+    )
+    SearchEnv(
+        schedule=sched,
+        cache=cache,
+        env_layers=env.env_layers,
+        cost_model=cost_model,
+        heuristic_model=heuristic_model,
+    )
+
 end
 
 update_cost_model!(model::C,env::S) where {C,S<:SearchEnv} = nothing

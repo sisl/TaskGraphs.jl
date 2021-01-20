@@ -22,24 +22,16 @@ Encodes the the relaxed PC-TAPF problem that ignores collision-avoidance
 constraints.
 
 Elements:
-- graph::G - task graph
 - D::T - a distance matrix (or environment) that implements get_distance(D,x1,x2,args...)
-- Δt::Vector{Float64}  - durations of operations
-- tr0_::Dict{Int,Float64} - robot start times
-- to0_::Dict{Int,Float64} - object start times
-- terminal_vtxs::Vector{Set{Int}} - identifies "project heads"
-- weights::Dict{Int,Float64} - stores weights associated with each project head
 - cost_function::F - the optimization objective (default is SumOfMakeSpans)
-- r0::Vector{Int} - initial locations for all robots
-- s0::Vector{Int} - pickup stations for each task
-- sF::Vector{Int} - delivery station for each task
-- nR::Vector{Int} - num robots required for each task (>1 => collaborative task)
+- Δt_collect::Dict{ObjectID,Int} # duration of COLLECT operations
+- Δt_deposit::Dict{ObjectID,Int} # duration of DEPOSIT operations
 """
 @with_kw struct ProblemSpec{T,F}
-    D::T                    = zeros(0,0) # full distance matrix
-    cost_function::F        = SumOfMakeSpans()
-    Δt_collect::Dict{ObjectID,Int} = Dict{ObjectID,Int}() # duration of COLLECT operations
-    Δt_deposit::Dict{ObjectID,Int} = Dict{ObjectID,Int}() # duration of DELIVER operations
+    D::T                            = zeros(0,0) # environment or distance matrix
+    cost_function::F                = SumOfMakeSpans()
+    Δt_collect::Dict{ObjectID,Int}  = Dict{ObjectID,Int}() # duration of COLLECT operations
+    Δt_deposit::Dict{ObjectID,Int}  = Dict{ObjectID,Int}() # duration of DELIVER operations
 end
 GraphUtils.get_distance(spec::ProblemSpec,args...) = get_distance(spec.D,args...)
 GraphUtils.get_distance(spec::ProblemSpec,a::LocationID,b::LocationID,args...) = get_distance(spec.D,get_id(a),get_id(b),args...)
@@ -84,6 +76,9 @@ function set_initial_condition!(spec,object_id,pred)
 end
 function set_final_condition!(spec,object_id,pred)
     spec.final_conditions[object_id] = pred
+end
+for op in [:set_initial_condition!,:set_final_condition!]
+    @eval $op(spec,pred) = $op(spec,get_object_id(pred),pred)
 end
 function ProjectSpec(ics::V,fcs::V) where {V<:Vector{OBJECT_AT}}
     spec = ProjectSpec(
@@ -147,31 +142,36 @@ function construct_operation(
         id=get_unique_operation_id()
         )
     op = Operation(
-        pre = Set{OBJECT_AT}(map(id->get_final_condition(spec,id), input_ids)), 
-        post = Set{OBJECT_AT}(map(id->get_initial_condition(spec,id), output_ids)),
+        pre = Dict{ObjectID,OBJECT_AT}(map(id->id=>get_final_condition(spec,id), input_ids)), 
+        post = Dict{ObjectID,OBJECT_AT}(map(id->id=>get_initial_condition(spec,id), output_ids)), 
         Δt = Δt,
         station_id = LocationID(station_id),
         id = id
     )
 end
-construct_operation(
+function construct_operation(
         spec::ProjectSpec, 
         station_id::Int, 
         input_ids::Vector, 
-        output_ids::Vector,args...) = construct_operation(spec,LocationID(station_id),convert.(ObjectID,input_ids),convert.(ObjectID,output_ids),args...)
+        output_ids::Vector,args...)
+    construct_operation(spec,
+        LocationID(station_id),
+        Vector{ObjectID}(convert.(ObjectID,input_ids)),
+        Vector{ObjectID}(convert.(ObjectID,output_ids)),
+        args...
+        )
+end
 function add_operation!(spec::ProjectSpec, op::Operation)
     add_node!(spec,op,get_operation_id(op))
     op_id = get_operation_id(op)
-    for pred in preconditions(op)
-        object_id = get_object_id(pred)
+    for (object_id,pred) in preconditions(op)
         if !has_vertex(spec,object_id)
             add_node!(spec,pred,object_id)
         end
         add_edge!(spec, object_id, op_id)
         set_final_condition!(spec,object_id,pred)
     end
-    for pred in postconditions(op)
-        object_id = get_object_id(pred)
+    for (object_id,pred) in postconditions(op)
         if !has_vertex(spec,object_id)
             add_node!(spec,pred,object_id)
         else
@@ -198,12 +198,20 @@ read_object(dict) = OBJECT_AT(dict["data"]...)
 read_object(arr::Vector) = OBJECT_AT(arr...)
 function TOML.parse(op::Operation)
     toml_dict = Dict()
-    toml_dict["pre"] = map(pred->TOML.parse(pred), collect(op.pre))
-    toml_dict["post"] = map(pred->TOML.parse(pred), collect(op.post))
+    toml_dict["pre"] = map(pred->TOML.parse(pred), collect(values(preconditions(op))))
+    toml_dict["post"] = map(pred->TOML.parse(pred), collect(values(postconditions(op))))
     toml_dict["dt"] = duration(op)
     toml_dict["station_id"] = get_id(op.station_id)
     toml_dict["id"] = get_id(op.id)
     return toml_dict
+end
+function read_op_dict_from_array(toml_dict)
+    dict = Dict{ObjectID,OBJECT_AT}()
+    for arr in toml_dict
+        o = read_object(arr)
+        dict[get_object_id(o)] = o
+    end
+    return dict
 end
 function read_operation(toml_dict::Dict,keep_id=false)
     op_id = OperationID(get(toml_dict,"id",-1))
@@ -211,8 +219,8 @@ function read_operation(toml_dict::Dict,keep_id=false)
         op_id = get_unique_operation_id()
     end
     op = Operation(
-        pre     = Set{OBJECT_AT}(map(arr->read_object(arr),toml_dict["pre"])),
-        post    = Set{OBJECT_AT}(map(arr->read_object(arr),toml_dict["post"])),
+        pre     = read_op_dict_from_array(toml_dict["pre"]),
+        post    = read_op_dict_from_array(toml_dict["post"]), 
         Δt      = get(toml_dict,"dt",get(toml_dict,"Δt",0.0)),
         station_id = LocationID(get(toml_dict,"station_id",-1)),
         id = op_id
@@ -284,55 +292,54 @@ function read_problem_def(io)
     read_problem_def(TOML.parsefile(io))
 end
 
-export
-    DeliveryTask,
-    DeliveryGraph
+# export
+#     DeliveryTask,
+#     DeliveryGraph
 
-"""
-    DeliveryTask
-"""
-struct DeliveryTask
-    o::ObjectID
-    s1::LocationID
-    s2::LocationID
-end
+# """
+#     DeliveryTask
+# """
+# struct DeliveryTask
+#     o::ObjectID
+#     s1::LocationID
+#     s2::LocationID
+# end
 
-"""
-    DeliveryGraph{G}
-"""
-struct DeliveryGraph{G}
-    tasks::Vector{DeliveryTask}
-    graph::G
-end
+# """
+#     DeliveryGraph{G}
+# """
+# struct DeliveryGraph{G}
+#     tasks::Vector{DeliveryTask}
+#     graph::G
+# end
 
-export
-    construct_delivery_graph
+# export
+#     construct_delivery_graph
 
-"""
-    construct_delivery_graph(project_spec::ProjectSpec,M::Int)
+# """
+#     construct_delivery_graph(project_spec::ProjectSpec,M::Int)
 
-Assumes that initial station ids correspond to object ids.
-"""
-function construct_delivery_graph(project_spec::ProjectSpec,M::Int)
-    delivery_graph = DeliveryGraph(Vector{DeliveryTask}(),MetaDiGraph(M))
-    object_id_map = Dict{ObjectID,Int}(
-        get_object_id(o)=>i for (i,o) in enumerate(initial_conditions_vector(project_spec)))
-    # for op in project_spec.operations
-    for op in get_operations(project_spec)
-        for pred in preconditions(op)
-            id = get_object_id(pred)
-            idx = object_id_map[id]
-            pre = get_initial_condition(project_spec,id)
-            post = get_final_condition(project_spec,id)
-            push!(delivery_graph.tasks,DeliveryTask(id,get_location_id(pre),get_location_id(post)))
-            for j in get_output_ids(op)
-                idx2 = object_id_map[j]
-                add_edge!(delivery_graph.graph, idx, idx2)
-            end
-        end
-    end
-    delivery_graph
-end
+# Assumes that initial station ids correspond to object ids.
+# """
+# function construct_delivery_graph(project_spec::ProjectSpec,M::Int)
+#     delivery_graph = DeliveryGraph(Vector{DeliveryTask}(),MetaDiGraph(M))
+#     object_id_map = Dict{ObjectID,Int}(
+#         get_object_id(o)=>i for (i,o) in enumerate(initial_conditions_vector(project_spec)))
+#     # for op in project_spec.operations
+#     for op in get_operations(project_spec)
+#         for (id,pred) in preconditions(op)
+#             idx = object_id_map[id]
+#             pre = get_initial_condition(project_spec,id)
+#             post = get_final_condition(project_spec,id)
+#             push!(delivery_graph.tasks,DeliveryTask(id,get_location_id(pre),get_location_id(post)))
+#             for j in get_output_ids(op)
+#                 idx2 = object_id_map[j]
+#                 add_edge!(delivery_graph.graph, idx, idx2)
+#             end
+#         end
+#     end
+#     delivery_graph
+# end
 
 export
     PathSpec,
@@ -420,6 +427,11 @@ export
     get_path_spec,
     set_path_spec!
 
+"""
+    ScheduleNode{I<:AbstractID,V<:AbstractPlanningPredicate}
+
+The node type of the `OperatingSchedule` graph.
+"""
 mutable struct ScheduleNode{I<:AbstractID,V<:AbstractPlanningPredicate}
     id::I
     node::V
@@ -667,13 +679,14 @@ function sanity_check(sched::OperatingSchedule,append_string="")
                 @assert(get_location_id(node) != -1, string("get_location_id(node) != -1 for node id ", id))
             end
             if matches_node_type(node,Operation)
-                input_ids = Set(map(o->get_id(get_object_id(o)),collect(node.pre)))
+                # input_ids = Set(map(o->get_id(get_object_id(o)),collect(preconditions(node)))))
+                input_ids = Set(collect(keys(preconditions(node))))
                 for v2 in inneighbors(sched,v)
                     node2 = get_node_from_vtx(sched, v2)
-                    @assert(get_id(get_object_id(node2)) in input_ids, string(string(node2), " should not be an inneighbor of ",string(node), " whose inputs should be ",input_ids))
+                    @assert(get_object_id(node2) in input_ids, string(string(node2), " should not be an inneighbor of ",string(node), " whose inputs should be ",input_ids))
                 end
                 @assert(
-                    indegree(sched,v) == length(node.pre),
+                    indegree(sched,v) == length(preconditions(node)),
                     string("Operation ",string(node),
                         " needs edges from objects ",collect(input_ids),
                         " but only has edges from objects ",map(v2->get_id(get_object_id(get_node_from_vtx(sched, v2))),inneighbors(sched,v))
@@ -694,11 +707,11 @@ function sanity_check(sched::OperatingSchedule,append_string="")
     return true
 end
 function validate(spec::ProjectSpec,op)
-    for pred in preconditions(op)
-        @assert get_final_condition(spec,get_object_id(pred)) == pred
+    for (id,pred) in preconditions(op)
+        @assert get_final_condition(spec,id) == pred
     end
-    for pred in postconditions(op)
-        @assert get_initial_condition(spec,get_object_id(pred)) == pred
+    for (id,pred) in postconditions(op)
+        @assert get_initial_condition(spec,id) == pred
     end
     return true
 end
@@ -952,7 +965,8 @@ function construct_partial_project_schedule(spec::ProjectSpec,problem_spec::Prob
         v = get_vtx(sched, ObjectID(id))
         if indegree(get_graph(sched),v) == 0
             op_id = get_unique_operation_id()
-            op = Operation(post=Set{OBJECT_AT}([pred]),id=op_id)
+            op = Operation(id=op_id)
+            set_postcondition!(op,pred)
             add_node!(sched,make_node(sched,problem_spec,op))
             add_edge!(sched,op_id,ObjectID(id))
         end

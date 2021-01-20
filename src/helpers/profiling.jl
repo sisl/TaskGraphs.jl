@@ -108,7 +108,8 @@ function add_env!(loader::TaskGraphsProblemLoader,env_id::String,
     if haskey(loader.envs,env_id)
     else
         loader.envs[env_id] = env
-        loader.prob_specs[env_id] = ProblemSpec(D=get_dist_matrix(env))
+        # loader.prob_specs[env_id] = ProblemSpec(D=get_dist_matrix(env))
+        loader.prob_specs[env_id] = ProblemSpec(D=env)
     end
     loader
 end
@@ -133,6 +134,11 @@ const ReplanningProblemLoader = TaskGraphsProblemLoader{RepeatedPC_TAPF}
 
 export write_problem
 
+"""
+    write_problem(loader::TaskGraphsProblemLoader,problem_def,prob_path,env_id="")
+
+Write a problem that can later be loaded and solved.
+"""
 function write_problem(loader::TaskGraphsProblemLoader,problem_def,prob_path,env_id="")
     if isdir(prob_path)
         prob_path = joinpath(prob_path,"problem.toml")
@@ -170,6 +176,8 @@ function write_problems!(loader::TaskGraphsProblemLoader,configs::Vector{D},base
 end
 
 """
+    CRCBS.load_problem(loader::TaskGraphsProblemLoader,solver_config,prob_path)
+
 Currently only impemented for PC_TAPF and PC_TA
 """
 function CRCBS.load_problem(loader::TaskGraphsProblemLoader,solver_config,prob_path)
@@ -201,6 +209,11 @@ end
 
 
 CRCBS.extract_feature(solver,::SolutionCost,  mapf,solution::OperatingSchedule,timer_results) = best_cost(solver)
+"""
+    CRCBS.run_profiling(loader::TaskGraphsProblemLoader,solver_config,problem_dir)
+
+Run profiling with a `TaskGraphsProblemLoader`.
+"""
 function CRCBS.run_profiling(loader::TaskGraphsProblemLoader,solver_config,problem_dir)
     solver = solver_config.solver
     for prob_path in readdir(problem_dir;join=true)
@@ -221,6 +234,12 @@ end
 
 export warmup
 
+"""
+    warmup(loader::TaskGraphsProblemLoader,solver_config,problem_dir,dummy_path = "dummy_path")
+
+Do a small dry run of `run_profiling(loader,solver_config,problem_dir)` to 
+ensure that all code is fully compiled before collecting results.
+"""
 function warmup(loader::TaskGraphsProblemLoader,solver_config,problem_dir,dummy_path = "dummy_path")
     solver = solver_config.solver
     for prob_path in readdir(problem_dir;join=true)

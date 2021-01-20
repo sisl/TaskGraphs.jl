@@ -88,7 +88,6 @@ let
         project_spec = ProjectSpec(object_ICs,object_FCs)
         add_operation!(project_spec,construct_operation(project_spec, 3, [1,2], [3], 1.0))
         add_operation!(project_spec,construct_operation(project_spec, 6, [3], [], 0.0))
-        delivery_graph = construct_delivery_graph(project_spec,M)
     end
 end
 let

@@ -14,11 +14,24 @@ Pages = ["getting_started.md"]
 Depth = 2
 ```
 
-## Library
+## Profiling Solver Performance
 
-```@index
+```@contents
+Pages = ["profiling.md"]
+Depth = 2
 ```
 
-```@autodocs
-Modules = [TaskGraphs]
+## Core Types
+
+```@contents
+Pages = ["library.md]
+Depth = 2
 ```
+
+## API Reference
+
+```@contents
+Pages = ["reference.md]
+Depth = 2
+```
+

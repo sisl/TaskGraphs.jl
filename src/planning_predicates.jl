@@ -220,48 +220,62 @@ export
 	get_output_ids,
 	get_operation_id,
     preconditions,
-    postconditions,
-    add_conditions,
-    delete_conditions,
+	postconditions,
+	set_precondition!,
+	set_postcondition!,
 	get_dropoff,
 	get_dropoffs,
     duration
 
+"""
+	Operation <: AbstractPlanningPredicate
+
+A manufacturing operation.
+"""
 @with_kw struct Operation <: AbstractPlanningPredicate
-    pre::Set{OBJECT_AT}     = Set{OBJECT_AT}()
-    post::Set{OBJECT_AT}    = Set{OBJECT_AT}()
-    Δt::Int 				= 0
-    station_id::LocationID   = LocationID(-1)
-    id::OperationID         = OperationID(-1)
+    pre::Dict{ObjectID,OBJECT_AT}     = Dict{ObjectID,OBJECT_AT}()
+    post::Dict{ObjectID,OBJECT_AT}    = Dict{ObjectID,OBJECT_AT}()
+    Δt::Int 					= 0
+    station_id::LocationID   	= LocationID(-1)
+    id::OperationID         	= get_unique_id(OperationID) #OperationID(-1)
 end
 get_location_id(op::Operation) = op.station_id
 get_operation_id(op::Operation) = op.id
 duration(op::Operation) = op.Δt
 preconditions(op::Operation) = op.pre
 postconditions(op::Operation) = op.post
-get_input_ids(op::Operation) = sort([get_object_id(p) for p in preconditions(op)])
-get_output_ids(op::Operation) = sort([get_object_id(p) for p in postconditions(op)])
-add_conditions(op::Operation) = op.post
-delete_conditions(op::Operation) = op.pre
+get_condition(op::Operation,o::ObjectID,dict) = get(dict,o,OBJECT_AT(-1,-1))
+function get_precondition(op::Operation,o::ObjectID)
+	@assert haskey(preconditions(op),o) "Object $o is not an input to operation $(get_operation_id(op))"
+	return preconditions(op)[o]
+end
+function get_postcondition(op::Operation,o::ObjectID)
+	@assert haskey(posconditions(op),o) "Object $o is not an output of operation $(get_operation_id(op))"
+	return postconditions(op)[o]
+end
+function set_precondition!(op::Operation,o::ObjectID,pred::OBJECT_AT)
+	preconditions(op)[o] = pred
+end
+function set_postcondition!(op::Operation,o::ObjectID,pred::OBJECT_AT)
+	postconditions(op)[o] = pred
+end
+for op in (:set_precondition!,:set_postcondition!)
+	@eval $op(o::Operation,pred::OBJECT_AT) = $op(o,get_object_id(pred),pred)
+	@eval begin
+		function $op(o::Operation,preds::Vector{OBJECT_AT})
+			for pred in preds
+				$op(o,pred)
+			end
+			return o
+		end
+	end
+end
+get_input_ids(op::Operation) = sort(collect(keys(preconditions(op))))
+get_output_ids(op::Operation) = sort(collect(keys(postconditions(op))))
 GraphUtils.get_id(op::Operation) = get_id(op.id)
-function get_dropoff(op::Operation,o::ObjectID)
-	for pred in preconditions(op)
-		if get_object_id(pred) == o
-			return get_location_id(pred)
-		end
-	end
-	throw(AssertionError("Cannot find dropoff point for object $(get_id(o)) because it is not an input to operation $(get_id(op))"))
-	return LocationID()
-end
-function get_dropoffs(op::Operation,o::ObjectID)
-	for pred in preconditions(op)
-		if get_object_id(pred) == o
-			return get_location_ids(pred)
-		end
-	end
-	throw(AssertionError("Cannot find dropoff point for object $(get_id(o)) because it is not an input to operation $(get_id(op))"))
-	return [LocationID()]
-end
+
+get_dropoff(op::Operation,o::ObjectID) = get_location_id(get_precondition(op,o))
+get_dropoffs(op::Operation,o::ObjectID) = get_location_ids(get_precondition(op,o))
 
 id_type(::BOT_AT{R}) where {R} = BotID{R} 
 id_type(::AbstractRobotAction{R}) where {R} = ActionID
@@ -450,8 +464,8 @@ GraphUtils.required_predecessors(node::BOT_CARRY{R}) where {R} 	= Dict(BOT_COLLE
 GraphUtils.required_successors(node::BOT_CARRY{R}) where {R} 		= Dict(BOT_DEPOSIT{R}=>1)
 GraphUtils.required_predecessors(node::BOT_DEPOSIT{R}) where {R} 	= Dict(BOT_CARRY{R}=>1)
 GraphUtils.required_successors(node::BOT_DEPOSIT{R}) where {R} 	= Dict(Operation=>1,BOT_GO{R}=>1)
-GraphUtils.required_predecessors(node::Operation)  				= Dict((BOT_DEPOSIT{DeliveryBot},OBJECT_AT)=>length(node.pre))
-GraphUtils.required_successors(node::Operation)    				= Dict(OBJECT_AT=>length(node.post))
+GraphUtils.required_predecessors(node::Operation)  				= Dict((BOT_DEPOSIT{DeliveryBot},OBJECT_AT)=>length(preconditions(node)))
+GraphUtils.required_successors(node::Operation)    				= Dict(OBJECT_AT=>length(postconditions(node)))
 GraphUtils.required_predecessors(node::OBJECT_AT)  				= Dict()
 GraphUtils.required_successors(node::OBJECT_AT)    				= Dict(BOT_COLLECT{DeliveryBot}=>1)
 GraphUtils.required_predecessors(node::BOT_AT{R}) where {R}   		= Dict()

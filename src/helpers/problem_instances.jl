@@ -63,20 +63,6 @@ function get_zero_initial_conditions(G,N)
     return to0_, tr0_
 end
 
-# function print_toy_problem_specs(prob_name,vtx_grid,r0,s0,sF,project_spec,delivery_graph=nothing)
-#     println(prob_name)
-#     display(vtx_grid)
-#     print("\n\n")
-#     @show r0
-#     @show s0
-#     @show sF
-#     display(project_spec.operations)
-#     print("\n\n")
-#     display(delivery_graph.tasks)
-#     print("\n\n")
-# end
-
-
 function pctapf_problem(r0,config;Δt_op=0)
     tasks = config.tasks
     ops = config.ops
@@ -101,9 +87,7 @@ end
 function pctapf_problem(
         solver,
         sched::OperatingSchedule,
-        # project_spec::ProjectSpec,
         problem_spec::ProblemSpec,
-        # robot_ICs,
         env_graph,
         args...
     )
@@ -115,8 +99,12 @@ function pctapf_problem(
         )
     PC_TAPF(env)
 end
+function pctapf_problem(solver,spec::ProjectSpec,env,robot_ics,prob_spec=ProblemSpec(D=env))
+    sched = construct_partial_project_schedule(spec,prob_spec,robot_ics)
+    return pctapf_problem(solver,sched,prob_spec,env)
+end
 function PC_TAPF(solver,def::SimpleProblemDef,env::GridFactoryEnvironment)
-    sched, prob_spec, env, _ = construct_task_graphs_problem(def,env)
+    sched, prob_spec = construct_task_graphs_problem(def,env)
     pctapf = pctapf_problem(solver,sched,prob_spec,env)
     return pctapf
 end

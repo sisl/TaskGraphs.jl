@@ -4,7 +4,7 @@ using Documenter
 makedocs(;
     modules=[TaskGraphs],
     authors="kylebrown <kylejbrown17@gmail.com> and contributors",
-    repo="https://github.com/kylejbrown17/TaskGraphs.jl/blob/{commit}{path}#L{line}",
+    repo="https://github.com/kylejbrown17/TaskGraphs.jl",
     sitename="TaskGraphs.jl",
     format=Documenter.HTML(;
         prettyurls=get(ENV, "CI", "false") == "true",
@@ -13,6 +13,10 @@ makedocs(;
     ),
     pages=[
         "Home" => "index.md",
+        "Getting Started" => "getting_started.md",
+        "Profiling" => "profiling.md",
+        "Core Types and Methods" => "library.md",
+        "API Reference" => "reference.md",
     ],
 )
 

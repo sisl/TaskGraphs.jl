@@ -8,10 +8,11 @@ export
 """
     TaskGraphsMILP
 
-Concrete subtypes of `TaskGraphsMILP` define different ways to formulat the
+Concrete subtypes of `TaskGraphsMILP` define different ways to formulate the
 sequential assignment portion of a PC-TAPF problem.
 """
 abstract type TaskGraphsMILP end
+
 """
     AssignmentMILP <: TaskGraphsMILP
 
@@ -97,7 +98,7 @@ end
     job_shop::Bool=false
 end
 """
-    SparseAdjacencyMILP
+    SparseAdjacencyMILP <: TaskGraphsMILP
 
 Formulates a MILP where the decision variable is a sparse adjacency matrix `X`
     for the operating schedule graph. If `X[i,j] = 1`, there is an edge from
@@ -117,12 +118,36 @@ end
     Xj::SparseMatrixCSC{VariableRef,Int} = SparseMatrixCSC{VariableRef,Int}(0,0,ones(Int,1),Int[],VariableRef[]) # job shop adjacency matrix
     job_shop::Bool=false
 end
-JuMP.optimize!(model::M) where {M<:TaskGraphsMILP}          = optimize!(model.model)
-JuMP.termination_status(model::M) where {M<:TaskGraphsMILP} = termination_status(model.model)
-JuMP.objective_function(model::M) where {M<:TaskGraphsMILP} = objective_function(model.model)
-JuMP.objective_bound(model::M) where {M<:TaskGraphsMILP}    = objective_bound(model.model)
-JuMP.primal_status(model::M) where {M<:TaskGraphsMILP}      = primal_status(model.model)
-JuMP.dual_status(model::M) where {M<:TaskGraphsMILP}        = dual_status(model.model)
+# JuMP.optimize!(model::M) where {M<:TaskGraphsMILP}          = optimize!(model.model)
+# JuMP.termination_status(model::M) where {M<:TaskGraphsMILP} = termination_status(model.model)
+# JuMP.objective_function(model::M) where {M<:TaskGraphsMILP} = objective_function(model.model)
+# JuMP.objective_bound(model::M) where {M<:TaskGraphsMILP}    = objective_bound(model.model)
+# JuMP.primal_status(model::M) where {M<:TaskGraphsMILP}      = primal_status(model.model)
+# JuMP.dual_status(model::M) where {M<:TaskGraphsMILP}        = dual_status(model.model)
+for op in [
+    :(JuMP.optimize!),
+    :(JuMP.termination_status),
+    :(JuMP.objective_function),
+    :(JuMP.objective_bound),
+    :(JuMP.primal_status),
+    :(JuMP.dual_status),
+    :(JuMP.set_silent),
+    ]
+    @eval $op(milp::TaskGraphsMILP) = $op(milp.model)
+end
+for op in [
+    :(JuMP.set_optimizer_attribute),
+    :(JuMP.set_optimizer_attributes),
+    :(JuMP.set_time_limit_sec),
+    ]
+    @eval $op(milp::TaskGraphsMILP,args...) = $op(milp.model,args...)
+end
+# function JuMP.set_optimizer_attribute(milp::TaskGraphsMILP,k,v)
+#     set_optimizer_attribute(milp.model,k,v)
+# end
+# JuMP.set_optimizer_attributes(milp::TaskGraphsMILP, pairs...) = set_optimizer_attributes(milp.model,pairs...) 
+# JuMP.set_silent(model::TaskGraphsMILP) = set_optimizer_attribute(model,MOI.Silent(),true)
+# JuMP.set_time_limit_sec(model::TaskGraphsMILP,val) = set_optimizer_attribute(model,MOI.TimeLimitSec(),val)
 # for op in (:optimize!, :termination_status, :objective_function)
 #     @eval JuMP.$op(model::M,args...) where {M<:TaskGraphsMILP} = $op(model.model,args...)
 # end
@@ -255,8 +280,8 @@ function get_objective_expr(milp::AssignmentMILP, f::SumOfMakeSpans)
     tof = model[:tof]
     @variable(model, T[1:length(terminal_ops)])
     for (i,op) in enumerate(terminal_ops)
-        for o in preconditions(op)
-            @constraint(model, T[i] >= tof[object_map[get_object_id(o)]] + duration(op))
+        for (o_id,o) in preconditions(op)
+            @constraint(model, T[i] >= tof[object_map[o_id]] + duration(op))
         end
     end
     weights = map(i->1.0,1:length(terminal_ops))
@@ -269,8 +294,8 @@ function get_objective_expr(milp::AssignmentMILP, f::MakeSpan)
     terminal_ops = map(p->p.second.node, filter(p->is_terminal_node(sched,p.first),operations))
     @variable(model, cost)
     for (i,op) in enumerate(terminal_ops)
-        for o in preconditions(op)
-            @constraint(model, cost >= tof[object_map[get_object_id(o)]] + duration(op))
+        for (o_id,o) in preconditions(op)
+            @constraint(model, cost >= tof[object_map[o_id]] + duration(op))
         end
     end
     return cost
@@ -296,34 +321,24 @@ Keyword Args:
     `cost_model=MakeSpan` - optimization objective, currently either `MakeSpan`
         or `SumOfMakeSpans`. Defaults to the cost_model associated with
         `problem_spec`
-    `TimeLimit=100` : a keyword argument for the optimizer (see JuMP and Gurobi
-        documentation)
-    `OutputFlag=0` : a keyword argument for the optimizer (see JuMP and Gurobi
-        documentation)
-
 Outputs:
-    `model` - an optimization model of type `T`
+    `model::AssignmentMILP` - an instantiated optimization problem
 """
-function formulate_milp(milp_model::AssignmentMILP,sched::OperatingSchedule,problem_spec::ProblemSpec;
-    optimizer=Gurobi.Optimizer,
+function formulate_milp(milp_model::AssignmentMILP,
+    sched::OperatingSchedule,
+    problem_spec::ProblemSpec;
+    optimizer=default_milp_optimizer(),
     cost_model=problem_spec.cost_function,
-    TimeLimit=100,
-    OutputFlag=0,
-    Presolve = -1, # automatic setting (-1), off (0), conservative (1), or aggressive (2)
     Mm = 10000,
     kwargs...)
 
     # SETUP
     # Define optimization model
-    milp = AssignmentMILP(
-        model=Model(optimizer_with_attributes(optimizer,
-        "TimeLimit"=>TimeLimit,
-        "OutputFlag"=>OutputFlag,
-        "Presolve"=>Presolve
-        )),
-        sched=sched
-        )
-    @unpack model,robot_ics,object_ics,operations,robot_map,object_map,operation_map = milp
+    model=Model(optimizer_with_attributes(optimizer))
+    set_optimizer_attributes(model,default_optimizer_attributes()...)
+    milp = AssignmentMILP(model=model,sched=sched)
+
+    @unpack robot_ics,object_ics,operations,robot_map,object_map,operation_map = milp
 
     N = length(robot_ics) # number of robots
     M = length(object_ics) # number of delivery tasks
@@ -341,7 +356,7 @@ function formulate_milp(milp_model::AssignmentMILP,sched::OperatingSchedule,prob
         end
     end
     # from ProblemSpec
-    D = problem_spec.D
+    D = (x,y) -> get_distance(problem_spec,x,y)
     
     @variable(model, to0[1:M] >= 0.0) # object availability time
     @variable(model, tor[1:M] >= 0.0) # object robot arrival time
@@ -368,9 +383,9 @@ function formulate_milp(milp_model::AssignmentMILP,sched::OperatingSchedule,prob
     end
     for (op_id,node) in operations #get_operations(sched) # precedence constraints on task start time
         op = node.node
-        for input in preconditions(op)
+        for (_,input) in preconditions(op)
             i = object_map[get_object_id(input)]
-            for output in postconditions(op)
+            for (_,output) in postconditions(op)
                 j = object_map[get_object_id(output)]
                 @constraint(model, to0[j] >= tof[i] + duration(op))
                 add_edge!(precedence_graph,get_object_id(input),get_object_id(output))
@@ -398,13 +413,10 @@ function formulate_milp(milp_model::AssignmentMILP,sched::OperatingSchedule,prob
         # lower bound on task completion time (task can't start until it's available).
         @constraint(model, tor[j] >= to0[j])
         for i in 1:N+M
-            @constraint(model, tor[j] - (tr0[i] + D[r0[i],s0[j]]) >= -Mm*(1 - X[i,j]))
+            @constraint(model, tor[j] - (tr0[i] + D(r0[i],s0[j])) >= -Mm*(1 - X[i,j]))
         end
-        # for i in 1:M # dummy robot i appears at sF[i]
-        #     @constraint(model, tor[j] - (tr0[i+N] + D[sF[i],s0[j]]) >= -Mm*(1 - X[i+N,j]))
-        # end
         @constraint(model, toc[j] == tor[j] + Δt_collect[j])
-        @constraint(model, tod[j] == toc[j] + D[s0[j],sF[j]])
+        @constraint(model, tod[j] == toc[j] + D(s0[j],sF[j]))
         @constraint(model, tof[j] == tod[j] + Δt_deposit[j])
         # "Job-shop" constraints specifying that no station may be double-booked. A station
         # can only support a single COLLECT or DEPOSIT operation at a time, meaning that all
@@ -558,10 +570,7 @@ end
 
 
 function formulate_schedule_milp(sched::OperatingSchedule,problem_spec::ProblemSpec;
-        optimizer = Gurobi.Optimizer,
-        TimeLimit=100,
-        OutputFlag=0,
-        Presolve=-1, # automatic setting (-1), off (0), conservative (1), or aggressive (2)
+        optimizer=default_milp_optimizer(),
         t0_ = Dict{AbstractID,Float64}(), # dictionary of initial times. Default is empty
         tF_ = Dict{AbstractID,Float64}(), # dictionary of initial times. Default is empty
         Mm = 10000, # for big M constraints
@@ -571,11 +580,8 @@ function formulate_schedule_milp(sched::OperatingSchedule,problem_spec::ProblemS
     assignments = [];
     Δt = get_min_duration(sched)
     
-    model = Model(optimizer_with_attributes(optimizer,
-        "TimeLimit"=>TimeLimit,
-        "OutputFlag"=>OutputFlag,
-        "Presolve"=>Presolve
-        ))
+    model=Model(optimizer_with_attributes(optimizer))
+    set_optimizer_attributes(model,default_optimizer_attributes()...)
     
     @variable(model, t0[1:nv(G)] >= 0.0); # initial times for all nodes
     @variable(model, tF[1:nv(G)] >= 0.0); # final times for all nodes
@@ -747,15 +753,12 @@ function formulate_schedule_milp(sched::OperatingSchedule,problem_spec::ProblemS
     milp
 end
 function formulate_milp(milp_model::AdjacencyMILP,sched::OperatingSchedule,problem_spec::ProblemSpec;
-    optimizer=Gurobi.Optimizer,
+    optimizer=default_milp_optimizer(),
     kwargs...)
     formulate_schedule_milp(sched,problem_spec;optimizer=optimizer,kwargs...)
 end
 function formulate_milp(milp_model::SparseAdjacencyMILP,sched::OperatingSchedule,problem_spec::ProblemSpec;
-        optimizer = Gurobi.Optimizer,
-        TimeLimit=100,
-        OutputFlag=0,
-        Presolve=-1, # automatic setting (-1), off (0), conservative (1), or aggressive (2)
+        optimizer=default_milp_optimizer(),
         t0_ = Dict{AbstractID,Float64}(), # dictionary of initial times. Default is empty
         tF_ = Dict{AbstractID,Float64}(), # dictionary of initial times. Default is empty
         Mm = 10000, # for big M constraints
@@ -764,11 +767,8 @@ function formulate_milp(milp_model::SparseAdjacencyMILP,sched::OperatingSchedule
         kwargs...
     )
 
-    model = Model(optimizer_with_attributes(optimizer,
-        "TimeLimit"=>TimeLimit,
-        "OutputFlag"=>OutputFlag,
-        "Presolve"=>Presolve
-        ))
+    model=Model(optimizer_with_attributes(optimizer))
+    set_optimizer_attributes(model,default_optimizer_attributes()...)
 
     G = get_graph(sched);
     (missing_successors, missing_predecessors, n_eligible_successors,
@@ -898,10 +898,7 @@ function formulate_milp(milp_model::SparseAdjacencyMILP,sched::OperatingSchedule
     milp
 end
 function formulate_milp(milp_model::FastSparseAdjacencyMILP,sched::OperatingSchedule,problem_spec::ProblemSpec;
-        optimizer = Gurobi.Optimizer,
-        TimeLimit=100,
-        OutputFlag=0,
-        Presolve=-1, # automatic setting (-1), off (0), conservative (1), or aggressive (2)
+        optimizer=default_milp_optimizer(),
         t0_ = Dict{AbstractID,Float64}(), # dictionary of initial times. Default is empty
         tF_ = Dict{AbstractID,Float64}(), # dictionary of initial times. Default is empty
         Mm = 10000, # for big M constraints
@@ -910,11 +907,8 @@ function formulate_milp(milp_model::FastSparseAdjacencyMILP,sched::OperatingSche
         kwargs...
     )
     
-    model = Model(optimizer_with_attributes(optimizer,
-        "TimeLimit"=>TimeLimit,
-        "OutputFlag"=>OutputFlag,
-        "Presolve"=>Presolve
-        ))
+    model=Model(optimizer_with_attributes(optimizer))
+    set_optimizer_attributes(model,default_optimizer_attributes()...)
 
     G = get_graph(sched);
     cache = preprocess_project_schedule(sched,true)
@@ -1082,8 +1076,23 @@ struct GreedyFinalTimeCost  <: GreedyCost end
 struct GreedyLowerBoundCost <: GreedyCost end
 
 """
-    GreedyAssignment - baseline for task assignment. It works by maintaining two
-    "open" sets of vertices: one containing vertices that are eligible for a
+    GreedyAssignment{C,M} <: TaskGraphsMILP
+
+GreedyAssignment maintains three sets: The "satisfied set" `C`, the "required
+incoming" set `Ai`, and the "available outgoing" set `Ao`.
+
+At each step, the algorithm identifies the nodes `v1 ∈ Ai` and `v2 ∈ Ao` with
+shortest "distance" (in the context of `OperatingSchedule`s, this distance
+refers to the duration of `v1` if an edge `v1 → v2` is added) and adds an edge
+between them. The distance corresponding to an ineligible edge is set to Inf.
+
+After adding the edge, the algorithm sweeps through a topological ordering of
+the vertices and updates `C`, `Ai`, and `Ao`. In order for `v` to be placed in
+`C`, `v` must have enough incoming edges and all of `v`'s predecessors must
+already be in `C`. In order to be added to `Ai`, `v` must have less than the
+required number of incoming edges and all of `v`'s predecessors must
+already be in `C`. In order for `v` to be added to `Ao`, `v` must have less than
+the allowable number of outgoing edges, and must be in `C`.
 """
 @with_kw struct GreedyAssignment{C,M} <: TaskGraphsMILP
     schedule::OperatingSchedule = OperatingSchedule()
@@ -1110,6 +1119,17 @@ function JuMP.objective_function(model::GreedyAssignment)
 end
 JuMP.objective_bound(model::GreedyAssignment)       = objective_function(model)
 JuMP.value(c::Real) = c
+# JuMP.set_optimizer_attribute(milp::GreedyAssignment,k,v) = nothing
+# JuMP.set_optimizer_attribute(milp::GreedyAssignment,k,v) = nothing
+# JuMP.set_time_limit_sec(milp::GreedyAssignment,val) = nothing
+JuMP.set_silent(milp::GreedyAssignment) = nothing
+for op in [
+    :(JuMP.set_optimizer_attribute),
+    :(JuMP.set_optimizer_attributes),
+    :(JuMP.set_time_limit_sec),
+    ]
+    @eval $op(milp::GreedyAssignment,args...) = nothing
+end
 function formulate_milp(milp_model::GreedyAssignment,sched::OperatingSchedule,problem_spec::ProblemSpec;
         t0_ = Dict{AbstractID,Float64}(),
         cost_model = SumOfMakeSpans(),

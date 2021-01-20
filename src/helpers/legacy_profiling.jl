@@ -368,7 +368,7 @@ function profile_full_solver(solver, project_spec, problem_spec, robot_ICs, env_
     # solver = PC_TAPF_Solver(verbosity=0,LIMIT_A_star_iterations=5*nv(env_graph));
 
     (solution, assignment, cost, search_env, optimality_gap), elapsed_time, byte_ct, gc_time, mem_ct = @timed high_level_search!(
-        solver, env_graph, project_spec, problem_spec, robot_ICs, Gurobi.Optimizer;
+        solver, env_graph, project_spec, problem_spec, robot_ICs, default_milp_optimizer();
         primary_objective=primary_objective,
         kwargs...);
 
@@ -457,7 +457,7 @@ function profile_replanning(replan_model, fallback_model, solver, fallback_solve
 
     # print_project_schedule(string("schedule",idx,"B"),get_schedule(base_search_env);mode=:leaf_aligned)
     (solution, _, cost, search_env, optimality_gap), elapsed_time, byte_ct, gc_time, mem_ct = @timed high_level_search!(
-        solver, base_search_env, Gurobi.Optimizer;primary_objective=primary_objective,kwargs...)
+        solver, base_search_env, default_milp_optimizer();primary_objective=primary_objective,kwargs...)
     # print_project_schedule(string("schedule",idx,"C"),get_schedule(search_env);mode=:leaf_aligned)
     local_results[idx] = compile_solver_results(solver, solution, cost, search_env, optimality_gap, elapsed_time, t_arrival)
     merge!(final_times[idx], Dict{AbstractID,Int}(OperationID(k)=>t_arrival for k in keys(get_operations(partial_schedule))))
@@ -497,7 +497,7 @@ function profile_replanning(replan_model, fallback_model, solver, fallback_solve
         # reset_solver!(fallback_solver)
         fallback_search_env, fallback_solver = replan!(fallback_solver, fallback_model, search_env, env_graph, problem_spec, solution, next_schedule, t_request, t_arrival;commit_threshold=fallback_commit_threshold)
         (fallback_solution, _, fallback_cost, fallback_search_env, fallback_optimality_gap), fallback_elapsed_time, _, _, _ = @timed high_level_search!(
-            fallback_solver, fallback_search_env, Gurobi.Optimizer;primary_objective=primary_objective,kwargs...)
+            fallback_solver, fallback_search_env, default_milp_optimizer();primary_objective=primary_objective,kwargs...)
 
         # print_project_schedule(string("schedule",idx,"A"),fallback_search_env;mode=:leaf_aligned)
         # Replanning outer loop
@@ -505,7 +505,7 @@ function profile_replanning(replan_model, fallback_model, solver, fallback_solve
         solver = PC_TAPF_Solver(solver_template,start_time=time())
         # reset_solver!(solver)
         base_search_env, solver = replan!(solver, replan_model, search_env, env_graph, problem_spec, solution, next_schedule, t_request, t_arrival; commit_threshold=commit_threshold,kwargs...)
-        (solution, _, cost, search_env, optimality_gap), elapsed_time, _, _, _ = @timed high_level_search!(solver, base_search_env, Gurobi.Optimizer;primary_objective=primary_objective,kwargs...)
+        (solution, _, cost, search_env, optimality_gap), elapsed_time, _, _, _ = @timed high_level_search!(solver, base_search_env, default_milp_optimizer();primary_objective=primary_objective,kwargs...)
         # print_project_schedule(string("schedule",idx,"C"),search_env;mode=:leaf_aligned)
         # m = maximum(map(p->length(p), get_paths(solution)))
         # @show
@@ -575,7 +575,7 @@ function run_profiling(solver,MODE=:nothing;
         initial_problem_id = 1,
         primary_objective = SumOfMakeSpans(),
         seed = 1,
-        optimizer=Gurobi.Optimizer
+        optimizer=default_milp_optimizer()
         )
     if !isdir(base_problem_dir)
         mkdir(base_problem_dir)

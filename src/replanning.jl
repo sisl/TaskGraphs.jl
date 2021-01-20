@@ -277,8 +277,9 @@ function prune_schedule(sched::OperatingSchedule,
         if isa(pred,Operation) && indegree(new_sched,v) < num_required_predecessors(pred)
             # add deleted objects back in
             input_ids = Set(map(v2->get_object_id(get_node_from_vtx(new_sched,v2)), inneighbors(new_sched,v)))
-            for o in preconditions(pred)
-                if !(get_object_id(o) in input_ids)
+            for (object_id,o) in preconditions(pred)
+                # if !(get_object_id(o) in input_ids)
+                if !(object_id in input_ids)
                     o_node = add_node!(new_sched,make_node(sched,problem_spec,o)) 
                     add_edge!(new_sched, o_node.id, node)
                     set_t0!(o_node,get_t0(node))
@@ -499,6 +500,12 @@ function reset_cache!(cache::ReplanningProfilerCache)
     cache
 end
 
+"""
+    FullReplanner{R,S}
+
+Wrapper for a `ReplannerModel` and a `PC_TAPF` solver, as well as a 
+`ReplanningProfilerCache`.
+"""
 @with_kw struct FullReplanner{R,S}
     solver::S                       = NBSSolver()
     replanner::R                    = MergeAndBalance()
