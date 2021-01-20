@@ -1,4 +1,4 @@
 debug/*
 experiments/video/*
 docs/build/
-Manifest.jl
+Manifest.toml
