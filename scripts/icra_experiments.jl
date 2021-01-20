@@ -1,7 +1,13 @@
 using TaskGraphs 
+# NOTE that the experiments described in "Optimal Sequential Task Assignment and 
+# Path Finding for Multi-Agent Robotic Assembly Planning", Brown et al. 
+# were performed using Gurobi as the black box MILP solver. To use the default
+# (GLPK), simply comment out the following two lines.
+using Gurobi
+set_default_milp_optimizer!(Gurobi.Optimizer)
 
 ## ICRA experiments
-# YOU MUST DEFINE base_dir
+# You may want to redefine base_dis
 # -------------------------- #
 base_dir            = joinpath("/scratch/task_graphs_experiments")
 # -------------------------- #

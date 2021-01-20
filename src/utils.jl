@@ -1,22 +1,3 @@
-# module TaskGraphsUtils
-#
-# using Parameters
-# using LightGraphs, MetaGraphs
-# using GraphUtils
-# using LinearAlgebra
-# using DataStructures
-# using JuMP, MathOptInterface, Gurobi
-# using Random
-#
-# using ..TaskGraphs
-# using CRCBS
-# using ..FactoryWorlds
-# using ..PlanningPredicates
-# using ..TaskGraphsCore
-
-
-
-
 export to_string_dict
 
 to_string_dict(dict::Dict) = Dict{String,Any}(string(k)=>v for (k,v) in dict)
@@ -600,5 +581,3 @@ function convert_to_path_vectors(object_path_dict, object_interval_dict)
     end
     object_paths, object_intervals
 end
-
-# end # module TaskGraphsUtils

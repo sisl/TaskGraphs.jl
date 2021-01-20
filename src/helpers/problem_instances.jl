@@ -1,15 +1,3 @@
-# module Helpers
-#
-# using LightGraphs
-# using MetaGraphs
-# using GraphUtils
-# using CRCBS
-#
-# # using ..PlanningPredicates
-# # using ..TaskGraphsCore
-# # using ..TaskGraphsUtils
-# using ..TaskGraphs
-
 export
     init_env_1,
     init_env_2,
@@ -936,8 +924,4 @@ end
 #     sched, problem_spec = construct_task_graphs_problem(
 #         def,env_graph;cost_function=cost_function)
 #     return sched, problem_spec, env_graph, assignment_dict
-# end
-
-
-
 # end

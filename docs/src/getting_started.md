@@ -11,8 +11,6 @@ julia> ] # enter package mode by typing "]"
 
 (@v1.4) pkg> add https://github.com/kylejbrown17/TaskGraphs.jl.git
 ```
-To take full advantage of the package, you will also need to install 
-[Gurobi](https://www.gurobi.com/downloads/).
 
 ## Example
 

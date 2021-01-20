@@ -1,13 +1,21 @@
 # Profiling
 
-To run the suite of experiments described in the [ICRA paper](https://arxiv.org/abs/2006.08845), run the following code:
+To run the suite of experiments described in the [ICRA paper](https://arxiv.org/abs/2006.08845), 
+run the script below (if you wish to use [Gurobi](https://www.gurobi.com/downloads/), 
+you'll need to obtain a license and install [Gurobi.jl](https://github.com/jump-dev/Gurobi.jl).
 
 ```julia
 # copied from TaskGraphs/scripts/icra_experiments.jl
 using TaskGraphs 
+# NOTE that the experiments described in "Optimal Sequential Task Assignment and 
+# Path Finding for Multi-Agent Robotic Assembly Planning", Brown et al. 
+# were performed using Gurobi as the black box MILP solver. To use the default
+# (GLPK), simply comment out the following two lines.
+using Gurobi
+set_default_milp_optimizer!(Gurobi.Optimizer)
 
 ## ICRA experiments
-# YOU MUST DEFINE base_dir
+# You may want to redefine base_dir
 # -------------------------- #
 base_dir            = joinpath("/scratch/task_graphs_experiments")
 # -------------------------- #

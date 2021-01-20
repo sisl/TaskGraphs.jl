@@ -1,3 +1,4 @@
 debug/*
 experiments/video/*
-docs/build/*
+docs/build/
+Manifest.jl
