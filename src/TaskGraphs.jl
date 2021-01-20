@@ -7,7 +7,8 @@ using Random
 using LinearAlgebra
 using DataStructures
 using JuMP, MathOptInterface
-using Gurobi
+# using Gurobi
+using GLPK
 using TOML
 using CRCBS
 using SparseArrays
@@ -46,7 +47,8 @@ include("experiments/replanning_experiments.jl")
 @reexport using CRCBS
 
 # set Gurobi as the default optimizer
-set_default_milp_optimizer!(Gurobi.Optimizer)
+# set_default_milp_optimizer!(Gurobi.Optimizer)
+set_default_milp_optimizer!(GLPK.Optimizer)
 set_default_optimizer_attributes!(MOI.TimeLimitSec()=>100, MOI.Silent()=>true)
 
 end

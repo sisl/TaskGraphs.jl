@@ -39,6 +39,12 @@ git-tree-sha1 = "9e62e66db34540a0c919d72172cc2f642ac71260"
 uuid = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
 version = "0.5.0"
 
+[[BinaryProvider]]
+deps = ["Libdl", "Logging", "SHA"]
+git-tree-sha1 = "ecdec412a9abc8db54c0efc5548c64dfce072058"
+uuid = "b99e7846-7c00-51b0-8f62-c81ae34c0232"
+version = "0.5.10"
+
 [[Bzip2_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
 git-tree-sha1 = "c3598e525718abcc440f69cc6d5f60dda0a1b61e"
@@ -270,6 +276,24 @@ version = "0.10.14"
 deps = ["Random"]
 uuid = "9fa8497b-333b-5362-9e8d-4d0656e87820"
 
+[[GLPK]]
+deps = ["BinaryProvider", "CEnum", "GLPK_jll", "Libdl", "MathOptInterface"]
+git-tree-sha1 = "83efde82808c62c365c6807a07e7eab581ec1f72"
+uuid = "60bf3e95-4087-53dc-ae20-288a0d20c6a6"
+version = "0.14.5"
+
+[[GLPK_jll]]
+deps = ["GMP_jll", "Libdl", "Pkg"]
+git-tree-sha1 = "ccc855de74292e478d4278e3a6fdd8212f75e81e"
+uuid = "e8aa6df9-e6ca-548a-97ff-1f85fc5b8b98"
+version = "4.64.0+0"
+
+[[GMP_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
+git-tree-sha1 = "15abc5f976569a1c9d651aff02f7222ef305eb2a"
+uuid = "781609d7-10c4-51f6-84f2-b8444358ff6d"
+version = "6.1.2+6"
+
 [[GraphUtils]]
 deps = ["DataStructures", "Documenter", "ImageFiltering", "LightGraphs", "LinearAlgebra", "Logging", "MetaGraphs", "Parameters", "Printf", "Random", "Reexport", "SortingAlgorithms", "SparseArrays", "StaticArrays", "TOML", "Test"]
 path = "/home/kylebrown/.julia/dev/GraphUtils"
@@ -281,12 +305,6 @@ deps = ["Colors", "LinearAlgebra", "NaNMath"]
 git-tree-sha1 = "45d684ead5b65c043ad46bd5be750d61c39d7ef8"
 uuid = "a2bd30eb-e257-5431-a919-1863eab51364"
 version = "1.0.2"
-
-[[Gurobi]]
-deps = ["CEnum", "Libdl", "MathOptInterface"]
-git-tree-sha1 = "87c818dc7da7f7927cda470fda06bc2d05881d46"
-uuid = "2e9cd046-0924-5485-92f1-d5272153d98b"
-version = "0.9.7"
 
 [[HTTP]]
 deps = ["Base64", "Dates", "IniFile", "MbedTLS", "Sockets", "URIs"]
@@ -341,10 +359,10 @@ uuid = "83e8ac13-25f8-5344-8a64-a9f2b223428f"
 version = "0.5.0"
 
 [[IntelOpenMP_jll]]
-deps = ["Libdl", "Pkg"]
-git-tree-sha1 = "fb8e1c7a5594ba56f9011310790e03b5384998d6"
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
+git-tree-sha1 = "d979e54b71da82f3a65b62553da4fc3d18c9004c"
 uuid = "1d5cc7b8-4909-519e-a0f8-d0f5ad9712d0"
-version = "2018.0.3+0"
+version = "2018.0.3+2"
 
 [[InteractiveUtils]]
 deps = ["Markdown"]

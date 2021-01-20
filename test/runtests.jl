@@ -2,7 +2,7 @@ using TaskGraphs
 using CRCBS
 using LightGraphs, MetaGraphs, GraphUtils
 using JuMP, MathOptInterface
-using Gurobi
+# using Gurobi
 using Random
 using TOML
 
