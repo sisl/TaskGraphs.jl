@@ -24,14 +24,14 @@ Depth = 2
 ## Core Types
 
 ```@contents
-Pages = ["library.md]
+Pages = ["library.md"]
 Depth = 2
 ```
 
 ## API Reference
 
 ```@contents
-Pages = ["reference.md]
+Pages = ["reference.md"]
 Depth = 2
 ```
 
