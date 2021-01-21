@@ -921,8 +921,8 @@ function formulate_milp(milp_model::FastSparseAdjacencyMILP,sched::OperatingSche
     tF = Vector{Union{Real,VariableRef,GenericAffExpr}}(zeros(nv(G)))
     for v in topological_sort(G)
         if indegree(G,v) == cache.n_eligible_predecessors[v] == 0
-            node_id = get_vtx_id(sched,v)
-            t0[v] = @expression(model,get(t0_,node_id,0.0))
+            n_id = get_vtx_id(sched,v)
+            t0[v] = @expression(model,get(t0_,n_id,0.0))
             # @show indegree(G,v), v, string(get_node_from_vtx(sched,v)), typeof(t0[v])
         elseif indegree(G,v) == cache.n_eligible_predecessors[v] == 1
             vp = inneighbors(G,v)[1]
@@ -1327,8 +1327,8 @@ function propagate_valid_ids!(sched::OperatingSchedule,problem_spec::ProblemSpec
     @assert(is_cyclic(sched) == false, "is_cyclic(sched)") # string(sparse(adj_matrix))
     # Propagate valid IDs through the schedule
     for v in topological_sort_by_dfs(sched)
-        node_id = get_vtx_id(sched, v)
-        node = get_node_from_id(sched, node_id)
+        n_id = get_vtx_id(sched, v)
+        node = get_node_from_id(sched, n_id)
         for v2 in inneighbors(sched,v)
             node = align_with_predecessor(node,get_node_from_vtx(sched, v2))
         end
@@ -1337,9 +1337,9 @@ function propagate_valid_ids!(sched::OperatingSchedule,problem_spec::ProblemSpec
         end
         path_spec = get_path_spec(sched, v)
         if path_spec.fixed
-            replace_in_schedule!(sched, path_spec, node, node_id)
+            replace_in_schedule!(sched, path_spec, node, n_id)
         else
-            replace_in_schedule!(sched, problem_spec, node, node_id)
+            replace_in_schedule!(sched, problem_spec, node, n_id)
         end
     end
     return true

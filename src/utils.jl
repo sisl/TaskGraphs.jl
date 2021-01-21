@@ -106,14 +106,14 @@ end
 export get_valid_robot_ids
 
 """
-    get_valid_robot_ids(sched::OperatingSchedule,node_id::AbstractID)
+    get_valid_robot_ids(sched::OperatingSchedule,n_id::AbstractID)
 
 Returns vector of all robot ids associated with the schedule node referenced by
-node_id.
+n_id.
 """
-function get_valid_robot_ids(sched::OperatingSchedule,node_id::A,v=get_vtx(sched,node_id)) where {A<:Union{ActionID,BotID}}
+function get_valid_robot_ids(sched::OperatingSchedule,n_id::A,v=get_vtx(sched,n_id)) where {A<:Union{ActionID,BotID}}
     ids = Vector{BotID}()
-    node = get_node(sched,node_id).node
+    node = get_node(sched,n_id).node
     if matches_template(TEAM_ACTION,node)
         for n in sub_nodes(node)
             r = get_robot_id(n)
@@ -126,7 +126,7 @@ function get_valid_robot_ids(sched::OperatingSchedule,node_id::A,v=get_vtx(sched
     end
     return filter(CRCBS.is_valid,ids)
 end
-function get_valid_robot_ids(sched::OperatingSchedule,node_id::A,v=get_vtx(sched,node_id)) where {A<:Union{ObjectID,OperationID}}
+function get_valid_robot_ids(sched::OperatingSchedule,n_id::A,v=get_vtx(sched,n_id)) where {A<:Union{ObjectID,OperationID}}
     return Vector{BotID}()
 end
 get_valid_robot_ids(s::OperatingSchedule,v::Int) = get_valid_robot_ids(s,get_vtx_id(s,v),v)
@@ -145,11 +145,11 @@ the `sched` corresponding to the robot's last assigned task.
 function robot_tip_map(sched::OperatingSchedule,vtxs=get_all_terminal_nodes(sched))
     robot_tips = Dict{BotID,AbstractID}()
     for v in vtxs
-        node_id = get_vtx_id(sched,v)
-        for robot_id in get_valid_robot_ids(sched,node_id,v)
+        n_id = get_vtx_id(sched,v)
+        for robot_id in get_valid_robot_ids(sched,n_id,v)
             if get_id(robot_id) != -1
                 @assert !haskey(robot_tips,robot_id)
-                robot_tips[robot_id] = node_id
+                robot_tips[robot_id] = n_id
             end
         end
     end

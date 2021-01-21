@@ -129,10 +129,6 @@ function remove_vtxs(sched,remove_set)
     keep_vtxs = setdiff(Set{Int}(collect(vertices(sched))), remove_set)
     # add all non-deleted nodes to new project schedule
     for v in keep_vtxs
-        # node_id = get_vtx_id(sched,v)
-        # node = get_node_from_id(sched, node_id)
-        # path_spec = get_path_spec(sched,v)
-        # add_to_schedule!(new_sched,path_spec,node,node_id)
         add_to_schedule!(new_sched,get_node(sched,v))
     end
     # add all edges between nodes that still exist
@@ -319,25 +315,25 @@ function remove_robot!(env::SearchEnv,id::BotID,t::Int)
     to_remove = Set{AbstractID}(id)
     v = get_vtx(sched,id)
     for vp in edges(bfs_tree(G,v))
-        node_id = get_vtx_id(sched,vp)
-        if isa(node_id,ActionID)
-            node = get_node_from_id(sched,node_id)
+        n_id = get_vtx_id(sched,vp)
+        if isa(n_id,ActionID)
+            node = get_node_from_id(sched,n_id)
             if isa(node,BOT_GO)
-                push!(to_remove,node_id)
+                push!(to_remove,n_id)
             else
                 new_node = replace_robot_id(node,-1)
-                replace_in_schedule!(sched,get_problem_spec(env),new_node,node_id)
+                replace_in_schedule!(sched,get_problem_spec(env),new_node,n_id)
             end
         end
     end
-    for node_id in to_remove
-        delete_node!(sched,node_id)
+    for n_id in to_remove
+        delete_node!(sched,n_id)
     end
     # Verify that the robot is no longer in schedule
     for v in vertices(G)
-        node_id = get_vtx_id(sched,v)
-        if isa(node_id,ActionID)
-            node = get_node_from_id(sched,node_id)
+        n_id = get_vtx_id(sched,v)
+        if isa(n_id,ActionID)
+            node = get_node_from_id(sched,n_id)
             @assert !(get_id(id) in get_valid_robot_ids(node)) "Robot id $(string(id)) should be wiped from schedule, but is present in $(string(node))"
         end
     end

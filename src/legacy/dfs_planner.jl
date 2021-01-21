@@ -105,7 +105,7 @@ function update_envs!(solver,search_env,envs,paths)
     for i in 1:length(envs)
         env = envs[i]
         path = paths[i]
-        v = get_vtx(schedule,env.node_id)
+        v = get_vtx(schedule,env.n_id)
         s = get_final_state(path)
         t_arrival = max(cache.tF[v], s.t + get_distance(get_graph(search_env).dist_function,s.vtx,env.goal.vtx))
         if is_goal(envs[i],s)
@@ -127,7 +127,7 @@ function update_envs!(solver,search_env,envs,paths)
         for i in 1:length(envs)
             env = envs[i]
             path = paths[i]
-            v = get_vtx(schedule,env.node_id)
+            v = get_vtx(schedule,env.n_id)
             envs[i] = build_env(solver,search_env,cbs_node,v)
         end
     end
@@ -137,7 +137,7 @@ function update_envs!(solver,search_env,envs,paths)
         path = paths[i]
         if is_goal(envs[i],get_final_state(path))
             # update schedule and cache
-            v = get_vtx(schedule,env.node_id)
+            v = get_vtx(schedule,env.n_id)
             if !(v in cache.closed_set)
                 update_planning_cache!(solver,search_env,v,path)
                 @assert v in cache.closed_set
@@ -151,7 +151,7 @@ function update_envs!(solver,search_env,envs,paths)
         i += 1
         env = envs[i]
         path = paths[i]
-        v = get_vtx(schedule,env.node_id)
+        v = get_vtx(schedule,env.n_id)
         if is_goal(envs[i],get_final_state(path))
             # update schedule and cache
             if !(v in cache.closed_set)
@@ -169,14 +169,14 @@ function update_envs!(solver,search_env,envs,paths)
                 end
             end
             # swap out env for new env
-            node_id = get_next_node_matching_agent_id(schedule,cache,env.agent_idx)
-            @assert node_id != env.node_id
-            if get_vtx(schedule,node_id) in cache.active_set
-                envs[i] = build_env(solver,search_env,cbs_node,get_vtx(schedule,node_id))
+            n_id = get_next_node_matching_agent_id(schedule,cache,env.agent_idx)
+            @assert n_id != env.n_id
+            if get_vtx(schedule,n_id) in cache.active_set
+                envs[i] = build_env(solver,search_env,cbs_node,get_vtx(schedule,n_id))
                 # i = 0
                 i -= 1
             else
-                node_string = string(get_node_from_id(get_schedule(search_env),node_id))
+                node_string = string(get_node_from_id(get_schedule(search_env),n_id))
                 @log_info(4,verbosity(solver),"cannot update environment for agent $i because next node ",node_string," not in cache.active_set")
             end
         end
@@ -192,7 +192,7 @@ function select_ordering(solver,search_env,envs)
         by = i->(
             ~isa(envs[i].schedule_node,Union{COLLECT,DEPOSIT}),
             ~isa(envs[i].schedule_node,CARRY),
-            minimum(cache.slack[get_vtx(schedule,envs[i].node_id)])
+            minimum(cache.slack[get_vtx(schedule,envs[i].n_id)])
             )
         )
     ordering
@@ -324,8 +324,8 @@ function CRCBS.solve!(
     envs = Vector{PCCBS.LowLevelEnv}([PCCBS.LowLevelEnv() for p in paths])
     cbs_node = initialize_root_node(search_env)
     for i in 1:search_env.num_agents
-        node_id = get_next_node_matching_agent_id(get_schedule(search_env),get_cache(search_env),i)
-        envs[i] = build_env(solver,search_env,cbs_node,get_vtx(get_schedule(search_env),node_id))
+        n_id = get_next_node_matching_agent_id(get_schedule(search_env),get_cache(search_env),i)
+        envs[i] = build_env(solver,search_env,cbs_node,get_vtx(get_schedule(search_env),n_id))
     end
 
     envs, paths, status = prioritized_dfs_search(solver,search_env,envs,paths;

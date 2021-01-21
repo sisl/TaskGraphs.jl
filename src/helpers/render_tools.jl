@@ -1466,30 +1466,30 @@ end
 function get_node_shape(search_env::SearchEnv,graph,v,x,y,r)
     sched = get_schedule(search_env)
     cache = get_cache(search_env)
-    node_id = get_vtx_id(sched,get_prop(graph,v,:vtx_id))
-    if typeof(node_id) <: ActionID
+    n_id = get_vtx_id(sched,get_prop(graph,v,:vtx_id))
+    if typeof(n_id) <: ActionID
         return Compose.circle(x,y,r)
-    elseif typeof(node_id) <: RobotID
+    elseif typeof(n_id) <: RobotID
         return Compose.ngon(x,y,r,4)
-    elseif typeof(node_id) <: ObjectID
+    elseif typeof(n_id) <: ObjectID
         return Compose.ngon(x,y,r,3)
-    elseif typeof(node_id) <: OperationID
+    elseif typeof(n_id) <: OperationID
         return Compose.circle(x,y,r)
     end
 end
 function get_node_color(search_env::SearchEnv,graph,v,x,y,r)
     sched = get_schedule(search_env)
     cache = get_cache(search_env)
-    node_id = get_vtx_id(sched,get_prop(graph,v,:vtx_id))
-    if typeof(node_id) <: ActionID
+    n_id = get_vtx_id(sched,get_prop(graph,v,:vtx_id))
+    if typeof(n_id) <: ActionID
         return "cyan"
-    elseif typeof(node_id) <: CleanUpBotID
+    elseif typeof(n_id) <: CleanUpBotID
         return "purple"
-    elseif typeof(node_id) <: BotID
+    elseif typeof(n_id) <: BotID
         return "lime"
-    elseif typeof(node_id) <: ObjectID
+    elseif typeof(n_id) <: ObjectID
         return "orange"
-    elseif typeof(node_id) <: OperationID
+    elseif typeof(n_id) <: OperationID
         return "red"
     end
 end

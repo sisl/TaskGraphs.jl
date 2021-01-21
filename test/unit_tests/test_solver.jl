@@ -42,9 +42,9 @@ let
         path_planner = DefaultAStarSC()
         node = initialize_root_node(search_env)
         # plan for Robot Start
-        node_id = RobotID(1)
-        schedule_node = get_node_from_id(search_env.schedule, node_id)
-        v = get_vtx(search_env.schedule, node_id)
+        n_id = RobotID(1)
+        schedule_node = get_node_from_id(search_env.schedule, n_id)
+        v = get_vtx(search_env.schedule, n_id)
         @test plan_path!(path_planner, pc_mapf,search_env, node, schedule_node, v)
         # plan for GO
         v2 = outneighbors(search_env.schedule,v)[1]

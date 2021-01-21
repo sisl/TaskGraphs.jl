@@ -219,7 +219,7 @@ function plan_path!(solver::AStarSC, pc_mapf::AbstractPC_MAPF, env::SearchEnv, n
         kwargs...) where {N<:ConstraintTreeNode,T}
 
     cache = get_cache(env)
-    node_id = get_vtx_id(get_schedule(env),v)
+    # n_id = get_vtx_id(get_schedule(env),v)
 
     reset_solver!(solver)
     cbs_env = build_env(solver, pc_mapf, env, node, VtxID(v)) #schedule_node, v)
@@ -320,8 +320,8 @@ function plan_next_path!(solver::ISPS, pc_mapf::AbstractPC_MAPF, env::SearchEnv,
     valid_flag = true
     if ~isempty(get_cache(env).node_queue)
         v,priority = dequeue_pair!(get_cache(env).node_queue)
-        node_id = get_vtx_id(get_schedule(env),v)
-        schedule_node = get_node_from_id(get_schedule(env),node_id)
+        n_id = get_vtx_id(get_schedule(env),v)
+        schedule_node = get_node_from_id(get_schedule(env),n_id)
         if get_path_spec(get_schedule(env), v).plan_path == true
             try
                 @log_info(2,verbosity(solver),sprint(show,env))

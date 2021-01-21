@@ -179,8 +179,8 @@ end
 
 function break_assignments!(sched::OperatingSchedule,problem_spec,v)
     G = get_graph(sched)
-    node_id = get_vtx_id(sched,v)
-    node = get_node_from_id(sched,node_id)
+    n_id = get_vtx_id(sched,v)
+    node = get_node_from_id(sched,n_id)
     if isa(node, AbstractRobotAction)
         new_node = replace_robot_id(node,RobotID(-1)) # TODO Why is this line here? I don't think the robot id should be replaced in this node--just it's successors
         if isa(node,BOT_GO)
@@ -191,7 +191,7 @@ function break_assignments!(sched::OperatingSchedule,problem_spec,v)
                 end
             end
         end
-        replace_in_schedule!(sched,problem_spec,new_node,node_id)
+        replace_in_schedule!(sched,problem_spec,new_node,n_id)
     elseif isa(node,TEAM_ACTION)
         for i in 1:length(node.instructions)
             n = node.instructions[i]

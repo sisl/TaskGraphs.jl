@@ -743,8 +743,8 @@ end
 function replan_path!(solver, pc_mapf::AbstractPC_MAPF, env::SearchEnv, constraint_node::ConstraintTreeNode, vtx::VtxID,t0)
     v = get_id(vtx)
     sched = get_schedule(env)
-    node_id = get_vtx_id(sched,v)
-    schedule_node = get_node_from_id(sched,node_id)
+    n_id = get_vtx_id(sched,v)
+    schedule_node = get_node_from_id(sched,n_id)
     ### trim path
     cbs_env = build_env(solver,pc_mapf,env,constraint_node,VtxID(v))
     path = get_base_path(solver,env,cbs_env)
@@ -766,9 +766,9 @@ function tighten_gaps!(solver, pc_mapf::AbstractPC_MAPF, env::SearchEnv, constra
     solver.tighten_paths ? nothing : return env
     sched = get_schedule(env)
     active_nodes = robot_tip_map(sched,get_cache(env).active_set)
-    for (robot_id, node_id) in active_nodes
+    for (robot_id, n_id) in active_nodes
         path = get_paths(env)[get_id(robot_id)]
-        v = get_vtx(sched,node_id)
+        v = get_vtx(sched,n_id)
         gap = evaluate_path_gap(env,path,v)
         if gap > 0
             t0 = get_t0(env,v)
@@ -876,8 +876,8 @@ function CRCBS.build_env(
         constraint_node::ConstraintTreeNode,
         agent_id::AgentID
         )
-    node_id = get_next_node_matching_agent_id(env,RobotID(get_id(agent_id)))
-    build_env(solver,pc_mapf,env,constraint_node,VtxID(get_vtx(get_schedule(env),node_id)))
+    n_id = get_next_node_matching_agent_id(env,RobotID(get_id(agent_id)))
+    build_env(solver,pc_mapf,env,constraint_node,VtxID(get_vtx(get_schedule(env),n_id)))
 end
 CRCBS.build_env(env::SearchEnv) = PCCBSEnv(search_env=env)
 
