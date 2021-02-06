@@ -44,7 +44,6 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.JULIA_PACKAGE_REGISTRY_KEY }}
       - run: julia -e 'using Pkg; pkg"registry add git@github.com:kylejbrown17/JuliaPackageRegistry.git"'
-      - run: ls ~/.julia/registries
       - uses: julia-actions/julia-buildpkg@v1
       - uses: julia-actions/julia-runtest@v1
   docs:

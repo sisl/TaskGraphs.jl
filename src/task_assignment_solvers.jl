@@ -917,25 +917,25 @@ function formulate_milp(milp_model::FastSparseAdjacencyMILP,sched::OperatingSche
     # In order to speed up the solver, we try to reduce the total number of
     # variables in the JuMP Model. Wherever possible, t0[v] and tF[v] are
     # defined as constants or expressions rather than variables.
-    t0 = Vector{Union{Real,VariableRef,GenericAffExpr}}(zeros(nv(G)))
-    tF = Vector{Union{Real,VariableRef,GenericAffExpr}}(zeros(nv(G)))
-    for v in topological_sort(G)
-        if indegree(G,v) == cache.n_eligible_predecessors[v] == 0
+    t0 = Vector{Union{Real,VariableRef,GenericAffExpr}}(zeros(nv(sched)))
+    tF = Vector{Union{Real,VariableRef,GenericAffExpr}}(zeros(nv(sched)))
+    for v in topological_sort(sched)
+        if indegree(sched,v) == cache.n_eligible_predecessors[v] == 0
             n_id = get_vtx_id(sched,v)
             t0[v] = @expression(model,get(t0_,n_id,0.0))
-            # @show indegree(G,v), v, string(get_node_from_vtx(sched,v)), typeof(t0[v])
-        elseif indegree(G,v) == cache.n_eligible_predecessors[v] == 1
-            vp = inneighbors(G,v)[1]
+            # @show indegree(sched,v), v, string(get_node_from_vtx(sched,v)), typeof(t0[v])
+        elseif indegree(sched,v) == cache.n_eligible_predecessors[v] == 1
+            vp = inneighbors(sched,v)[1]
             t0[v] = @expression(model,tF[vp])
-            # @show indegree(G,v), v, string(get_node_from_vtx(sched,v)), typeof(t0[v])
+            # @show indegree(sched,v), v, string(get_node_from_vtx(sched,v)), typeof(t0[v])
         else
             t0[v] = @variable(model)
-            for vp in inneighbors(G,v)
+            for vp in inneighbors(sched,v)
                 @constraint(model,t0[v] >= tF[vp])
             end
-            # @show indegree(G,v), v, string(get_node_from_vtx(sched,v)), typeof(t0[v])
+            # @show indegree(sched,v), v, string(get_node_from_vtx(sched,v)), typeof(t0[v])
         end
-        if outdegree(G,v) == cache.n_eligible_successors[v]
+        if outdegree(sched,v) == cache.n_eligible_successors[v]
             tF[v] = @expression(model,t0[v] + Δt[v])
         else
             tF[v] = @variable(model)
@@ -955,22 +955,22 @@ function formulate_milp(milp_model::FastSparseAdjacencyMILP,sched::OperatingSche
     #     @constraint(model, tF[v] >= t)
     # end
     # Precedence relationships
-    Xa = SparseMatrixCSC{VariableRef,Int}(nv(G),nv(G),ones(Int,nv(G)+1),Int[],VariableRef[])
+    Xa = SparseMatrixCSC{VariableRef,Int}(nv(sched),nv(sched),ones(Int,nv(sched)+1),Int[],VariableRef[])
     # Precedence constraints and duration constraints for existing nodes and edges
-    for v in vertices(G)
-        for v2 in outneighbors(G,v)
+    for v in vertices(sched)
+        for v2 in outneighbors(sched,v)
             Xa[v,v2] = @variable(model, binary=true) # TODO remove this (MUST UPDATE n_eligible_successors, etc. accordingly)
             @constraint(model, Xa[v,v2] == 1) #TODO this edge already exists--no reason to encode it as a decision variable
         end
     end
 
     # Big M constraints
-    for v in vertices(G)
+    for v in vertices(sched)
         node = get_node_from_id(sched, get_vtx_id(sched, v))
         potential_match = false
-        if outdegree(G,v) < cache.n_eligible_successors[v] # NOTE: Trying this out to save time on formulation
-            for v2 in cache.non_upstream_vertices[v] # for v2 in vertices(G)
-                if indegree(G,v2) < cache.n_eligible_predecessors[v2]
+        if outdegree(sched,v) < cache.n_eligible_successors[v] # NOTE: Trying this out to save time on formulation
+            for v2 in cache.non_upstream_vertices[v] # for v2 in vertices(sched)
+                if indegree(sched,v2) < cache.n_eligible_predecessors[v2]
                     node2 = get_node_from_id(sched, get_vtx_id(sched, v2))
                     for (template, val) in cache.missing_successors[v]
                         if !matches_template(template, typeof(node2)) # possible to add an edge
@@ -1000,12 +1000,12 @@ function formulate_milp(milp_model::FastSparseAdjacencyMILP,sched::OperatingSche
     end
 
     # In the sparse implementation, these constraints must come after all possible edges are defined by a VariableRef
-    @constraint(model, Xa * ones(nv(G))  .<= cache.n_eligible_successors);
-    @constraint(model, Xa * ones(nv(G))  .>= cache.n_required_successors);
-    @constraint(model, Xa' * ones(nv(G)) .<= cache.n_eligible_predecessors);
-    @constraint(model, Xa' * ones(nv(G)) .>= cache.n_required_predecessors);
-    for i in 1:nv(G)
-        for j in i:nv(G)
+    @constraint(model, Xa * ones(nv(sched))  .<= cache.n_eligible_successors);
+    @constraint(model, Xa * ones(nv(sched))  .>= cache.n_required_successors);
+    @constraint(model, Xa' * ones(nv(sched)) .<= cache.n_eligible_predecessors);
+    @constraint(model, Xa' * ones(nv(sched)) .>= cache.n_required_predecessors);
+    for i in 1:nv(sched)
+        for j in i:nv(sched)
             # prevent self-edges and cycles
             @constraint(model, Xa[i,j] + Xa[j,i] <= 1)
         end
@@ -1020,12 +1020,12 @@ function formulate_milp(milp_model::FastSparseAdjacencyMILP,sched::OperatingSche
     # j must occur before the operation for task j2. The opposite is true for y == [0,1].
     # We use the big M method here as well to tightly enforce the binary constraints.
     # job_shop_variables = Dict{Tuple{Int,Int},JuMP.VariableRef}();
-    Xj = SparseMatrixCSC{VariableRef,Int}(nv(G),nv(G),ones(Int,nv(G)+1),Int[],VariableRef[])
+    Xj = SparseMatrixCSC{VariableRef,Int}(nv(sched),nv(sched),ones(Int,nv(sched)+1),Int[],VariableRef[])
     if job_shop
-        for v in 1:nv(G)
+        for v in 1:nv(sched)
             node = get_node_from_id(sched, get_vtx_id(sched, v))
-            for v2 in cache.non_upstream_vertices[v] #v+1:nv(G)
-                if v2 > v && ~(v in cache.upstream_vertices[v2]) && ~(has_edge(G,v,v2) || has_edge(G,v2,v))
+            for v2 in cache.non_upstream_vertices[v] #v+1:nv(sched)
+                if v2 > v && ~(v in cache.upstream_vertices[v2]) && ~(has_edge(sched,v,v2) || has_edge(sched,v2,v))
                     node2 = get_node_from_id(sched, get_vtx_id(sched, v2))
                     common_resources = intersect(resources_reserved(node),resources_reserved(node2))
                     if length(common_resources) > 0
