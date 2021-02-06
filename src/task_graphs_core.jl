@@ -384,9 +384,9 @@ Fields:
 """
 @with_kw mutable struct PathSpec
     # temporal
-    t0              ::Int               = 0
-    min_duration    ::Int               = 0
-    tF              ::Int               = t0 + min_duration
+    t0              ::Float64           = 0
+    min_duration    ::Float64           = 0
+    tF              ::Float64           = t0 + min_duration
     slack           ::Vector{Float64}   = Float64[]
     local_slack     ::Vector{Float64}   = Float64[]
     # instructions
@@ -432,7 +432,7 @@ export
 
 The node type of the `OperatingSchedule` graph.
 """
-mutable struct ScheduleNode{I<:AbstractID,V<:AbstractPlanningPredicate}
+mutable struct ScheduleNode{I<:AbstractID,V}
     id::I
     node::V
     spec::PathSpec
