@@ -455,13 +455,14 @@ export
     update_planning_cache!(solver,env,v,path)
 """
 update_planning_cache!(solver,env::SearchEnv,v::Int,path::Path) = update_planning_cache!(solver,env,v,get_t(get_final_state(path)))
-function update_planning_cache!(solver,env::SearchEnv,v::Int,t::Int=-1)
-    cache = get_cache(env)
-    sched = get_schedule(env)
+function update_planning_cache!(solver,env::SearchEnv,v::Int,t::Real=-1)
+    update_planning_cache!(solver,get_schedule(env),get_cache(env),v,t)
+end
+function update_planning_cache!(solver,sched::OperatingSchedule,cache::PlanningCache,v::Int,t=-1)
     active_set = cache.active_set
     closed_set = cache.closed_set
     node_queue = cache.node_queue
-    Δt = t - get_tF(env,v)
+    Δt = t - get_tF(sched,v)
     if Δt > 0
         set_tF!(sched,v,t)
         process_schedule!(sched)
@@ -506,7 +507,6 @@ complete.
 function update_planning_cache!(solver,env)
     cache = get_cache(env)
     sched = get_schedule(env)
-    node = initialize_root_node(env)
     # Skip over nodes that are already planned or just don't need planning
     while true
         done = true

@@ -583,7 +583,7 @@ replace_in_schedule!(sched::OperatingSchedule,node::ScheduleNode,id::AbstractID=
 function replace_in_schedule!(sched::P,path_spec::T,pred,id::ID) where {P<:OperatingSchedule,T<:PathSpec,ID<:AbstractID}
     replace_in_schedule!(sched,ScheduleNode(id,pred,path_spec))
 end
-function replace_in_schedule!(sched::P,spec::T,pred,id::ID) where {P<:OperatingSchedule,T<:ProblemSpec,ID<:AbstractID}
+function replace_in_schedule!(sched::P,spec,pred,id::ID) where {P<:OperatingSchedule,T<:ProblemSpec,ID<:AbstractID}
     replace_in_schedule!(sched,generate_path_spec(sched,spec,pred),pred,id)
 end
 function replace_in_schedule!(sched::P,pred,id::ID) where {P<:OperatingSchedule,ID<:AbstractID}

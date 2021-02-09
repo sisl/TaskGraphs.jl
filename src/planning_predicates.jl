@@ -491,6 +491,9 @@ resources_reserved(node::BOT_COLLECT)	= AbstractID[get_location_id(node)]
 resources_reserved(node::BOT_DEPOSIT)	= AbstractID[get_location_id(node)]
 resources_reserved(node::TEAM_ACTION)	= union(map(pred->resources_reserved(pred), node.instructions)...)
 
+align_with_predecessor(graph,node,pred) = align_with_predecessor(node,pred)
+align_with_successor(graph,node,pred) 	= align_with_successor(node,pred)
+
 align_with_predecessor(node::BOT_GO,pred::BOT_AT)			= BOT_GO(first_valid(node.r,pred.r), first_valid(node.x1,pred.x), node.x2)
 align_with_predecessor(node::BOT_GO,pred::BOT_GO)			= BOT_GO(first_valid(node.r,pred.r), first_valid(node.x1,pred.x2), node.x2)
 align_with_predecessor(node::BOT_GO,pred::BOT_DEPOSIT)		= BOT_GO(first_valid(node.r,pred.r), first_valid(node.x1,pred.x), node.x2)

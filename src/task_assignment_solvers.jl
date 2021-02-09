@@ -1053,13 +1053,17 @@ function formulate_milp(milp_model::FastSparseAdjacencyMILP,sched::OperatingSche
 end
 function get_objective_expr(milp,f::SumOfMakeSpans,model,sched,tF)
     terminal_vtxs = sched.terminal_vtxs
+    if isempty(terminal_vtxs)
+        @warn "sched.terminal_vtxs is empty. Using get_all_terminal_nodes(sched) instead" 
+        terminal_vtxs = get_all_terminal_nodes(sched)
+    end
     @variable(model, T[1:length(terminal_vtxs)])
     for (i,project_head) in enumerate(terminal_vtxs)
         for v in project_head
             @constraint(model, T[i] >= tF[v])
         end
     end
-    cost1 = @expression(model, sum(map(v->tF[v]*get(sched.weights,v,0.0), terminal_vtxs)))
+    cost1 = @expression(model, sum(map(v->tF[v]*get(sched.weights,v,1.0), terminal_vtxs)))
 end
 function get_objective_expr(milp,f::MakeSpan,model,sched,tF)
     @variable(model, T)
@@ -1151,7 +1155,7 @@ end
 function construct_schedule_distance_matrix(sched,problem_spec)
     G = get_graph(sched);
     cache = preprocess_project_schedule(sched,true)
-    D = Inf * ones(nv(sched),nv(sched))
+    D = DefaultDict{Tuple{Int,Int},Float64}(Inf) #Inf * ones(nv(sched),nv(sched))
     for v in vertices(sched)
         if outdegree(sched,v) < cache.n_eligible_successors[v]
             node = get_node_from_id(sched, get_vtx_id(sched, v))
@@ -1173,7 +1177,7 @@ function construct_schedule_distance_matrix(sched,problem_spec)
                             end
                             if (val > 0 && val2 > 0)
                                 new_node = align_with_successor(node,node2)
-                                D[v,v2] = generate_path_spec(sched,problem_spec,new_node).min_duration
+                                D[(v,v2)] = generate_path_spec(sched,problem_spec,new_node).min_duration
                             end
                         end
                     end
@@ -1213,8 +1217,9 @@ function select_next_edges(model,D,Ao,Ai)
     a = -1
     b = -2
     for (v,v2) in Base.Iterators.product(sort(collect(Ao)),sort(collect(Ai)))
-        if D[v,v2] < c
-            c = D[v,v2]
+        cost = D[(v,v2)]
+        if cost < c
+            c = cost
             a = v
             b = v2
         end
@@ -1223,10 +1228,13 @@ function select_next_edges(model,D,Ao,Ai)
         println("debugging edge selection for model ",typeof(model))
         for v in Ai
             node = get_node_from_vtx(model.schedule,v)
-            println(string("node ",string(node), " needs assignment"))
-            @show required_predecessors(node)
-            @show indegree(model.schedule,v)
+            required_preds = required_predecessors(node)
+            @warn "node $(node_id(node)) of type $(typeof(node)) needs assignment. indegree(node) = $(indegree(model.schedule,v))" required_preds
+            # println(string("node ",string(node), " needs assignment"))
+            # @show required_predecessors(node)
+            # @show indegree(model.schedule,v)
         end
+        throw(ErrorException("GreedyAssignment is stuck"))
     end
     return [(a,b)]
 end
@@ -1251,21 +1259,20 @@ the allowable number of outgoing edges, and must be in `C`.
 function JuMP.optimize!(model::GreedyAssignment)
     sched    = model.schedule
     problem_spec        = model.problem_spec
-    G                   = get_graph(sched);
     cache = preprocess_project_schedule(sched,true)
     C = Set{Int}() # Closed set (these nodes have enough predecessors)
     Ai = Set{Int}() # Nodes that don't have enough incoming edges
     Ao = Set{Int}() # Nodes that can have more outgoing edges
-    update_greedy_sets!(model,G,C,Ai,Ao,
+    update_greedy_sets!(model,sched,C,Ai,Ao,
         cache.n_required_predecessors,cache.n_eligible_successors)
     D = construct_schedule_distance_matrix(sched,problem_spec)
     while length(Ai) > 0
         for (v,v2) in select_next_edges(model,D,Ao,Ai)
             setdiff!(Ao,v)
             setdiff!(Ai,v2)
-            add_edge!(G,v,v2)
+            add_edge!(sched,v,v2)
         end
-        update_greedy_sets!(model,G,C,Ai,Ao,
+        update_greedy_sets!(model,sched,C,Ai,Ao,
             cache.n_required_predecessors,cache.n_eligible_successors)
     end
     set_leaf_operation_vtxs!(sched)
@@ -1323,17 +1330,17 @@ end
 export
     propagate_valid_ids!
 
-function propagate_valid_ids!(sched::OperatingSchedule,problem_spec::ProblemSpec)
+function propagate_valid_ids!(sched::OperatingSchedule,problem_spec)
     @assert(is_cyclic(sched) == false, "is_cyclic(sched)") # string(sparse(adj_matrix))
     # Propagate valid IDs through the schedule
     for v in topological_sort_by_dfs(sched)
         n_id = get_vtx_id(sched, v)
         node = get_node_from_id(sched, n_id)
         for v2 in inneighbors(sched,v)
-            node = align_with_predecessor(node,get_node_from_vtx(sched, v2))
+            node = align_with_predecessor(sched,node,get_node_from_vtx(sched, v2))
         end
         for v2 in outneighbors(sched,v)
-            node = align_with_successor(node,get_node_from_vtx(sched, v2))
+            node = align_with_successor(sched,node,get_node_from_vtx(sched, v2))
         end
         path_spec = get_path_spec(sched, v)
         if path_spec.fixed
