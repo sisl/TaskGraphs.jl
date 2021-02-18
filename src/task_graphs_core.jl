@@ -729,8 +729,8 @@ function validate(sched::OperatingSchedule)
             if matches_node_type(node,COLLECT)
                 @assert(get_location_id(node) != -1, string("get_location_id(node) != -1 for node id ", id))
             end
-            @assert( outdegree(sched,v) >= sum([0, values(required_successors(node))...]) , string("node = ", string(node), " outdegree = ",outdegree(G,v), " "))
-            @assert( indegree(sched,v) >= sum([0, values(required_predecessors(node))...]), string("node = ", string(node), " indegree = ",indegree(G,v), " ") )
+            @assert( outdegree(sched,v) >= sum([0, values(required_successors(node))...]) , string("outdegree = ",outdegree(sched,v), " for node = ", string(node)))
+            @assert( indegree(sched,v) >= sum([0, values(required_predecessors(node))...]), string("indegree = ",indegree(sched,v), " for node = ", string(node)))
             if matches_node_type(node, AbstractSingleRobotAction)
                 for v2 in outneighbors(sched,v)
                     node2 = get_node_from_vtx(sched, v2)
@@ -994,8 +994,8 @@ Args:
 * [OPTIONAL] t0::Vector{Int}: default = zeros(Int,nv(schedule))
 * [OPTIONAL] tF::Vector{Int}: default = zeros(Int,nv(schedule))
 """
-function process_schedule(sched::P,t0=zeros(Int,nv(sched)),
-        tF=zeros(Int,nv(sched))
+function process_schedule(sched::P,t0=zeros(nv(sched)),
+        tF=zeros(nv(sched))
     ) where {P<:OperatingSchedule}
 
     G = get_graph(sched)

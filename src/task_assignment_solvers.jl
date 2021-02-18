@@ -1072,8 +1072,10 @@ function get_objective_expr(milp,f::MakeSpan,model,sched,tF)
 end
 
 export
+    AbstractGreedyAssignment,
     GreedyAssignment
 
+abstract type AbstractGreedyAssignment <: TaskGraphsMILP end
 abstract type GreedyCost end
 struct GreedyPathLengthCost <: GreedyCost end
 struct GreedyFinalTimeCost  <: GreedyCost end
@@ -1098,41 +1100,46 @@ required number of incoming edges and all of `v`'s predecessors must
 already be in `C`. In order for `v` to be added to `Ao`, `v` must have less than
 the allowable number of outgoing edges, and must be in `C`.
 """
-@with_kw struct GreedyAssignment{C,M,P} <: TaskGraphsMILP
+@with_kw struct GreedyAssignment{C,M,P} <: AbstractGreedyAssignment
     schedule::OperatingSchedule = OperatingSchedule()
     problem_spec::P             = ProblemSpec()
     cost_model::C               = SumOfMakeSpans()
     greedy_cost::M              = GreedyPathLengthCost()
-    t0::Vector{Int}             = zeros(Int,nv(schedule))
+    t0::Vector{Int}             = zeros(Int,nv(schedule)) # get_tF(schedule)
 end
-exclude_solutions!(model::GreedyAssignment) = nothing # exclude most recent solution in order to get next best solution
-JuMP.termination_status(model::GreedyAssignment)    = MOI.OPTIMAL
-JuMP.primal_status(model::GreedyAssignment)         = MOI.FEASIBLE_POINT
-get_assignment_matrix(model::GreedyAssignment)      = adjacency_matrix(get_graph(model.schedule))
-function JuMP.objective_function(model::GreedyAssignment{SumOfMakeSpans,M,P}) where {M,P}
-    t0,tF,slack,local_slack = process_schedule(model.schedule,model.t0)
-    return sum(tF[model.schedule.terminal_vtxs] .* map(v->model.schedule.weights[v], model.schedule.terminal_vtxs))
+exclude_solutions!(::AbstractGreedyAssignment) = nothing # exclude most recent solution in order to get next best solution
+JuMP.termination_status(::AbstractGreedyAssignment)    = MOI.OPTIMAL
+JuMP.primal_status(::AbstractGreedyAssignment)         = MOI.FEASIBLE_POINT
+get_assignment_matrix(model::AbstractGreedyAssignment)      = adjacency_matrix(get_graph(model.schedule))
+JuMP.objective_function(model::AbstractGreedyAssignment) = JuMP.objective_function(model.cost_model,model)
+function JuMP.objective_function(::SumOfMakeSpans,model::AbstractGreedyAssignment) 
+    # t0,tF,slack,local_slack = process_schedule(model.schedule,model.t0)
+    process_schedule!(model.schedule)
+    sum((get_tF(model.schedule,v) * model.schedule.weights[v] for v in model.schedule.terminal_vtxs))
+    # return sum(tF[model.schedule.terminal_vtxs] .* map(v->model.schedule.weights[v], model.schedule.terminal_vtxs))
 end
-function JuMP.objective_function(model::GreedyAssignment{MakeSpan,M,P}) where {M,P}
-    t0,tF,slack,local_slack = process_schedule(model.schedule,model.t0)
-    return maximum(tF[model.schedule.terminal_vtxs])
+function JuMP.objective_function(::MakeSpan,model::AbstractGreedyAssignment)
+    # t0,tF,slack,local_slack = process_schedule(model.schedule,model.t0)
+    # return maximum(tF[model.schedule.terminal_vtxs])
+    process_schedule!(model.schedule)
+    maximum((get_tF(model.schedule,v) for v in vertices(model.schedule)))
 end
-function JuMP.objective_function(model::GreedyAssignment)
-    println("UNKNOWN COST FUNCTION!")
+function JuMP.objective_function(::T,::AbstractGreedyAssignment) where {T}
+    throw(ErrorException("UNKNOWN COST FUNCTION $T"))
     return Inf
 end
-JuMP.objective_bound(model::GreedyAssignment)       = objective_function(model)
+JuMP.objective_bound(model::AbstractGreedyAssignment)       = objective_function(model)
 JuMP.value(c::Real) = c
 # JuMP.set_optimizer_attribute(milp::GreedyAssignment,k,v) = nothing
 # JuMP.set_optimizer_attribute(milp::GreedyAssignment,k,v) = nothing
 # JuMP.set_time_limit_sec(milp::GreedyAssignment,val) = nothing
-JuMP.set_silent(milp::GreedyAssignment) = nothing
+JuMP.set_silent(::AbstractGreedyAssignment) = nothing
 for op in [
     :(JuMP.set_optimizer_attribute),
     :(JuMP.set_optimizer_attributes),
     :(JuMP.set_time_limit_sec),
     ]
-    @eval $op(milp::GreedyAssignment,args...) = nothing
+    @eval $op(::AbstractGreedyAssignment,args...) = nothing
 end
 function formulate_milp(milp_model::GreedyAssignment,sched,problem_spec;
         t0_ = Dict{AbstractID,Float64}(),
@@ -1188,25 +1195,29 @@ function construct_schedule_distance_matrix(sched,problem_spec)
     D
 end
 
-function update_greedy_sets!(model,G,C,Ai,Ao,n_required_predecessors,n_eligible_successors,frontier=get_all_root_nodes(G))
+function update_greedy_sets!(model,G,cache,Ai=Set{Int}(),Ao=Set{Int}(),C=Set{Int}();
+        frontier::Set{Int}=get_all_root_nodes(G))
     while !isempty(frontier)
         v = pop!(frontier)
         if issubset(inneighbors(G,v),C)
-            if indegree(G,v) >= n_required_predecessors[v]
+            if indegree(G,v) >= cache.n_required_predecessors[v]
                 push!(C,v)
                 union!(frontier,outneighbors(G,v))
             else
                 push!(Ai,v)
             end
         end
-        if (outdegree(G,v) < n_eligible_successors[v]) && (v in C)
+        if (outdegree(G,v) < cache.n_eligible_successors[v]) && (v in C)
             push!(Ao,v)
         end
     end
+    return Ai, Ao, C
 end
 
-get_edge_cost(model::GreedyAssignment{M,GreedyPathLengthCost,P},D,v,v2) where {M,P} = D[v,v2]
-get_edge_cost(model::GreedyAssignment{M,GreedyFinalTimeCost,P},D,v,v2) where {M,P} = model.t0[v] + D[v,v2]
+get_edge_cost(model::AbstractGreedyAssignment,D,v,v2) = get_edge_cost(model.greedy_cost, model, D, v, v2)
+get_edge_cost(::GreedyPathLengthCost,model,D,v,v2) = D[v,v2]
+get_edge_cost(::GreedyFinalTimeCost,model,D,v,v2) = get_tF(model.schedule,v) + D[v,v2]
+# get_edge_cost(model::GreedyAssignment{M,GreedyFinalTimeCost,P},D,v,v2) where {M,P} = model.t0[v] + D[v,v2]
 
 """
 Identifies the nodes `v ∈ Ai` and `v2 ∈ Ao` with the shortest distance
@@ -1234,6 +1245,14 @@ function select_next_edges(model,D,Ao,Ai)
             # @show required_predecessors(node)
             # @show indegree(model.schedule,v)
         end
+        for v in Ao
+            node = get_node_from_vtx(model.schedule,v)
+            required_preds = eligible_successors(node)
+            @warn "node $(node_id(node)) of type $(typeof(node)) is available to be assigned. outdegree(node) = $(outdegree(model.schedule,v))" eligible_preds
+            # println(string("node ",string(node), " needs assignment"))
+            # @show required_predecessors(node)
+            # @show indegree(model.schedule,v)
+        end
         throw(ErrorException("GreedyAssignment is stuck"))
     end
     return [(a,b)]
@@ -1256,29 +1275,29 @@ required number of incoming edges and all of `v`'s predecessors must
 already be in `C`. In order for `v` to be added to `Ao`, `v` must have less than
 the allowable number of outgoing edges, and must be in `C`.
 """
-function JuMP.optimize!(model::GreedyAssignment)
+function greedy_assignment!(model)
     sched    = model.schedule
     problem_spec        = model.problem_spec
     cache = preprocess_project_schedule(sched,true)
     C = Set{Int}() # Closed set (these nodes have enough predecessors)
     Ai = Set{Int}() # Nodes that don't have enough incoming edges
     Ao = Set{Int}() # Nodes that can have more outgoing edges
-    update_greedy_sets!(model,sched,C,Ai,Ao,
-        cache.n_required_predecessors,cache.n_eligible_successors)
+    update_greedy_sets!(model,sched,cache,Ai,Ao,C)
     D = construct_schedule_distance_matrix(sched,problem_spec)
     while length(Ai) > 0
         for (v,v2) in select_next_edges(model,D,Ao,Ai)
             setdiff!(Ao,v)
             setdiff!(Ai,v2)
             add_edge!(sched,v,v2)
+            # @info "$(string(node_id(get_node(sched,v)))), $(string(node_id(entity(get_node(sched,v))))) => $(string(node_id(get_node(sched,v2)))), $(string(node_id(entity(get_node(sched,v2)))))"
         end
-        update_greedy_sets!(model,sched,C,Ai,Ao,
-            cache.n_required_predecessors,cache.n_eligible_successors)
+        update_greedy_sets!(model,sched,cache,Ai,Ao,C)
     end
     set_leaf_operation_vtxs!(sched)
     propagate_valid_ids!(sched,problem_spec)
     model
 end
+JuMP.optimize!(model::AbstractGreedyAssignment) = greedy_assignment!(model)
 
 export compute_lower_bound
 """
