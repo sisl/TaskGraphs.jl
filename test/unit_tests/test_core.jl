@@ -217,6 +217,40 @@ let
 end
 # Test process_schedule
 let
+    for (i, f) in enumerate(pctapf_test_problems())
+        sched1, = f()
+        sched2, = f()
+        for n in get_nodes(sched1)
+            set_t0!(n,0)
+            set_tF!(n,0)
+        end
+        for n in get_nodes(sched2)
+            set_t0!(n,0)
+            set_tF!(n,0)
+        end
+        TaskGraphs.update_schedule_times!(sched1)
+        TaskGraphs.update_schedule_times!(sched2,get_all_root_nodes(sched2))
+        @test all(isapprox.(get_t0(sched1), get_t0(sched2)))
+        @test all(isapprox.(get_tF(sched1), get_tF(sched2)))
+    end
+
+end
+let
+    sched, = pctapf_problem_1()
+    for n in get_nodes(sched)
+        set_t0!(n,0)
+        set_tF!(n,1)
+    end
+    # Test that descendants will not be updated because
+    TaskGraphs.update_schedule_times!(sched,get_all_root_nodes(sched),local_only=true)
+    @test all(isapprox.(get_t0(sched), 0.0))
+    @test all(isapprox.(get_tF(sched), 1.0))
+    TaskGraphs.update_schedule_times!(sched,get_all_root_nodes(sched),local_only=false)
+    @test !all(isapprox.(get_t0(sched), 0.0))
+    @test !all(isapprox.(get_tF(sched), 1.0))
+
+end
+let
     solver = TaskGraphsMILPSolver(AssignmentMILP())
     # project_spec, problem_spec, robot_ICs, env_graph, _ = pctapf_problem_1()
     sched, problem_spec, env_graph, _ = pctapf_problem_1()

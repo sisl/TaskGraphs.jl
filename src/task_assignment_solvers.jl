@@ -1200,7 +1200,8 @@ function construct_schedule_distance_matrix(sched,problem_spec)
 end
 
 function update_greedy_sets!(model,G,cache,Ai=Set{Int}(),Ao=Set{Int}(),C=Set{Int}();
-        frontier::Set{Int}=get_all_root_nodes(G))
+        frontier::Set{Int}=get_all_root_nodes(G),
+        )
     while !isempty(frontier)
         v = pop!(frontier)
         if issubset(inneighbors(G,v),C)
@@ -1221,18 +1222,34 @@ end
 get_edge_cost(model::AbstractGreedyAssignment,D,v,v2) = get_edge_cost(model.greedy_cost, model, D, v, v2)
 get_edge_cost(::GreedyPathLengthCost,model,D,v,v2) = D[v,v2]
 get_edge_cost(::GreedyFinalTimeCost,model,D,v,v2) = get_tF(model.schedule,v) + D[v,v2]
-# get_edge_cost(model::GreedyAssignment{M,GreedyFinalTimeCost,P},D,v,v2) where {M,P} = model.t0[v] + D[v,v2]
+update_greedy_cost_model!(::GreedyCost,model,new_edges) = nothing
+update_greedy_cost_model!(model::AbstractGreedyAssignment,args...) = update_greedy_cost_model!(model.greedy_cost,model,args...) 
+function update_greedy_cost_model!(::GreedyFinalTimeCost,model,new_edges) 
+    update_schedule_times!(
+        model.schedule,
+        Set{Int}([e[1] for e in new_edges]),
+        local_only=true)
+end
+
+abstract type EdgeSelectionModel end
+struct SingleBestEdge <: EdgeSelectionModel end
+struct HungarianEdgeSelection <: EdgeSelectionModel end
+
+edge_selection_model(::AbstractGreedyAssignment) = SingleBestEdge()
+function select_next_edges(model::AbstractGreedyAssignment,args...)
+    select_next_edges(edge_selection_model(model),model,args...)
+end
 
 """
 Identifies the nodes `v ∈ Ai` and `v2 ∈ Ao` with the shortest distance
 `D[v,v2]`.
 """
-function select_next_edges(model,D,Ao,Ai)
+function select_next_edges(::SingleBestEdge,model,D,Ao,Ai)
     c = Inf
     a = -1
     b = -2
     for (v,v2) in Base.Iterators.product(sort(collect(Ao)),sort(collect(Ai)))
-        cost = D[(v,v2)]
+        cost = get_edge_cost(model,D,v,v2)
         if cost < c
             c = cost
             a = v
@@ -1245,17 +1262,11 @@ function select_next_edges(model,D,Ao,Ai)
             node = get_node_from_vtx(model.schedule,v)
             required_preds = required_predecessors(node)
             @warn "node $(node_id(node)) of type $(typeof(node)) needs assignment. indegree(node) = $(indegree(model.schedule,v))" required_preds
-            # println(string("node ",string(node), " needs assignment"))
-            # @show required_predecessors(node)
-            # @show indegree(model.schedule,v)
         end
         for v in Ao
             node = get_node_from_vtx(model.schedule,v)
             required_preds = eligible_successors(node)
             @warn "node $(node_id(node)) of type $(typeof(node)) is available to be assigned. outdegree(node) = $(outdegree(model.schedule,v))" eligible_preds
-            # println(string("node ",string(node), " needs assignment"))
-            # @show required_predecessors(node)
-            # @show indegree(model.schedule,v)
         end
         throw(ErrorException("GreedyAssignment is stuck"))
     end
@@ -1286,7 +1297,7 @@ function greedy_assignment!(model)
     C = Set{Int}() # Closed set (these nodes have enough predecessors)
     Ai = Set{Int}() # Nodes that don't have enough incoming edges
     Ao = Set{Int}() # Nodes that can have more outgoing edges
-    update_greedy_sets!(model,sched,cache,Ai,Ao,C)
+    update_greedy_sets!(model,sched,cache,Ai,Ao,C;frontier=get_all_root_nodes(sched))
     D = construct_schedule_distance_matrix(sched,problem_spec)
     while length(Ai) > 0
         new_edges = select_next_edges(model,D,Ao,Ai)
@@ -1296,7 +1307,8 @@ function greedy_assignment!(model)
             add_edge!(sched,v,v2)
             # @info "$(string(node_id(get_node(sched,v)))), $(string(node_id(entity(get_node(sched,v))))) => $(string(node_id(get_node(sched,v2)))), $(string(node_id(entity(get_node(sched,v2)))))"
         end
-        update_greedy_sets!(model,sched,cache,Ai,Ao,C)
+        update_greedy_sets!(model,sched,cache,Ai,Ao,C;frontier=Set{Int}([e[1] for e in new_edges]))
+        update_greedy_cost_model!(model,new_edges)
     end
     set_leaf_operation_vtxs!(sched)
     propagate_valid_ids!(sched,problem_spec)

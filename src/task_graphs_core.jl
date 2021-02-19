@@ -1027,6 +1027,12 @@ function process_schedule(sched::P,t0=zeros(nv(sched)),
     end
     t0,tF,slack,local_slack
 end
+"""
+    update_schedule_times!(sched::OperatingSchedule)
+
+Compute start and end times for all nodes based on the end times of their 
+inneighbors and their own durations.
+"""
 function update_schedule_times!(sched::OperatingSchedule)
     G = get_graph(sched)
     for v in topological_sort_by_dfs(G)
@@ -1036,6 +1042,32 @@ function update_schedule_times!(sched::OperatingSchedule)
         end
         set_t0!(sched,v,t0)
         set_tF!(sched,v,max(get_tF(sched,v),t0+get_min_duration(sched,v)))
+    end
+    return sched
+end
+"""
+    update_schedule_times!(sched::OperatingSchedule,frontier::Set{Int},local_only=true)
+
+Compute start and end times for all nodes in `frontier` and their descendants.
+If `local_only == true`, descendants of nodes with unchanged final time will not 
+be updated.
+"""
+function update_schedule_times!(sched::OperatingSchedule,frontier::Set{Int};
+        local_only::Bool=true,
+        )
+    iter = GraphUtils.BFSIterator(sched,frontier)
+    while !isempty(iter)
+        v = pop!(iter)
+        t0 = get_t0(sched,v)
+        for v2 in inneighbors(sched,v)
+            t0 = max(t0,get_tF(sched,v2))
+        end
+        set_t0!(sched,v,t0)
+        tF = t0+get_min_duration(sched,v)
+        if tF >= get_tF(sched,v) || !local_only
+            set_tF!(sched,v,tF)
+            GraphUtils.update_iterator!(iter,v)
+        end
     end
     return sched
 end
