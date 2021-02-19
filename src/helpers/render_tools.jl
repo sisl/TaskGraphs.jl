@@ -706,105 +706,6 @@ function robots_vs_task_vs_time_box_plot(df;
     )
 end
 
-# function get_box_plot_group_plot_normal(df;
-#         obj=:time,
-#         outer_key=:M,
-#         inner_key=:N,
-#         outer_range=10:10:60,
-#         inner_range=10:10:40,
-#         xmin=0,
-#         xmax=length(inner_range)+1,
-#         ymin=0.007,
-#         ymax=120,
-#         xtick=[10,20,30,40],
-#         xticklabels=[10,20,30,40],
-#         tickpos="left",
-#         ytick=[0.1,1,10,100],
-#         ylabel_shift="0pt",
-#         title="",
-#         title_shift=[3.3,2.55],
-#         inner_sym="n",
-#         outer_sym="m",
-#         xlabels=map(m->string(outer_sym," = ",m), outer_range),
-#         ylabels=map(n->string(inner_sym," = ",n), inner_range),
-#         ylabel="time (s)",
-#         draw_labels=true,
-#         ymode="log",
-#         width="3.25cm",
-#         height="6cm",
-#         legend_draw="black",
-#         legend_fill="white",
-#         legend_x_shift="2pt",
-#         vertical_sep = "0pt",
-#         horizontal_sep = "0pt",
-#         mark="*",
-#     )
-#     group_style = [
-#         "group name"=>"myPlots",
-#         "group size"=>"$(length(outer_range)) by 1",
-#         "xlabels at"=>"edge bottom",
-#         "xticklabels at"=>"edge bottom",
-#         "vertical sep"=>"0pt",
-#         "horizontal sep"=>"2pt"
-#     ]
-#     gstyle=prod(map(p->string(p.first,"=",p.second,","),group_style))
-#     gp = PGFPlots.GroupPlot(groupStyle=gstyle,
-#             # "boxplot"
-#             # "boxplot/draw direction = y",
-#             # ymode=ymode,
-#             # "\footnotesize",
-#             # width=width,
-#             # height=height,
-#             # xmin=xmin,
-#             # xmax=xmax,
-#             # ymin=ymin,
-#             # ymax=ymax,
-#             # xtick=xtick,
-#             # xticklabels=xtick,
-#             # tickpos=tickpos,
-#             # ytick=ytick,
-#             # yticklabels=[],
-#             # "ylabel shift=$(ylabel_shift)",
-#             # "ytick align=outside",
-#             # "xtick align=outside",
-#     )
-#     # pushPGFPlotsOptions("boxplot")
-#
-#     # for (i,m) in enumerate(outer_range)
-#     #     if i == 1 && draw_labels
-#     #         push!(gp,
-#     #             xlabel="\$$(xlabels[i])\$",
-#     #             ylabel=ylabel,
-#     #             yticklabels=ytick,
-#     #             "legend style=[draw=$legend_draw,
-#     #                 fill=$legend_fill,
-#     #                 xshift=$legend_x_shift,
-#     #                 yshift=0pt],
-#     #                 legend pos=north west
-#     #             ],"
-#     #             map(j->LegendEntry({},@sprintf("\$%s\$",ylabels[j]),false),1:length(inner_range))...,
-#     #             """
-#     #             \\addlegendimage{no markers,blue}
-#     #             \\addlegendimage{no markers,red}
-#     #             \\addlegendimage{no markers,brown}
-#     #             \\addlegendimage{no markers,black}
-#     #             """,
-#     #             map(n->PGFPlotsX.PlotInc({boxplot,mark=mark},Table(
-#     #                         {"y index"=0},
-#     #                         [:data=>df[(df[:,outer_key] .== m) .& (df[:,inner_key] .== n),obj]])),inner_range)...)
-#     #     else
-#     #         push!(gp, {
-#     #                 xlabel=@sprintf("\$%s\$",xlabels[i]),
-#     #                 ymajorticks="false",
-#     #                 yminorticks="false"
-#     #             },
-#     #             map(n->PGFPlotsX.PlotInc({boxplot,mark=mark},Table(
-#     #                         {"y index"=0},
-#     #                         [:data=>df[(df[:,outer_key] .== m) .& (df[:,inner_key] .== n),obj]])),inner_range)...)
-#     #     end
-#     # end;
-#     gp
-# end
 function get_box_plot_group_plot(df;
         obj=:time,
         outer_key=:M,
@@ -813,7 +714,7 @@ function get_box_plot_group_plot(df;
         inner_range=sort(unique(df[!,inner_key])),
         xmin=0,
         xmax=length(inner_range)+1,
-        ymin=0.007,
+        ymin=minimum(df[!,obj]),
         ymax=maximum(df[!,obj]),
         xtick=[10,20,30,40],
         xticklabels=[10,20,30,40],
@@ -826,7 +727,7 @@ function get_box_plot_group_plot(df;
         outer_sym="m",
         xlabels=map(m->string(outer_sym," = ",m), outer_range),
         ylabels=map(n->string(inner_sym," = ",n), inner_range),
-        ylabel="time (s)",
+        ylabel="$(string(obj)) (s)",
         draw_labels=true,
         ymode="log",
         width="3.25cm",
@@ -954,8 +855,6 @@ function get_titled_group_box_plot(df;
     end
     return tikzpic
 end
-
-# print_tex(gp)
 
 function preprocess_collab_results!(df_dict)
     num_tasks = [12,18,24]

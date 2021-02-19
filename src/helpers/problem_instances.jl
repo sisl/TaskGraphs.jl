@@ -120,7 +120,7 @@ function pcta_problem(
 end
 
 function PC_TA(def::SimpleProblemDef,env::GridFactoryEnvironment,objective=MakeSpan())
-    sched, prob_spec, env, _ = construct_task_graphs_problem(def,env)
+    sched, prob_spec = construct_task_graphs_problem(def,env)
     pcta = pcta_problem(sched,prob_spec,env,objective)
 end
 

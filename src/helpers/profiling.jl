@@ -209,6 +209,7 @@ end
 
 
 CRCBS.extract_feature(solver,::SolutionCost,  mapf,solution::OperatingSchedule,timer_results) = best_cost(solver)
+get_solver_name(solver_config) = split(solver_config.results_path,"/")[end]
 """
     CRCBS.run_profiling(loader::TaskGraphsProblemLoader,solver_config,problem_dir)
 
@@ -220,6 +221,7 @@ function CRCBS.run_profiling(loader::TaskGraphsProblemLoader,solver_config,probl
         is_problem_file(loader,prob_path) ? nothing : continue
         prob = load_problem(loader,solver_config,prob_path)
         solution, timer_results = profile_solver!(solver,prob)
+        @info "$(get_solver_name(solver_config)) solved $(split(prob_path,"/")[end]) in $(timer_results.t) seconds"
         results_dict = compile_results(
             solver,
             solver_config.feats,

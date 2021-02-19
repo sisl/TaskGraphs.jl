@@ -1073,7 +1073,9 @@ end
 
 export
     AbstractGreedyAssignment,
-    GreedyAssignment
+    GreedyAssignment,
+    GreedyPathLengthCost,
+    GreedyFinalTimeCost
 
 abstract type AbstractGreedyAssignment <: TaskGraphsMILP end
 abstract type GreedyCost end
@@ -1143,14 +1145,16 @@ for op in [
 end
 function formulate_milp(milp_model::GreedyAssignment,sched,problem_spec;
         t0_ = Dict{AbstractID,Float64}(),
-        cost_model = SumOfMakeSpans(),
+        cost_model = milp_model.cost_model,
+        greedy_cost=milp_model.greedy_cost,
         kwargs...
     )
 
     model = GreedyAssignment(
         schedule = sched,
         problem_spec = problem_spec,
-        cost_model = cost_model
+        cost_model = cost_model,
+        greedy_cost=greedy_cost,
     )
     for (id,t) in t0_
         v = get_vtx(sched, id)
@@ -1285,7 +1289,8 @@ function greedy_assignment!(model)
     update_greedy_sets!(model,sched,cache,Ai,Ao,C)
     D = construct_schedule_distance_matrix(sched,problem_spec)
     while length(Ai) > 0
-        for (v,v2) in select_next_edges(model,D,Ao,Ai)
+        new_edges = select_next_edges(model,D,Ao,Ai)
+        for (v,v2) in new_edges
             setdiff!(Ao,v)
             setdiff!(Ai,v2)
             add_edge!(sched,v,v2)
