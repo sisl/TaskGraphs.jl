@@ -17,8 +17,8 @@ let
             set_iteration_limit!(pibt_planner,50)
             set_verbosity!(pibt_planner,0)
             solution, valid_flag = pibt!(pibt_planner,deepcopy(pc_mapf))
-            @show i, f, get_cost(solution)
-            @show solution.route_plan
+            # @show i, f, get_cost(solution)
+            # @show solution.route_plan
             @test valid_flag
             @test validate(solution) 
 
@@ -28,6 +28,7 @@ let
         end
     end
 end
+# Test that PIBT can terminate early with a partial plan that is viable
 let
     solver = NBSSolver(
         assignment_model = TaskGraphsMILPSolver(GreedyAssignment()),
@@ -45,7 +46,6 @@ let
     pc_tapf = PC_TAPF(env)
 
     reset_solver!(solver)
-    # Why is there no progress on the route plan here?
     solution, cost = solve!(solver,pc_tapf)
 
     fix_precutoff_nodes!(solution)
