@@ -977,7 +977,7 @@ function CRCBS.cbs_update_conflict_table!(solver,mapf::AbstractPC_MAPF,node,cons
     idxs = collect(1:num_agents(search_env))
     # t0 = max(minimum(get_cache(search_env).t0), 1) # This is particularly relevant for replanning, where we don't care to look for conflicts way back in the past.
     t0 = max(minimum(get_t0(get_schedule(search_env))),1) # This is particularly relevant for replanning, where we don't care to look for conflicts way back in the past.
-    detect_conflicts!(node.conflict_table,get_route_plan(search_env),idxs,t0)
+    detect_conflicts!(node.conflict_table,get_route_plan(search_env),idxs,Int(floor(t0)))
 end
 CRCBS.detect_conflicts!(table,env::SearchEnv,args...) = detect_conflicts!(table,get_route_plan(env),args...)
 

@@ -30,7 +30,7 @@ end
 read_simple_request(path::String) = read_simple_request(TOML.parsefile(path))
 
 function ProjectRequest(def::SimpleReplanningRequest,prob_spec)
-    ProjectRequest(
+    request = ProjectRequest(
         construct_partial_project_schedule(
             def.def.project_spec,prob_spec),
         def.t_request,
@@ -38,7 +38,8 @@ function ProjectRequest(def::SimpleReplanningRequest,prob_spec)
         )
     set_t0!(request.schedule,t_request)
     process_schedule!(request.schedule)
-    return request.schedule
+    return request
+    # return request.schedule
 end
 
 export SimpleRepeatedProblemDef
