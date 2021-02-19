@@ -993,3 +993,7 @@ for op in [
 end
 CRCBS.base_env_type(pc_mapf::AbstractPC_MAPF)               = PCCBSEnv
 CRCBS.base_env_type(pc_mapf::Union{C_PC_MAPF,C_PC_TAPF})    = MetaAgentCBS.TeamMetaEnv
+
+function validate(env::SearchEnv)
+    validate(get_schedule(env),convert_to_vertex_lists(get_route_plan(env)))
+end

@@ -17,9 +17,10 @@ let
             set_iteration_limit!(pibt_planner,50)
             set_verbosity!(pibt_planner,0)
             solution, valid_flag = pibt!(pibt_planner,deepcopy(pc_mapf))
-            # @show i, f, get_cost(solution)
-            # @show convert_to_vertex_lists(solution.route_plan)
+            @show i, f, get_cost(solution)
+            @show solution.route_plan
             @test valid_flag
+            @test validate(solution) 
 
             reset_solver!(solver)
             solution, cost = solve!(pibt_planner,pc_mapf)
@@ -32,17 +33,24 @@ let
         assignment_model = TaskGraphsMILPSolver(GreedyAssignment()),
         path_planner = PIBTPlanner{NTuple{3,Float64}}(partial=true)
         )
+    set_iteration_limit!(solver,1)
     set_iteration_limit!(solver.path_planner,5)
+    set_deadline!(solver,Inf)
+    set_runtime_limit!(solver,Inf)
     rpctapf = replanning_problem_1(solver)
     replan_model = MergeAndBalance()
 
     base_env = deepcopy(rpctapf.env)
     env = replan!(solver,replan_model,base_env,rpctapf.requests[1])
     pc_tapf = PC_TAPF(env)
+
     reset_solver!(solver)
+    # Why is there no progress on the route plan here?
     solution, cost = solve!(solver,pc_tapf)
+
     fix_precutoff_nodes!(solution)
     reset_solver!(solver)
+    set_iteration_limit!(solver.path_planner,100)
     solution2, cost = solve!(solver,PC_TAPF(solution))
 
     for v in solution2.cache.active_set
