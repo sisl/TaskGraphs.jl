@@ -552,7 +552,7 @@ function CRCBS.solve!(solver::NBSSolver, prob::E;kwargs...) where {E<:AbstractPC
                 prob)
             set_lower_bound!(solver,l_bound)
             if optimality_gap(solver) > 0
-                soft_reset_solver!(route_planner(solver)) # Will this break anything?
+                # soft_reset_solver!(route_planner(solver)) # Will this break anything?
                 env, cost = plan_route!(route_planner(solver),
                     schedule, prob;kwargs...)
                 if cost < best_cost(solver)

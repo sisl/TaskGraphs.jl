@@ -1057,7 +1057,7 @@ be updated.
 function update_schedule_times!(sched::OperatingSchedule,frontier::Set{Int};
         local_only::Bool=true,
         )
-    iter = GraphUtils.BFSIterator(sched,frontier)
+    iter = GraphUtils.SortedBFSIterator(graph=sched,frontier=collect(frontier),replace=true)
     while !isempty(iter)
         v = pop!(iter)
         t0 = get_t0(sched,v)

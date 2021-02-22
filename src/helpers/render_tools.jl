@@ -8,6 +8,9 @@ using GraphUtils
 
 using PGFPlotsX
 latexengine!(PGFPlotsX.PDFLATEX)
+push!(PGFPlotsX.CUSTOM_PREAMBLE,"\\usetikzlibrary{backgrounds}")
+push!(PGFPlotsX.CUSTOM_PREAMBLE,"\\tikzset{background rectangle/.style={fill=white,}}")
+push!(PGFPlotsX.CUSTOM_PREAMBLE,"\\tikzset{use background/.style={show background rectangle,}}")
 using PGFPlots
 using Printf
 using Parameters
@@ -736,6 +739,7 @@ function get_box_plot_group_plot(df;
         legend_fill="white",
         legend_x_shift="2pt",
         mark="*",
+        axis_bg_color="white",
     )
     @pgf gp = PGFPlotsX.GroupPlot({group_style = {
                 "group name"="myPlots",
@@ -760,6 +764,7 @@ function get_box_plot_group_plot(df;
             tickpos=tickpos,
             ytick=ytick,
             yticklabels=[],
+            "axis background/.style"="{fill=$axis_bg_color}",
             # "set layers"="standard",
             "ylabel shift"=ylabel_shift,
             "ytick align"="outside",
@@ -825,10 +830,14 @@ function get_titled_group_box_plot(df;
         title="",
         title_shift=[3.3,2.55],
         scale=0.7,
+        axis_bg_color="white",
         kwargs...)
     gp = get_box_plot_group_plot(df;kwargs...)
     if title != ""
-        tikzpic = @pgf TikzPicture({scale=scale},
+        tikzpic = @pgf TikzPicture({scale=scale,
+                "background rectangle/.style"="{fill=$(axis_bg_color)}",
+                # "use background rectangle/.style"="{show background rectangle}",
+                },
             """
             \\centering
             \\pgfplotsset{set layers=standard,cell picture=true}
@@ -1060,7 +1069,7 @@ function plot_histories_pgf(df_list::Vector,ax=PGFPlots.Axis();
                 style=string(color,",solid, mark options={solid,fill=",color,"}")
                 for k in 1:nrow(df_cut)
                     y_arr = df_cut[!,y_key][k]
-                    x_arr = x_key == :none ? collect(1:length(y_arr)) : df_cut[x_key][k]
+                    x_arr = x_key == :none ? collect(1:length(y_arr)) : df_cut[!,x_key][k]
                     opt_vals = df_cut[!,opt_key][k] # tracks whether the fall back was employed
 
                     idx = minimum([length(x_arr),length(y_arr),length(opt_vals)])
@@ -1292,7 +1301,7 @@ function print_latex_row_start(io,tab,i;span=length(get_data(tab)[1,1]),delim=" 
     xkeys = get_xkeys(tab)[i]
     for (k,v) in xkeys
         print(io,"\$$(k)=$(v)\$")
-        if length(xkeys > 1)
+        if !isempty(xkeys)
             print(io,",")
         end
     end

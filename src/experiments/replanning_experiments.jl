@@ -36,7 +36,7 @@ function ProjectRequest(def::SimpleReplanningRequest,prob_spec)
         def.t_request,
         def.t_arrival
         )
-    set_t0!(request.schedule,t_request)
+    set_t0!(request.schedule,def.t_request)
     process_schedule!(request.schedule)
     return request
     # return request.schedule
@@ -704,7 +704,7 @@ function construct_replanning_results_dataframe(loader,solver_config,feats)
         prob_file = joinpath(solver_config.problem_path,prob_name)
         config = CRCBS.load_config(loader,prob_file)
         TaskGraphs.post_process_replanning_results!(results,config)
-        push!(results_df,results)
+        push!(results_df,results;cols=:intersect)
     end
     results_df
 end
