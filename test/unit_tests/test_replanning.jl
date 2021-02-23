@@ -69,7 +69,7 @@ let
 end
 let
 
-    cache = features=[
+    features=[
         RunTime(),SolutionCost(),OptimalFlag(),FeasibleFlag(),OptimalityGap(),
         IterationCount(),TimeOutStatus(),IterationMaxOutStatus(),
         RobotPaths()
@@ -93,7 +93,9 @@ let
             # @show f
             cache = ReplanningProfilerCache(features=features)
             prob = f(solver)
-            cache = profile_replanner!(solver,replan_model,prob)
+            env, cache = profile_replanner!(solver,replan_model,prob,cache)
+            @show cache.stage_results[end]["OptimalityGap"]
+            @show cache.stage_results[end]["OptimalFlag"]
             reset_solver!(solver)
         end
     end
@@ -122,4 +124,143 @@ let
     base_env = replan!(planner,env,request)
     env, cost = solve!(planner.solver,PC_TAPF(base_env))
 
+end
+# Test loading saved problems
+let
+    loader = ReplanningProblemLoader()
+    add_env!(loader,"env_2",init_env_2())
+
+    MAX_TIME_LIMIT = 40
+    MAX_BACKUP_TIME_LIMIT = 20
+    COMMIT_THRESHOLD = 10
+    ASTAR_ITERATION_LIMIT = 5000
+    PIBT_ITERATION_LIMIT = 5000
+    CBS_ITERATION_LIMIT = 1000
+    MAX_ASSIGNMENT_ITERATIONS = 1
+
+    reset_all_id_counters!()
+    # # write problems
+    Random.seed!(0)
+    # write_problems!(loader,problem_configs,base_problem_dir)
+
+    feats = [
+        RunTime(),IterationCount(),LowLevelIterationCount(),
+        TimeOutStatus(),IterationMaxOutStatus(),
+        SolutionCost(),OptimalityGap(),OptimalFlag(),FeasibleFlag(),NumConflicts(),
+        # ObjectPathSummaries(),
+        ]
+    final_feats = [SolutionCost(),NumConflicts(),RobotPaths()]
+    planner_configs = []
+    for (primary_replanner, backup_replanner) in [
+            (ConstrainedMergeAndBalance(max_problem_size=300),     DeferUntilCompletion()),
+        ]
+        # Primary planner
+        path_finder = DefaultAStarSC()
+        set_iteration_limit!(path_finder,ASTAR_ITERATION_LIMIT)
+        primary_route_planner = CBSSolver(ISPS(path_finder))
+        set_iteration_limit!(primary_route_planner,CBS_ITERATION_LIMIT)
+        primary_assignment_model = TaskGraphsMILPSolver(SparseAdjacencyMILP())
+        primary_planner = FullReplanner(
+            solver = NBSSolver(
+                assignment_model=primary_assignment_model,
+                path_planner=primary_route_planner,
+                ),
+            replanner = primary_replanner,
+            cache = ReplanningProfilerCache(features=feats,final_features=final_feats)
+            )
+        set_iteration_limit!(primary_planner,MAX_ASSIGNMENT_ITERATIONS)
+        set_max_time_limit!(primary_planner,MAX_TIME_LIMIT)
+        set_commit_threshold!(primary_planner,COMMIT_THRESHOLD)
+        # Backup planner
+        backup_planner = FullReplanner(
+            solver = NBSSolver(
+                assignment_model = TaskGraphsMILPSolver(GreedyAssignment(
+                    greedy_cost = GreedyFinalTimeCost(),
+                )),
+                path_planner = PIBTPlanner{NTuple{3,Float64}}(partial=true)
+                ),
+            replanner = backup_replanner,
+            cache = ReplanningProfilerCache(features=feats,final_features=final_feats)
+            )
+        set_iteration_limit!(backup_planner,1)
+        set_iteration_limit!(route_planner(backup_planner.solver),PIBT_ITERATION_LIMIT)
+        set_commit_threshold!(backup_planner,COMMIT_THRESHOLD)
+        set_debug!(backup_planner,true)
+        # set_debug!(route_planner(backup_planner.solver),true)
+        # Full solver
+        planner = ReplannerWithBackup(primary_planner,backup_planner)
+        planner_name=string(string(typeof(primary_replanner)),"-",string(typeof(backup_replanner)))
+        planner_config = (
+            planner=planner,
+            planner_name=planner_name,
+            results_path=joinpath(base_results_dir,planner_name),
+            objective = SumOfMakeSpans(),
+        )
+        push!(planner_configs,planner_config)
+    end
+
+    # warm up to precompile replanning code
+    planner_config = planner_configs[1]
+    planner = planner_config.planner
+
+    @info "Warming up $(planner_config.planner_name)"
+    # warmup(planner_config.planner,loader)
+    base_dir            = joinpath("/tmp","warmup")
+    base_problem_dir    = joinpath(base_dir,"problem_instances")
+    base_results_dir    = joinpath(base_dir,"results")
+    config = Dict(
+        :N => 10,
+        :M => 5,
+        :num_projects => 3,
+        :env_id => sort(collect(keys(loader.envs)))[1],
+        )
+    Random.seed!(0)
+    write_problems!(loader,config,base_problem_dir)
+    env = get_env!(loader,config[:env_id])
+    set_real_time_flag!(planner,false)
+    set_deadline!(planner,Inf)
+    set_runtime_limit!(planner,Inf)
+
+    # profile_replanner!(loader,planner,base_problem_dir,base_results_dir)
+    plannerA = planner.primary_planner
+    reset_cache!(plannerA)
+    hard_reset_solver!(plannerA)
+
+    f = joinpath(base_problem_dir,"problem0001")
+    problem_name = splitdir(f)[end]
+    outpath = joinpath(base_results_dir,problem_name)
+    # ispath(outpath) ? continue : nothing # skip over this if results already exist
+    @log_info(-1,0,"PROFILING: testing on problem ",problem_name)
+    simple_prob_def = read_simple_repeated_problem_def(f)
+    prob = RepeatedPC_TAPF(simple_prob_def,planner.primary_planner.solver,loader)
+
+    # search_env, planner = profile_replanner!(planner,prob)
+    reset_cache!(planner)
+    plannerA = planner.primary_planner
+    plannerB = planner.backup_planner
+    hard_reset_solver!(planner.primary_planner.solver)
+    hard_reset_solver!(planner.backup_planner.solver)
+    env = get_env(prob)
+
+    stage = 1
+    request = prob.requests[stage]
+    request = ProjectRequest(request.schedule,0,0)
+    remap_object_ids!(request.schedule,get_schedule(env))
+
+    base_envA = replan!(plannerA,env,request)
+
+    pctapf = TaskGraphs.construct_pctapf_problem(prob,base_envA)
+
+    set_verbosity!(plannerA.solver,2)
+    envA,cost = solve!(plannerA.solver,pctapf)
+    compile_replanning_results!(plannerA.cache,plannerA.solver,envA,
+        resultsA,prob,stage,request
+
+    # set_real_time_flag!(planner_config.planner,false)
+    # @info "Profiling $(planner_config.planner_name)"
+    # # profile
+    # profile_replanner!(loader,
+    #     planner_config.planner,
+    #     base_problem_dir,
+    #     planner_config.results_path)
 end

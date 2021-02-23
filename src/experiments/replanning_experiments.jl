@@ -278,7 +278,7 @@ function profile_replanner!(solver,replan_model,prob::RepeatedAbstractPC_TAPF,
         base_env = replan!(solver,replan_model,env,request)
         reset_solver!(solver)
         # env, cost = solve!(solver,base_env)
-        env, timer_results = profile_solver!(solver,construct_routing_problem(prob,base_env))
+        env, timer_results = profile_solver!(solver,construct_pctapf_problem(prob,base_env))
         compile_replanning_results!(cache,solver,env,timer_results,prob,stage,request)
         @log_info(1,verbosity(solver),"Stage ",stage," - ","route planner iterations: ",
             iterations(route_planner(solver)))
@@ -297,23 +297,25 @@ function profile_replanner!(planner::ReplannerWithBackup,prob::RepeatedAbstractP
         remap_object_ids!(request.schedule,get_schedule(env))
 
         # base_envB = replan!(plannerB,env,request)
-        # envB, resultsB = profile_solver!(plannerB.solver,construct_routing_problem(prob,base_envB))
+        # envB, resultsB = profile_solver!(plannerB.solver,construct_pctapf_problem(prob,base_envB))
         # compile_replanning_results!(plannerB.cache,plannerB.solver,envB,
         #     resultsB,prob,stage,request)
 
         base_envA = replan!(plannerA,env,request)
-        envA, resultsA = profile_solver!(plannerA.solver,construct_routing_problem(prob,base_envA))
+        envA, resultsA = profile_solver!(plannerA.solver,construct_pctapf_problem(prob,base_envA))
         compile_replanning_results!(plannerA.cache,plannerA.solver,envA,
             resultsA,prob,stage,request)
 
         if feasible_status(plannerA)
-            @log_info(-1,0,"REPLANNING: ",
-            "Primary planner succeeded at stage $stage.")
+            @log_info(-1,0,"REPLANNING: ", "Primary planner succeeded at stage $stage.")
+            # @info "OptimalityGap: $(plannerA.cache.stage_results[end]["OptimalityGap"])"
+            results = plannerA.cache.stage_results
+            @info "Stage results" results
             env = envA
         else
             # backup
             base_envB = replan!(plannerB,env,request)
-            envB, resultsB = profile_solver!(plannerB.solver,construct_routing_problem(prob,base_envB))
+            envB, resultsB = profile_solver!(plannerB.solver,construct_pctapf_problem(prob,base_envB))
             compile_replanning_results!(plannerB.cache,plannerB.solver,envB,
                 resultsB,prob,stage,request)
             if feasible_status(plannerB)

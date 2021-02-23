@@ -459,7 +459,7 @@ function formulate_milp(solver::TaskGraphsMILPSolver,args...;kwargs...)
     milp = formulate_milp(solver.milp,args...;
         kwargs...)
     set_optimizer_attributes(milp,default_optimizer_attributes()...)
-    set_time_limit_sec(milp, max(0,time_to_deadline(solver)))
+    set_time_limit_sec(milp, max(0,min(1000,time_to_deadline(solver))))
     milp
 end
 
@@ -632,7 +632,7 @@ A helper method for updating an instance of an assignment problem. In the case
 function update_assignment_problem!(solver, model::T, base_prob) where {T<:TaskGraphsMILP}
     exclude_solutions!(model) # exclude most recent solution in order to get next best solution
     # Trying this
-    set_time_limit_sec(model, max(0,time_to_deadline(solver)))
+    set_time_limit_sec(model, max(0,min(1000,time_to_deadline(solver))))
     model
 end
 
@@ -647,10 +647,14 @@ wherein we ignore collisions--using the algorithm encoded by solver.
 """
 function solve_assignment_problem!(solver::TaskGraphsMILPSolver, model, prob)
     l_bound = lower_bound(solver)
-    set_time_limit_sec(model, max(0,time_to_deadline(solver)))
+    set_time_limit_sec(model, max(0,min(1000,time_to_deadline(solver))))
     optimize!(model)
     if primal_status(model) != MOI.FEASIBLE_POINT
-        throw(SolverException("Assignment problem is infeasible -- in `solve_assignment_problem!(solver::$(typeof(solver)))`. iterations = $(iterations(solver))"))
+        # throw(SolverException("Assignment problem is infeasible -- in `solve_assignment_problem!(solver::$(typeof(solver)))`. iterations = $(iterations(solver))"))
+        @warn "Assignment problem is infeasible -- in `solve_assignment_problem!(solver::$(typeof(solver)))`. iterations = $(iterations(solver))"
+        set_lower_bound!(solver, typemax(Int))
+        set_best_cost!(solver, typemax(Int))
+        return OperatingSchedule(), lower_bound(solver)
     end
     set_lower_bound!(solver, Int(round(value(objective_bound(model)))) )
     set_best_cost!(solver, Int(round(value(objective_function(model)))) )
@@ -659,8 +663,9 @@ function solve_assignment_problem!(solver::TaskGraphsMILPSolver, model, prob)
     end
     sched = deepcopy(get_schedule(get_env(prob)))
     update_project_schedule!(solver, model, sched, get_problem_spec(get_env(prob)))
-    sched, lower_bound(solver)
+    return sched, lower_bound(solver)
 end
+
 
 function CRCBS.solve!(solver,pcta::PC_TA)
     prob = formulate_assignment_problem(solver,pcta)

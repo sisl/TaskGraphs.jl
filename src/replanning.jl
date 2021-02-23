@@ -63,8 +63,8 @@ for T in [:RepeatedPC_TAPF,:RepeatedC_PC_TAPF]
     @eval $T(prob::$T,env::SearchEnv) = $T(env,prob.requests)
 end
 
-construct_routing_problem(prob::RepeatedPC_TAPF,env) = PC_TAPF(env)
-construct_routing_problem(prob::RepeatedC_PC_TAPF,env) = C_PC_TAPF(env)
+construct_pctapf_problem(prob::RepeatedPC_TAPF,env) = PC_TAPF(env)
+construct_pctapf_problem(prob::RepeatedC_PC_TAPF,env) = C_PC_TAPF(env)
 
 
 """
@@ -117,6 +117,7 @@ function split_action_node!(sched::OperatingSchedule,problem_spec::ProblemSpec,n
     set_tF!(node1,t)
     node2 = add_node!(sched,make_node(sched,problem_spec,pred1))
     set_t0!(node2,t)
+    set_tF!(node2,t+get_min_duration(node2.path_spec))
     # set_tF!(sched,id2,get_tF(node))
     for v in outneighbors(sched,get_vtx(sched,node1.id))
         rem_edge!(sched,node1,v)
