@@ -43,12 +43,12 @@ let
         node = initialize_root_node(search_env)
         # plan for Robot Start
         n_id = RobotID(1)
-        schedule_node = get_node_from_id(search_env.schedule, n_id)
-        v = get_vtx(search_env.schedule, n_id)
+        schedule_node = get_node(search_env.schedule, n_id)
+        v = get_vtx(search_env.schedule, schedule_node)
         @test plan_path!(path_planner, pc_mapf,search_env, node, schedule_node, v)
         # plan for GO
         v2 = outneighbors(search_env.schedule,v)[1]
-        schedule_node = get_node_from_vtx(search_env.schedule, v2)
+        schedule_node = get_node(search_env.schedule, v2)
         @test plan_path!(path_planner, pc_mapf,search_env, node, schedule_node, v2)
         # @show convert_to_vertex_lists(node.solution)
     end
@@ -131,6 +131,7 @@ let
 
                     prob = formulate_assignment_problem(solver.assignment_model,pc_tapf)
                     sched, cost = solve_assignment_problem!(solver.assignment_model,prob,pc_tapf)
+                    # @show cost, maximum(get_tF(sched))
                     if !isa(solver.assignment_model.milp,GreedyAssignment)
                         push!(costs, cost)
                     end

@@ -656,10 +656,13 @@ function solve_assignment_problem!(solver::TaskGraphsMILPSolver, model, prob)
         set_best_cost!(solver, typemax(Int))
         return OperatingSchedule(), lower_bound(solver)
     end
+    @show value(objective_bound(model)), value(objective_function(model))
     set_lower_bound!(solver, Int(round(value(objective_bound(model)))) )
     set_best_cost!(solver, Int(round(value(objective_function(model)))) )
     if termination_status(model) == MOI.OPTIMAL
         @assert lower_bound(solver) <= best_cost(solver) "lower_bound($(solver_type(solver))) = $(value(objective_bound(model))) -> $(lower_bound(solver)) but should be equal to best_cost($(solver_type(solver))) = $(value(objective_function(model))) -> $(best_cost(solver))"
+    else
+        @warn "Assignment problem not solved to optimality"
     end
     sched = deepcopy(get_schedule(get_env(prob)))
     update_project_schedule!(solver, model, sched, get_problem_spec(get_env(prob)))

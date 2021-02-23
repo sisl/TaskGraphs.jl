@@ -32,7 +32,7 @@ let
     for (k,v) in get_object_ICs(sched)
         @test get_id(k) > 10
         @test get_id(get_object_id(v)) > 10
-    end
+   end
 end
 # Test break_assignments(...)
 let
@@ -251,11 +251,26 @@ let
 
     pctapf = TaskGraphs.construct_pctapf_problem(prob,base_envA)
 
-    set_verbosity!(plannerA.solver,2)
-    envA,cost = solve!(plannerA.solver,pctapf)
-    compile_replanning_results!(plannerA.cache,plannerA.solver,envA,
-        resultsA,prob,stage,request
+    # envA,cost = solve!(plannerA.solver,pctapf)
+    solver = plannerA.solver
+    pcta = formulate_assignment_problem(solver.assignment_model,pctapf)
+    sched, cost = solve_assignment_problem!(solver.assignment_model,pcta,pctapf)
+    termination_status(solver.assignment_model.milp.model)
+    sched, cost = solve_assignment_problem!(TaskGraphsMILPSolver(ExtendedAssignmentMILP()),pcta,pctapf)
+    @assert cost == maximum(get_tF(sched)) "Why is cost $(cost) but max tF $(maximum(get_tF(sched)))?"
+    @test validate(sched)
 
+    search_env = construct_search_env(solver,deepcopy(sched),pctapf.env)
+    path_planner = CRCBS.low_level(solver.path_planner)
+    node = initialize_root_node(search_env)
+    # OptimalityGap shows up here
+    set_verbosity!(low_level(path_planner),3)
+    @test compute_route_plan!(path_planner,PC_MAPF(search_env),node)
+
+    compile_replanning_results!(plannerA.cache,plannerA.solver,envA,
+        resultsA,prob,stage,request)
+
+    Revise.includet(joinpath(pathof(TaskGraphs),"..","helpers/render_tools.jl"))
     # set_real_time_flag!(planner_config.planner,false)
     # @info "Profiling $(planner_config.planner_name)"
     # # profile

@@ -39,11 +39,12 @@ extract_object_data(node::DEPOSIT,t0,tF) = Dict{Symbol,Union{Vector{Int},Int}}(
 function get_object_path_summaries(env::SearchEnv)
     summaries = Dict{Int,Dict{Symbol,Union{Vector{Int},Int}}}()
     for v in vertices(get_schedule(env))
-        node = get_node_from_vtx(get_schedule(env),v)
-        dict = extract_object_data(node,
-            Int(round(get_t0(env,v))),
-            Int(round(get_tF(env,v)))
-            )
+        node = get_node(get_schedule(env),v)
+        t0 = Int(round(get_t0(node)))
+        tF = Int(round(get_tF(node)))
+        @assert abs(t0-get_t0(node)) <= 0.01
+        @assert abs(tF-get_tF(node)) <= 0.01
+        dict = extract_object_data(node.node,t0,tF)
         if haskey(dict,:object_id)
             object_id = dict[:object_id]
             merge!(get!(summaries,object_id,valtype(summaries)()),dict)

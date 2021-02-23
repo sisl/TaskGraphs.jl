@@ -791,6 +791,8 @@ function validate(node::ScheduleNode,paths::Vector{Vector{Int}})
                 @assert(length(path) > get_tF(node), string("length(path) == $(length(path)), should be greater than get_t0(node) == $(get_t0(node)) in node ",string(node)))
                 t0 = Int(round(get_t0(node)))
                 tF = Int(round(get_tF(node)))
+                @assert abs(t0-get_t0(node)) <= 0.01
+                @assert abs(tF-get_tF(node)) <= 0.01
                 if start_vtx != -1
                     if length(path) > t0
                         @assert(path[t0 + 1] == start_vtx, string("node: ",string(node), ", start_vtx: ",start_vtx, ", t0+1: ",get_t0(node)+1,", path[get_t0(node) + 1] = ",path[get_t0(node) + 1],", path: ", path))
