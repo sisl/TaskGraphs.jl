@@ -118,12 +118,6 @@ end
     Xj::SparseMatrixCSC{VariableRef,Int} = SparseMatrixCSC{VariableRef,Int}(0,0,ones(Int,1),Int[],VariableRef[]) # job shop adjacency matrix
     job_shop::Bool=false
 end
-# JuMP.optimize!(model::M) where {M<:TaskGraphsMILP}          = optimize!(model.model)
-# JuMP.termination_status(model::M) where {M<:TaskGraphsMILP} = termination_status(model.model)
-# JuMP.objective_function(model::M) where {M<:TaskGraphsMILP} = objective_function(model.model)
-# JuMP.objective_bound(model::M) where {M<:TaskGraphsMILP}    = objective_bound(model.model)
-# JuMP.primal_status(model::M) where {M<:TaskGraphsMILP}      = primal_status(model.model)
-# JuMP.dual_status(model::M) where {M<:TaskGraphsMILP}        = dual_status(model.model)
 for op in [
     :(JuMP.optimize!),
     :(JuMP.termination_status),
@@ -142,15 +136,6 @@ for op in [
     ]
     @eval $op(milp::TaskGraphsMILP,args...) = $op(milp.model,args...)
 end
-# function JuMP.set_optimizer_attribute(milp::TaskGraphsMILP,k,v)
-#     set_optimizer_attribute(milp.model,k,v)
-# end
-# JuMP.set_optimizer_attributes(milp::TaskGraphsMILP, pairs...) = set_optimizer_attributes(milp.model,pairs...) 
-# JuMP.set_silent(model::TaskGraphsMILP) = set_optimizer_attribute(model,MOI.Silent(),true)
-# JuMP.set_time_limit_sec(model::TaskGraphsMILP,val) = set_optimizer_attribute(model,MOI.TimeLimitSec(),val)
-# for op in (:optimize!, :termination_status, :objective_function)
-#     @eval JuMP.$op(model::M,args...) where {M<:TaskGraphsMILP} = $op(model.model,args...)
-# end
 
 export
     exclude_solutions!,
