@@ -552,7 +552,7 @@ function CRCBS.solve!(solver::NBSSolver, prob::E;kwargs...) where {E<:AbstractPC
                 prob)
             set_lower_bound!(solver,l_bound)
             if optimality_gap(solver) > 0
-                # soft_reset_solver!(route_planner(solver)) # Will this break anything?
+                soft_reset_solver!(route_planner(solver)) # Will this break anything?
                 env, cost = plan_route!(route_planner(solver),
                     schedule, prob;kwargs...)
                 if cost < best_cost(solver)
@@ -645,7 +645,7 @@ function solve_assignment_problem!(solver::TaskGraphsMILPSolver, model, prob)
     set_time_limit_sec(model, max(0,time_to_deadline(solver)))
     optimize!(model)
     if primal_status(model) != MOI.FEASIBLE_POINT
-        throw(SolverException("Assignment problem is infeasible -- in `solve_assignment_problem!()`"))
+        throw(SolverException("Assignment problem is infeasible -- in `solve_assignment_problem!(solver::$(typeof(solver)))`. iterations = $(iterations(solver))"))
     end
     set_lower_bound!(solver, Int(round(value(objective_bound(model)))) )
     set_best_cost!(solver, Int(round(value(objective_function(model)))) )

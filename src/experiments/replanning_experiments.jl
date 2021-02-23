@@ -342,6 +342,8 @@ function warmup(planner::ReplannerWithBackup,loader::ReplanningProblemLoader,
     env = get_env!(loader,config[:env_id])
     # turn off time constraints for warm up
     set_real_time_flag!(planner,false)
+    set_deadline!(planner,Inf)
+    set_runtime_limit!(planner,Inf)
     profile_replanner!(loader,planner,base_problem_dir,base_results_dir)
     # turn real time constraints back on
     set_real_time_flag!(planner,true)

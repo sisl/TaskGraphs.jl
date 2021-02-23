@@ -1151,10 +1151,11 @@ function formulate_milp(milp_model::GreedyAssignment,sched,problem_spec;
     )
 
     model = GreedyAssignment(
-        schedule = sched,
+        # schedule = sched, 
+        schedule = copy(sched), # Trying to see if this will fix problems in replanning
         problem_spec = problem_spec,
         cost_model = cost_model,
-        greedy_cost=greedy_cost,
+        greedy_cost = greedy_cost,
     )
     for (id,t) in t0_
         v = get_vtx(sched, id)

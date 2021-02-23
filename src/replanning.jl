@@ -537,6 +537,19 @@ struct ReplannerWithBackup{A,B}
     primary_planner::A
     backup_planner::B
 end
+for op in [:(CRCBS.set_runtime_limit!),:(CRCBS.set_deadline!)]
+    @eval begin
+        $op(model::FullReplanner,val) = $op(model.solver,val)
+        function $op(model::ReplannerWithBackup,val)
+            $op(model.backup_planner,val)
+            $op(model.primary_planner,val)
+        end
+    end
+end
+# function set_runtime_limit!(model::ReplannerModel,val)
+#     set_runtime_limit!(model.primary_planner,val)
+#     set_runtime_limit!(model.backup_planner,val)
+# end
 function set_real_time_flag!(model::ReplannerWithBackup,val)
     set_real_time_flag!(model.backup_planner,val)
     set_real_time_flag!(model.primary_planner,val)

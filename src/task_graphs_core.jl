@@ -439,6 +439,7 @@ mutable struct ScheduleNode{I<:AbstractID,V}
 end
 ScheduleNode(id,node) = ScheduleNode(id,node,PathSpec())
 get_path_spec(node::ScheduleNode) = node.spec
+Base.copy(n::ScheduleNode) = ScheduleNode(n.id,n.node,deepcopy(n.spec))
 function set_path_spec!(node::ScheduleNode,spec)
     node.spec = spec
 end
@@ -500,6 +501,16 @@ constraint between them.
 end
 get_terminal_vtxs(sched::P) where {P<:OperatingSchedule}     = sched.terminal_vtxs
 get_root_node_weights(sched::P) where {P<:OperatingSchedule} = sched.weights
+function Base.copy(sched::OperatingSchedule)
+    OperatingSchedule(
+        graph = deepcopy(get_graph(sched)),
+        nodes = map(copy, get_nodes(sched)),
+        vtx_map = deepcopy(sched.vtx_map),
+        vtx_ids = deepcopy(sched.vtx_ids),
+        terminal_vtxs = deepcopy(sched.terminal_vtxs),
+        weights = deepcopy(sched.weights),
+    )
+end
 
 GraphUtils.get_vtx(sched::OperatingSchedule,node::ScheduleNode) = get_vtx(sched,node.id)
 get_node_from_id(sched::OperatingSchedule,id)                   = get_node(sched,id).node
