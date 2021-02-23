@@ -50,7 +50,7 @@ with an invalid robot id.
     robot_ics  ::Vector{Pair{AbstractID,ScheduleNode}} = sort(
         map(p->p.first=>get_node(sched,p.second),collect(pairs(robot_tip_map(sched))));by=p->p.first)
     object_ics ::Vector{Pair{AbstractID,ScheduleNode}} = sort(collect(
-        get_object_id(n)=>n for n in get_nodes(sched) if matches_template(COLLECT,n) && !valid_id(get_robot_id(n)))
+        get_object_id(n)=>n for n in get_nodes(sched) if matches_template(COLLECT,n) && (!valid_id(get_robot_id(n)) || indegree(sched,n) < 2) )
         ;by=p->p.first)
     operations ::Vector{Pair{OperationID,ScheduleNode}} = sort(collect(get_nodes_of_type(sched,OperationID));by=p->p.first)
     robot_map    ::Dict{AbstractID,Int} = Dict{AbstractID,Int}(p.first=>k for (k,p) in enumerate(robot_ics))
@@ -237,8 +237,8 @@ function formulate_milp(milp_model::ExtendedAssignmentMILP,
     milp = ExtendedAssignmentMILP(model=model,sched=sched)
 
     @unpack robot_ics,object_ics,operations,robot_map,object_map = milp
-    robot_node_strings = map(p->(string(p.second.node),get_t0(p.second)),robot_ics)
-    object_node_strings = map(p->(string(p.second.node),get_t0(p.second)),object_ics)
+    # robot_node_strings = map(p->(string(p.second.node),get_t0(p.second)),robot_ics)
+    # object_node_strings = map(p->(string(p.second.node),get_t0(p.second)),object_ics)
     # @info "ExtendedAssignmentMILP" robot_node_strings object_node_strings
 
     N = length(robot_ics) # number of robots
@@ -305,6 +305,11 @@ function formulate_milp(milp_model::ExtendedAssignmentMILP,
             end
         end
         add_edge!(precedence_graph,v,v)
+    end
+    for (id,node) in object_ics 
+        if indegree(precedence_graph,id) == 1 # only applies to tasks with no prereqs
+            @constraint(model, to0[object_map[id]] == get_t0(node))
+        end
     end
     # constraints
     r0 = vcat(r0,sF) # combine to get dummy robot ``spawn'' locations too

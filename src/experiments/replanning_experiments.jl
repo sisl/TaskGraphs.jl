@@ -296,31 +296,37 @@ function profile_replanner!(planner::ReplannerWithBackup,prob::RepeatedAbstractP
     for (stage,request) in enumerate(prob.requests)
         remap_object_ids!(request.schedule,get_schedule(env))
 
-        base_envB = replan!(plannerB,env,request)
-        envB, resultsB = profile_solver!(plannerB.solver,construct_routing_problem(prob,base_envB))
-        compile_replanning_results!(plannerB.cache,plannerB.solver,envB,
-            resultsB,prob,stage,request)
+        # base_envB = replan!(plannerB,env,request)
+        # envB, resultsB = profile_solver!(plannerB.solver,construct_routing_problem(prob,base_envB))
+        # compile_replanning_results!(plannerB.cache,plannerB.solver,envB,
+        #     resultsB,prob,stage,request)
 
         base_envA = replan!(plannerA,env,request)
         envA, resultsA = profile_solver!(plannerA.solver,construct_routing_problem(prob,base_envA))
         compile_replanning_results!(plannerA.cache,plannerA.solver,envA,
             resultsA,prob,stage,request)
 
-        # if failed_status(plannerA) == false
         if feasible_status(plannerA)
             @log_info(-1,0,"REPLANNING: ",
             "Primary planner succeeded at stage $stage.")
             env = envA
-        elseif feasible_status(plannerB)
-            @log_info(-1,0,"REPLANNING: ",
-            "Primary planner failed at stage $stage. Proceeding with backup plan.")
-            env = envB
-            validate(get_schedule(envB))
         else
-            @log_info(-1,0,"REPLANNING:",
-                "Both primary and backup planners failed at stage $stage.",
-                " Returning early.")
-            break
+            # backup
+            base_envB = replan!(plannerB,env,request)
+            envB, resultsB = profile_solver!(plannerB.solver,construct_routing_problem(prob,base_envB))
+            compile_replanning_results!(plannerB.cache,plannerB.solver,envB,
+                resultsB,prob,stage,request)
+            if feasible_status(plannerB)
+                @log_info(-1,0,"REPLANNING: ",
+                "Primary planner failed at stage $stage. Proceeding with backup plan.")
+                env = envB
+                validate(get_schedule(envB))
+            else
+                @log_info(-1,0,"REPLANNING:",
+                    "Both primary and backup planners failed at stage $stage.",
+                    " Returning early.")
+                break
+            end
         end
     end
     return env, planner
