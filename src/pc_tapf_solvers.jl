@@ -409,7 +409,10 @@ function CRCBS.low_level_search!(solver::ISPS, pc_mapf::AbstractPC_MAPF,
         reset_route_plan!(node,get_route_plan(get_env(pc_mapf)))
         valid_flag = compute_route_plan!(solver, pc_mapf, node)
         if valid_flag == false
-            @log_info(0,verbosity(solver),"ISPS: failed on ",i,"th repair iteration.")
+            @log_info(0,verbosity(solver),"ISPS: failed on iteration $i.")
+            break
+        elseif count_conflicts(detect_conflicts(node.solution)) == 0 # if route plan is valid, break
+            @log_info(2,verbosity(solver),"ISPS: returning valid solution on iteration $i.")
             break
         end
     end

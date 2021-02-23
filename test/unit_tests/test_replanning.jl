@@ -68,6 +68,7 @@ let
     # env, cost = solve!(planner.solver,PC_TAPF(base_env))
 end
 let
+
     cache = features=[
         RunTime(),SolutionCost(),OptimalFlag(),FeasibleFlag(),OptimalityGap(),
         IterationCount(),TimeOutStatus(),IterationMaxOutStatus(),
@@ -77,6 +78,7 @@ let
     set_real_time_flag!(replan_model,false) # turn off real time constraints
     solvers = [
         NBSSolver(),
+        NBSSolver(assignment_model=TaskGraphsMILPSolver(ExtendedAssignmentMILP())),
         NBSSolver(path_planner = PIBTPlanner{NTuple{3,Float64}}()),
     ]
     for solver in solvers

@@ -1,6 +1,7 @@
 export
     TaskGraphsMILP,
     AssignmentMILP,
+    ExtendedAssignmentMILP,
     AdjacencyMILP,
     SparseAdjacencyMILP,
     FastSparseAdjacencyMILP
@@ -33,263 +34,36 @@ be posed as a one-off assignment problem with inter-task constraints.
     robot_map    ::Dict{BotID,Int}      = Dict{BotID,Int}(p.first=>k for (k,p) in enumerate(robot_ics))
     object_map   ::Dict{ObjectID,Int}   = Dict{ObjectID,Int}(p.first=>k for (k,p) in enumerate(object_ics))
     operation_map::Dict{OperationID,Int}= Dict{OperationID,Int}(p.first=>k for (k,p) in enumerate(operations))
-    # robot_ids::Vector{BotID}            = Vector{BotID}() # ids of all robots
-    # robot_map::Dict{BotID,Int}          = Dict{BotID,Int}(id=>k for (k,id) in enumerate(robot_ids)) # robot id to idx
-    # object_ids::Vector{ObjectID}        = Vector{ObjectID}()
-    # object_map::Dict{ObjectID,Int}      = Dict{ObjectID,Int}(id=>k for (k,id) in enumerate(object_ids))
-    # r0::Vector{Int}                     = Vector{Int}()
-    # s0::Vector{Int}                     = Vector{Int}()
-    # tr0_::Dict{Int,Int}                 = Dict{Int,Int}()
-    # to0_::Dict{Int,Int}                 = Dict{Int,Int}()
-    # Δt_collect::Vector{Int}             = zeros(Int,length(object_ids))
-    # Δt_deposit::Vector{Int}             = zeros(Int,length(object_ids))
-    # sF::Vector{Int}                     = -1.0*zeros(Int,length(s0))
-    # Δt::Vector{Int}                     = zeros(Int,length(s0)) # the (parent operation duration) for each object
-    # terminal_vtxs::Vector{Set{Int}}     = Vector{Set{Int}}()
-    # weights::Vector{Int}                = map(s->1.0,terminal_vtxs) 
 end
 AssignmentMILP(model::JuMP.Model) = AssignmentMILP(model=model)
 
 """
-    adj_mat_from_assignment_mat(sched,assignment_matrix)
+    ExtendedAssignmentMILP <: TaskGraphsMILP
 
-Compute an adjacency matrix from an assignment matrix
+Extended to the replanning setting. Replaces robot_ics with the "tips" of each
+robot's existing itinerary, and replaces object_ics with each COLLECT node that 
+with an invalid robot id.
 """
-function adj_mat_from_assignment_mat(sched::OperatingSchedule,assignment_matrix)
-    N = length(get_robot_ICs(sched))
-    M = length(get_object_ICs(sched))
-    assignment_dict = get_assignment_dict(assignment_matrix,N,M)
-    G = get_graph(sched)
-    adj_matrix = adjacency_matrix(G)
-    for (robot_id, task_list) in assignment_dict
-        robot_node = get_node_from_id(sched, RobotID(robot_id))
-        v_go = outneighbors(G, get_vtx(sched, RobotID(robot_id)))[1] # GO_NODE
-        for object_id in task_list
-            v_collect = outneighbors(G,get_vtx(sched, ObjectID(object_id)))[1]
-            adj_matrix[v_go,v_collect] = 1
-            v_carry = outneighbors(G,v_collect)[1]
-            v_deposit = outneighbors(G,v_carry)[1]
-            for v in outneighbors(G,v_deposit)
-                if isa(get_vtx_id(sched, v), ActionID)
-                    v_go = v
-                    break
-                end
-            end
-        end
-    end
-    adj_matrix
+@with_kw struct ExtendedAssignmentMILP <: TaskGraphsMILP
+    model::JuMP.Model                   = Model()
+    sched::OperatingSchedule            = OperatingSchedule()
+    robot_ics  ::Vector{Pair{AbstractID,ScheduleNode}} = sort(
+        map(p->p.first=>get_node(sched,p.second),collect(pairs(robot_tip_map(sched))));by=p->p.first)
+    object_ics ::Vector{Pair{AbstractID,ScheduleNode}} = sort(collect(
+        get_object_id(n)=>n for n in get_nodes(sched) if matches_template(COLLECT,n) && !valid_id(get_robot_id(n)))
+        ;by=p->p.first)
+    operations ::Vector{Pair{OperationID,ScheduleNode}} = sort(collect(get_nodes_of_type(sched,OperationID));by=p->p.first)
+    robot_map    ::Dict{AbstractID,Int} = Dict{AbstractID,Int}(p.first=>k for (k,p) in enumerate(robot_ics))
+    object_map   ::Dict{AbstractID,Int} = Dict{AbstractID,Int}(p.first=>k for (k,p) in enumerate(object_ics))
 end
-
-"""
-    TeamAssignmentMILP
-
-***Not yet implemented.***
-
-Eextend the assignment matrix
-formulation of `AssignmentMILP` to the "team-forming" case where robots must
-collaboratively transport some objects.
-"""
-@with_kw struct TeamAssignmentMILP <: TaskGraphsMILP
-    model::JuMP.Model = Model()
-    task_group::Vector{Vector{Int}}
-end
-@with_kw struct AdjacencyMILP <: TaskGraphsMILP
-    model::JuMP.Model = Model()
-    job_shop::Bool=false
-end
-"""
-    SparseAdjacencyMILP <: TaskGraphsMILP
-
-Formulates a MILP where the decision variable is a sparse adjacency matrix `X`
-    for the operating schedule graph. If `X[i,j] = 1`, there is an edge from
-    node `i` to node `j`.
-Experiments have shown that the sparse matrix approach leads to much faster
-solve times than the dense matrix approach.
-"""
-@with_kw struct SparseAdjacencyMILP <: TaskGraphsMILP
-    model::JuMP.Model = Model()
-    Xa::SparseMatrixCSC{VariableRef,Int} = SparseMatrixCSC{VariableRef,Int}(0,0,ones(Int,1),Int[],VariableRef[]) # assignment adjacency matrix
-    Xj::SparseMatrixCSC{VariableRef,Int} = SparseMatrixCSC{VariableRef,Int}(0,0,ones(Int,1),Int[],VariableRef[]) # job shop adjacency matrix
-    job_shop::Bool=false
-end
-@with_kw struct FastSparseAdjacencyMILP <: TaskGraphsMILP
-    model::JuMP.Model = Model()
-    Xa::SparseMatrixCSC{VariableRef,Int} = SparseMatrixCSC{VariableRef,Int}(0,0,ones(Int,1),Int[],VariableRef[]) # assignment adjacency matrix
-    Xj::SparseMatrixCSC{VariableRef,Int} = SparseMatrixCSC{VariableRef,Int}(0,0,ones(Int,1),Int[],VariableRef[]) # job shop adjacency matrix
-    job_shop::Bool=false
-end
-for op in [
-    :(JuMP.optimize!),
-    :(JuMP.termination_status),
-    :(JuMP.objective_function),
-    :(JuMP.objective_bound),
-    :(JuMP.primal_status),
-    :(JuMP.dual_status),
-    :(JuMP.set_silent),
-    ]
-    @eval $op(milp::TaskGraphsMILP) = $op(milp.model)
-end
-for op in [
-    :(JuMP.set_optimizer_attribute),
-    :(JuMP.set_optimizer_attributes),
-    :(JuMP.set_time_limit_sec),
-    ]
-    @eval $op(milp::TaskGraphsMILP,args...) = $op(milp.model,args...)
-end
-
-export
-    exclude_solutions!,
-    exclude_current_solution!
-
-"""
-    exclude_solutions!(model::JuMP.Model,forbidden_solutions::Vector{Matrix{Int}})
-
-Adds constraints to model such that the solution may not match any solution
-contained in forbidden_solutions. Assumes that the model contains a variable
-container called X whose entries are binary and whose dimensions are identical
-to the dimensions of each solution in forbidden_solutions.
-"""
-function exclude_solutions!(model::JuMP.Model,X::Matrix{Int})
-    @assert !any((X .< 0) .| (X .> 1))
-    @constraint(model, sum(model[:X] .* X) <= sum(model[:X])-1)
-end
-exclude_solutions!(model::TaskGraphsMILP,args...) = exclude_solutions!(model.model, args...)
-function exclude_solutions!(model::JuMP.Model,M::Int,forbidden_solutions::Vector{Matrix{Int}})
-    for X in forbidden_solutions
-        exclude_solutions!(model,X)
-    end
-end
-function exclude_solutions!(model::JuMP.Model)
-    if termination_status(model) != MOI.OPTIMIZE_NOT_CALLED
-        X = get_assignment_matrix(model)
-        exclude_solutions!(model,X)
-    end
-end
-exclude_current_solution!(args...) = exclude_solutions!(args...)
-
-
-export
-    get_assignment_matrix
-
-function get_assignment_matrix(model::M) where {M<:JuMP.Model}
-    Matrix{Int}(min.(1, round.(value.(model[:X])))) # guarantees binary matrix
-end
-get_assignment_matrix(model::TaskGraphsMILP) = get_assignment_matrix(model.model)
-
-export
-    add_job_shop_constraints!,
-    formulate_optimization_problem,
-    formulate_schedule_milp,
-    formulate_milp,
-    update_project_schedule!
-
-"""
-    get_sF(milp_model::AssignmentMILP)
-
-Return an a vector of final object locations.
-"""
-function get_sF(milp_model::AssignmentMILP)
-    @unpack sched, object_ics, object_map = milp_model
-    M = length(object_ics)
-    sF = zeros(Int,M)
-    for (o_id,node) in object_ics
-        _, deposit_node = get_deposit_node(sched,o_id)
-        sF[object_map[o_id]] = get_id(get_destination_location_id(deposit_node))
-    end
-    return sF
-end
-
-"""
-    add_job_shop_constraints!(milp_model::AssignmentMILP,sched::OperatingSchedule,spec::ProblemSpec) #,model::JuMP.Model)
-
-After an `AssignmentMILP` has been optimized, add in any edges that result from
-an active ``job shop'' constraint (where two robots require the same resource).
-"""
-function add_job_shop_constraints!(milp_model::AssignmentMILP,sched::OperatingSchedule,spec::ProblemSpec) #,model::JuMP.Model)
-    @unpack model,robot_ics,object_ics = milp_model
-
-    N = length(robot_ics) # number of robots
-    M = length(object_ics) # number of delivery tasks
-    r0 = map(p->get_id(get_initial_location_id(p.second.node)),robot_ics) # initial robot locations
-    s0 = map(p->get_id(get_initial_location_id(p.second.node)),object_ics) # initial object locations
-    sF = get_sF(milp_model)
-    tor = Int.(round.(value.(model[:tor]))) # collect begin time
-    toc = Int.(round.(value.(model[:toc]))) # collect end time
-    tod = Int.(round.(value.(model[:tod]))) # deposit begin time
-    tof = Int.(round.(value.(model[:tof]))) # deposit end time
-    for (j,(o_id1,_)) in enumerate(object_ics)
-        for (j2,(o_id2,_)) in Base.Iterators.drop(enumerate(object_ics),j)
-            if (s0[j] == s0[j2]) || (s0[j] == sF[j2]) || (sF[j] == s0[j2]) || (sF[j] == sF[j2])
-                if s0[j] == s0[j2]
-                    id1, n1 = get_collect_node(sched, ObjectID(o_id1))
-                    id2, n2 = get_collect_node(sched, ObjectID(o_id2))
-                    t1 = [tor[j], toc[j]]
-                    t2 = [tor[j2], toc[j2]]
-                elseif s0[j] == sF[j2]
-                    id1, n1 = get_collect_node(sched, ObjectID(o_id1))
-                    id2, n2 = get_deposit_node(sched, ObjectID(o_id2))
-                    t1 = [tor[j], toc[j]]
-                    t2 = [tod[j2], tof[j2]]
-                elseif sF[j] == s0[j2]
-                    id1, n1 = get_deposit_node(sched, ObjectID(o_id1))
-                    id2, n2 = get_collect_node(sched, ObjectID(o_id2))
-                    t1 = [tod[j], tof[j]]
-                    t2 = [tor[j2], toc[j2]]
-                elseif sF[j] == sF[j2]
-                    id1, n1 = get_deposit_node(sched, ObjectID(o_id1))
-                    id2, n2 = get_deposit_node(sched, ObjectID(o_id2))
-                    t1 = [tod, tof[j]]
-                    t2 = [tod, tof[j2]]
-                end
-                if t1[2] < t2[1]
-                    add_edge!(sched, id1, id2)
-                elseif t2[2] < t1[1]
-                    add_edge!(sched, id2, id1)
-                else
-                    throw(ErrorException("JOB SHOP CONSTRAINT VIOLATED"))
-                end
-            end
-        end
-    end
-end
+ExtendedAssignmentMILP(model::JuMP.Model) = ExtendedAssignmentMILP(model=model)
+const AbstractAssignmentMILP = Union{AssignmentMILP,ExtendedAssignmentMILP}
 
 
 """
-    get_objective_expr
+    formulate_milp(milp_model::AbstractAssignmentMILP,sched,problem_spec;kwargs...)
 
-Helper for setting the objective function for a milp model
-"""
-function get_objective_expr(milp::AssignmentMILP, f::SumOfMakeSpans)
-    @unpack model, sched, operations, object_map = milp
-    terminal_ops = map(p->p.second.node, filter(p->is_terminal_node(sched,p.first),operations))
-    tof = model[:tof]
-    @variable(model, T[1:length(terminal_ops)])
-    for (i,op) in enumerate(terminal_ops)
-        for (o_id,o) in preconditions(op)
-            @constraint(model, T[i] >= tof[object_map[o_id]] + duration(op))
-        end
-    end
-    weights = map(i->1.0,1:length(terminal_ops))
-    cost = @expression(model, sum(map(i->T[i]*weights[i],1:length(terminal_ops))))
-    return cost
-end
-function get_objective_expr(milp::AssignmentMILP, f::MakeSpan)
-    @unpack model, sched, operations, object_map = milp
-    tof = model[:tof]
-    terminal_ops = map(p->p.second.node, filter(p->is_terminal_node(sched,p.first),operations))
-    @variable(model, cost)
-    for (i,op) in enumerate(terminal_ops)
-        for (o_id,o) in preconditions(op)
-            @constraint(model, cost >= tof[object_map[o_id]] + duration(op))
-        end
-    end
-    return cost
-end
-
-"""
-    formulate_milp(milp_model::AssignmentMILP,sched,problem_spec;kwargs...)
-
-Express the TaskGraphs assignment problem as an `AssignmentMILP` using the JuMP
+Express the TaskGraphs assignment problem as an `AbstractAssignmentMILP` using the JuMP
 optimization framework.
 
 Inputs:
@@ -448,6 +222,388 @@ function formulate_milp(milp_model::AssignmentMILP,
     @objective(model, Min, cost)
     milp
 end
+function formulate_milp(milp_model::ExtendedAssignmentMILP,
+    sched::OperatingSchedule,
+    problem_spec::ProblemSpec;
+    optimizer=default_milp_optimizer(),
+    cost_model=problem_spec.cost_function,
+    Mm = 10000,
+    kwargs...)
+
+    # SETUP
+    # Define optimization model
+    model=Model(optimizer_with_attributes(optimizer))
+    set_optimizer_attributes(model,default_optimizer_attributes()...)
+    milp = ExtendedAssignmentMILP(model=model,sched=sched)
+
+    @unpack robot_ics,object_ics,operations,robot_map,object_map = milp
+
+    N = length(robot_ics) # number of robots
+    M = length(object_ics) # number of delivery tasks
+    Δt_collect = zeros(Int,M)
+    Δt_deposit = zeros(Int,M)
+    r0 = map(p->get_id(get_initial_location_id(p.second.node)),robot_ics) # initial robot locations
+    s0 = map(p->get_id(get_initial_location_id(p.second.node)),object_ics) # initial object locations
+    sF = zeros(Int,M)
+    for (v,n) in enumerate(get_nodes(sched))
+        if matches_node_type(n,BOT_COLLECT)
+            Δt_collect[object_map[get_object_id(n)]] = get_min_duration(n)
+        elseif matches_node_type(n,BOT_DEPOSIT)
+            Δt_deposit[object_map[get_object_id(n)]] = get_min_duration(n)
+            sF[object_map[get_object_id(n)]] = get_id(get_destination_location_id(n))
+        end
+    end
+    # from ProblemSpec
+    D = (x,y) -> get_distance(problem_spec,x,y)
+    
+    @variable(model, to0[1:M] >= 0.0) # object availability time
+    @variable(model, tor[1:M] >= 0.0) # object robot arrival time
+    @variable(model, toc[1:M] >= 0.0) # object collection complete time
+    @variable(model, tod[1:M] >= 0.0) # object deliver begin time
+    @variable(model, tof[1:M] >= 0.0) # object termination time
+    @variable(model, tr0[1:N+M] >= 0.0) # robot availability time
+
+    # Assignment matrix x
+    @variable(model, X[1:N+M,1:M], binary = true) # X[i,j] ∈ {0,1}
+    @constraint(model, X * ones(M) .<= 1)         # each robot may have no more than 1 task
+    @constraint(model, X' * ones(N+M) .== 1)     # each task must have exactly 1 assignment
+    for (id,node) in robot_ics # robot start times
+        @constraint(model, tr0[robot_map[id]] == get_t0(node))
+    end
+    for (id,node) in object_ics # task start times
+        @constraint(model, to0[object_map[id]] >= get_t0(node))
+        # if is_root_node(sched,id) # only applies to root tasks (with no prereqs)
+        #     @constraint(model, to0[object_map[id]] == get_t0(node))
+        # end
+    end
+    precedence_graph = CustomNDiGraph{Nothing,ObjectID}()
+    for (id,_) in object_ics
+        add_node!(precedence_graph,nothing,id)
+    end
+    for (op_id,node) in operations #get_operations(sched) # precedence constraints on task start time
+        op = node.node
+        for (_,input) in preconditions(op)
+            i = object_map[get_object_id(input)]
+            for (_,output) in postconditions(op)
+                j = object_map[get_object_id(output)]
+                @constraint(model, to0[j] >= tof[i] + duration(op))
+                add_edge!(precedence_graph,get_object_id(input),get_object_id(output))
+            end
+        end
+    end
+    # propagate upstream edges through precedence graph
+    for v in topological_sort_by_dfs(precedence_graph)
+        for v1 in inneighbors(precedence_graph,v)
+            for v2 in outneighbors(precedence_graph,v)
+                add_edge!(precedence_graph,v1,v2)
+            end
+        end
+        add_edge!(precedence_graph,v,v)
+    end
+    # constraints
+    r0 = vcat(r0,sF) # combine to get dummy robot ``spawn'' locations too
+    for j in 1:M
+        # constraint on dummy robot start time (corresponds to moment of object delivery)
+        @constraint(model, tr0[j+N] == tof[j])
+        # dummy robots can't do upstream jobs
+        for v in inneighbors(precedence_graph,j)
+            @constraint(model, X[j+N,v] == 0)
+        end
+        # lower bound on task completion time (task can't start until it's available).
+        @constraint(model, tor[j] >= to0[j])
+        for i in 1:N+M
+            @constraint(model, tor[j] - (tr0[i] + D(r0[i],s0[j])) >= -Mm*(1 - X[i,j]))
+        end
+        @constraint(model, toc[j] == tor[j] + Δt_collect[j])
+        @constraint(model, tod[j] == toc[j] + D(s0[j],sF[j]))
+        @constraint(model, tof[j] == tod[j] + Δt_deposit[j])
+        # "Job-shop" constraints specifying that no station may be double-booked. A station
+        # can only support a single COLLECT or DEPOSIT operation at a time, meaning that all
+        # the windows for these operations cannot overlap. In the constraints below, t1 and t2
+        # represent the intervals for the COLLECT or DEPOSIT operations of tasks j and j2,
+        # respectively. If eny of the operations for these two tasks require use of the same
+        # station, we introduce a 2D binary variable y. if y = [1,0], the operation for task
+        # j must occur before the operation for task j2. The opposite is true for y == [0,1].
+        # We use the big M method here as well to tightly enforce the binary constraints.
+        for j2 in j+1:M
+            if (s0[j] == s0[j2]) || (s0[j] == sF[j2]) || (sF[j] == s0[j2]) || (sF[j] == sF[j2])
+                # @show j, j2
+                if s0[j] == s0[j2]
+                    t1 = [tor[j], toc[j]]
+                    t2 = [tor[j2], toc[j2]]
+                elseif s0[j] == sF[j2]
+                    t1 = [tor[j], toc[j]]
+                    t2 = [tod[j2], tof[j2]]
+                elseif sF[j] == s0[j2]
+                    t1 = [tod[j], tof[j]]
+                    t2 = [tor[j2], toc[j2]]
+                elseif sF[j] == sF[j2]
+                    t1 = [tod, tof[j]]
+                    t2 = [tod, tof[j2]]
+                end
+                tmax = @variable(model)
+                tmin = @variable(model)
+                y = @variable(model, binary=true)
+                @constraint(model, tmax >= t1[1])
+                @constraint(model, tmax >= t2[1])
+                @constraint(model, tmin <= t1[2])
+                @constraint(model, tmin <= t2[2])
+
+                @constraint(model, tmax - t2[1] <= (1 - y)*Mm)
+                @constraint(model, tmax - t1[1] <= y*Mm)
+                @constraint(model, tmin - t1[2] >= (1 - y)*-Mm)
+                @constraint(model, tmin - t2[2] >= y*-Mm)
+                # @constraint(model, tmin + 1 <= tmax)
+                @constraint(model, tmin + 1 - X[j+N,j2] - X[j2+N,j] <= tmax) # NOTE +1 not necessary if the same robot is doing both
+            end
+        end
+    end
+    cost = get_objective_expr(milp, cost_model)
+    @objective(model, Min, cost)
+    milp
+end
+
+"""
+    adj_mat_from_assignment_mat(sched,assignment_matrix)
+
+Compute an adjacency matrix from an assignment matrix
+"""
+function adj_mat_from_assignment_mat(model::AbstractAssignmentMILP,sched::OperatingSchedule,assignment_matrix)
+    M = size(assignment_matrix,2)
+    N = size(assignment_matrix,1) - M
+    @assert N == length(get_robot_ICs(sched))
+    @unpack robot_ics, object_ics = model
+    # M = length(get_object_ICs(sched))
+    assignment_dict = get_assignment_dict(assignment_matrix,N,M)
+    G = get_graph(sched)
+    adj_matrix = adjacency_matrix(G)
+    for (robot_idx, task_list) in assignment_dict
+        robot_id = get_robot_id(robot_ics[robot_idx].second)
+        robot_node = get_node_from_id(sched, robot_id)
+        v_go = outneighbors(G, get_vtx(sched, robot_id))[1] # GO_NODE
+        for object_idx in task_list
+            object_id = get_object_id(object_ics[object_idx])
+            v_collect = outneighbors(G,get_vtx(sched, object_id))[1]
+            adj_matrix[v_go,v_collect] = 1
+            v_carry = outneighbors(G,v_collect)[1]
+            v_deposit = outneighbors(G,v_carry)[1]
+            for v in outneighbors(G,v_deposit)
+                if isa(get_vtx_id(sched, v), ActionID)
+                    v_go = v
+                    break
+                end
+            end
+        end
+    end
+    adj_matrix
+end
+
+"""
+    TeamAssignmentMILP
+
+***Not yet implemented.***
+
+Eextend the assignment matrix
+formulation of `AssignmentMILP` to the "team-forming" case where robots must
+collaboratively transport some objects.
+"""
+@with_kw struct TeamAssignmentMILP <: TaskGraphsMILP
+    model::JuMP.Model = Model()
+    task_group::Vector{Vector{Int}}
+end
+@with_kw struct AdjacencyMILP <: TaskGraphsMILP
+    model::JuMP.Model = Model()
+    job_shop::Bool=false
+end
+"""
+    SparseAdjacencyMILP <: TaskGraphsMILP
+
+Formulates a MILP where the decision variable is a sparse adjacency matrix `X`
+    for the operating schedule graph. If `X[i,j] = 1`, there is an edge from
+    node `i` to node `j`.
+Experiments have shown that the sparse matrix approach leads to much faster
+solve times than the dense matrix approach.
+"""
+@with_kw struct SparseAdjacencyMILP <: TaskGraphsMILP
+    model::JuMP.Model = Model()
+    Xa::SparseMatrixCSC{VariableRef,Int} = SparseMatrixCSC{VariableRef,Int}(0,0,ones(Int,1),Int[],VariableRef[]) # assignment adjacency matrix
+    Xj::SparseMatrixCSC{VariableRef,Int} = SparseMatrixCSC{VariableRef,Int}(0,0,ones(Int,1),Int[],VariableRef[]) # job shop adjacency matrix
+    job_shop::Bool=false
+end
+@with_kw struct FastSparseAdjacencyMILP <: TaskGraphsMILP
+    model::JuMP.Model = Model()
+    Xa::SparseMatrixCSC{VariableRef,Int} = SparseMatrixCSC{VariableRef,Int}(0,0,ones(Int,1),Int[],VariableRef[]) # assignment adjacency matrix
+    Xj::SparseMatrixCSC{VariableRef,Int} = SparseMatrixCSC{VariableRef,Int}(0,0,ones(Int,1),Int[],VariableRef[]) # job shop adjacency matrix
+    job_shop::Bool=false
+end
+for op in [
+    :(JuMP.optimize!),
+    :(JuMP.termination_status),
+    :(JuMP.objective_function),
+    :(JuMP.objective_bound),
+    :(JuMP.primal_status),
+    :(JuMP.dual_status),
+    :(JuMP.set_silent),
+    ]
+    @eval $op(milp::TaskGraphsMILP) = $op(milp.model)
+end
+for op in [
+    :(JuMP.set_optimizer_attribute),
+    :(JuMP.set_optimizer_attributes),
+    :(JuMP.set_time_limit_sec),
+    ]
+    @eval $op(milp::TaskGraphsMILP,args...) = $op(milp.model,args...)
+end
+
+export
+    exclude_solutions!,
+    exclude_current_solution!
+
+"""
+    exclude_solutions!(model::JuMP.Model,forbidden_solutions::Vector{Matrix{Int}})
+
+Adds constraints to model such that the solution may not match any solution
+contained in forbidden_solutions. Assumes that the model contains a variable
+container called X whose entries are binary and whose dimensions are identical
+to the dimensions of each solution in forbidden_solutions.
+"""
+function exclude_solutions!(model::JuMP.Model,X::Matrix{Int})
+    @assert !any((X .< 0) .| (X .> 1))
+    @constraint(model, sum(model[:X] .* X) <= sum(model[:X])-1)
+end
+exclude_solutions!(model::TaskGraphsMILP,args...) = exclude_solutions!(model.model, args...)
+function exclude_solutions!(model::JuMP.Model,M::Int,forbidden_solutions::Vector{Matrix{Int}})
+    for X in forbidden_solutions
+        exclude_solutions!(model,X)
+    end
+end
+function exclude_solutions!(model::JuMP.Model)
+    if termination_status(model) != MOI.OPTIMIZE_NOT_CALLED
+        X = get_assignment_matrix(model)
+        exclude_solutions!(model,X)
+    end
+end
+exclude_current_solution!(args...) = exclude_solutions!(args...)
+
+
+export
+    get_assignment_matrix
+
+function get_assignment_matrix(model::M) where {M<:JuMP.Model}
+    Matrix{Int}(min.(1, round.(value.(model[:X])))) # guarantees binary matrix
+end
+get_assignment_matrix(model::TaskGraphsMILP) = get_assignment_matrix(model.model)
+
+export
+    add_job_shop_constraints!,
+    formulate_optimization_problem,
+    formulate_schedule_milp,
+    formulate_milp,
+    update_project_schedule!
+
+"""
+    get_sF(milp_model::AbstractAssignmentMILP)
+
+Return an a vector of final object locations.
+"""
+function get_sF(milp_model::AbstractAssignmentMILP)
+    @unpack sched, object_ics, object_map = milp_model
+    M = length(object_ics)
+    sF = zeros(Int,M)
+    for (o_id,node) in object_ics
+        _, deposit_node = get_deposit_node(sched,o_id)
+        sF[object_map[o_id]] = get_id(get_destination_location_id(deposit_node))
+    end
+    return sF
+end
+
+"""
+    add_job_shop_constraints!(milp_model::AbstractAssignmentMILP,sched::OperatingSchedule,spec::ProblemSpec) #,model::JuMP.Model)
+
+After an `AbstractAssignmentMILP` has been optimized, add in any edges that result from
+an active ``job shop'' constraint (where two robots require the same resource).
+"""
+function add_job_shop_constraints!(milp_model::AbstractAssignmentMILP,sched::OperatingSchedule,spec::ProblemSpec) #,model::JuMP.Model)
+    @unpack model,robot_ics,object_ics = milp_model
+
+    N = length(robot_ics) # number of robots
+    M = length(object_ics) # number of delivery tasks
+    r0 = map(p->get_id(get_initial_location_id(p.second.node)),robot_ics) # initial robot locations
+    s0 = map(p->get_id(get_initial_location_id(p.second.node)),object_ics) # initial object locations
+    sF = get_sF(milp_model)
+    tor = Int.(round.(value.(model[:tor]))) # collect begin time
+    toc = Int.(round.(value.(model[:toc]))) # collect end time
+    tod = Int.(round.(value.(model[:tod]))) # deposit begin time
+    tof = Int.(round.(value.(model[:tof]))) # deposit end time
+    for (j,(o_id1,_)) in enumerate(object_ics)
+        for (j2,(o_id2,_)) in Base.Iterators.drop(enumerate(object_ics),j)
+            if (s0[j] == s0[j2]) || (s0[j] == sF[j2]) || (sF[j] == s0[j2]) || (sF[j] == sF[j2])
+                if s0[j] == s0[j2]
+                    id1, n1 = get_collect_node(sched, ObjectID(o_id1))
+                    id2, n2 = get_collect_node(sched, ObjectID(o_id2))
+                    t1 = [tor[j], toc[j]]
+                    t2 = [tor[j2], toc[j2]]
+                elseif s0[j] == sF[j2]
+                    id1, n1 = get_collect_node(sched, ObjectID(o_id1))
+                    id2, n2 = get_deposit_node(sched, ObjectID(o_id2))
+                    t1 = [tor[j], toc[j]]
+                    t2 = [tod[j2], tof[j2]]
+                elseif sF[j] == s0[j2]
+                    id1, n1 = get_deposit_node(sched, ObjectID(o_id1))
+                    id2, n2 = get_collect_node(sched, ObjectID(o_id2))
+                    t1 = [tod[j], tof[j]]
+                    t2 = [tor[j2], toc[j2]]
+                elseif sF[j] == sF[j2]
+                    id1, n1 = get_deposit_node(sched, ObjectID(o_id1))
+                    id2, n2 = get_deposit_node(sched, ObjectID(o_id2))
+                    t1 = [tod, tof[j]]
+                    t2 = [tod, tof[j2]]
+                end
+                if t1[2] < t2[1]
+                    add_edge!(sched, id1, id2)
+                elseif t2[2] < t1[1]
+                    add_edge!(sched, id2, id1)
+                else
+                    throw(ErrorException("JOB SHOP CONSTRAINT VIOLATED"))
+                end
+            end
+        end
+    end
+end
+
+
+"""
+    get_objective_expr
+
+Helper for setting the objective function for a milp model
+"""
+function get_objective_expr(milp::AbstractAssignmentMILP, f::SumOfMakeSpans)
+    @unpack model, sched, operations, object_map = milp
+    terminal_ops = map(p->p.second.node, filter(p->is_terminal_node(sched,p.first),operations))
+    tof = model[:tof]
+    @variable(model, T[1:length(terminal_ops)])
+    for (i,op) in enumerate(terminal_ops)
+        for (o_id,o) in preconditions(op)
+            @constraint(model, T[i] >= tof[object_map[o_id]] + duration(op))
+        end
+    end
+    weights = map(i->1.0,1:length(terminal_ops))
+    cost = @expression(model, sum(map(i->T[i]*weights[i],1:length(terminal_ops))))
+    return cost
+end
+function get_objective_expr(milp::AbstractAssignmentMILP, f::MakeSpan)
+    @unpack model, sched, operations, object_map = milp
+    tof = model[:tof]
+    terminal_ops = map(p->p.second.node, filter(p->is_terminal_node(sched,p.first),operations))
+    @variable(model, cost)
+    for (i,op) in enumerate(terminal_ops)
+        for (o_id,o) in preconditions(op)
+            @constraint(model, cost >= tof[object_map[o_id]] + duration(op))
+        end
+    end
+    return cost
+end
+
 
 export
     preprocess_project_schedule
@@ -1391,7 +1547,7 @@ Returns `false` if the new edges cause cycles in the project graph.
 function update_project_schedule!(solver,sched::OperatingSchedule,problem_spec,adj_matrix)
     mtx = adjacency_matrix(sched)
     val = update_project_schedule!(sched,problem_spec,adj_matrix)
-    @log_info(1,verbosity(solver),"Assignment: Adding edges \n",
+    @log_info(1,verbosity(solver),"Assignment: cost = $(best_cost(solver)). Adding edges \n",
         map(idx->string("\t",
                 string(get_node_from_vtx(sched,idx.I[1]))," → ",
                 string(get_node_from_vtx(sched,idx.I[2])),"\n"
@@ -1451,9 +1607,9 @@ function update_project_schedule!(solver,model::TaskGraphsMILP,sched,prob_spec,
     )
     update_project_schedule!(solver,sched,prob_spec,adj_matrix)
 end
-function update_project_schedule!(solver,model::AssignmentMILP,sched,prob_spec,
+function update_project_schedule!(solver,model::AbstractAssignmentMILP,sched,prob_spec,
         assignment_matrix=get_assignment_matrix(model),
     )
-    adj_matrix = adj_mat_from_assignment_mat(sched,assignment_matrix)
+    adj_matrix = adj_mat_from_assignment_mat(model,sched,assignment_matrix)
     update_project_schedule!(solver,sched,prob_spec,adj_matrix)
 end

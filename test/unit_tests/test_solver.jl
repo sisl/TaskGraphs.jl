@@ -113,6 +113,7 @@ let
 end
 # test task assignment
 let
+
     # init search env
     for (i, f) in enumerate(pctapf_test_problems())
         for cost_model in [SumOfMakeSpans(), MakeSpan()]
