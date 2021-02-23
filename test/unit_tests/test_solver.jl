@@ -113,7 +113,6 @@ let
 end
 # test task assignment
 let
-
     # init search env
     for (i, f) in enumerate(pctapf_test_problems())
         for cost_model in [SumOfMakeSpans(), MakeSpan()]
@@ -121,6 +120,7 @@ let
                 costs = Float64[]
                 for solver in [
                         NBSSolver(assignment_model = TaskGraphsMILPSolver(AssignmentMILP())),
+                        NBSSolver(assignment_model = TaskGraphsMILPSolver(ExtendedAssignmentMILP())),
                         NBSSolver(assignment_model = TaskGraphsMILPSolver(SparseAdjacencyMILP())),
                         NBSSolver(assignment_model = TaskGraphsMILPSolver(GreedyAssignment())),
                         ]
@@ -128,6 +128,7 @@ let
                     # @show i, f, solver
                     pc_tapf = f(solver;cost_function=cost_model,verbose=false);
                     search_env = pc_tapf.env
+
                     prob = formulate_assignment_problem(solver.assignment_model,pc_tapf)
                     sched, cost = solve_assignment_problem!(solver.assignment_model,prob,pc_tapf)
                     if !isa(solver.assignment_model.milp,GreedyAssignment)
@@ -161,6 +162,7 @@ let
                 costs = Float64[]
                 for solver in [
                         NBSSolver(assignment_model = TaskGraphsMILPSolver(AssignmentMILP())),
+                        NBSSolver(assignment_model = TaskGraphsMILPSolver(ExtendedAssignmentMILP())),
                         NBSSolver(assignment_model = TaskGraphsMILPSolver(SparseAdjacencyMILP())),
                         NBSSolver(assignment_model = TaskGraphsMILPSolver(GreedyAssignment())),
                         NBSSolver(
@@ -200,6 +202,7 @@ let
         ])
         for solver in [
                 NBSSolver(assignment_model = TaskGraphsMILPSolver(AssignmentMILP())),
+                NBSSolver(assignment_model = TaskGraphsMILPSolver(ExtendedAssignmentMILP())),
                 NBSSolver(assignment_model = TaskGraphsMILPSolver(SparseAdjacencyMILP())),
                 ]
             let

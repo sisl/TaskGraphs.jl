@@ -237,6 +237,9 @@ function formulate_milp(milp_model::ExtendedAssignmentMILP,
     milp = ExtendedAssignmentMILP(model=model,sched=sched)
 
     @unpack robot_ics,object_ics,operations,robot_map,object_map = milp
+    robot_node_strings = map(p->(string(p.second.node),get_t0(p.second)),robot_ics)
+    object_node_strings = map(p->(string(p.second.node),get_t0(p.second)),object_ics)
+    # @info "ExtendedAssignmentMILP" robot_node_strings object_node_strings
 
     N = length(robot_ics) # number of robots
     M = length(object_ics) # number of delivery tasks
@@ -246,9 +249,9 @@ function formulate_milp(milp_model::ExtendedAssignmentMILP,
     s0 = map(p->get_id(get_initial_location_id(p.second.node)),object_ics) # initial object locations
     sF = zeros(Int,M)
     for (v,n) in enumerate(get_nodes(sched))
-        if matches_node_type(n,BOT_COLLECT)
+        if matches_node_type(n,BOT_COLLECT) && haskey(object_map,get_object_id(n))
             Δt_collect[object_map[get_object_id(n)]] = get_min_duration(n)
-        elseif matches_node_type(n,BOT_DEPOSIT)
+        elseif matches_node_type(n,BOT_DEPOSIT) && haskey(object_map,get_object_id(n))
             Δt_deposit[object_map[get_object_id(n)]] = get_min_duration(n)
             sF[object_map[get_object_id(n)]] = get_id(get_destination_location_id(n))
         end
@@ -283,11 +286,14 @@ function formulate_milp(milp_model::ExtendedAssignmentMILP,
     for (op_id,node) in operations #get_operations(sched) # precedence constraints on task start time
         op = node.node
         for (_,input) in preconditions(op)
-            i = object_map[get_object_id(input)]
-            for (_,output) in postconditions(op)
-                j = object_map[get_object_id(output)]
-                @constraint(model, to0[j] >= tof[i] + duration(op))
-                add_edge!(precedence_graph,get_object_id(input),get_object_id(output))
+            input_id = get_object_id(input)
+            if haskey(object_map,input_id)
+                i = object_map[input_id]
+                for (_,output) in postconditions(op)
+                    j = object_map[get_object_id(output)]
+                    @constraint(model, to0[j] >= tof[i] + duration(op))
+                    add_edge!(precedence_graph,get_object_id(input),get_object_id(output))
+                end
             end
         end
     end
@@ -325,38 +331,38 @@ function formulate_milp(milp_model::ExtendedAssignmentMILP,
         # station, we introduce a 2D binary variable y. if y = [1,0], the operation for task
         # j must occur before the operation for task j2. The opposite is true for y == [0,1].
         # We use the big M method here as well to tightly enforce the binary constraints.
-        for j2 in j+1:M
-            if (s0[j] == s0[j2]) || (s0[j] == sF[j2]) || (sF[j] == s0[j2]) || (sF[j] == sF[j2])
-                # @show j, j2
-                if s0[j] == s0[j2]
-                    t1 = [tor[j], toc[j]]
-                    t2 = [tor[j2], toc[j2]]
-                elseif s0[j] == sF[j2]
-                    t1 = [tor[j], toc[j]]
-                    t2 = [tod[j2], tof[j2]]
-                elseif sF[j] == s0[j2]
-                    t1 = [tod[j], tof[j]]
-                    t2 = [tor[j2], toc[j2]]
-                elseif sF[j] == sF[j2]
-                    t1 = [tod, tof[j]]
-                    t2 = [tod, tof[j2]]
-                end
-                tmax = @variable(model)
-                tmin = @variable(model)
-                y = @variable(model, binary=true)
-                @constraint(model, tmax >= t1[1])
-                @constraint(model, tmax >= t2[1])
-                @constraint(model, tmin <= t1[2])
-                @constraint(model, tmin <= t2[2])
+        # for j2 in j+1:M
+        #     if (s0[j] == s0[j2]) || (s0[j] == sF[j2]) || (sF[j] == s0[j2]) || (sF[j] == sF[j2])
+        #         # @show j, j2
+        #         if s0[j] == s0[j2]
+        #             t1 = [tor[j], toc[j]]
+        #             t2 = [tor[j2], toc[j2]]
+        #         elseif s0[j] == sF[j2]
+        #             t1 = [tor[j], toc[j]]
+        #             t2 = [tod[j2], tof[j2]]
+        #         elseif sF[j] == s0[j2]
+        #             t1 = [tod[j], tof[j]]
+        #             t2 = [tor[j2], toc[j2]]
+        #         elseif sF[j] == sF[j2]
+        #             t1 = [tod, tof[j]]
+        #             t2 = [tod, tof[j2]]
+        #         end
+        #         tmax = @variable(model)
+        #         tmin = @variable(model)
+        #         y = @variable(model, binary=true)
+        #         @constraint(model, tmax >= t1[1])
+        #         @constraint(model, tmax >= t2[1])
+        #         @constraint(model, tmin <= t1[2])
+        #         @constraint(model, tmin <= t2[2])
 
-                @constraint(model, tmax - t2[1] <= (1 - y)*Mm)
-                @constraint(model, tmax - t1[1] <= y*Mm)
-                @constraint(model, tmin - t1[2] >= (1 - y)*-Mm)
-                @constraint(model, tmin - t2[2] >= y*-Mm)
-                # @constraint(model, tmin + 1 <= tmax)
-                @constraint(model, tmin + 1 - X[j+N,j2] - X[j2+N,j] <= tmax) # NOTE +1 not necessary if the same robot is doing both
-            end
-        end
+        #         @constraint(model, tmax - t2[1] <= (1 - y)*Mm)
+        #         @constraint(model, tmax - t1[1] <= y*Mm)
+        #         @constraint(model, tmin - t1[2] >= (1 - y)*-Mm)
+        #         @constraint(model, tmin - t2[2] >= y*-Mm)
+        #         # @constraint(model, tmin + 1 <= tmax)
+        #         @constraint(model, tmin + 1 - X[j+N,j2] - X[j2+N,j] <= tmax) # NOTE +1 not necessary if the same robot is doing both
+        #     end
+        # end
     end
     cost = get_objective_expr(milp, cost_model)
     @objective(model, Min, cost)
@@ -379,15 +385,24 @@ function adj_mat_from_assignment_mat(model::AbstractAssignmentMILP,sched::Operat
     adj_matrix = adjacency_matrix(G)
     for (robot_idx, task_list) in assignment_dict
         robot_id = get_robot_id(robot_ics[robot_idx].second)
-        robot_node = get_node_from_id(sched, robot_id)
-        v_go = outneighbors(G, get_vtx(sched, robot_id))[1] # GO_NODE
+        robot_node = robot_ics[robot_idx].second
+        if is_terminal_node(sched,robot_node)
+            v_go = get_vtx(sched,robot_node)
+        else
+            v_go = outneighbors(sched, robot_node)[1] # GO_NODE
+        end
+        if !is_terminal_node(sched,v_go)
+            log_schedule_edges(sched)
+            @assert is_terminal_node(sched,v_go) "!is_terminal_node($(string(get_node(sched,v_go).node)))"
+        end
         for object_idx in task_list
-            object_id = get_object_id(object_ics[object_idx])
-            v_collect = outneighbors(G,get_vtx(sched, object_id))[1]
+            object_id = get_object_id(object_ics[object_idx].second)
+            # object_node = get_node(sched,object_id)
+            v_collect = outneighbors(sched, object_id)[1]
             adj_matrix[v_go,v_collect] = 1
-            v_carry = outneighbors(G,v_collect)[1]
-            v_deposit = outneighbors(G,v_carry)[1]
-            for v in outneighbors(G,v_deposit)
+            v_carry = outneighbors(sched,v_collect)[1]
+            v_deposit = outneighbors(sched,v_carry)[1]
+            for v in outneighbors(sched,v_deposit)
                 if isa(get_vtx_id(sched, v), ActionID)
                     v_go = v
                     break
@@ -581,17 +596,22 @@ function get_objective_expr(milp::AbstractAssignmentMILP, f::SumOfMakeSpans)
     @unpack model, sched, operations, object_map = milp
     terminal_ops = map(p->p.second.node, filter(p->is_terminal_node(sched,p.first),operations))
     tof = model[:tof]
-    @variable(model, T[1:length(terminal_ops)])
+    @variable(model, T[1:length(terminal_ops)] >= 0)
     for (i,op) in enumerate(terminal_ops)
+        @constraint(model, T[i] >= get_tF(sched,get_operation_id(op))) # Crucial because not all inputs will be among the unassigned objects
         for (o_id,o) in preconditions(op)
-            @constraint(model, T[i] >= tof[object_map[o_id]] + duration(op))
+            if haskey(object_map,o_id)
+                @constraint(model, T[i] >= tof[object_map[o_id]] + duration(op))
+            end
         end
     end
     weights = map(i->1.0,1:length(terminal_ops))
+    # @info "objective is SumOfMakeSpans" weights
     cost = @expression(model, sum(map(i->T[i]*weights[i],1:length(terminal_ops))))
     return cost
 end
 function get_objective_expr(milp::AbstractAssignmentMILP, f::MakeSpan)
+    # @info "objective is MakeSpan"
     @unpack model, sched, operations, object_map = milp
     tof = model[:tof]
     terminal_ops = map(p->p.second.node, filter(p->is_terminal_node(sched,p.first),operations))

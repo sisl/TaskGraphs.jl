@@ -606,6 +606,7 @@ function formulate_assignment_problem(solver,prob;
 end
 
 function formulate_milp(milp_model::TaskGraphsMILP,env::SearchEnv;kwargs...)
+    process_schedule!(get_schedule(env))
     t0,tF = get_node_start_and_end_times(env)
     formulate_milp(milp_model,get_schedule(env),get_problem_spec(env);
         t0_=t0,
@@ -613,7 +614,8 @@ function formulate_milp(milp_model::TaskGraphsMILP,env::SearchEnv;kwargs...)
         kwargs...
         )
 end
-function formulate_milp(model::AssignmentMILP,env::SearchEnv;kwargs...)
+function formulate_milp(model::AbstractAssignmentMILP,env::SearchEnv;kwargs...)
+    process_schedule!(get_schedule(env))
     formulate_milp(model,get_schedule(env),get_problem_spec(env);kwargs...)
 end
 

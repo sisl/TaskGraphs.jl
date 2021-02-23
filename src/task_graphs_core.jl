@@ -756,6 +756,8 @@ function validate(sched::OperatingSchedule)
     catch e
         if typeof(e) <: AssertionError
             bt = catch_backtrace()
+            @info "Schedule is invalid"
+            log_schedule_edges(sched)
             showerror(stdout,e,bt)
             print(e.msg)
         else
@@ -764,6 +766,11 @@ function validate(sched::OperatingSchedule)
         return false
     end
     return true
+end
+function log_schedule_edges(sched)
+    for e in edges(sched)
+        @info "$(string(get_node(sched,e.src).node)) --> $(string(get_node(sched,e.dst).node))"
+    end
 end
 function validate(node::ScheduleNode,paths::Vector{Vector{Int}})
     if matches_template(TEAM_ACTION,node)
