@@ -581,3 +581,13 @@ function convert_to_path_vectors(object_path_dict, object_interval_dict)
     end
     object_paths, object_intervals
 end
+
+function print_schedule_node_details(io::IO,sched,n)
+    print(io,sprint_padded(string(n.node);pad=20)," - ")
+    s = "t0: $(get_t0(n)), tF: $(get_tF(n)), "
+    print(io,s)
+    print(io,"fixed: $(n.spec.fixed), ")
+    print(io,"inneighbors: ",[string(get_node(sched,vp).node) for vp in inneighbors(sched,n)]...)
+    print(io,", outneighbors: ",[string(get_node(sched,vp).node) for vp in outneighbors(sched,n)]...)
+    print(io,"\n")
+end

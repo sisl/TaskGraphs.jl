@@ -84,7 +84,7 @@ export
     fix_precutoff_nodes!,
     break_assignments!,
     prune_schedule,
-    prune_project_schedule,
+    # prune_project_schedule,
     splice_schedules!
 
 """
@@ -99,7 +99,7 @@ function get_active_and_fixed_vtxs(sched::OperatingSchedule,t)
     for v in vertices(get_graph(sched))
         if get_tF(sched,v) + minimum(get_local_slack(sched,v)) <= t
             push!(fixed_vtxs, v)
-    elseif get_t0(sched,v) <= t < get_tF(sched,v) + minimum(get_local_slack(sched,v))
+        elseif get_t0(sched,v) <= t < get_tF(sched,v) + minimum(get_local_slack(sched,v))
             push!(active_vtxs, v)
         end
     end
@@ -115,9 +115,11 @@ function split_action_node!(sched::OperatingSchedule,problem_spec::ProblemSpec,n
     node1 = replace_in_schedule!(sched,pred1,node.id)
     set_t0!(node1,get_t0(node))
     set_tF!(node1,t)
-    node2 = add_node!(sched,make_node(sched,problem_spec,pred1))
+    node2 = add_node!(sched,make_node(sched,problem_spec,pred2))
     set_t0!(node2,t)
-    set_tF!(node2,t+get_min_duration(node2.path_spec))
+    set_tF!(node2,t+get_min_duration(node2.spec))
+    @show node_id(node1), string(node1.node), node1
+    @show node_id(node2), string(node2.node), node2
     # set_tF!(sched,id2,get_tF(node))
     for v in outneighbors(sched,get_vtx(sched,node1.id))
         rem_edge!(sched,node1,v)
@@ -142,11 +144,11 @@ function split_active_vtxs!(sched::OperatingSchedule,problem_spec::ProblemSpec,t
     # split active nodes
     for v in active_vtxs
         node = get_node(sched,v)
-        if isa(node,BOT_GO) # split TODO why aren't we splitting CARRY, COLLECT, and DEPOSIT as well?
-            x = robot_positions[node.r].x
+        if matches_template(BOT_GO,node) # split TODO why aren't we splitting CARRY, COLLECT, and DEPOSIT as well?
+            x = robot_positions[get_robot_id(node)].x
             node1,node2 = split_action_node!(sched,problem_spec,node,x,t)
             set_path_spec!(node1,PathSpec(get_path_spec(node1),fixed=true,plan_path=false))
-            set_path_spec!(node2,PathSpec(get_path_spec(node1),tight=true))
+            set_path_spec!(node2,PathSpec(get_path_spec(node2),tight=true))
         end
     end
     set_leaf_operation_vtxs!(sched)
@@ -168,7 +170,7 @@ function fix_precutoff_nodes!(sched::OperatingSchedule,problem_spec::ProblemSpec
     for v in fixed_vtxs
         set_path_spec!(sched,v,PathSpec(get_path_spec(sched,v), plan_path=false, fixed=true))
     end
-    # verify that all vertices following active_vtxs have a start time > 0
+    # verify that all vertices following active_vtxs have a start time > t
     @assert all(map(v->get_t0(sched,v), collect(fixed_vtxs)) .<= t)
     @assert all(map(v->get_tF(sched,v) + minimum(get_local_slack(sched,v)), collect(active_vtxs)) .>= t)
     sched
@@ -279,7 +281,6 @@ function prune_schedule(sched::OperatingSchedule,
             # add deleted objects back in
             input_ids = Set(map(v2->get_object_id(get_node_from_vtx(new_sched,v2)), inneighbors(new_sched,v)))
             for (object_id,o) in preconditions(pred)
-                # if !(get_object_id(o) in input_ids)
                 if !(object_id in input_ids)
                     o_node = add_node!(new_sched,make_node(sched,problem_spec,o)) 
                     add_edge!(new_sched, o_node.id, node)
@@ -299,26 +300,26 @@ end
 prune_schedule(env::SearchEnv,args...) = prune_schedule(get_schedule(env),get_problem_spec(env),args...)
 prune_schedule(solver,env::SearchEnv,args...) = prune_schedule(env,args...)
 
-"""
-    `prune_project_schedule`
+# """
+#     `prune_project_schedule`
 
-Remove all vertices that have already been completed. The idea is to identify
-all `Operation`s that are completed before `t`, remove all nodes upstream of
-them (except for ROBOT_AT nodes), and create new edges between the ROBOT_AT
-nodes and their first GO assignments.
-"""
-function prune_project_schedule(sched::OperatingSchedule,problem_spec::ProblemSpec,t;
-        robot_positions::Dict{RobotID,ROBOT_AT}=Dict{RobotID,ROBOT_AT}()
-    )
-    new_sched = prune_schedule(sched,problem_spec,t)
-    # split active nodes
-    new_sched = split_active_vtxs!(new_sched,problem_spec,t;robot_positions=robot_positions)
-    # freeze nodes that terminate before cutoff time
-    fix_precutoff_nodes!(new_sched,problem_spec,t)
-    # Remove all "assignments" from schedule
-    break_assignments!(new_sched,problem_spec)
-    new_sched
-end
+# Remove all vertices that have already been completed. The idea is to identify
+# all `Operation`s that are completed before `t`, remove all nodes upstream of
+# them (except for ROBOT_AT nodes), and create new edges between the ROBOT_AT
+# nodes and their first GO assignments.
+# """
+# function prune_project_schedule(sched::OperatingSchedule,problem_spec::ProblemSpec,t;
+#         robot_positions::Dict{RobotID,ROBOT_AT}=Dict{RobotID,ROBOT_AT}()
+#     )
+#     new_sched = prune_schedule(sched,problem_spec,t)
+#     # split active nodes
+#     new_sched = split_active_vtxs!(new_sched,problem_spec,t;robot_positions=robot_positions)
+#     # freeze nodes that terminate before cutoff time
+#     fix_precutoff_nodes!(new_sched,problem_spec,t)
+#     # Remove all "assignments" from schedule
+#     break_assignments!(new_sched,problem_spec)
+#     new_sched
+# end
 
 """
     splice_schedules!(sched::P,next_sched::P) where {P<:OperatingSchedule}
@@ -657,6 +658,7 @@ function replan!(solver, replan_model, search_env, request;
     t_commit = get_commit_time(replan_model, search_env, request, commit_threshold)
     t_final = minimum(map(length, get_paths(get_route_plan(search_env))))
     t_split = min(t_commit,t_final)
+
     robot_positions=get_env_snapshot(search_env,t_split)
     reset_solver!(solver)
     set_time_limits!(replan_model,solver,t_request,t_commit)
@@ -664,15 +666,17 @@ function replan!(solver, replan_model, search_env, request;
     new_sched = prune_schedule(replan_model,search_env,t_split)
     @assert sanity_check(new_sched," after prune_schedule()")
     # split active nodes
-    new_sched = split_active_vtxs!(replan_model,new_sched,problem_spec,t_split;robot_positions=robot_positions)
+    # new_sched = split_active_vtxs!(replan_model,new_sched,problem_spec,t_split;robot_positions=robot_positions)
+    new_sched = split_active_vtxs!(replan_model,new_sched,problem_spec,t_commit;robot_positions=robot_positions)
     @assert sanity_check(new_sched," after split_active_vtxs!()")
     # freeze nodes that terminate before cutoff time
-    new_sched = fix_precutoff_nodes!(replan_model,new_sched,problem_spec,t_split)
+    # new_sched = fix_precutoff_nodes!(replan_model,new_sched,problem_spec,t_split)
+    new_sched = fix_precutoff_nodes!(replan_model,new_sched,problem_spec,t_commit)
     # Remove all "assignments" from schedule
     break_assignments!(replan_model,new_sched,problem_spec)
     @assert sanity_check(new_sched," after break_assignments!()")
     # splice projects together!
-    set_t0!(next_sched,t_commit)
+    set_t0!(next_sched,t_commit) 
     splice_schedules!(new_sched,next_sched)
     process_schedule!(new_sched)
     @assert sanity_check(new_sched," after splice_schedules!()")

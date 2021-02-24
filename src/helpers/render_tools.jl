@@ -1417,6 +1417,50 @@ function show_times(sched::OperatingSchedule,v,scalar_slack=true)
     end
     return string(get_t0(sched,v),", ",get_tF(sched,v),", ",slack_string)
 end
+
+GraphPlottingBFS._title_string(n::BOT_GO)       = "G"
+GraphPlottingBFS._title_string(n::BOT_COLLECT)  = "C"
+GraphPlottingBFS._title_string(n::BOT_CARRY)    = "T"
+GraphPlottingBFS._title_string(n::BOT_DEPOSIT)  = "D"
+GraphPlottingBFS._title_string(::Operation)     = "OP"
+GraphPlottingBFS._title_string(::OBJECT_AT)     = "O"
+GraphPlottingBFS._title_string(::BOT_AT)        = "R"
+
+for op in (
+    :(GraphPlottingBFS._node_shape),
+    :(GraphPlottingBFS._node_color),
+    :(GraphPlottingBFS._title_string),
+    :(GraphPlottingBFS._subtitle_string),
+    :(GraphPlottingBFS.draw_node)
+    )
+    @eval $op(n::ScheduleNode,args...) = $op(n.node,args...)
+end
+
+# GraphPlottingBFS._subtitle_string(n::AbstractPlanningPredicate) = "$(get_id(node_id(n)))"
+GraphPlottingBFS._subtitle_string(n::BOT_AT) = "r$(get_id(get_robot_id(n))),x$(get_id(get_initial_location_id(n)))"
+GraphPlottingBFS._subtitle_string(n::OBJECT_AT) = "o$(get_id(get_object_id(n))),x$(get_id(get_initial_location_id(n)))"
+GraphPlottingBFS._subtitle_string(n::BOT_GO) = "r$(get_id(get_robot_id(n))),x$(get_id(get_initial_location_id(n)))=>x$(get_id(get_destination_location_id(n)))"
+GraphPlottingBFS._subtitle_string(n::Union{BOT_COLLECT,BOT_DEPOSIT}) = "r$(get_id(get_robot_id(n))),o$(get_id(get_object_id(n))),x$(get_id(get_initial_location_id(n)))"
+GraphPlottingBFS._subtitle_string(n::BOT_CARRY) = "r$(get_id(get_robot_id(n))),o$(get_id(get_object_id(n))),x$(get_id(get_initial_location_id(n)))=>x$(get_id(get_destination_location_id(n)))"
+
+# global SPACE_GRAY = RGB(0.2,0.2,0.2)
+# global BRIGHT_RED = RGB(0.6,0.0,0.2)
+# global LIGHT_BROWN = RGB(0.6,0.3,0.2)
+# global LIME_GREEN = RGB(0.2,0.6,0.2)
+# global BRIGHT_BLUE = RGB(0.0,0.4,1.0)
+
+GraphPlottingBFS._node_color(::BOT_AT)                      = RGB(0.2,0.6,0.2)
+GraphPlottingBFS._node_color(::OBJECT_AT)                   = RGB(0.2,0.2,0.2)
+GraphPlottingBFS._node_color(::Operation)                   = RGB(0.6,0.0,0.2)
+GraphPlottingBFS._node_color(::AbstractSingleRobotAction)   = RGB(0.0,0.4,1.0)
+
+GraphPlottingBFS._subtitle_text_scale(n::AbstractPlanningPredicate) = 0.3
+GraphPlottingBFS._text_color(n::AbstractPlanningPredicate) = "black"
+
+function GraphPlottingBFS.draw_node(g::AbstractCustomNGraph,v,args...;kwargs...) 
+    draw_node(get_node(g,v))
+end
+
 # function show_times(cache::PlanningCache,v)
 #     slack = minimum(get_slack(sched,v))
 #     slack_string = slack == Inf ? string(slack) : string(Int(slack))

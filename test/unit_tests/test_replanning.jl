@@ -199,6 +199,7 @@ let
         push!(planner_configs,planner_config)
     end
 
+    reset_all_id_counters!()
     # warm up to precompile replanning code
     planner_config = planner_configs[1]
     planner = planner_config.planner
@@ -244,19 +245,34 @@ let
 
     stage = 1
     request = prob.requests[stage]
-    request = ProjectRequest(request.schedule,0,0)
+    # request = ProjectRequest(request.schedule,0,0)
     remap_object_ids!(request.schedule,get_schedule(env))
+
+    solver = plannerA.solver
+    replan_model = plannerA.replanner
+    commit_threshold = get_commit_threshold(replan_model)
+    search_env = env
 
     base_envA = replan!(plannerA,env,request)
 
     pctapf = TaskGraphs.construct_pctapf_problem(prob,base_envA)
 
     # envA,cost = solve!(plannerA.solver,pctapf)
-    solver = plannerA.solver
     pcta = formulate_assignment_problem(solver.assignment_model,pctapf)
+    set_verbosity!(solver.assignment_model,2)
     sched, cost = solve_assignment_problem!(solver.assignment_model,pcta,pctapf)
-    termination_status(solver.assignment_model.milp.model)
-    sched, cost = solve_assignment_problem!(TaskGraphsMILPSolver(ExtendedAssignmentMILP()),pcta,pctapf)
+    # Check to see if start times line up
+    for n in node_iterator(sched,topological_sort_by_dfs(sched))
+        base_node = get_node(pctapf.env.schedule,node_id(n))
+        TaskGraphs.print_schedule_node_details(stdout,sched,n)
+        s = "                  t0_base: $(get_t0(base_node)), " #t0: $(get_t0(n)), tF: $(get_tF(n)), "
+        print(s,"\n")
+    end
+    for n in node_iterator(sched,topological_sort_by_dfs(sched))
+        @show string(n.node), get_t0(n), get_t0(get_node(pctapf.env.schedule,node_id(n))), get_tF(n)
+    end
+    # termination_status(solver.assignment_model.milp.model)
+    # sched, cost = solve_assignment_problem!(TaskGraphsMILPSolver(ExtendedAssignmentMILP()),pcta,pctapf)
     @assert cost == maximum(get_tF(sched)) "Why is cost $(cost) but max tF $(maximum(get_tF(sched)))?"
     @test validate(sched)
 
@@ -271,6 +287,7 @@ let
         resultsA,prob,stage,request)
 
     Revise.includet(joinpath(pathof(TaskGraphs),"..","helpers/render_tools.jl"))
+    display_graph(sched,scale=2.0,aspect_stretch=(0.8,0.8))
     # set_real_time_flag!(planner_config.planner,false)
     # @info "Profiling $(planner_config.planner_name)"
     # # profile
