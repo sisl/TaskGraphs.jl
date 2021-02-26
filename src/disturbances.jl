@@ -295,12 +295,12 @@ function add_headless_cleanup_task!(
         )
 
     robot_id = CleanUpBotID(-1)
-    action_id = get_unique_action_id()
+    action_id = get_unique_id(ActionID)
     add_to_sched!(sched, spec, CLEAN_UP(robot_id, d.vtxs), action_id)
     set_t0!(sched,action_id,t0)
 
     prev_action_id = action_id
-    action_id = get_unique_action_id()
+    action_id = get_unique_id(ActionID)
     add_to_sched!(sched, spec, CUB_GO(robot_id, d.vtxs[1], return_vtx), action_id)
     set_t0!(sched,action_id,t0)
     add_edge!(sched, prev_action_id, action_id)
@@ -315,14 +315,20 @@ function remove_robot!(env::SearchEnv,id::BotID,t::Int)
     to_remove = Set{AbstractID}(id)
     v = get_vtx(sched,id)
     for vp in edges(bfs_tree(G,v))
-        n_id = get_vtx_id(sched,vp)
-        if isa(n_id,ActionID)
-            node = get_node_from_id(sched,n_id)
-            if isa(node,BOT_GO)
-                push!(to_remove,n_id)
+        node = get_node(sched,vp)
+        # n_id = get_vtx_id(sched,vp)
+        # if isa(n_id,ActionID)
+        if matches_template(AbstractRobotAction,node)
+            # node = get_node_from_id(sched,n_id)
+            # if isa(node,BOT_GO)
+            if matches_template(BOT_GO,node)
+                # push!(to_remove,n_id)
+                push!(to_remove,node_id(node))
             else
-                new_node = replace_robot_id(node,-1)
+                # new_node = replace_robot_id(node,-1)
                 replace_in_schedule!(sched,get_problem_spec(env),new_node,n_id)
+                new_node = replace_robot_id(node.node,-1)
+                replace_in_schedule!(sched,get_problem_spec(env),new_node,node_id(node))
             end
         end
     end

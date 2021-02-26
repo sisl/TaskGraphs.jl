@@ -139,7 +139,7 @@ function construct_operation(
         input_ids::Vector{ObjectID}, 
         output_ids::Vector{ObjectID},
         Δt, 
-        id=get_unique_operation_id()
+        id=get_unique_id(OperationID)
         )
     op = Operation(
         pre = Dict{ObjectID,OBJECT_AT}(map(id->id=>get_final_condition(spec,id), input_ids)), 
@@ -615,9 +615,16 @@ end
 function GraphUtils.make_node(g::OperatingSchedule,spec::PathSpec,pred::OBJECT_AT,id=get_object_id(pred))
     ScheduleNode(id,pred,spec)
 end
+# function GraphUtils.make_node(g::OperatingSchedule,spec::PathSpec,pred::Union{OBJECT_AT,BOT_AT,Operation},id=node_id(pred))
+#     ScheduleNode(id,pred,spec)
+# end
+# function GraphUtils.make_node(g::OperatingSchedule,spec::PathSpec,pred::A,id=node_id(pred)) where {A<:AbstractRobotAction}
 function GraphUtils.make_node(g::OperatingSchedule,spec::PathSpec,pred::AbstractRobotAction,id=get_unique_action_id())
     ScheduleNode(id,pred,spec)
 end
+# function GraphUtils.make_node(g::OperatingSchedule,spec::PathSpec,pred::A,id=get_unique_id(TemplatedID{A})) where {A<:BOT_GO}
+#     ScheduleNode(id,pred,spec)
+# end
 function GraphUtils.make_node(g::OperatingSchedule,spec::PathSpec,pred::Operation,id=get_operation_id(pred))
     ScheduleNode(id,pred,spec)
 end
