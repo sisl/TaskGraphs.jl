@@ -198,7 +198,6 @@ get_object_id(pred::OBJECT_AT) = pred.o
 get_location_id(pred::OBJECT_AT) = pred.x[1]
 get_location_ids(pred::OBJECT_AT) = pred.x
 
-
 """
 	BOT_AT <: AbstractPlanningPredicate
 
@@ -208,7 +207,7 @@ struct BOT_AT{R<:AbstractRobotType} <: AbstractPlanningPredicate
     r::BotID{R}
     x::LocationID
 end
-robot_type(a::BOT_AT{R}) where {R} = R
+robot_type(::BOT_AT{R}) where {R} = R
 get_location_id(pred::BOT_AT) 	= pred.x
 get_robot_id(pred::BOT_AT) 		= pred.r
 
@@ -241,6 +240,7 @@ A manufacturing operation.
 end
 get_location_id(op::Operation) = op.station_id
 get_operation_id(op::Operation) = op.id
+GraphUtils.get_id(op::Operation) = get_id(op.id)
 duration(op::Operation) = op.Δt
 preconditions(op::Operation) = op.pre
 postconditions(op::Operation) = op.post
@@ -272,15 +272,9 @@ for op in (:set_precondition!,:set_postcondition!)
 end
 get_input_ids(op::Operation) = sort(collect(keys(preconditions(op))))
 get_output_ids(op::Operation) = sort(collect(keys(postconditions(op))))
-GraphUtils.get_id(op::Operation) = get_id(op.id)
 
 get_dropoff(op::Operation,o::ObjectID) = get_location_id(get_precondition(op,o))
 get_dropoffs(op::Operation,o::ObjectID) = get_location_ids(get_precondition(op,o))
-
-id_type(::BOT_AT{R}) where {R} = BotID{R} 
-id_type(::AbstractRobotAction{R}) where {R} = ActionID
-id_type(::OBJECT_AT) = ObjectID
-id_type(::Operation) = OperationID
 
 export
 	BOT_GO,BOT_CARRY,BOT_COLLECT,BOT_DEPOSIT,
@@ -410,7 +404,8 @@ sub_nodes(n) = [n]
 sub_nodes(n::TEAM_ACTION) = n.instructions
 team_configuration(n) = (1,1)
 team_configuration(n::TEAM_ACTION) = n.shape
-team_action_type(n::TEAM_ACTION{R,A}) where {R,A} = A
+team_action_type(::TEAM_ACTION{R,A}) where {R,A} = A
+
 
 export
 	TEAM_GO,
@@ -422,6 +417,29 @@ const TEAM_GO= TEAM_ACTION{DeliveryBot,GO}
 const TEAM_COLLECT= TEAM_ACTION{DeliveryBot,COLLECT}
 const TEAM_CARRY= TEAM_ACTION{DeliveryBot,CARRY}
 const TEAM_DEPOSIT= TEAM_ACTION{DeliveryBot,DEPOSIT}
+
+
+id_type(::BOT_AT{R}) where {R} = BotID{R} 
+id_type(::OBJECT_AT) = ObjectID
+id_type(::Operation) = OperationID
+# id_type(::AbstractRobotAction{R}) where {R} = ActionID
+id_type(::A) where {A<:AbstractRobotAction) = TemplatedID{A}
+
+GraphUtils.node_id(pred::OBJECT_AT) = get_object_id(pred)
+GraphUtils.node_id(pred::BOT_AT) 	= get_robot_id(pred)
+GraphUtils.node_id(pred::Operation) = get_operation_id(pred)
+function GraphUtils.node_id(n::A) where {A<:Union{BOT_DEPOSIT,BOT_CARRY,BOT_COLLECT}}
+	TemplatedID{A}(get_id(get_object_id(n)))
+end
+function GraphUtils.node_id(n::A) where {A<:Union{TEAM_COLLECT,TEAM_CARRY,TEAM_DEPOSIT}}
+	TemplatedID{A}(get_id(get_object_id(n)))
+end
+
+function _unique_or_existing_id(n::Union{BOT_GO,CLEAN_UP,UNDERTAKE})
+	get_unique_id(id_type(n))
+end
+_unique_or_existing_id(n::AbstractPlanningPredicate) = node_id(n)
+
 
 get_location_id(a::A) where {A<:Union{BOT_COLLECT,BOT_DEPOSIT}}             				= a.x
 get_initial_location_id(a::A) where {A<:Union{BOT_GO,BOT_CARRY}}        					= a.x1
