@@ -90,6 +90,7 @@ function add_gadget_layer!(G::GadgetGraph,edge_list,t,vtx_map=Dict{Int,Int}())
         end
         if e.src == e.dst
             # shortcut
+            # |
             add_vertex!(G,t)
             add_edge!(G,vtx_map[e.src],nv(G))
             push!(get!(outgoing,e.dst,Int[]),nv(G))
@@ -98,6 +99,9 @@ function add_gadget_layer!(G::GadgetGraph,edge_list,t,vtx_map=Dict{Int,Int}())
                 e = reverse(e)
             end
             # Gadget
+            # \ /
+            #  |
+            # / \
             add_movement_vtx!(G,t)
             v1 = nv(G)
             add_edge!(G,vtx_map[e.src],v1)
@@ -166,6 +170,27 @@ function add_continuity_constraints!(model,G,flow)
     end
     return model
 end
+function add_single_transporter_constraint!(model,G,source_map,robot_flow,object_flow,start,goal)
+    T = length(source_map[goal])-1
+    for v in vertices(G)
+        vtx = get_vtx_from_var(G,v)
+        if !(vtx == start || vtx == goal)
+            # if object is not at its start or goal, it cannot be without a robot
+            @constraint(model, object_flow[v] <= robot_flow[v])
+        end
+    end
+    return model
+end
+function add_single_object_per_robot_constraints!(model,G,object_flows)
+    for v in vertices(G)
+        if is_movement_vtx(G,v)
+            # objects may not overlap on movement vtxs (meaning that robot may not
+            # collect multiple objects at once)
+            @constraint(model, sum(flow[v] for flow in values(object_flows)) <= 1)
+        end
+    end
+    return model
+end
 function add_carrying_constraints!(model,G,robot_flow,object_flow)
     for v in vertices(G)
         if is_movement_vtx(G,v)
@@ -176,7 +201,8 @@ function add_carrying_constraints!(model,G,robot_flow,object_flow)
     return model
 end
 function add_precedence_constraints!(model,source_map,inflow,outflow,goal,start,Δt=0)
-    for t in 0:size(source_map,2)-Δt
+    T = length(source_map[goal])-1
+    for t in 0:T-(1+Δt) 
         vtx1 = source_map[goal][t]
         vtx2 = source_map[start][t+1+Δt]
         # if flow1 is not at vtx1, flow2 must still be at vtx2
@@ -310,20 +336,28 @@ function formulate_big_milp(prob::PC_TAPF,EXTRA_T=1)
         add_continuity_constraints!(model,G,object_flow)
         add_carrying_constraints!(model,G,robot_flow,object_flow)
     end
+    add_single_object_per_robot_constraints!(model,G,object_flows)
+    for node in get_nodes(sched)
+        if matches_template(BOT_CARRY,node)
+            pred = node.node
+            start = get_id(get_initial_location_id(pred))
+            goal = get_id(get_destination_location_id(pred))
+            id = get_object_id(pred)
+            add_single_transporter_constraint!(model,G,source_map,robot_flow,
+                object_flows[id],start,goal)
+        end
+    end
     # precedence constraints
     for op in values(get_operations(sched))
-        Δt = duration(op)
         for (id2,o2) in postconditions(op)
             outflow = object_flows[id2]
             start = get_id(get_initial_location_id(o2))
             @assert get_id(get_destination_location_id(object_ICs[id2])) == start
             for (id1,o1) in preconditions(op)
-                # makespans
                 inflow = object_flows[id1]
                 goal = get_id(get_destination_location_id(o1))
-                @show string(id1)=>string(id2)
-                # @assert get_id(get_destination_location_id(get_object_FCs(sched)[id1])) == goal
-                add_precedence_constraints!(model,source_map,inflow,outflow,goal,start,Δt)
+                # @show string(id1)=>string(id2)
+                add_precedence_constraints!(model,source_map,inflow,outflow,goal,start,duration(op))
             end
         end
     end
@@ -372,12 +406,28 @@ function extract_solution(prob::PC_TAPF,m::PCTAPF_MILP)
     unmatched_object_ids = Set{ObjectID}(keys(object_paths))
     for (object_id,object_path) in object_paths
         object_id in unmatched_object_ids ? nothing : continue
+        # t_collect = -1
+        # t_deposit = -1
+        # for (t,o_vtx) in zip(Base.Iterators.countfrom(0),object_path)
+        #     if !(o_vtx == object_path[1])
+        #         t_collect = t-1
+        #         break
+        #     end
+        # end
+        # for (t,o_vtx) in zip(Base.Iterators.countfrom(length(object_path)-1,-1),reverse(object_path))
+        #     if !(o_vtx == object_path[end])
+        #         t_deposit = t+1
+        #         break
+        #     end
+        # end
+        # @show t_collect, t_deposit
         for (robot_id,robot_path) in robot_paths
             object_id in unmatched_object_ids ? nothing : continue
             for (t,(r_vtx,o_vtx)) in enumerate(zip(robot_path,object_path)) 
                 if (o_vtx != object_path[1])
                     if r_vtx == o_vtx 
                         assignment = (t,robot_id,object_id)
+                        # @show assignment
                         push!(assignments,assignment)
                         delete!(unmatched_object_ids, object_id)
                         break
@@ -395,26 +445,66 @@ function extract_solution(prob::PC_TAPF,m::PCTAPF_MILP)
     for assignment in sort(collect(assignments);by=a->a[1])
         t, robot_id, object_id = assignment
         collect_node = collect_tips[object_id]
-        robot_node = robot_tips[robot_id]
+        robot_node = get_node(sched,robot_tips[robot_id])
+        # @show string(robot_node.node)
+        # @show string(align_with_successor(robot_node.node,collect_node.node))
+        robot_node = replace_in_schedule!(sched,
+            get_problem_spec(search_env),
+            align_with_successor(robot_node.node,collect_node.node),
+            node_id(robot_node)
+            )
+        # @show string(robot_node.node), robot_node.spec
         add_edge!(sched,robot_node,collect_node)
-        new_tip = robot_tip_map(sched,Set{Int}(get_vtx(sched,robot_node)))
-        @show robot_tips[robot_id] = new_tip[robot_id]
+        propagate_valid_ids!(sched,get_problem_spec(search_env))
+        robot_tips = robot_tip_map(sched)
+        # robot_tips[robot_id] = new_tip[robot_id]
     end
     # Sync schedule with route plan
     propagate_valid_ids!(sched,get_problem_spec(search_env))
-    process_schedule!(sched)
-    for node in node_iterator(sched,topological_sort_by_dfs(sched))
-        if matches_template(Union{BOT_COLLECT,BOT_CARRY,BOT_DEPOSIT},node)
-            pred = node.node
-            robot_path = robot_paths[get_robot_id(pred)]
-            for (t,vtx) in enumerate(robot_path)
-                t <= get_t0(node) ? continue : nothing
-                if vtx == get_id(get_initial_location_id(pred))
+    for node in get_nodes(sched)
+        if matches_template(BOT_COLLECT,node)
+            object_path = object_paths[get_object_id(node.node)]
+            for (t,o_vtx) in zip(Base.Iterators.countfrom(0),object_path)
+                if !(o_vtx == object_path[1])
                     set_t0!(node,t-1)
                     break
                 end
             end
-            update_schedule_times!(sched,Set{Int}(get_vtx(sched,node)))
+        elseif matches_template(BOT_DEPOSIT,node)
+            object_path = object_paths[get_object_id(node.node)]
+            for (t,o_vtx) in zip(Base.Iterators.countfrom(length(object_path)-1,-1),reverse(object_path))
+                if !(o_vtx == object_path[end])
+                    set_t0!(node,t+1)
+                    break
+                end
+            end
+        end
+    end
+    process_schedule!(sched)
+    # for node in node_iterator(sched,topological_sort_by_dfs(sched))
+    #     if matches_template(Union{BOT_COLLECT,BOT_CARRY,BOT_DEPOSIT},node)
+    #         pred = node.node
+    #         robot_path = robot_paths[get_robot_id(pred)]
+    #         for (t,vtx) in enumerate(robot_path)
+    #             t <= get_t0(node) ? continue : nothing
+    #             if vtx == get_id(get_initial_location_id(pred))
+    #                 set_t0!(node,t-1)
+    #                 # for n in node_iterator(sched,inneighbors(sched,node))
+    #                 #     if matches_template(Union{BOT_CARRY,BOT_GO},n)
+    #                 #         set_tF!(n,get_t0(node))
+    #                 #     end
+    #                 # end
+    #                 break
+    #             end
+    #         end
+    #         update_schedule_times!(sched,Set{Int}(get_vtx(sched,node)))
+    #     end
+    # end
+    for node in get_nodes(sched)
+        if matches_template(Union{BOT_CARRY,BOT_GO},node)
+            if outdegree(sched,node) > 0
+                set_tF!(node,get_t0(sched,outneighbors(sched,node)[1]))
+            end
         end
     end
     return search_env
@@ -439,3 +529,5 @@ function CRCBS.solve!(solver::BigMILPSolver,prob::PC_TAPF)
     env = extract_solution(prob,milp)
     return env, cost
 end
+
+construct_cost_model(solver::BigMILPSolver,sched,cache,args...;kwargs...) = MakeSpan(sched,cache), NullHeuristic()

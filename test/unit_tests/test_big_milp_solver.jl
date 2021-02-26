@@ -1,12 +1,56 @@
 # Big MILP solver
 let
-    prob = pctapf_problem_2(NBSSolver())
+    using Gurobi
+    TaskGraphs.set_default_milp_optimizer!(Gurobi.Optimizer)
+
+    for (i, f) in enumerate([
+        pctapf_problem_1,
+        pctapf_problem_2,
+        pctapf_problem_3,
+        pctapf_problem_4,
+        pctapf_problem_5,
+        # pctapf_problem_6,
+        # pctapf_problem_7,
+        pctapf_problem_8,
+        ])
+        for cost_model in [MakeSpan()]
+            let
+                costs = Float64[]
+                for solver in [
+                        NBSSolver(assignment_model = TaskGraphsMILPSolver(AssignmentMILP())),
+                        BigMILPSolver(EXTRA_T=2),
+                        ]
+                    set_iteration_limit!(solver,1)
+                    @show f
+                    pc_tapf = f(solver;cost_function=cost_model,verbose=false);
+                    env, cost = solve!(solver,pc_tapf)
+                    # @show convert_to_vertex_lists(get_route_plan(env))
+                    push!(costs, cost[1])
+                    @test validate(env.schedule)
+                    @test validate(env.schedule,convert_to_vertex_lists(get_route_plan(env)))
+                    @test cost != typemax(Int)
+                    @test cost != Inf
+                end
+                # @show costs
+                @test all(costs .== costs[1])
+            end
+        end
+    end
+
+end
+let
+    TaskGraphs.clear_default_optimizer_attributes!()
     solver = TaskGraphs.BigMILPSolver(EXTRA_T=2)
-    solve!(solver,prob)
+    prob = pctapf_problem_1(solver)
+    env, cost = solve!(solver,prob)
+    validate(env.schedule)
+    validate(env.schedule,convert_to_vertex_lists(get_route_plan(env)))
 
-    solve!(NBSSolver(),prob)
+    env, cost = solve!(NBSSolver(),prob)
+    convert_to_vertex_lists(env.route_plan)
+    validate(env.schedule)
 
-    milp = TaskGraphs.formulate_big_milp(prob,solver.EXTRA_T)
+    milp = TaskGraphs.formulate_big_milp(prob,solver.EXTRA_T);
     optimize!(milp)
     @test termination_status(milp) == MOI.OPTIMAL
     robot_paths = TaskGraphs.extract_robot_paths(prob,milp)

@@ -794,20 +794,20 @@ function validate(node::ScheduleNode,paths::Vector{Vector{Int}})
             start_vtx = get_id(get_initial_location_id(node))
             final_vtx = get_id(get_destination_location_id(node))
             try
-                @assert(length(path) > get_t0(node), string("length(path) == $(length(path)), should be greater than get_t0(node) == $(get_t0(node)) in node ",string(node)))
-                @assert(length(path) > get_tF(node), string("length(path) == $(length(path)), should be greater than get_t0(node) == $(get_t0(node)) in node ",string(node)))
                 t0 = Int(round(get_t0(node)))
                 tF = Int(round(get_tF(node)))
                 @assert abs(t0-get_t0(node)) <= 0.01
                 @assert abs(tF-get_tF(node)) <= 0.01
+                @assert(length(path) > t0, string("length(path) == $(length(path)), should be greater than get_t0(node) == $(get_t0(node)) in node ",string(node)))
+                @assert(length(path) > tF, string("length(path) == $(length(path)), should be greater than get_tF(node) == $(get_tF(node)) in node ",string(node)))
                 if start_vtx != -1
                     if length(path) > t0
-                        @assert(path[t0 + 1] == start_vtx, string("node: ",string(node), ", start_vtx: ",start_vtx, ", t0+1: ",get_t0(node)+1,", path[get_t0(node) + 1] = ",path[get_t0(node) + 1],", path: ", path))
+                        @assert(path[t0 + 1] == start_vtx, string("node: ",string(node.node), ", start_vtx: ",start_vtx, ", t0+1: ",t0+1,", path[get_t0(node) + 1] = ",path[t0 + 1],", path: ", path))
                     end
                 end
                 if final_vtx != -1
                     if length(path) > tF
-                        @assert(path[tF + 1] == final_vtx, string("node: ",string(node), ", final vtx: ",final_vtx, ", tF+1: ",get_tF(node)+1,", path[get_tF(node) + 1] = ",path[get_tF(node) + 1],", path: ", path))
+                        @assert(path[tF + 1] == final_vtx, string("node: ",string(node.node), ", final vtx: ",final_vtx, ", tF+1: ",tF+1,", path[get_tF(node) + 1] = ",path[tF + 1],", path: ", path))
                     end
                 end
             catch e
