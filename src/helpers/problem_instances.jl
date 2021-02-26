@@ -1,7 +1,8 @@
 export
     init_env_1,
     init_env_2,
-    init_env_3
+    init_env_3,
+    init_env_small
 
 init_env_1() = construct_regular_factory_world(;
     n_obstacles_x=2,
@@ -30,6 +31,16 @@ init_env_3() = construct_regular_factory_world(;
     obs_offset = [1;1],
     env_pad = [1;1],
     # env_offset = [1,1],
+    env_scale = 1,
+    exclude_from_free = true,
+)
+
+init_env_small() = construct_regular_factory_world(;
+    n_obstacles_x=2,
+    n_obstacles_y=2,
+    obs_width = [2;2],
+    obs_offset = [2;2],
+    env_pad = [1;1],
     env_scale = 1,
     exclude_from_free = true,
 )

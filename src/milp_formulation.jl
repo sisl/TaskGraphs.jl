@@ -1,35 +1,32 @@
 """
-    The number of edges in each "gadget" per original edge
+The number of edges in each "gadget" per original edge
 """
 const GADGET_EDGE_MULTIPLIER = 5
 const GADGET_VTX_MULTIPLIER = 2
 
 
 """
-    It is necessary to convert the env graph to an undirected graph because the
-    gadget is based on undirected edges. Self-edges also need to be removed, as
-    these are already accounted for in the gadget.
+    convert_env_graph_to_undirected(G)
+
+It is necessary to convert the env graph to an undirected graph because the
+gadget is based on undirected edges. Self-edges also need to be removed, as 
+these are already accounted for in the gadget.
 """
 function convert_env_graph_to_undirected(G)
     env_graph = Graph(G)
-    # for v in vertices(env_graph)
-    #     rem_edge!(env_graph,v,v)
-    # end
-    # return env_graph
 end
 
 """
     GadgetGraph
 
 Represents a time-extended graph useful for MILP formulations
-
 """
 @with_kw_noshow struct GadgetGraph <: AbstractGraph{Int}
     G::DiGraph          = DiGraph()
     vtxs::Vector{Int}   = Vector{Int}()
     tvec::Vector{Int}   = Vector{Int}()
 end
-Base.zero(graph::GadgetGraph) = GadgetGraph()
+Base.zero(::GadgetGraph) = GadgetGraph()
 LightGraphs.edges(graph::GadgetGraph) = edges(graph.G)
 LightGraphs.is_directed(graph::GadgetGraph) = true
 function LightGraphs.add_vertex!(graph::GadgetGraph,t=-1,v=-1)
@@ -58,11 +55,13 @@ add_movement_vtx!(graph::GadgetGraph,t) = add_vertex!(graph,t,0)
 is_movement_vtx(graph::GadgetGraph,v) = get_vtx_from_var(graph,v) == 0
 
 """
-    Return a source map such that source_map[v][t] points to the corresponding
-    vertex in the gadget graph.
+    get_source_map(G::GadgetGraph,env_graph,TMAX)
+
+Return a source map such that source_map[v][t] points to the corresponding 
+vertex in the gadget graph.
 """
-function get_source_map(G::GadgetGraph,env_graph,T_MAX)
-    # source_map = zeros(Int,nv(env_graph),T_MAX)
+function get_source_map(G::GadgetGraph,env_graph,TMAX)
+    # source_map = zeros(Int,nv(env_graph),TMAX)
     source_map = [Dict{Int,Int}() for v in 1:nv(env_graph)]
     for (idx,v,t) in zip(vertices(G),G.vtxs,G.tvec)
         if has_vertex(env_graph,v)
@@ -126,20 +125,25 @@ function add_gadget_layer!(G::GadgetGraph,edge_list,t,vtx_map=Dict{Int,Int}())
     return outgoing
 end
 
-function construct_gadget_graph(env_graph,T_MAX,t0=0,cap=true)
+function construct_gadget_graph(env_graph,TMAX,t0=0,cap=true)
     G = GadgetGraph()
     incoming = Dict(v=>Int[] for v in vertices(env_graph))
     edge_list = collect(edges(env_graph))
-    for t in t0:T_MAX-1
+    for t in t0:TMAX-1
         outgoing = add_vertex_layer!(G,incoming,t)
         incoming = add_gadget_layer!(G,edge_list,t,outgoing)
     end
     if cap
-        add_vertex_layer!(G,incoming,T_MAX)
+        add_vertex_layer!(G,incoming,TMAX)
     end
     return G
 end
 
+"""
+    add_point_constraint!(model,source_map,flow,v,t=0)
+
+Constrain flow to be equal to 1 at vertex `v`, time `t`
+"""
 function add_point_constraint!(model,source_map,flow,v,t=0)
     idx = source_map[v][t]
     @constraint(model, flow[idx] == 1)
@@ -179,9 +183,9 @@ function add_precedence_constraints!(model,source_map,inflow,outflow,goal,start,
         @constraint(model,outflow[vtx2] + inflow[vtx1] >= 1)
     end
 end
-function add_makespan_constraint!(model,T,flow,source_map,goal)
+function add_makespan_constraint!(model,T,flow,source_map,goal,op_duration=0)
     for (t,v) in source_map[goal]
-        @constraint(model,T >= t*(1-flow[v]))
+        @constraint(model,T >= 1+t*(1-flow[v])+op_duration)
     end
     return model
 end
@@ -196,7 +200,15 @@ struct PCTAPF_MILP
     robot_flow::Vector{VariableRef}
     object_flows::Dict{ObjectID,Vector{VariableRef}}
 end
-JuMP.optimize!(m::PCTAPF_MILP) = JuMP.optimize!(m.model)
+for op in [
+    :(JuMP.optimize!),
+    :(JuMP.primal_status),
+    :(JuMP.termination_status),
+    :(JuMP.objective_bound),
+    :(JuMP.objective_value),
+]
+    @eval $op(m::PCTAPF_MILP) = $op(m.model)
+end
 extract_robot_flow(m::PCTAPF_MILP) = Int.(round.(value.(m.robot_flow)))
 extract_object_flows(m::PCTAPF_MILP) = Dict(id=>Int.(round.(value.(var))) for (id,var) in m.object_flows)
 function extract_flow_path(m::PCTAPF_MILP,flow,v0,t0)
@@ -249,28 +261,12 @@ function extract_object_paths(prob::PC_TAPF,m::PCTAPF_MILP)
     return paths
 end
 
-function extract_solution(prob::PC_TAPF,m::PCTAPF_MILP,TMAX)
-    robot_paths = extract_robot_paths(prob,m)
-    object_paths = extract_object_paths(prob,m)
-    assignments = Set{Tuple{Int,RobotID,ObjectID}}()
-    unmatched_object_ids = Set{ObjectID}(keys(object_paths))
-    for (robot_id,robot_path) in robot_paths
-        for (object_id,object_path) in object_paths
-            object_id in unmatched_object_ids ? nothing : continue
-            for (t,(r_vtx,o_vtx)) in enumerate(zip(robot_path,object_path))
-                if r_vtx == o_vtx
-                    push!(assignments,(t,robot_id,object_id))
-                    delete!(unmatched_object_ids, object_id)
-                end
-            end
-        end
-    end
-    # Add assignments to schedule
-    robot_tips = robot_tip_map(prob.sched)
-    # collect_tips = Dict{ObjectID,ScheduleNode}()
-    for assignments in sort(collect(assignments);by=a->a[1])
+export BigMILPSolver
 
-    end
+@with_kw struct BigMILPSolver <: AbstractPCTAPFSolver
+    EXTRA_T::Int                       = 10
+    LIMIT_EXTRA_T::Int                 = 1000
+    logger::SolverLogger{Float64}   = SolverLogger{Float64}()
 end
 
 """
@@ -278,13 +274,18 @@ end
 
 Formulate a PCTAPF problem as a giant network flow MILP.
 """
-function formulate_big_milp(prob::PC_TAPF,T_MAX,model = JuMP.Model())
+function formulate_big_milp(prob::PC_TAPF,EXTRA_T=1)
+    model = JuMP.Model(default_milp_optimizer())
+    set_optimizer_attributes(model,default_optimizer_attributes()...)
+
     sched = get_schedule(get_env(prob))
     robot_ICs = get_robot_ICs(sched)
     object_ICs = get_object_ICs(sched)
     env_graph = convert_env_graph_to_undirected(get_graph(get_env(prob)).graph)
-    G = construct_gadget_graph(env_graph,T_MAX) # for robot flow
-    source_map = get_source_map(G,env_graph,T_MAX)
+    # Choose the time horizon to fix for the flow formulation
+    TMAX = makespan_lower_bound(sched,get_problem_spec(get_env(prob)))+EXTRA_T
+    G = construct_gadget_graph(env_graph,TMAX) # for robot flow
+    source_map = get_source_map(G,env_graph,TMAX)
     # Robot flows
     @variable(model,robot_flow[1:nv(G)], binary=true)
     # Object flows
@@ -294,7 +295,7 @@ function formulate_big_milp(prob::PC_TAPF,T_MAX,model = JuMP.Model())
     # initial constraints
     for (id,pred) in robot_ICs
         v0 = get_id(get_initial_location_id(pred))
-        t0 = get_t0(get_env(prob),id)
+        t0 = Int(round(get_t0(get_env(prob),id)))
         add_point_constraint!(model,source_map,robot_flow,v0,t0)
     end
     add_total_flow_constraint!(model,source_map,robot_flow,length(robot_ICs))
@@ -304,7 +305,7 @@ function formulate_big_milp(prob::PC_TAPF,T_MAX,model = JuMP.Model())
         add_total_flow_constraint!(model,source_map,object_flow,1)
         # initial location
         v0 = get_id(get_initial_location_id(pred))
-        t0 = get_t0(get_env(prob),id)
+        t0 = Int(round(get_t0(get_env(prob),id)))
         add_point_constraint!(model,source_map,object_flow,v0,t0)
         add_continuity_constraints!(model,G,object_flow)
         add_carrying_constraints!(model,G,robot_flow,object_flow)
@@ -318,9 +319,9 @@ function formulate_big_milp(prob::PC_TAPF,T_MAX,model = JuMP.Model())
             @assert get_id(get_destination_location_id(object_ICs[id2])) == start
             for (id1,o1) in preconditions(op)
                 # makespans
-                # id1 = get_object_id(o1)
                 inflow = object_flows[id1]
                 goal = get_id(get_destination_location_id(o1))
+                @show string(id1)=>string(id2)
                 # @assert get_id(get_destination_location_id(get_object_FCs(sched)[id1])) == goal
                 add_precedence_constraints!(model,source_map,inflow,outflow,goal,start,Δt)
             end
@@ -331,12 +332,11 @@ function formulate_big_milp(prob::PC_TAPF,T_MAX,model = JuMP.Model())
     for op in values(get_operations(sched))
         for (id,o) in preconditions(op)
             # makespans
-            # id = get_object_id(o)
             object_flow = object_flows[id]
             goal = get_id(get_destination_location_id(o))
-            # @show o, goal
-            add_point_constraint!(model,source_map,object_flow,goal,T_MAX)
-            add_makespan_constraint!(model,T,object_flow,source_map,goal)
+            # @show string(o)
+            add_point_constraint!(model,source_map,object_flow,goal,TMAX)
+            add_makespan_constraint!(model,T,object_flow,source_map,goal,duration(op))
         end
     end
     @objective(model,Min,T)
@@ -344,30 +344,98 @@ function formulate_big_milp(prob::PC_TAPF,T_MAX,model = JuMP.Model())
 end
 
 
+function extract_solution(prob::PC_TAPF,m::PCTAPF_MILP)
+    sched = deepcopy(get_schedule(get_env(prob)))
+    cache = initialize_planning_cache(sched)
+    search_env = SearchEnv(
+        schedule=sched,
+        cache=cache,
+        env_layers=get_env(prob).env_layers,
+        cost_model=MakeSpan(sched,cache),
+        heuristic_model=NullHeuristic())
+    route_plan = get_route_plan(search_env)
 
-@with_kw struct BigMILPSolver <: AbstractPCTAPFSolver
-    TMAX::Int                       = 10
-    LIMIT_TMAX::Int                     = 1000
-    logger::SolverLogger{Float64}   = SolverLogger{Float64}()
+    robot_paths = extract_robot_paths(prob,m)
+    object_paths = extract_object_paths(prob,m)
+    # extract route plan
+    for (robot_id,robot_path) in robot_paths
+        path = get_paths(route_plan)[get_id(robot_id)]
+        for (t,(v1,v2)) in enumerate(zip(robot_path[1:end-1],robot_path[2:end]))
+            s = GraphState(v1,t-1)
+            a = GraphAction(LightGraphs.Edge(v1,v2),1)
+            sp = GraphState(v2,t)
+            push!(path,PathNode(s,a,sp))
+        end
+    end
+    # extract schedule
+    assignments = Set{Tuple{Int,RobotID,ObjectID}}()
+    unmatched_object_ids = Set{ObjectID}(keys(object_paths))
+    for (object_id,object_path) in object_paths
+        object_id in unmatched_object_ids ? nothing : continue
+        for (robot_id,robot_path) in robot_paths
+            object_id in unmatched_object_ids ? nothing : continue
+            for (t,(r_vtx,o_vtx)) in enumerate(zip(robot_path,object_path)) 
+                if (o_vtx != object_path[1])
+                    if r_vtx == o_vtx 
+                        assignment = (t,robot_id,object_id)
+                        push!(assignments,assignment)
+                        delete!(unmatched_object_ids, object_id)
+                        break
+                    end
+                end
+            end
+        end
+    end
+    sched = get_schedule(search_env)
+    # Add assignments to schedule
+    robot_tips = robot_tip_map(sched)
+    collect_tips = Dict{ObjectID,ScheduleNode}(
+        get_object_id(n) => n for n in get_nodes(sched) if matches_template(BOT_COLLECT,n)
+    )
+    for assignment in sort(collect(assignments);by=a->a[1])
+        t, robot_id, object_id = assignment
+        collect_node = collect_tips[object_id]
+        robot_node = robot_tips[robot_id]
+        add_edge!(sched,robot_node,collect_node)
+        new_tip = robot_tip_map(sched,Set{Int}(get_vtx(sched,robot_node)))
+        @show robot_tips[robot_id] = new_tip[robot_id]
+    end
+    # Sync schedule with route plan
+    propagate_valid_ids!(sched,get_problem_spec(search_env))
+    process_schedule!(sched)
+    for node in node_iterator(sched,topological_sort_by_dfs(sched))
+        if matches_template(Union{BOT_COLLECT,BOT_CARRY,BOT_DEPOSIT},node)
+            pred = node.node
+            robot_path = robot_paths[get_robot_id(pred)]
+            for (t,vtx) in enumerate(robot_path)
+                t <= get_t0(node) ? continue : nothing
+                if vtx == get_id(get_initial_location_id(pred))
+                    set_t0!(node,t-1)
+                    break
+                end
+            end
+            update_schedule_times!(sched,Set{Int}(get_vtx(sched,node)))
+        end
+    end
+    return search_env
 end
 
 function CRCBS.solve!(solver::BigMILPSolver,prob::PC_TAPF)
-    model = Model(default_milp_optimizer())
-    set_optimizer_attributes(model,default_optimizer_attributes()...)
-
-    TMAX = solver.TMAX
-    milp = formulate_big_milp(prob, solver.TMAX, model)
+    EXTRA_T = solver.EXTRA_T
+    milp = formulate_big_milp(prob, EXTRA_T)
     optimize!(milp)
-    while !(termination_status(milp) == MOI.FEASIBLE_POINT)
-        TMAX *= 2
-        if TMAX > solver.LIMIT_TMAX
+    while !(primal_status(milp) == MOI.FEASIBLE_POINT)
+        @show EXTRA_T = max(EXTRA_T,1) * 2
+        if EXTRA_T > solver.LIMIT_EXTRA_T
             break
         end
-        milp = formulate_big_milp(prob, solver.TMAX, model)
+        milp = formulate_big_milp(prob, EXTRA_T)
         optimize!(milp)
     end
-    robot_paths = extract_robot_paths(prob,milp)
-    object_paths = extract_object_paths(prob,milp)
-
-
+    bound = Int(round(objective_bound(milp)))
+    cost = Int(round(objective_value(milp)))
+    set_lower_bound!(solver,bound)
+    set_best_cost!(solver,cost)
+    env = extract_solution(prob,milp)
+    return env, cost
 end

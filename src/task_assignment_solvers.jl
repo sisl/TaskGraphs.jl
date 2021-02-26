@@ -1505,7 +1505,7 @@ function compute_lower_bound(env,
     )
     sched = deepcopy(get_schedule(env))
     for p in pairs
-        for vp in topological_sort_by_dfs(get_graph(sched))
+        for vp in topological_sort_by_dfs(sched)
             if (vp in assigned) || !isa(get_node_from_vtx(sched,vp), p.second)
                 continue
             end
@@ -1527,7 +1527,32 @@ function compute_lower_bound(env,
         end
     end
     process_schedule!(sched)
-    return cache
+end
+
+"""
+    compute_lower_bound(_sched,dist_func,
+
+Compute a (potentially very loose) lower bound on the makespan of a schedule
+"""
+function makespan_lower_bound(_sched,dist_func,
+        _starts=[n for n in get_nodes(_sched) if matches_template(BOT_GO,n)],
+        template=BOT_COLLECT,
+        )
+    sched = deepcopy(_sched)
+    starts = [get_node(sched,node_id(s)) for s in _starts]
+    for n in get_nodes(sched)
+        matches_template(template,n) ? nothing : continue
+        for s in starts
+            set_t0!(n,
+                min(get_t0(n),
+                    get_t0(s)+get_distance(dist_func,
+                        get_destination_location_id(s),
+                        get_initial_location_id(n)))
+                        )
+        end
+    end
+    process_schedule!(sched)
+    return maximum(get_tF(sched))
 end
 
 export
