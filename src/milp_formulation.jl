@@ -147,16 +147,16 @@ function add_point_constraint!(model,source_map,flow,v,t=0)
 end
 function add_continuity_constraints!(model,G,flow)
     for v in vertices(G)
-        @constraint(model,1 >= sum(map(vp->flow[vp],outneighbors(G,v))))
-        @constraint(model,1 >= sum(map(vp->flow[vp],inneighbors(G,v))))
+        @constraint(model,1 >= sum(map(vp->flow[vp],outneighbors(G,v)))) # unit capacity edges
+        @constraint(model,1 >= sum(map(vp->flow[vp],inneighbors(G,v)))) # unit capacity edges
         if outdegree(G,v) > 0
             @constraint(model,
-                flow[v] <= sum(map(vp->flow[vp],outneighbors(G,v)))
+                flow[v] <= sum(map(vp->flow[vp],outneighbors(G,v))) # No disappearing robots
                 )
         end
         if indegree(G,v) > 0
             @constraint(model,
-                flow[v] <= sum(map(vp->flow[vp],inneighbors(G,v)))
+                flow[v] <= sum(map(vp->flow[vp],inneighbors(G,v))) # No appearing robots
                 )
         end
     end
@@ -249,6 +249,30 @@ function extract_object_paths(prob::PC_TAPF,m::PCTAPF_MILP)
     return paths
 end
 
+function extract_solution(prob::PC_TAPF,m::PCTAPF_MILP,TMAX)
+    robot_paths = extract_robot_paths(prob,m)
+    object_paths = extract_object_paths(prob,m)
+    assignments = Set{Tuple{Int,RobotID,ObjectID}}()
+    unmatched_object_ids = Set{ObjectID}(keys(object_paths))
+    for (robot_id,robot_path) in robot_paths
+        for (object_id,object_path) in object_paths
+            object_id in unmatched_object_ids ? nothing : continue
+            for (t,(r_vtx,o_vtx)) in enumerate(zip(robot_path,object_path))
+                if r_vtx == o_vtx
+                    push!(assignments,(t,robot_id,object_id))
+                    delete!(unmatched_object_ids, object_id)
+                end
+            end
+        end
+    end
+    # Add assignments to schedule
+    robot_tips = robot_tip_map(prob.sched)
+    # collect_tips = Dict{ObjectID,ScheduleNode}()
+    for assignments in sort(collect(assignments);by=a->a[1])
+
+    end
+end
+
 """
     formulate_big_milp
 
@@ -274,8 +298,7 @@ function formulate_big_milp(prob::PC_TAPF,T_MAX,model = JuMP.Model())
         add_point_constraint!(model,source_map,robot_flow,v0,t0)
     end
     add_total_flow_constraint!(model,source_map,robot_flow,length(robot_ICs))
-    # makespan
-    @variable(model,T >= 0)
+    # Object constraints
     for (id,pred) in object_ICs
         object_flow = object_flows[id]
         add_total_flow_constraint!(model,source_map,object_flow,1)
@@ -289,7 +312,7 @@ function formulate_big_milp(prob::PC_TAPF,T_MAX,model = JuMP.Model())
     # precedence constraints
     for op in values(get_operations(sched))
         Δt = duration(op)
-        for (id1,o2) in postconditions(op)
+        for (id2,o2) in postconditions(op)
             outflow = object_flows[id2]
             start = get_id(get_initial_location_id(o2))
             @assert get_id(get_destination_location_id(object_ICs[id2])) == start
@@ -304,17 +327,47 @@ function formulate_big_milp(prob::PC_TAPF,T_MAX,model = JuMP.Model())
         end
     end
     # Objective
+    @variable(model,T >= 0) # makespan
     for op in values(get_operations(sched))
         for (id,o) in preconditions(op)
             # makespans
             # id = get_object_id(o)
             object_flow = object_flows[id]
             goal = get_id(get_destination_location_id(o))
-            @show o, goal
+            # @show o, goal
             add_point_constraint!(model,source_map,object_flow,goal,T_MAX)
             add_makespan_constraint!(model,T,object_flow,source_map,goal)
         end
     end
     @objective(model,Min,T)
     return PCTAPF_MILP(model, G, source_map, robot_flow, object_flows)
+end
+
+
+
+@with_kw struct BigMILPSolver <: AbstractPCTAPFSolver
+    TMAX::Int                       = 10
+    LIMIT_TMAX::Int                     = 1000
+    logger::SolverLogger{Float64}   = SolverLogger{Float64}()
+end
+
+function CRCBS.solve!(solver::BigMILPSolver,prob::PC_TAPF)
+    model = Model(default_milp_optimizer())
+    set_optimizer_attributes(model,default_optimizer_attributes()...)
+
+    TMAX = solver.TMAX
+    milp = formulate_big_milp(prob, solver.TMAX, model)
+    optimize!(milp)
+    while !(termination_status(milp) == MOI.FEASIBLE_POINT)
+        TMAX *= 2
+        if TMAX > solver.LIMIT_TMAX
+            break
+        end
+        milp = formulate_big_milp(prob, solver.TMAX, model)
+        optimize!(milp)
+    end
+    robot_paths = extract_robot_paths(prob,milp)
+    object_paths = extract_object_paths(prob,milp)
+
+
 end

@@ -487,6 +487,7 @@ The input to the route planner is the PC-TAPF problem spec along with the
     assignment_model::A     = TaskGraphsMILPSolver()
     path_planner    ::P     = CBSSolver(ISPS())
     logger          ::SolverLogger{C} = SolverLogger{primary_cost_type(path_planner)}()
+    return_first_feasible::Bool        = false # if true, return the first feasible solution
 end
 NBSSolver(a,b) = NBSSolver(assignment_model=a,path_planner=b)
 assignment_solver(solver::NBSSolver) = solver.assignment_model
@@ -546,6 +547,11 @@ function CRCBS.solve!(solver::NBSSolver, prob::E;kwargs...) where {E<:AbstractPC
         prob;kwargs...)
     try
         while optimality_gap(solver) > 0
+            if solver.return_first_feasible && feasible_status(solver)
+                @log_info(1,verbosity(solver),
+                    "NBS: Returning feasible solution: optimality gap = $(optimality_gap(solver))")
+                break
+            end
             enforce_time_limit!(solver)
             update_assignment_problem!(assignment_solver(solver),
                 assignment_problem, prob)
@@ -650,13 +656,13 @@ function solve_assignment_problem!(solver::TaskGraphsMILPSolver, model, prob)
     set_time_limit_sec(model, max(0,min(1000,time_to_deadline(solver))))
     optimize!(model)
     if primal_status(model) != MOI.FEASIBLE_POINT
-        # throw(SolverException("Assignment problem is infeasible -- in `solve_assignment_problem!(solver::$(typeof(solver)))`. iterations = $(iterations(solver))"))
-        @warn "Assignment problem is infeasible -- in `solve_assignment_problem!(solver::$(typeof(solver)))`. iterations = $(iterations(solver))"
-        set_lower_bound!(solver, typemax(Int))
-        set_best_cost!(solver, typemax(Int))
-        return OperatingSchedule(), lower_bound(solver)
+        throw(SolverException("Assignment problem is infeasible -- in `solve_assignment_problem!(solver::$(typeof(solver)))`. iterations = $(iterations(solver))"))
+        # @warn "Assignment problem is infeasible -- in `solve_assignment_problem!(solver::$(typeof(solver)))`. iterations = $(iterations(solver))"
+        # set_lower_bound!(solver, typemax(Int))
+        # set_best_cost!(solver, typemax(Int))
+        # return OperatingSchedule(), lower_bound(solver)
     end
-    @show value(objective_bound(model)), value(objective_function(model))
+    # @show value(objective_bound(model)), value(objective_function(model))
     set_lower_bound!(solver, Int(round(value(objective_bound(model)))) )
     set_best_cost!(solver, Int(round(value(objective_function(model)))) )
     if termination_status(model) == MOI.OPTIMAL

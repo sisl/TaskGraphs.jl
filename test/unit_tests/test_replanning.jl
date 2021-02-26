@@ -34,6 +34,57 @@ let
         @test get_id(get_object_id(v)) > 10
    end
 end
+# Test prune_schedule, split_active_vtxs!, and fix_precutoff_nodes!
+let
+    reset_all_id_counters!()
+    solver = NBSSolver()
+    prob = pctapf_problem_1(solver)
+    env,cost = solve!(solver,prob)
+    let 
+        search_env = deepcopy(env)
+        @test has_vertex(get_schedule(search_env),ObjectID(1))
+        new_sched = prune_schedule(MergeAndBalance(),search_env,5)
+        @test !has_vertex(new_sched,ObjectID(1))
+    end
+    let
+        search_env = deepcopy(env)
+        sched = get_schedule(search_env)
+        problem_spec = get_problem_spec(search_env)
+        r = get_node(sched,RobotID(1))
+        g = get_node(sched,outneighbors(sched,r)[1])
+        @test r.spec.fixed == false
+        @test g.spec.fixed == false
+
+        t_commit = 1
+        robot_positions=get_env_snapshot(search_env,t_commit)
+        split_active_vtxs!(sched,problem_spec,t_commit;robot_positions=robot_positions)
+        g1 = get_node(sched,node_id(g))
+        @test get_initial_location_id(g1) == get_initial_location_id(g)
+        @test get_destination_location_id(g1) == get_destination_location_id(robot_positions[get_robot_id(g1)])
+        @test get_t0(g1) == get_t0(g)
+        @test get_tF(g1) == t_commit
+        g2 = get_node(sched,outneighbors(sched,node_id(g1))[1])
+        @test get_initial_location_id(g2) == get_destination_location_id(g1)
+        @test get_destination_location_id(g2) == get_destination_location_id(g)
+        @test get_t0(g2) == t_commit
+
+        fix_precutoff_nodes!(sched,problem_spec,t_commit)
+        r = get_node(sched,RobotID(1))
+        g1 = get_node(sched,outneighbors(sched,r)[1])
+        g2 = get_node(sched,outneighbors(sched,node_id(g1))[1])
+        @test r.spec.fixed == true
+        @test g1.spec.fixed == true
+        @test g2.spec.fixed == true
+    end
+    let
+        search_env = deepcopy(env)
+        sched = get_schedule(search_env)
+        @test get_node(sched,RobotID(1)).spec.fixed == false
+        # new_sched = fix_precutoff_nodes!()
+        # @test !has_vertex(new_sched,ObjectID(1))
+    end
+
+end
 # Test break_assignments(...)
 let
     sched = OperatingSchedule()
@@ -94,8 +145,8 @@ let
             cache = ReplanningProfilerCache(features=features)
             prob = f(solver)
             env, cache = profile_replanner!(solver,replan_model,prob,cache)
-            @show cache.stage_results[end]["OptimalityGap"]
-            @show cache.stage_results[end]["OptimalFlag"]
+            # @show cache.stage_results[end]["OptimalityGap"]
+            # @show cache.stage_results[end]["OptimalFlag"]
             reset_solver!(solver)
         end
     end
@@ -125,174 +176,174 @@ let
     env, cost = solve!(planner.solver,PC_TAPF(base_env))
 
 end
-# Test loading saved problems
-let
-    loader = ReplanningProblemLoader()
-    add_env!(loader,"env_2",init_env_2())
+# Debug
+# let
+#     loader = ReplanningProblemLoader()
+#     add_env!(loader,"env_2",init_env_2())
 
-    MAX_TIME_LIMIT = 40
-    MAX_BACKUP_TIME_LIMIT = 20
-    COMMIT_THRESHOLD = 10
-    ASTAR_ITERATION_LIMIT = 5000
-    PIBT_ITERATION_LIMIT = 5000
-    CBS_ITERATION_LIMIT = 1000
-    MAX_ASSIGNMENT_ITERATIONS = 1
+#     MAX_TIME_LIMIT = 40
+#     MAX_BACKUP_TIME_LIMIT = 20
+#     COMMIT_THRESHOLD = 10
+#     ASTAR_ITERATION_LIMIT = 5000
+#     PIBT_ITERATION_LIMIT = 5000
+#     CBS_ITERATION_LIMIT = 1000
+#     MAX_ASSIGNMENT_ITERATIONS = 1
 
-    reset_all_id_counters!()
-    # # write problems
-    Random.seed!(0)
-    # write_problems!(loader,problem_configs,base_problem_dir)
+#     reset_all_id_counters!()
+#     # # write problems
+#     Random.seed!(0)
+#     # write_problems!(loader,problem_configs,base_problem_dir)
 
-    feats = [
-        RunTime(),IterationCount(),LowLevelIterationCount(),
-        TimeOutStatus(),IterationMaxOutStatus(),
-        SolutionCost(),OptimalityGap(),OptimalFlag(),FeasibleFlag(),NumConflicts(),
-        # ObjectPathSummaries(),
-        ]
-    final_feats = [SolutionCost(),NumConflicts(),RobotPaths()]
-    planner_configs = []
-    for (primary_replanner, backup_replanner) in [
-            (ConstrainedMergeAndBalance(max_problem_size=300),     DeferUntilCompletion()),
-        ]
-        # Primary planner
-        path_finder = DefaultAStarSC()
-        set_iteration_limit!(path_finder,ASTAR_ITERATION_LIMIT)
-        primary_route_planner = CBSSolver(ISPS(path_finder))
-        set_iteration_limit!(primary_route_planner,CBS_ITERATION_LIMIT)
-        primary_assignment_model = TaskGraphsMILPSolver(SparseAdjacencyMILP())
-        primary_planner = FullReplanner(
-            solver = NBSSolver(
-                assignment_model=primary_assignment_model,
-                path_planner=primary_route_planner,
-                ),
-            replanner = primary_replanner,
-            cache = ReplanningProfilerCache(features=feats,final_features=final_feats)
-            )
-        set_iteration_limit!(primary_planner,MAX_ASSIGNMENT_ITERATIONS)
-        set_max_time_limit!(primary_planner,MAX_TIME_LIMIT)
-        set_commit_threshold!(primary_planner,COMMIT_THRESHOLD)
-        # Backup planner
-        backup_planner = FullReplanner(
-            solver = NBSSolver(
-                assignment_model = TaskGraphsMILPSolver(GreedyAssignment(
-                    greedy_cost = GreedyFinalTimeCost(),
-                )),
-                path_planner = PIBTPlanner{NTuple{3,Float64}}(partial=true)
-                ),
-            replanner = backup_replanner,
-            cache = ReplanningProfilerCache(features=feats,final_features=final_feats)
-            )
-        set_iteration_limit!(backup_planner,1)
-        set_iteration_limit!(route_planner(backup_planner.solver),PIBT_ITERATION_LIMIT)
-        set_commit_threshold!(backup_planner,COMMIT_THRESHOLD)
-        set_debug!(backup_planner,true)
-        # set_debug!(route_planner(backup_planner.solver),true)
-        # Full solver
-        planner = ReplannerWithBackup(primary_planner,backup_planner)
-        planner_name=string(string(typeof(primary_replanner)),"-",string(typeof(backup_replanner)))
-        planner_config = (
-            planner=planner,
-            planner_name=planner_name,
-            results_path=joinpath(base_results_dir,planner_name),
-            objective = SumOfMakeSpans(),
-        )
-        push!(planner_configs,planner_config)
-    end
+#     feats = [
+#         RunTime(),IterationCount(),LowLevelIterationCount(),
+#         TimeOutStatus(),IterationMaxOutStatus(),
+#         SolutionCost(),OptimalityGap(),OptimalFlag(),FeasibleFlag(),NumConflicts(),
+#         # ObjectPathSummaries(),
+#         ]
+#     final_feats = [SolutionCost(),NumConflicts(),RobotPaths()]
+#     planner_configs = []
+#     for (primary_replanner, backup_replanner) in [
+#             (ConstrainedMergeAndBalance(max_problem_size=300),     DeferUntilCompletion()),
+#         ]
+#         # Primary planner
+#         path_finder = DefaultAStarSC()
+#         set_iteration_limit!(path_finder,ASTAR_ITERATION_LIMIT)
+#         primary_route_planner = CBSSolver(ISPS(path_finder))
+#         set_iteration_limit!(primary_route_planner,CBS_ITERATION_LIMIT)
+#         primary_assignment_model = TaskGraphsMILPSolver(SparseAdjacencyMILP())
+#         primary_planner = FullReplanner(
+#             solver = NBSSolver(
+#                 assignment_model=primary_assignment_model,
+#                 path_planner=primary_route_planner,
+#                 ),
+#             replanner = primary_replanner,
+#             cache = ReplanningProfilerCache(features=feats,final_features=final_feats)
+#             )
+#         set_iteration_limit!(primary_planner,MAX_ASSIGNMENT_ITERATIONS)
+#         set_max_time_limit!(primary_planner,MAX_TIME_LIMIT)
+#         set_commit_threshold!(primary_planner,COMMIT_THRESHOLD)
+#         # Backup planner
+#         backup_planner = FullReplanner(
+#             solver = NBSSolver(
+#                 assignment_model = TaskGraphsMILPSolver(GreedyAssignment(
+#                     greedy_cost = GreedyFinalTimeCost(),
+#                 )),
+#                 path_planner = PIBTPlanner{NTuple{3,Float64}}(partial=true)
+#                 ),
+#             replanner = backup_replanner,
+#             cache = ReplanningProfilerCache(features=feats,final_features=final_feats)
+#             )
+#         set_iteration_limit!(backup_planner,1)
+#         set_iteration_limit!(route_planner(backup_planner.solver),PIBT_ITERATION_LIMIT)
+#         set_commit_threshold!(backup_planner,COMMIT_THRESHOLD)
+#         set_debug!(backup_planner,true)
+#         # set_debug!(route_planner(backup_planner.solver),true)
+#         # Full solver
+#         planner = ReplannerWithBackup(primary_planner,backup_planner)
+#         planner_name=string(string(typeof(primary_replanner)),"-",string(typeof(backup_replanner)))
+#         planner_config = (
+#             planner=planner,
+#             planner_name=planner_name,
+#             results_path=joinpath(base_results_dir,planner_name),
+#             objective = SumOfMakeSpans(),
+#         )
+#         push!(planner_configs,planner_config)
+#     end
 
-    reset_all_id_counters!()
-    # warm up to precompile replanning code
-    planner_config = planner_configs[1]
-    planner = planner_config.planner
+#     reset_all_id_counters!()
+#     # warm up to precompile replanning code
+#     planner_config = planner_configs[1]
+#     planner = planner_config.planner
 
-    @info "Warming up $(planner_config.planner_name)"
-    # warmup(planner_config.planner,loader)
-    base_dir            = joinpath("/tmp","warmup")
-    base_problem_dir    = joinpath(base_dir,"problem_instances")
-    base_results_dir    = joinpath(base_dir,"results")
-    config = Dict(
-        :N => 10,
-        :M => 5,
-        :num_projects => 3,
-        :env_id => sort(collect(keys(loader.envs)))[1],
-        )
-    Random.seed!(0)
-    write_problems!(loader,config,base_problem_dir)
-    env = get_env!(loader,config[:env_id])
-    set_real_time_flag!(planner,false)
-    set_deadline!(planner,Inf)
-    set_runtime_limit!(planner,Inf)
+#     @info "Warming up $(planner_config.planner_name)"
+#     # warmup(planner_config.planner,loader)
+#     base_dir            = joinpath("/tmp","warmup")
+#     base_problem_dir    = joinpath(base_dir,"problem_instances")
+#     base_results_dir    = joinpath(base_dir,"results")
+#     config = Dict(
+#         :N => 10,
+#         :M => 5,
+#         :num_projects => 3,
+#         :env_id => sort(collect(keys(loader.envs)))[1],
+#         )
+#     Random.seed!(0)
+#     write_problems!(loader,config,base_problem_dir)
+#     env = get_env!(loader,config[:env_id])
+#     set_real_time_flag!(planner,false)
+#     set_deadline!(planner,Inf)
+#     set_runtime_limit!(planner,Inf)
 
-    # profile_replanner!(loader,planner,base_problem_dir,base_results_dir)
-    plannerA = planner.primary_planner
-    reset_cache!(plannerA)
-    hard_reset_solver!(plannerA)
+#     # profile_replanner!(loader,planner,base_problem_dir,base_results_dir)
+#     plannerA = planner.primary_planner
+#     reset_cache!(plannerA)
+#     hard_reset_solver!(plannerA)
 
-    f = joinpath(base_problem_dir,"problem0001")
-    problem_name = splitdir(f)[end]
-    outpath = joinpath(base_results_dir,problem_name)
-    # ispath(outpath) ? continue : nothing # skip over this if results already exist
-    @log_info(-1,0,"PROFILING: testing on problem ",problem_name)
-    simple_prob_def = read_simple_repeated_problem_def(f)
-    prob = RepeatedPC_TAPF(simple_prob_def,planner.primary_planner.solver,loader)
+#     f = joinpath(base_problem_dir,"problem0001")
+#     problem_name = splitdir(f)[end]
+#     outpath = joinpath(base_results_dir,problem_name)
+#     # ispath(outpath) ? continue : nothing # skip over this if results already exist
+#     @log_info(-1,0,"PROFILING: testing on problem ",problem_name)
+#     simple_prob_def = read_simple_repeated_problem_def(f)
+#     prob = RepeatedPC_TAPF(simple_prob_def,planner.primary_planner.solver,loader)
 
-    # search_env, planner = profile_replanner!(planner,prob)
-    reset_cache!(planner)
-    plannerA = planner.primary_planner
-    plannerB = planner.backup_planner
-    hard_reset_solver!(planner.primary_planner.solver)
-    hard_reset_solver!(planner.backup_planner.solver)
-    env = get_env(prob)
+#     # search_env, planner = profile_replanner!(planner,prob)
+#     reset_cache!(planner)
+#     plannerA = planner.primary_planner
+#     plannerB = planner.backup_planner
+#     hard_reset_solver!(planner.primary_planner.solver)
+#     hard_reset_solver!(planner.backup_planner.solver)
+#     env = get_env(prob)
 
-    stage = 1
-    request = prob.requests[stage]
-    # request = ProjectRequest(request.schedule,0,0)
-    remap_object_ids!(request.schedule,get_schedule(env))
+#     stage = 1
+#     request = prob.requests[stage]
+#     # request = ProjectRequest(request.schedule,0,0)
+#     remap_object_ids!(request.schedule,get_schedule(env))
 
-    solver = plannerA.solver
-    replan_model = plannerA.replanner
-    commit_threshold = get_commit_threshold(replan_model)
-    search_env = env
+#     solver = plannerA.solver
+#     replan_model = plannerA.replanner
+#     commit_threshold = get_commit_threshold(replan_model)
+#     search_env = env
 
-    base_envA = replan!(plannerA,env,request)
+#     base_envA = replan!(plannerA,env,request)
 
-    pctapf = TaskGraphs.construct_pctapf_problem(prob,base_envA)
+#     pctapf = TaskGraphs.construct_pctapf_problem(prob,base_envA)
 
-    # envA,cost = solve!(plannerA.solver,pctapf)
-    pcta = formulate_assignment_problem(solver.assignment_model,pctapf)
-    set_verbosity!(solver.assignment_model,2)
-    sched, cost = solve_assignment_problem!(solver.assignment_model,pcta,pctapf)
-    # Check to see if start times line up
-    for n in node_iterator(sched,topological_sort_by_dfs(sched))
-        base_node = get_node(pctapf.env.schedule,node_id(n))
-        TaskGraphs.print_schedule_node_details(stdout,sched,n)
-        s = "                  t0_base: $(get_t0(base_node)), " #t0: $(get_t0(n)), tF: $(get_tF(n)), "
-        print(s,"\n")
-    end
-    for n in node_iterator(sched,topological_sort_by_dfs(sched))
-        @show string(n.node), get_t0(n), get_t0(get_node(pctapf.env.schedule,node_id(n))), get_tF(n)
-    end
-    # termination_status(solver.assignment_model.milp.model)
-    # sched, cost = solve_assignment_problem!(TaskGraphsMILPSolver(ExtendedAssignmentMILP()),pcta,pctapf)
-    @assert cost == maximum(get_tF(sched)) "Why is cost $(cost) but max tF $(maximum(get_tF(sched)))?"
-    @test validate(sched)
+#     # envA,cost = solve!(plannerA.solver,pctapf)
+#     pcta = formulate_assignment_problem(solver.assignment_model,pctapf)
+#     set_verbosity!(solver.assignment_model,2)
+#     sched, cost = solve_assignment_problem!(solver.assignment_model,pcta,pctapf)
+#     # Check to see if start times line up
+#     for n in node_iterator(sched,topological_sort_by_dfs(sched))
+#         base_node = get_node(pctapf.env.schedule,node_id(n))
+#         TaskGraphs.print_schedule_node_details(stdout,sched,n)
+#         s = "                  t0_base: $(get_t0(base_node)), " #t0: $(get_t0(n)), tF: $(get_tF(n)), "
+#         print(s,"\n")
+#     end
+#     for n in node_iterator(sched,topological_sort_by_dfs(sched))
+#         @show string(n.node), get_t0(n), get_t0(get_node(pctapf.env.schedule,node_id(n))), get_tF(n)
+#     end
+#     # termination_status(solver.assignment_model.milp.model)
+#     # sched, cost = solve_assignment_problem!(TaskGraphsMILPSolver(ExtendedAssignmentMILP()),pcta,pctapf)
+#     @assert cost == maximum(get_tF(sched)) "Why is cost $(cost) but max tF $(maximum(get_tF(sched)))?"
+#     @test validate(sched)
 
-    search_env = construct_search_env(solver,deepcopy(sched),pctapf.env)
-    path_planner = CRCBS.low_level(solver.path_planner)
-    node = initialize_root_node(search_env)
-    # OptimalityGap shows up here
-    set_verbosity!(low_level(path_planner),3)
-    @test compute_route_plan!(path_planner,PC_MAPF(search_env),node)
+#     search_env = construct_search_env(solver,deepcopy(sched),pctapf.env)
+#     path_planner = CRCBS.low_level(solver.path_planner)
+#     node = initialize_root_node(search_env)
+#     # OptimalityGap shows up here
+#     set_verbosity!(low_level(path_planner),3)
+#     @test compute_route_plan!(path_planner,PC_MAPF(search_env),node)
 
-    compile_replanning_results!(plannerA.cache,plannerA.solver,envA,
-        resultsA,prob,stage,request)
+#     compile_replanning_results!(plannerA.cache,plannerA.solver,envA,
+#         resultsA,prob,stage,request)
 
-    Revise.includet(joinpath(pathof(TaskGraphs),"..","helpers/render_tools.jl"))
-    display_graph(sched,scale=2.0,aspect_stretch=(0.8,0.8))
-    # set_real_time_flag!(planner_config.planner,false)
-    # @info "Profiling $(planner_config.planner_name)"
-    # # profile
-    # profile_replanner!(loader,
-    #     planner_config.planner,
-    #     base_problem_dir,
-    #     planner_config.results_path)
-end
+#     Revise.includet(joinpath(pathof(TaskGraphs),"..","helpers/render_tools.jl"))
+#     display_graph(sched,scale=2.0,aspect_stretch=(0.8,0.8))
+#     # set_real_time_flag!(planner_config.planner,false)
+#     # @info "Profiling $(planner_config.planner_name)"
+#     # # profile
+#     # profile_replanner!(loader,
+#     #     planner_config.planner,
+#     #     base_problem_dir,
+#     #     planner_config.results_path)
+# end

@@ -310,7 +310,7 @@ function profile_replanner!(planner::ReplannerWithBackup,prob::RepeatedAbstractP
             @log_info(-1,0,"REPLANNING: ", "Primary planner succeeded at stage $stage.")
             # @info "OptimalityGap: $(plannerA.cache.stage_results[end]["OptimalityGap"])"
             results = plannerA.cache.stage_results
-            @info "Stage results" results
+            # @info "Stage results" results
             env = envA
         else
             # backup

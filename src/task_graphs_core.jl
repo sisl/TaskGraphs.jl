@@ -983,16 +983,16 @@ function construct_partial_project_schedule(spec::ProjectSpec,problem_spec::Prob
         end
     end
     # NOTE: A hack to get speed up on SparseAdjacencyMILP. Not sure if it will work
-    for (id, pred) in get_object_ICs(sched)
-        v = get_vtx(sched, ObjectID(id))
-        if indegree(get_graph(sched),v) == 0
-            op_id = get_unique_operation_id()
-            op = Operation(id=op_id)
-            set_postcondition!(op,pred)
-            add_node!(sched,make_node(sched,problem_spec,op))
-            add_edge!(sched,op_id,ObjectID(id))
-        end
-    end
+    # for (id, pred) in get_object_ICs(sched)
+    #     v = get_vtx(sched, ObjectID(id))
+    #     if indegree(get_graph(sched),v) == 0
+    #         op_id = get_unique_operation_id()
+    #         op = Operation(id=op_id)
+    #         set_postcondition!(op,pred)
+    #         add_node!(sched,make_node(sched,problem_spec,op))
+    #         add_edge!(sched,op_id,ObjectID(id))
+    #     end
+    # end
     set_leaf_operation_vtxs!(sched)
     process_schedule!(sched)
     sched

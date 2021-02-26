@@ -118,8 +118,8 @@ function split_action_node!(sched::OperatingSchedule,problem_spec::ProblemSpec,n
     node2 = add_node!(sched,make_node(sched,problem_spec,pred2))
     set_t0!(node2,t)
     set_tF!(node2,t+get_min_duration(node2.spec))
-    @show node_id(node1), string(node1.node), node1
-    @show node_id(node2), string(node2.node), node2
+    # @show node_id(node1), string(node1.node), node1
+    # @show node_id(node2), string(node2.node), node2
     # set_tF!(sched,id2,get_tF(node))
     for v in outneighbors(sched,get_vtx(sched,node1.id))
         rem_edge!(sched,node1,v)
