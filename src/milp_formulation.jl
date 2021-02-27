@@ -255,8 +255,9 @@ for op in [
     :(JuMP.termination_status),
     :(JuMP.objective_bound),
     :(JuMP.objective_value),
+    :(JuMP.set_time_limit_sec),
 ]
-    @eval $op(m::PCTAPF_MILP) = $op(m.model)
+    @eval $op(m::PCTAPF_MILP,args...) = $op(m.model,args...)
 end
 extract_robot_flow(m::PCTAPF_MILP) = Int.(round.(value.(m.robot_flow)))
 extract_object_flows(m::PCTAPF_MILP) = Dict(id=>Int.(round.(value.(var))) for (id,var) in m.object_flows)
@@ -535,8 +536,10 @@ function extract_solution(prob::PC_TAPF,m::PCTAPF_MILP)
 end
 
 function CRCBS.solve!(solver::BigMILPSolver,prob::PC_TAPF)
+    set_runtime_limit!(solver,max(0,min(runtime_limit(solver),1000)))
     EXTRA_T = solver.EXTRA_T
     milp = formulate_big_milp(prob, EXTRA_T)
+    set_time_limit_sec(milp, runtime_limit(solver))
     optimize!(milp)
     while !(primal_status(milp) == MOI.FEASIBLE_POINT)
         @show EXTRA_T = max(EXTRA_T,1) * 2
@@ -544,6 +547,7 @@ function CRCBS.solve!(solver::BigMILPSolver,prob::PC_TAPF)
             break
         end
         milp = formulate_big_milp(prob, EXTRA_T)
+        set_time_limit_sec(milp, runtime_limit(solver))
         optimize!(milp)
     end
     bound = Int(round(objective_bound(milp)))
