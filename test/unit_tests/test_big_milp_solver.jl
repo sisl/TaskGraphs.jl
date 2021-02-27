@@ -54,15 +54,32 @@ let
     optimize!(milp)
     @test termination_status(milp) == MOI.OPTIMAL
     robot_paths = TaskGraphs.extract_robot_paths(prob,milp)
-    @test robot_paths[RobotID(1)][1:7] == [1, 5, 9, 13, 17, 21, 25]
-    @test robot_paths[RobotID(2)][1:7] == [4, 8, 12, 16, 20, 24, 28]
 
     object_paths = TaskGraphs.extract_object_paths(prob,milp)
-    @test object_paths[ObjectID(1)][1:7] == [9, 9, 9, 13, 17, 17, 17,] 
-    @test object_paths[ObjectID(2)][1:7] == [12, 12, 12, 16, 20, 24, 28,]
-    @test object_paths[ObjectID(3)][1:7] == [21, 21, 21, 21, 21, 21, 25,]
+
+    # @test robot_paths[RobotID(1)][1:7] == [1, 5, 9, 13, 17, 21, 25]
+    # @test robot_paths[RobotID(2)][1:7] == [4, 8, 12, 16, 20, 24, 28]
+
+    # @test object_paths[ObjectID(1)][1:7] == [9, 9, 9, 13, 17, 17, 17,] 
+    # @test object_paths[ObjectID(2)][1:7] == [12, 12, 12, 16, 20, 24, 28,]
+    # @test object_paths[ObjectID(3)][1:7] == [21, 21, 21, 21, 21, 21, 25,]
 
     # robot_path = robot_paths[RobotID(1)]
     # object_path = object_paths[ObjectID(1)]
     # TaskGraphs.extract_solution(prob,milp)
+end
+let
+    TaskGraphs.clear_default_optimizer_attributes!()
+    solver = TaskGraphs.BigMILPSolver(EXTRA_T=2)
+    prob = pctapf_problem_1(solver)
+
+    graph = DiGraph(3)
+    add_edge!(graph,1,2)
+    add_edge!(graph,2,3)
+    G = TaskGraphs.construct_gadget_graph(graph,2)
+    GraphPlottingBFS._title_string(n::Tuple{Int,Int}) = "$(n[2]),$(n[2])"
+    GraphPlottingBFS.draw_node(G::TaskGraphs.GadgetGraph,v,args...;kwargs...) = draw_node(node_val(get_node(G,v)),args...;kwargs...)
+    display_graph(G)
+
+
 end

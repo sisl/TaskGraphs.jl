@@ -1457,7 +1457,7 @@ GraphPlottingBFS._node_color(::AbstractSingleRobotAction)   = RGB(0.0,0.4,1.0)
 GraphPlottingBFS._subtitle_text_scale(n::AbstractPlanningPredicate) = 0.3
 GraphPlottingBFS._text_color(n::AbstractPlanningPredicate) = "black"
 
-function GraphPlottingBFS.draw_node(g::AbstractCustomNGraph,v,args...;kwargs...) 
+function GraphPlottingBFS.draw_node(g::OperatingSchedule,v,args...;kwargs...) 
     draw_node(get_node(g,v))
 end
 
