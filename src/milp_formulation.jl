@@ -16,41 +16,29 @@ function convert_env_graph_to_undirected(G)
     env_graph = Graph(G)
 end
 
+@enum GadgetNodeType begin
+    _STAY
+    _BRIDGE
+    _EDGE
+end
+
+# struct GadgetNode
+
+# end
+
 """
     GadgetGraph
 
 Represents a time-extended graph useful for MILP formulations
 """
-# const GadgetGraph = CustomNDiGraph{Tuple{Int,Int},VtxID}
 const GadgetGraph = NGraph{DiGraph,Tuple{Int,Int},VtxID}
-# @with_kw_noshow struct GadgetGraph <: AbstractGraph{Int}
-#     G::DiGraph          = DiGraph()
-#     vtxs::Vector{Int}   = Vector{Int}()
-#     tvec::Vector{Int}   = Vector{Int}()
-# end
-# Base.zero(::GadgetGraph) = GadgetGraph()
-# LightGraphs.edges(graph::GadgetGraph) = edges(graph.G)
-# LightGraphs.is_directed(graph::GadgetGraph) = true
 LightGraphs.add_vertex!(graph::GadgetGraph,t=-1,v=-1) = add_node!(graph,(Int(round(t)),v),VtxID(nv(graph)+1))
-# function LightGraphs.add_vertex!(graph::GadgetGraph,t=-1,v=-1)
-#     if add_vertex!(graph.G)
-#         push!(graph.vtxs,v)
-#         push!(graph.tvec,t)
-#         return true
-#     end
-#     return false
-# end
-# for op in [
-#     :edgetype,:has_edge,:has_vertex,:inneighbors,:ne,:nv,:outneighbors,
-#     :vertices,:add_edge!
-#     ]
-#     @eval LightGraphs.$op(g::GadgetGraph,args...) = $op(g.G,args...)
-# end
-# get_vtx_from_var(G::GadgetGraph,v) = get(G.vtxs,v,-1)
-# get_t_from_var(G::GadgetGraph,v) = get(G.t_vec,v,-1)
 
 get_vtx_from_var(G::GadgetGraph,v) = has_vertex(G,v) ? node_val(get_node(G,v))[2] : -1
 get_t_from_var(G::GadgetGraph,v) = has_vertex(G,v) ? node_val(get_node(G,v))[1] : -1
+is_movement_vtx(graph::GadgetGraph,v) = get_vtx_from_var(graph,v) == 0
+is_bridge_vtx(graph::GadgetGraph,v)   = !is_movement_vtx(graph,v) && get_t_from_var(graph,v) == -1
+is_stay_vtx(graph::GadgetGraph,v)     = !is_movement_vtx(graph,v) && !is_bridge_vtx(graph,v)
 
 """
     add_movement_vtx!
@@ -60,11 +48,6 @@ Flags a vertex of the gadget graph as corresponding to a non-"wait" edge
 add_movement_vtx!(graph::GadgetGraph,t) = add_vertex!(graph,t,0)
 add_stay_vtx!(graph::GadgetGraph,t,v) = add_vertex!(graph,t,v)
 add_bridge_vtx!(graph::GadgetGraph,t) = add_vertex!(graph,t)
-is_movement_vtx(graph::GadgetGraph,v) = get_vtx_from_var(graph,v) == 0
-# add_movement_vtx!(graph::GadgetGraph,t) = add_vertex!(graph,t,0)
-# add_stay_vtx!(graph::GadgetGraph,t,v) = add_vertex!(graph,t,v)
-# add_bridge_vtx!(graph::GadgetGraph,t) = add_vertex!(graph,t)
-# is_movement_vtx(graph::GadgetGraph,v) = get_vtx_from_var(graph,v) == 0
 
 """
     get_source_map(G::GadgetGraph,env_graph,TMAX)
@@ -75,11 +58,10 @@ vertex in the gadget graph.
 function get_source_map(G::GadgetGraph,env_graph,TMAX)
     # source_map = zeros(Int,nv(env_graph),TMAX)
     source_map = [Dict{Int,Int}() for v in 1:nv(env_graph)]
-    # for (idx,v,t) in zip(vertices(G),G.vtxs,G.tvec)
     for idx in vertices(G)
         v = get_vtx_from_var(G,idx)
         t = get_t_from_var(G,idx)
-        if has_vertex(env_graph,v)
+        if has_vertex(env_graph,v) && !is_bridge_vtx(G,idx)
             source_map[v][t] = idx
         end
     end

@@ -74,10 +74,14 @@ let
     prob = pctapf_problem_1(solver)
 
     graph = DiGraph(3)
+    add_edge!(graph,1,1)
+    add_edge!(graph,2,2)
+    add_edge!(graph,3,3)
     add_edge!(graph,1,2)
     add_edge!(graph,2,3)
+    # add_edge!(graph,3,4)
     G = TaskGraphs.construct_gadget_graph(graph,2)
-    GraphPlottingBFS._title_string(n::Tuple{Int,Int}) = "$(n[2]),$(n[2])"
+    GraphPlottingBFS._title_string(n::Tuple{Int,Int}) = "$(n[2]),$(n[1])"
     GraphPlottingBFS.draw_node(G::TaskGraphs.GadgetGraph,v,args...;kwargs...) = draw_node(node_val(get_node(G,v)),args...;kwargs...)
     display_graph(G)
 
