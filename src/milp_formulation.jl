@@ -16,38 +16,51 @@ function convert_env_graph_to_undirected(G)
     env_graph = Graph(G)
 end
 
-@enum GadgetNodeType begin
-    _STAY
-    _BRIDGE
-    _EDGE
+@enum FlowNodeType begin
+    _STAY # wait for a time step
+    _BRIDGE # carry over between gadget layers
+    _EDGE # edge vtx
 end
 
-# struct GadgetNode
-
-# end
+struct FlowNode
+    type::FlowNodeType # type of node
+    v::Int # vertex of node in original graph
+    t::Int # time step of node
+end
 
 """
     GadgetGraph
 
 Represents a time-extended graph useful for MILP formulations
 """
-const GadgetGraph = NGraph{DiGraph,Tuple{Int,Int},VtxID}
-LightGraphs.add_vertex!(graph::GadgetGraph,t=-1,v=-1) = add_node!(graph,(Int(round(t)),v),VtxID(nv(graph)+1))
+const GadgetGraph = NGraph{DiGraph,FlowNode,VtxID}
+# const GadgetGraph = NGraph{DiGraph,Tuple{Int,Int},VtxID}
+# LightGraphs.add_vertex!(graph::GadgetGraph,t=-1,v=-1) = add_node!(graph,(Int(round(t)),v),VtxID(nv(graph)+1))
+# LightGraphs.add_vertex!(graph::GadgetGraph,t=-1,v=-1) = add_node!(graph,(Int(round(t)),v),VtxID(nv(graph)+1))
 
-get_vtx_from_var(G::GadgetGraph,v) = has_vertex(G,v) ? node_val(get_node(G,v))[2] : -1
-get_t_from_var(G::GadgetGraph,v) = has_vertex(G,v) ? node_val(get_node(G,v))[1] : -1
-is_movement_vtx(graph::GadgetGraph,v) = get_vtx_from_var(graph,v) == 0
-is_bridge_vtx(graph::GadgetGraph,v)   = !is_movement_vtx(graph,v) && get_t_from_var(graph,v) == -1
-is_stay_vtx(graph::GadgetGraph,v)     = !is_movement_vtx(graph,v) && !is_bridge_vtx(graph,v)
+# get_vtx_from_var(G::GadgetGraph,v) = has_vertex(G,v) ? node_val(get_node(G,v))[2] : -1
+# get_t_from_var(G::GadgetGraph,v) = has_vertex(G,v) ? node_val(get_node(G,v))[1] : -1
+# is_movement_vtx(graph::GadgetGraph,v) = get_vtx_from_var(graph,v) == 0
+# is_stay_vtx(graph::GadgetGraph,v)   = !is_movement_vtx(graph,v) && get_t_from_var(graph,v) == -1
+# is_bridge_vtx(graph::GadgetGraph,v)     = !is_movement_vtx(graph,v) && !is_bridge_vtx(graph,v)
+get_vtx_from_var(G::GadgetGraph,v)      = has_vertex(G,v) ? node_val(get_node(G,v)).v : -1
+get_t_from_var(G::GadgetGraph,v)        = has_vertex(G,v) ? node_val(get_node(G,v)).t : -1
+is_movement_vtx(graph::GadgetGraph,v)   = node_val(get_node(graph,v)).type == _EDGE
+is_stay_vtx(graph::GadgetGraph,v)       = node_val(get_node(graph,v)).type == _STAY
+is_bridge_vtx(graph::GadgetGraph,v)     = node_val(get_node(graph,v)).type == _BRIDGE
 
 """
     add_movement_vtx!
 
 Flags a vertex of the gadget graph as corresponding to a non-"wait" edge
 """
-add_movement_vtx!(graph::GadgetGraph,t) = add_vertex!(graph,t,0)
-add_stay_vtx!(graph::GadgetGraph,t,v) = add_vertex!(graph,t,v)
-add_bridge_vtx!(graph::GadgetGraph,t) = add_vertex!(graph,t)
+# add_movement_vtx!(graph::GadgetGraph,t) = add_vertex!(graph,t,0)
+# add_bridge_vtx!(graph::GadgetGraph,t,v) = add_vertex!(graph,t,v)
+# add_stay_vtx!(graph::GadgetGraph,t)     = add_vertex!(graph,t)
+GraphUtils.add_node!(graph::GadgetGraph,n::FlowNode)       = add_node!(graph,n,get_unique_id(VtxID))
+add_movement_vtx!(graph::GadgetGraph,v,t)   = add_node!(graph,FlowNode(_EDGE,   v,t))
+add_bridge_vtx!(graph::GadgetGraph,v,t)     = add_node!(graph,FlowNode(_BRIDGE, v,t))
+add_stay_vtx!(graph::GadgetGraph,v,t)       = add_node!(graph,FlowNode(_STAY,   v,t))
 
 """
     get_source_map(G::GadgetGraph,env_graph,TMAX)
@@ -59,9 +72,12 @@ function get_source_map(G::GadgetGraph,env_graph,TMAX)
     # source_map = zeros(Int,nv(env_graph),TMAX)
     source_map = [Dict{Int,Int}() for v in 1:nv(env_graph)]
     for idx in vertices(G)
-        v = get_vtx_from_var(G,idx)
-        t = get_t_from_var(G,idx)
-        if has_vertex(env_graph,v) && !is_bridge_vtx(G,idx)
+        # if has_vertex(env_graph,v) && !is_bridge_vtx(G,idx)
+        # if has_vertex(env_graph,v) && !is_stay_vtx(G,idx)
+        if is_bridge_vtx(G,idx)
+            v = get_vtx_from_var(G,idx)
+            t = get_t_from_var(G,idx)
+            @assert has_vertex(env_graph,v)
             source_map[v][t] = idx
         end
     end
@@ -71,7 +87,8 @@ end
 function add_vertex_layer!(G::GadgetGraph,incoming::Dict{Int,Vector{Int}},t)
     outgoing = Dict{Int,Int}()
     for v in sort(collect(keys(incoming)))
-        add_stay_vtx!(G,t,v)
+        # add_stay_vtx!(G,t,v)
+        add_bridge_vtx!(G,v,t)
         outgoing[v] = nv(G)
         for v2 in incoming[v]
             add_edge!(G,v2,nv(G))
@@ -88,7 +105,9 @@ function add_gadget_layer!(G::GadgetGraph,edge_list,t,vtx_map=Dict{Int,Int}())
         if e.src == e.dst
             # shortcut
             # |
-            add_bridge_vtx!(G,t)
+            # add_bridge_vtx!(G,t)
+            # add_stay_vtx!(G,t)
+            add_stay_vtx!(G,e.src,t)
             add_edge!(G,vtx_map[e.src],nv(G))
             push!(get!(outgoing,e.dst,Int[]),nv(G))
         else
@@ -99,25 +118,30 @@ function add_gadget_layer!(G::GadgetGraph,edge_list,t,vtx_map=Dict{Int,Int}())
             # \ /
             #  |
             # / \
-            add_movement_vtx!(G,t)
+            # add_movement_vtx!(G,t)
+            add_movement_vtx!(G,e.src,t)
             v1 = nv(G)
             add_edge!(G,vtx_map[e.src],v1)
             if haskey(vtx_map,e.dst)
-                add_movement_vtx!(G,t)
+                # add_movement_vtx!(G,t)
+                add_movement_vtx!(G,e.dst,t)
                 v2 = nv(G)
                 add_edge!(G,vtx_map[e.dst],v2)
             end
-            add_movement_vtx!(G,t)
+            # add_movement_vtx!(G,t)
+            add_movement_vtx!(G,-1,t)
             v3 = nv(G)
             add_edge!(G,v1,v3)
             if haskey(vtx_map,e.dst)
                 add_edge!(G,v2,v3)
-                add_movement_vtx!(G,t)
+                # add_movement_vtx!(G,t)
+                add_movement_vtx!(G,e.src,t)
                 v4 = nv(G)
                 add_edge!(G,v3,v4)
                 push!(get!(outgoing,e.src,Int[]),v4)
             end
-            add_movement_vtx!(G,t)
+            # add_movement_vtx!(G,t)
+            add_movement_vtx!(G,e.dst,t)
             v5 = nv(G)
             add_edge!(G,v3,v5)
             push!(get!(outgoing,e.dst,Int[]),v5)
@@ -169,14 +193,13 @@ function add_continuity_constraints!(model,G,flow)
 end
 function add_single_transporter_constraint!(model,G,source_map,robot_flow,object_flow,start,goal)
     T = length(source_map[goal])-1
-    @show start, goal
     for v in vertices(G)
-        vtx = get_vtx_from_var(G,v)
-        if !(vtx == start || vtx == goal)
-            # if object is not at its start or goal, it cannot be without a robot
-            @constraint(model, object_flow[v] <= robot_flow[v])
-        # else
-        #     @show vtx
+        if is_bridge_vtx(G,v) || is_stay_vtx(G,v)
+            vtx = get_vtx_from_var(G,v)
+            if !(vtx == start || vtx == goal)
+                # if object is not at its start or goal, it cannot be without a robot
+                @constraint(model, object_flow[v] <= robot_flow[v])
+            end
         end
     end
     return model
@@ -254,7 +277,8 @@ end
 function extract_true_path(m::PCTAPF_MILP,flow_path)
     path = Int[]
     for vtx in flow_path
-        if get_vtx_from_var(m.G,vtx) > 0
+        # if get_vtx_from_var(m.G,vtx) > 0
+        if is_bridge_vtx(m.G,vtx)
             push!(path,get_vtx_from_var(m.G,vtx))
         end
     end
@@ -343,8 +367,8 @@ function formulate_big_milp(prob::PC_TAPF,EXTRA_T=1)
             start = get_id(get_initial_location_id(pred))
             goal = get_id(get_destination_location_id(pred))
             id = get_object_id(pred)
-            # add_single_transporter_constraint!(model,G,source_map,robot_flow,
-            #     object_flows[id],start,goal)
+            add_single_transporter_constraint!(model,G,source_map,robot_flow,
+                object_flows[id],start,goal)
         end
     end
     # precedence constraints

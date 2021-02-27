@@ -21,7 +21,6 @@ let
                         BigMILPSolver(EXTRA_T=2),
                         ]
                     set_iteration_limit!(solver,1)
-                    @show f
                     pc_tapf = f(solver;cost_function=cost_model,verbose=false);
                     env, cost = solve!(solver,pc_tapf)
                     # @show convert_to_vertex_lists(get_route_plan(env))
@@ -39,9 +38,9 @@ let
 
 end
 let
-    TaskGraphs.clear_default_optimizer_attributes!()
+    TaskGraphs.set_default_optimizer_attributes!(MOI.Silent()=>true)
     solver = TaskGraphs.BigMILPSolver(EXTRA_T=2)
-    prob = pctapf_problem_1(solver)
+    prob = pctapf_problem_5(solver)
     env, cost = solve!(solver,prob)
     validate(env.schedule)
     validate(env.schedule,convert_to_vertex_lists(get_route_plan(env)))
@@ -67,23 +66,4 @@ let
     # robot_path = robot_paths[RobotID(1)]
     # object_path = object_paths[ObjectID(1)]
     # TaskGraphs.extract_solution(prob,milp)
-end
-let
-    TaskGraphs.clear_default_optimizer_attributes!()
-    solver = TaskGraphs.BigMILPSolver(EXTRA_T=2)
-    prob = pctapf_problem_1(solver)
-
-    graph = DiGraph(3)
-    add_edge!(graph,1,1)
-    add_edge!(graph,2,2)
-    add_edge!(graph,3,3)
-    add_edge!(graph,1,2)
-    add_edge!(graph,2,3)
-    # add_edge!(graph,3,4)
-    G = TaskGraphs.construct_gadget_graph(graph,2)
-    GraphPlottingBFS._title_string(n::Tuple{Int,Int}) = "$(n[2]),$(n[1])"
-    GraphPlottingBFS.draw_node(G::TaskGraphs.GadgetGraph,v,args...;kwargs...) = draw_node(node_val(get_node(G,v)),args...;kwargs...)
-    display_graph(G)
-
-
 end

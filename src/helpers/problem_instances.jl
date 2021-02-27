@@ -633,7 +633,6 @@ object 1 with robot 1.
 """
 function pctapf_problem_13(;
         cost_function = MakeSpan(),
-        verbose = false,
     )
     vtx_grid = initialize_dense_vtx_grid(4, 8)
     #  1   2   3   4   5   6   7   8
@@ -654,6 +653,25 @@ function pctapf_problem_13(;
     def = pctapf_problem(r0,config)
     sched, problem_spec = construct_task_graphs_problem(
         def,env_graph;cost_function=cost_function)
+
+    return sched, problem_spec, env_graph, assignment_dict
+end
+
+function pctapf_problem_14(;
+        cost_function = MakeSpan(),
+    )
+    vtx_grid = initialize_dense_vtx_grid(1,4) 
+    # 1  2  3  4
+    r0 = [1,4]
+    s0 = [1,4]
+    sF = [3,2]
+    env_graph = construct_factory_env_from_vtx_grid(vtx_grid)
+    project_spec, robot_ICs = TaskGraphs.empty_pctapf_problem(r0,s0,sF)
+    add_operation!(project_spec,construct_operation(project_spec,-1,[1,2],[],0))
+    assignment_dict = Dict(1=>[1],2=>[2])
+    def = SimpleProblemDef(project_spec,r0,s0,sF)
+    sched, problem_spec = construct_task_graphs_problem(
+        def,env_graph;cost_function=MakeSpan())
 
     return sched, problem_spec, env_graph, assignment_dict
 end
@@ -693,6 +711,7 @@ for op in [
         :pctapf_problem_11,
         :pctapf_problem_12,
         :pctapf_problem_13,
+        :pctapf_problem_14,
     ]
     @eval $op(solver,args...;kwargs...) = pctapf_problem(solver,$op(args...;kwargs...)...)
 end
