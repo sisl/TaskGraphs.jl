@@ -171,6 +171,9 @@ function fix_precutoff_nodes!(sched::OperatingSchedule,problem_spec::ProblemSpec
     # active_vtxs = Set{Int}()
     active_vtxs, fixed_vtxs = get_active_and_fixed_vtxs(sched,t)
     # set all fixed_vtxs to plan_path=false
+    for v in active_vtxs
+        set_path_spec!(sched,v,PathSpec(get_path_spec(sched,v), fixed=false))
+    end
     for v in fixed_vtxs
         set_path_spec!(sched,v,PathSpec(get_path_spec(sched,v), plan_path=false, fixed=true))
     end
