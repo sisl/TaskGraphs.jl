@@ -655,13 +655,14 @@ function replan!(solver, replan_model, search_env, request;
     problem_spec        = get_problem_spec(search_env)
     env_graph           = get_graph(search_env)
     t_request           = request.t_request
-    next_sched          = request.schedule
+    next_sched          = deepcopy(request.schedule)
 
     @assert sanity_check(sched," in replan!()")
     # Freeze route_plan and schedule at t_commit
     t_commit = get_commit_time(replan_model, search_env, request, commit_threshold)
     t_final = minimum(map(length, get_paths(get_route_plan(search_env))))
     t_split = min(t_commit,t_final)
+    @info "t_commit" t_commit t_split
 
     robot_positions=get_env_snapshot(search_env,t_split)
     reset_solver!(solver)

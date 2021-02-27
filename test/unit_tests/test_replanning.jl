@@ -182,6 +182,74 @@ let
     env, cost = solve!(planner.solver,PC_TAPF(base_env))
 
 end
+let    
+    
+    MAX_TIME_LIMIT = 30
+    MAX_BACKUP_TIME_LIMIT = 20
+    COMMIT_THRESHOLD = 10
+    ASTAR_ITERATION_LIMIT = 5000
+    PIBT_ITERATION_LIMIT = 5000
+    CBS_ITERATION_LIMIT = 1000
+    NBS_ITERATION_LIMIT = 10
+    primary_replanner = MergeAndBalance()
+    backup_replanner = ConstrainedMergeAndBalance(max_problem_size=300)
+    path_finder = DefaultAStarSC()
+    set_iteration_limit!(path_finder,ASTAR_ITERATION_LIMIT)
+    primary_route_planner = CBSSolver(ISPS(path_finder))
+    set_iteration_limit!(primary_route_planner,CBS_ITERATION_LIMIT)
+    primary_assignment_solver = TaskGraphsMILPSolver(ExtendedAssignmentMILP())
+    set_iteration_limit!(primary_assignment_solver,NBS_ITERATION_LIMIT)
+    primary_planner = FullReplanner(
+        solver = NBSSolver(
+            assignment_model=primary_assignment_solver,
+            path_planner=primary_route_planner,
+            return_first_feasible = true, # return if a feasible solution has been found
+            ),
+        replanner = primary_replanner,
+        cache = ReplanningProfilerCache(features=feats,final_features=final_feats)
+        )
+    set_max_time_limit!(primary_planner,MAX_TIME_LIMIT)
+    set_commit_threshold!(primary_planner,COMMIT_THRESHOLD)
+    # Backup planner
+    backup_planner = FullReplanner(
+        solver = NBSSolver(
+            assignment_model = TaskGraphsMILPSolver(GreedyAssignment(
+                greedy_cost = GreedyFinalTimeCost(),
+            )),
+            path_planner = PIBTPlanner{NTuple{3,Float64}}(partial=true) # allow partial solutions
+            ),
+        replanner = backup_replanner,
+        cache = ReplanningProfilerCache(features=feats,final_features=final_feats)
+        )
+    set_iteration_limit!(backup_planner,1)
+    set_iteration_limit!(route_planner(backup_planner.solver),PIBT_ITERATION_LIMIT)
+    set_commit_threshold!(backup_planner,COMMIT_THRESHOLD)
+    set_debug!(backup_planner,true)
+
+    planner = ReplannerWithBackup(primary_planner,backup_planner)
+
+    set_real_time_flag!(planner,false) # turn off real-time op constraints
+    # set_commit_threshold!(replan_model,40) # setting high commit threshold to allow for warmup
+    prob = replanning_problem_1(planner.primary_planner.solver)
+    env = prob.env
+    stage = 0
+
+    set_real_time_flag!(primary_planner,true) # turn off real-time op constraints
+
+    stage += 1
+    request = prob.requests[stage]
+    remap_object_ids!(request.schedule,env.schedule)
+    # @show [v for v in vertices(env.schedule) if get_node(env.schedule,v).spec.fixed]
+    base_envA = replan!(primary_planner,env,request)
+    # @show [v for v in vertices(env.schedule) if get_node(env.schedule,v).spec.fixed]
+    envA, costA = solve!(primary_planner.solver,TaskGraphs.construct_pctapf_problem(prob,base_envA))
+
+    base_envB = replan!(backup_planner,env,request)
+    envB, costB = solve!(backup_planner.solver,TaskGraphs.construct_pctapf_problem(prob,base_envB))
+
+    env = envA
+    # @show [v for v in vertices(env.schedule) if get_node(env.schedule,v).spec.fixed]
+end
 # Debug
 # let
 #     loader = ReplanningProblemLoader()
