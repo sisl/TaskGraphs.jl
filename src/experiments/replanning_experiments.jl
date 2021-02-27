@@ -679,20 +679,42 @@ function post_process_replanning_results!(results,config)
     primary_runtimes = Float64[]
     backup_runtimes = Float64[]
     runtime_gaps = Float64[]
-    for (resultsA,resultsB) in zip(results[:primary_planner],results[:backup_planner])
-        push!(primary_runtimes,resultsA[:RunTime])
-        push!(backup_runtimes,resultsB[:RunTime])
-        push!(runtime_gaps,(resultsA[:RunTime])/(resultsA[:RunTime]+resultsB[:RunTime]))
-        if resultsA[:FeasibleFlag] == true
-            push!(makespans,resultsA[:makespan])
-            push!(arrival_times,resultsA[:start_time])
-            push!(backup_flags,false)
-        elseif resultsB[:FeasibleFlag] == true
-            push!(makespans,resultsB[:makespan])
-            push!(arrival_times,resultsB[:start_time])
-            push!(backup_flags,true)
-        else
-            break
+    if length(results[:primary_planner]) == length(results[:backup_planner])
+        for (resultsA,resultsB) in zip(results[:primary_planner],results[:backup_planner])
+            push!(primary_runtimes,resultsA[:RunTime])
+            push!(backup_runtimes,resultsB[:RunTime])
+            push!(runtime_gaps,(resultsA[:RunTime])/(resultsA[:RunTime]+resultsB[:RunTime]))
+            if resultsA[:FeasibleFlag] == true
+                push!(makespans,resultsA[:makespan])
+                push!(arrival_times,resultsA[:start_time])
+                push!(backup_flags,false)
+            elseif resultsB[:FeasibleFlag] == true
+                push!(makespans,resultsB[:makespan])
+                push!(arrival_times,resultsB[:start_time])
+                push!(backup_flags,true)
+            else
+                break
+            end
+        end
+    else
+        j = 1
+        resultsB = get(results[:backup_planner],j,nothing)
+        for (stage,resultsA) in enumerate(results[:primary_planner])
+            push!(primary_runtimes,resultsA[:RunTime])
+            if resultsA[:FeasibleFlag] == true
+                push!(makespans,resultsA[:makespan])
+                push!(arrival_times,resultsA[:start_time])
+                push!(backup_flags,false)
+            elseif !(resultsB === nothing) && resultsB[:FeasibleFlag] == true
+                push!(makespans,resultsB[:makespan])
+                push!(arrival_times,resultsB[:start_time])
+                push!(backup_flags,true)
+                j += 1
+                resultsB = get(results[:backup_planner],j,nothing)
+            else
+                @warn "Cannot load a full set of results. Both the primary and backup planners fails at stage $(stage)."
+                break
+            end
         end
     end
     results[:makespans] = makespans
