@@ -97,9 +97,13 @@ function get_active_and_fixed_vtxs(sched::OperatingSchedule,t)
     active_vtxs = Set{Int}()
     fixed_vtxs = Set{Int}()
     for v in vertices(get_graph(sched))
-        if get_tF(sched,v) + minimum(get_local_slack(sched,v)) <= t
+        t0 = get_t0(sched,v)
+        tF = get_tF(sched,v)
+        # t0 = Int(round(get_t0(sched,v)))
+        # tF = Int(round(get_tF(sched,v)))
+        if tF + minimum(get_local_slack(sched,v)) <= t
             push!(fixed_vtxs, v)
-        elseif get_t0(sched,v) <= t < get_tF(sched,v) + minimum(get_local_slack(sched,v))
+        elseif t0 <= t < tF + minimum(get_local_slack(sched,v))
             push!(active_vtxs, v)
         end
     end

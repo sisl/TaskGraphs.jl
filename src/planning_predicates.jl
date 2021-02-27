@@ -553,6 +553,8 @@ GraphUtils.validate_edge(n1::BOT_CARRY,		n2::BOT_DEPOSIT		) = (n1.x2 	== n2.x) &
 GraphUtils.validate_edge(n1::BOT_DEPOSIT,		n2::BOT_CARRY		) = false
 GraphUtils.validate_edge(n1::BOT_DEPOSIT,		n2::BOT_GO			) = (n1.x 	== n2.x1)
 GraphUtils.validate_edge(n1::N,n2::N) where {N<:Union{BOT_COLLECT,BOT_DEPOSIT}} = (n1.x == n2.x) # job shop edges are valid
+GraphUtils.validate_edge(n1::Operation,n2::OBJECT_AT) = haskey(postconditions(n1),get_object_id(n2))
+GraphUtils.validate_edge(n1::OBJECT_AT,n2::Operation) = haskey(preconditions(n2),get_object_id(n1))
 
 Base.string(pred::OBJECT_AT)	=  string("O(",get_id(get_object_id(pred)),",",map(x->get_id(x), get_location_ids(pred)),")")
 Base.string(pred::BOT_AT)  		=  string("R(",get_id(get_robot_id(pred)),",",get_id(get_location_id(pred)),")")

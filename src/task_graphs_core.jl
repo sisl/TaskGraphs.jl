@@ -756,7 +756,7 @@ function validate(sched::OperatingSchedule)
                     node2 = get_node_from_vtx(sched, v2)
                     if matches_node_type(node2, AbstractSingleRobotAction)
                         if length(intersect(resources_reserved(node),resources_reserved(node2))) == 0 # job shop constraint
-                            @assert( get_robot_id(node) == get_robot_id(node2), string("robot IDs do not match: ",string(node), " --> ", string(node2)))
+                            @assert( get_robot_id(node) == get_robot_id(node2), string("robot IDs do not match: ",string(node), " => ", string(node2)))
                         end
                     end
                 end

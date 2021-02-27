@@ -312,6 +312,7 @@ function profile_replanner!(planner::ReplannerWithBackup,prob::RepeatedAbstractP
             results = plannerA.cache.stage_results
             # @info "Stage results" results
             env = envA
+            validate(get_schedule(envA))
         else
             # backup
             base_envB = replan!(plannerB,env,request)
@@ -323,6 +324,7 @@ function profile_replanner!(planner::ReplannerWithBackup,prob::RepeatedAbstractP
                 "Primary planner failed at stage $stage. Proceeding with backup plan.")
                 env = envB
                 validate(get_schedule(envB))
+                validate(get_schedule(env),convert_to_vertex_lists(get_route_plan(env)))
             else
                 @log_info(-1,0,"REPLANNING:",
                     "Both primary and backup planners failed at stage $stage.",

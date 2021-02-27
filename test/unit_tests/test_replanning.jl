@@ -46,6 +46,12 @@ let
         new_sched = prune_schedule(MergeAndBalance(),search_env,5)
         @test !has_vertex(new_sched,ObjectID(1))
     end
+    let 
+        search_env = deepcopy(env)
+        sched = get_schedule(env)
+        fix_precutoff_nodes!(sched,get_problem_spec(env),1)
+        GraphUtils.log_graph_edges(sched)
+    end
     let
         search_env = deepcopy(env)
         sched = get_schedule(search_env)
