@@ -315,8 +315,8 @@ end
 export BigMILPSolver
 
 @with_kw struct BigMILPSolver <: AbstractPCTAPFSolver
-    EXTRA_T::Int                       = 10
-    LIMIT_EXTRA_T::Int                 = 1000
+    EXTRA_T::Int                       = 2
+    LIMIT_EXTRA_T::Int                 = 64
     logger::SolverLogger{Float64}   = SolverLogger{Float64}()
 end
 
@@ -325,8 +325,14 @@ end
 
 Formulate a PCTAPF problem as a giant network flow MILP.
 """
-function formulate_big_milp(prob::PC_TAPF,EXTRA_T=1)
-    model = JuMP.Model(default_milp_optimizer())
+function formulate_big_milp(prob::PC_TAPF,EXTRA_T=1;
+        direct::Bool = true,
+    )
+    if direct
+        model = direct_model(default_milp_optimizer()()) # reduced memory footprint
+    else
+        model = JuMP.Model(default_milp_optimizer())
+    end
     set_optimizer_attributes(model,default_optimizer_attributes()...)
 
     sched = get_schedule(get_env(prob))
@@ -550,11 +556,17 @@ function CRCBS.solve!(solver::BigMILPSolver,prob::PC_TAPF)
         set_time_limit_sec(milp, runtime_limit(solver))
         optimize!(milp)
     end
-    bound = Int(round(objective_bound(milp)))
-    cost = Int(round(objective_value(milp)))
-    set_lower_bound!(solver,bound)
-    set_best_cost!(solver,cost)
-    env = extract_solution(prob,milp)
+    if primal_status(milp) == MOI.FEASIBLE_POINT
+        bound = Int(round(objective_bound(milp)))
+        cost = Int(round(objective_value(milp)))
+        set_lower_bound!(solver,bound)
+        set_best_cost!(solver,cost)
+        env = extract_solution(prob,milp)
+    else
+        cost = Inf
+        set_best_cost!(solver,Inf)
+        env = deepcopy(get_env(prob))
+    end
     return env, cost
 end
 
