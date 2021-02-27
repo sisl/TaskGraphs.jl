@@ -148,7 +148,15 @@ function robot_tip_map(sched::OperatingSchedule,vtxs=get_all_terminal_nodes(sche
         n_id = get_vtx_id(sched,v)
         for robot_id in get_valid_robot_ids(sched,n_id,v)
             if get_id(robot_id) != -1
-                @assert !haskey(robot_tips,robot_id)
+                if haskey(robot_tips,robot_id)
+                    current_tip = get_node(sched,robot_tips[robot_id])
+                    new_tip = get_node(sched,n_id)
+                    @error "Just found tip $(string(new_tip.node)), but robot tip map already has $(robot_id) => $(string(current_tip.node))"
+                    GraphUtils.log_graph_edges(sched,current_tip,show_all=false)
+                    GraphUtils.log_graph_edges(sched,new_tip,show_all=false)
+                    # @assert validate(sched)
+                    @assert !haskey(robot_tips,robot_id)
+                end
                 robot_tips[robot_id] = n_id
             end
         end

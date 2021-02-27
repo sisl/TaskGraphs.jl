@@ -406,6 +406,7 @@ get_slack(spec::PathSpec) = spec.slack
 set_slack!(spec::PathSpec,val) = begin spec.slack = val end
 get_local_slack(spec::PathSpec) = spec.local_slack
 set_local_slack!(spec::PathSpec,val) = begin spec.local_slack = val end
+Base.summary(s::PathSpec) = string("t0=",s.t0,", tF=",s.tF,", fixed=",s.fixed)
 
 const path_spec_accessor_interface = [
     :get_t0,
@@ -455,6 +456,7 @@ end
 for op in [:(GraphUtils.matches_template)]
     @eval $op(template::Type{T},node::ScheduleNode) where {T} = $op(template,node.node)
 end
+Base.summary(n::ScheduleNode) = string(string(n.node)," [",summary(n.spec),"]")
 
 const schedule_node_accessor_interface = [
     path_spec_accessor_interface...,
@@ -774,9 +776,29 @@ function validate(sched::OperatingSchedule)
     end
     return true
 end
-function log_schedule_edges(sched)
-    for e in edges(sched)
-        @info "$(string(get_node(sched,e.src).node)) --> $(string(get_node(sched,e.dst).node))"
+function log_schedule_edges(sched,v=-1;
+        show_upstream = true,
+        show_downstream = true,
+        show_all = true,
+    )
+    if has_vertex(sched,v)
+        if show_upstream
+            @info "upstream from $(summary(get_node(sched,v))):"
+            for e in edges(bfs_tree(sched,v;dir=:in))
+                @info "$(summary(get_node(sched,e.dst))) => $(summary(get_node(sched,e.src)))"
+            end
+        end
+        if show_downstream
+            @info "downstream from $(summary(get_node(sched,v))):"
+            for e in edges(bfs_tree(sched,v;dir=:out))
+                @info "$(summary(get_node(sched,e.src))) => $(summary(get_node(sched,e.dst)))"
+            end
+        end
+    end
+    if show_all
+        for e in edges(sched)
+            @info "$(summary(get_node(sched,e.src))) => $(summary(get_node(sched,e.dst))),"
+        end
     end
 end
 function validate(node::ScheduleNode,paths::Vector{Vector{Int}})

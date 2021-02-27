@@ -556,9 +556,9 @@ GraphUtils.validate_edge(n1::N,n2::N) where {N<:Union{BOT_COLLECT,BOT_DEPOSIT}} 
 
 Base.string(pred::OBJECT_AT)	=  string("O(",get_id(get_object_id(pred)),",",map(x->get_id(x), get_location_ids(pred)),")")
 Base.string(pred::BOT_AT)  		=  string("R(",get_id(get_robot_id(pred)),",",get_id(get_location_id(pred)),")")
-Base.string(a::BOT_GO)        	=  string("GO(",get_id(get_robot_id(a)),",",get_id(get_initial_location_id(a)),"->",get_id(get_destination_location_id(a)),")")
+Base.string(a::BOT_GO)        	=  string("GO(",get_id(get_robot_id(a)),",",get_id(get_initial_location_id(a)),"=>",get_id(get_destination_location_id(a)),")")
 Base.string(a::BOT_COLLECT)   	=  string("COLLECT(",get_id(get_robot_id(a)),",",get_id(get_object_id(a)),",",get_id(get_location_id(a)),")")
-Base.string(a::BOT_CARRY)     	=  string("CARRY(",get_id(get_robot_id(a)),",",get_id(get_object_id(a)),",",get_id(get_initial_location_id(a)),"->",get_id(get_destination_location_id(a)),")")
+Base.string(a::BOT_CARRY)     	=  string("CARRY(",get_id(get_robot_id(a)),",",get_id(get_object_id(a)),",",get_id(get_initial_location_id(a)),"=>",get_id(get_destination_location_id(a)),")")
 Base.string(a::BOT_DEPOSIT)   	=  string("DEPOSIT(",get_id(get_robot_id(a)),",",get_id(get_object_id(a)),",",get_id(get_location_id(a)),")")
 Base.string(op::Operation)    	=  string("OP(",get_id(get_operation_id(op)),")")
 Base.string(a::TEAM_ACTION)   	=  string("TEAM_ACTION( ",map(i->string(string(i), ","), a.instructions)...," )")
