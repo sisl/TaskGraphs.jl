@@ -38,6 +38,8 @@ abstract type AbstractRobotAction{R<:AbstractRobotType} <: AbstractPlanningPredi
 abstract type AbstractSingleRobotAction{R<:AbstractRobotType} <: AbstractRobotAction{R} end
 abstract type AbstractTeamRobotAction{R<:AbstractRobotType} <: AbstractRobotAction{R} end
 
+Base.copy(p::AbstractPlanningPredicate) = deepcopy(p)
+
 function get_object_id end
 function get_robot_id end
 function get_initial_location_id end

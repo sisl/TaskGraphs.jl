@@ -440,7 +440,7 @@ mutable struct ScheduleNode{I<:AbstractID,V}
 end
 ScheduleNode(id,node) = ScheduleNode(id,node,PathSpec())
 get_path_spec(node::ScheduleNode) = node.spec
-Base.copy(n::ScheduleNode) = ScheduleNode(n.id,n.node,deepcopy(n.spec))
+Base.copy(n::ScheduleNode) = ScheduleNode(n.id,copy(n.node),deepcopy(n.spec))
 function set_path_spec!(node::ScheduleNode,spec)
     node.spec = spec
 end

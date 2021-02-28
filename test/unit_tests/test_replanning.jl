@@ -40,6 +40,17 @@ let
     solver = NBSSolver()
     prob = pctapf_problem_1(solver)
     env,cost = solve!(solver,prob)
+    let
+        request = ProjectRequest(
+            OperatingSchedule(),
+            4,
+            4,
+        )
+        search_env = deepcopy(env)
+        new_env = replan!(solver,MergeAndBalance(),search_env,request,
+            commit_threshold=10,)
+        
+    end
     let 
         search_env = deepcopy(env)
         @test has_vertex(get_schedule(search_env),ObjectID(1))
@@ -232,6 +243,7 @@ let
     # set_commit_threshold!(replan_model,40) # setting high commit threshold to allow for warmup
     prob = replanning_problem_1(planner.primary_planner.solver)
     env = prob.env
+    @show [n for n in get_nodes(env.schedule) if n.spec.fixed]
     stage = 0
 
     set_real_time_flag!(primary_planner,true) # turn off real-time op constraints
@@ -248,6 +260,7 @@ let
     envB, costB = solve!(backup_planner.solver,TaskGraphs.construct_pctapf_problem(prob,base_envB))
 
     env = envA
+    env = envB
     # @show [v for v in vertices(env.schedule) if get_node(env.schedule,v).spec.fixed]
 end
 # Debug

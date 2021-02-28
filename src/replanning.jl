@@ -170,14 +170,21 @@ Identify all nodes that end before the cutoff time, and change their path spec
 function fix_precutoff_nodes!(sched::OperatingSchedule,problem_spec::ProblemSpec,t)
     # active_vtxs = Set{Int}()
     active_vtxs, fixed_vtxs = get_active_and_fixed_vtxs(sched,t)
-    # set all fixed_vtxs to plan_path=false
-    for v in active_vtxs
-        set_path_spec!(sched,v,PathSpec(get_path_spec(sched,v), fixed=false))
+    # for v in active_vtxs
+    for v in vertices(sched)
+        set_path_spec!(sched,v,
+            PathSpec(   
+                get_path_spec(sched,v), 
+                plan_path=needs_path(get_node(sched,v).node), 
+                fixed=false)
+                )
     end
+    # set all fixed_vtxs to plan_path=false
     for v in fixed_vtxs
         set_path_spec!(sched,v,PathSpec(get_path_spec(sched,v), plan_path=false, fixed=true))
     end
     # verify that all vertices following active_vtxs have a start time > t
+    @assert all([get_node(sched,v).spec.fixed==false for v in active_vtxs]) ""
     @assert all(map(v->get_t0(sched,v), collect(fixed_vtxs)) .<= t)
     @assert all(map(v->get_tF(sched,v) + minimum(get_local_slack(sched,v)), collect(active_vtxs)) .>= t)
     sched
@@ -188,15 +195,14 @@ function fix_precutoff_nodes!(env::SearchEnv,t=minimum(map(length, get_paths(get
 end
 
 function break_assignments!(sched::OperatingSchedule,problem_spec,v)
-    G = get_graph(sched)
     n_id = get_vtx_id(sched,v)
     node = get_node_from_id(sched,n_id)
     if isa(node, AbstractRobotAction)
         new_node = replace_robot_id(node,RobotID(-1)) # TODO Why is this line here? I don't think the robot id should be replaced in this node--just it's successors
         if isa(node,BOT_GO)
-            for v2 in outneighbors(G,v)
+            for v2 in outneighbors(sched,v)
                 if isa(get_node_from_vtx(sched,v2),Union{BOT_COLLECT,TEAM_COLLECT})
-                    rem_edge!(G,v,v2)
+                    rem_edge!(sched,v,v2)
                     new_node = replace_destination(new_node,LocationID(-1))
                 end
             end
@@ -267,7 +273,8 @@ function prune_schedule(sched::OperatingSchedule,
     keep_vtxs = setdiff(Set{Int}(collect(vertices(G))), remove_set)
     # add all non-deleted nodes to new project schedule
     for v in keep_vtxs
-        add_node!(new_sched,get_node(sched,v))
+        # add_node!(new_sched,get_node(sched,v))
+        add_node!(new_sched,deepcopy(get_node(sched,v)))
     end
     # add all edges between nodes that still exist
     for e in edges(get_graph(sched))
@@ -652,7 +659,7 @@ function replan!(solver, replan_model, search_env, request;
         commit_threshold=get_commit_threshold(replan_model),
         kwargs...
         )
-    sched               = get_schedule(search_env)
+    # sched               = get_schedule(search_env)
     cache               = get_cache(search_env)
     route_plan          = get_route_plan(search_env)
     problem_spec        = get_problem_spec(search_env)
@@ -660,7 +667,7 @@ function replan!(solver, replan_model, search_env, request;
     t_request           = request.t_request
     next_sched          = deepcopy(request.schedule)
 
-    @assert sanity_check(sched," in replan!()")
+    @assert sanity_check(get_schedule(search_env)," in replan!()")
     # Freeze route_plan and schedule at t_commit
     t_commit = get_commit_time(replan_model, search_env, request, commit_threshold)
     t_final = minimum(map(length, get_paths(get_route_plan(search_env))))

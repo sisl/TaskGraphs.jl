@@ -75,20 +75,3 @@ let
     # solution2, cost = solve!(solver,PC_TAPF(env))
 
 end
-
-# function show_cache_state(env,cache=env.cache)
-#     for (name,c) in zip(["closed","active"],[cache.closed_set, cache.active_set])
-#        vtxs = map(v->string(get_node_from_vtx(env.schedule,v)), collect(c))
-#        println("***",name,"***")
-#        for node in vtxs
-#            println(node)
-#        end
-#        println("\n")
-#    end
-#    println("*** FIXED ***")
-#    for v in vertices(env.schedule)
-#        path_spec = get_path_spec(env.schedule,v)
-#        pre = path_spec.fixed ? " - FIXED" : ""
-#        println(string(get_node_from_vtx(env.schedule,v)), pre)
-#    end
-# end
