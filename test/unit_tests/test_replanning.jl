@@ -20,7 +20,7 @@ let
 end
 let
     n_heads = 3
-    prob = random_repeated_pctapf_def(init_env_small(),Dict(:M=>4,:num_unique_projects=>n_heads))
+    prob = random_repeated_pctapf_def(init_env_small(),Dict(:M=>12,:num_unique_projects=>n_heads))
     for request in prob.requests
         @test length(get_all_terminal_nodes(request.def.project_spec)) == n_heads
     end
@@ -40,6 +40,26 @@ let
         @test get_id(k) > 10
         @test get_id(get_object_id(v)) > 10
    end
+end
+# Test that ConstrainedMergeAndBalance can constrain based on number of tasks
+let 
+    reset_all_id_counters!()
+    solver = NBSSolver()
+    prob = replanning_problem_1(solver)
+    replanner = ConstrainedMergeAndBalance(max_tasks=2,constrain_tasks=true)
+    set_commit_threshold!(replanner,3)
+    set_real_time_flag!(replanner,false)
+    
+    base_env = get_env(prob)
+    stage = 0
+
+    stage += 1
+    request = prob.requests[stage]
+    remap_object_ids!(request.schedule,get_schedule(base_env))
+    search_env = replan!(solver,replanner,base_env,request)
+    env, cost = solve!(solver,TaskGraphs.construct_pctapf_problem(prob,search_env))
+    base_env = env
+
 end
 # Test prune_schedule, split_active_vtxs!, and fix_precutoff_nodes!
 let

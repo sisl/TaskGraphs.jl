@@ -929,6 +929,7 @@ function random_multihead_pctapf_def(env::GridFactoryEnvironment,
         N                   = get(config,:N,30),
         M                   = get(config,:M,10),
         num_unique_projects = get(config,:num_unique_projects,1),
+        m                   = get(config,:m,Int(M/num_unique_projects)),
         max_parents         = get(config,:max_parents,3),
         depth_bias          = get(config,:depth_bias,0.4),
         dt_min              = get(config,:dt_min,0),
@@ -938,9 +939,10 @@ function random_multihead_pctapf_def(env::GridFactoryEnvironment,
         task_sizes          = get(config,:task_sizes,(1=>1.0,2=>0.0,4=>0.0)),
     )
 
-
-    m = M # num objects per project
-    M = m*num_unique_projects # total number of objects
+    if !(m == M/num_unique_projects)
+        @warn "!(m == M/num_unique_projects)"
+        M = m*num_unique_projects
+    end
     r0, s0, sF = get_random_problem_instantiation(N,M,
         get_pickup_zones(env),get_dropoff_zones(env),get_free_zones(env))
     project_spec = ProjectSpec()

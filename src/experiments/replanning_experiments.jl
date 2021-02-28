@@ -641,6 +641,30 @@ function replanning_config_6()
         Dict(:M=>30, :arrival_interval=>60, ),
         Dict(:M=>30, :arrival_interval=>70, ),
         Dict(:M=>30, :arrival_interval=>80, ),
+        # medium-sized projects
+        Dict(:M=>30, :num_unique_projects=>6, :arrival_interval=>20, ),
+        Dict(:M=>30, :num_unique_projects=>6, :arrival_interval=>30, ),
+        Dict(:M=>30, :num_unique_projects=>6, :arrival_interval=>40, ),
+        Dict(:M=>30, :num_unique_projects=>6, :arrival_interval=>50, ),
+        Dict(:M=>30, :num_unique_projects=>6, :arrival_interval=>60, ),
+        Dict(:M=>30, :num_unique_projects=>6, :arrival_interval=>70, ),
+        Dict(:M=>30, :num_unique_projects=>6, :arrival_interval=>80, ),
+        # small-sized projects
+        Dict(:M=>30, :num_unique_projects=>10, :arrival_interval=>20, ),
+        Dict(:M=>30, :num_unique_projects=>10, :arrival_interval=>30, ),
+        Dict(:M=>30, :num_unique_projects=>10, :arrival_interval=>40, ),
+        Dict(:M=>30, :num_unique_projects=>10, :arrival_interval=>50, ),
+        Dict(:M=>30, :num_unique_projects=>10, :arrival_interval=>60, ),
+        Dict(:M=>30, :num_unique_projects=>10, :arrival_interval=>70, ),
+        Dict(:M=>30, :num_unique_projects=>10, :arrival_interval=>80, ),
+        # single-task projects
+        Dict(:M=>30, :num_unique_projects=>30, :arrival_interval=>20, ),
+        Dict(:M=>30, :num_unique_projects=>30, :arrival_interval=>30, ),
+        Dict(:M=>30, :num_unique_projects=>30, :arrival_interval=>40, ),
+        Dict(:M=>30, :num_unique_projects=>30, :arrival_interval=>50, ),
+        Dict(:M=>30, :num_unique_projects=>30, :arrival_interval=>60, ),
+        Dict(:M=>30, :num_unique_projects=>30, :arrival_interval=>70, ),
+        Dict(:M=>30, :num_unique_projects=>30, :arrival_interval=>80, ),
     ]
     product_config_dicts(base_configs,robot_configs,project_configs,stream_configs)
 end
