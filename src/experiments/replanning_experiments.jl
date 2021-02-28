@@ -117,7 +117,8 @@ Instantiate a random `RepeatedPC_TAPF` problem based on the parameters of config
 function random_pctapf_sequence(env::GridFactoryEnvironment,config;
         num_projects        = get(config,:num_projects,10),
         kwargs...)
-    projects = map(i->random_pctapf_def(env,config;kwargs...), 1:num_projects)
+    # projects = map(i->random_pctapf_def(env,config;kwargs...), 1:num_projects)
+    projects = map(i->random_multihead_pctapf_def(env,config;kwargs...), 1:num_projects)
 end
 
 function random_repeated_pctapf_def(env,config;

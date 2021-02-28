@@ -924,6 +924,41 @@ function random_pctapf_def(env::GridFactoryEnvironment,
     shapes = choose_random_object_sizes(M,Dict(task_sizes...))
     problem_def = SimpleProblemDef(project_spec,r0,s0,sF,shapes)
 end
+function random_multihead_pctapf_def(env::GridFactoryEnvironment,
+        config;
+        N                   = get(config,:N,30),
+        M                   = get(config,:M,10),
+        num_unique_projects = get(config,:num_unique_projects,1),
+        max_parents         = get(config,:max_parents,3),
+        depth_bias          = get(config,:depth_bias,0.4),
+        dt_min              = get(config,:dt_min,0),
+        dt_max              = get(config,:dt_max,0),
+        dt_collect          = get(config,:dt_collect,0),
+        dt_deliver          = get(config,:dt_deliver,0),
+        task_sizes          = get(config,:task_sizes,(1=>1.0,2=>0.0,4=>0.0)),
+    )
+
+
+    m = M # num objects per project
+    M = m*num_unique_projects # total number of objects
+    r0, s0, sF = get_random_problem_instantiation(N,M,
+        get_pickup_zones(env),get_dropoff_zones(env),get_free_zones(env))
+    project_spec = ProjectSpec()
+    # iterate over s0 and sF in chunks of m at a time
+    for (s0_,sF_) in zip(
+        Base.Iterators.partition(s0, m),
+        Base.Iterators.partition(sF, m),
+    )
+        new_project_spec = construct_random_project_spec(m,collect(s0_),collect(sF_);
+            max_parents=max_parents,
+            depth_bias=depth_bias,
+            Δt_min=dt_min,
+            Δt_max=dt_max)
+        merge!(project_spec,new_project_spec)
+    end
+    shapes = choose_random_object_sizes(M,Dict(task_sizes...))
+    problem_def = SimpleProblemDef(project_spec,r0,s0,sF,shapes)
+end
 
 ## Stochastic PCTAPF problems
 # """

@@ -100,16 +100,20 @@ function remap_object_ids!(spec::ProjectSpec,args...)
     remap_object_ids!(get_initial_conditions(spec),args...)
     remap_object_ids!(get_final_conditions(spec),args...)
     # @assert sanity_check(sched," after remap_object_ids!()")
-    sched
+    spec
 end
-function remap_object_ids!(new_schedule::Union{ProjectSpec,OperatingSchedule},old_schedule::Union{ProjectSpec,OperatingSchedule})
-    max_obj_id = 0
-    for id in get_vtx_ids(old_schedule)
-        if typeof(id) <: ObjectID
-            max_obj_id = max(get_id(id),max_obj_id)
+for T in [:OperatingSchedule,:ProjectSpec]
+    @eval begin
+        function remap_object_ids!(new_schedule::$T,old_schedule::$T)
+            max_obj_id = 0
+            for id in get_vtx_ids(old_schedule)
+                if typeof(id) <: ObjectID
+                    max_obj_id = max(get_id(id),max_obj_id)
+                end
+            end
+            remap_object_ids!(new_schedule,max_obj_id)
         end
     end
-    remap_object_ids!(new_schedule,max_obj_id)
 end
 
 export get_valid_robot_ids

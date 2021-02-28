@@ -19,6 +19,13 @@ let
     ProjectRequest(OperatingSchedule(),10,10)
 end
 let
+    n_heads = 3
+    prob = random_repeated_pctapf_def(init_env_small(),Dict(:M=>4,:num_unique_projects=>n_heads))
+    for request in prob.requests
+        @test length(get_all_terminal_nodes(request.def.project_spec)) == n_heads
+    end
+end
+let
     @test remap_object_id(ObjectID(1),2) == ObjectID(3)
     @test remap_object_id(OBJECT_AT(1,1),2) == OBJECT_AT(3,1)
     remap_object_id(ScheduleNode(
@@ -36,15 +43,16 @@ let
 end
 # Test prune_schedule, split_active_vtxs!, and fix_precutoff_nodes!
 let
+
     reset_all_id_counters!()
     solver = NBSSolver()
     prob = pctapf_problem_1(solver)
     env,cost = solve!(solver,prob)
     let 
         search_env = deepcopy(env)
-        sched = get_schedule(env)
+        sched = get_schedule(search_env)
         break_assignments!(sched,get_problem_spec(search_env))
-        GraphUtils.log_graph_edges(sched)
+        # GraphUtils.log_graph_edges(sched)
     end
     let 
         search_env = deepcopy(env)
@@ -54,11 +62,11 @@ let
     end
     let 
         search_env = deepcopy(env)
-        sched = get_schedule(env)
+        sched = get_schedule(search_env)
         vgo = outneighbors(sched,RobotID(1))[1]
-        fix_precutoff_nodes!(sched,get_problem_spec(env),2)
+        fix_precutoff_nodes!(sched,get_problem_spec(search_env),2)
         @test get_path_spec(sched,vgo).fixed == true
-        fix_precutoff_nodes!(sched,get_problem_spec(env),0)
+        fix_precutoff_nodes!(sched,get_problem_spec(search_env),0)
         @test get_path_spec(sched,vgo).fixed == false
         # GraphUtils.log_graph_edges(sched)
     end
@@ -96,8 +104,6 @@ let
         search_env = deepcopy(env)
         sched = get_schedule(search_env)
         @test get_node(sched,RobotID(1)).spec.fixed == false
-        # new_sched = fix_precutoff_nodes!()
-        # @test !has_vertex(new_sched,ObjectID(1))
     end
 
 end
