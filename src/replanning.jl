@@ -475,7 +475,10 @@ stage.
 """
 @with_kw struct ConstrainedMergeAndBalance      <: ReplannerModel
     config::ReplannerConfig = ReplannerConfig()
-    max_problem_size::Int   = 400 # max permissible number of variables in sub problem
+    max_problem_size::Int   = 400 # max permissible number of unfrozen nodes in sub problem
+    max_tasks::Int          = 80 # max permissible number of tasks
+    constrain_tasks::Bool   = false 
+    constrain_nodes::Bool   = true
 end
 @with_kw struct Oracle               <: ReplannerModel
     config::ReplannerConfig = ReplannerConfig(
@@ -599,8 +602,24 @@ end
 function get_commit_time(replan_model::ConstrainedMergeAndBalance, search_env, request, commit_threshold)
     nv_max = replan_model.max_problem_size - nv(request.schedule)
     t_commit = request.t_request + commit_threshold
-    if 0 < nv_max < nv(get_schedule(search_env))
-        t_commit = max(t_commit, sort(get_tF(get_schedule(search_env)); rev=true)[nv_max])
+    # constrain the total number of unfrozen nodes
+    if replan_model.constrain_nodes
+        if 0 < nv_max < nv(get_schedule(search_env))
+            t_commit = max(t_commit, sort(get_tF(get_schedule(search_env)); rev=true)[nv_max])
+        end
+    end
+    # constrain the total number of delivery tasks
+    if replan_model.constrain_tasks
+        n_tasks = length(n for n in get_nodes(request.schedule) if matches_template(OBJECT_AT,n))
+        for n in node_iterator(sched,reverse(topological_sort_by_dfs(sched)))
+            if matches_template(BOT_COLLECT,n)
+                n_tasks += 1
+                if n_tasks > replan_model.max_tasks
+                    t_commit = max(t_commit, get_tF(n))
+                    break
+                end
+            end
+        end
     end
     return t_commit
 end
