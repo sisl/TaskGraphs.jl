@@ -168,9 +168,9 @@ Identify all nodes that end before the cutoff time, and change their path spec
     so that the route planner will not actually plan a path for them.
 """
 function fix_precutoff_nodes!(sched::OperatingSchedule,problem_spec::ProblemSpec,t)
-    # active_vtxs = Set{Int}()
     active_vtxs, fixed_vtxs = get_active_and_fixed_vtxs(sched,t)
-    # for v in active_vtxs
+    # Make sure no nodes are already fixed (e.g, from a previous replanning 
+    # attempt that would have gone farther into the future.)
     for v in vertices(sched)
         set_path_spec!(sched,v,
             PathSpec(   
@@ -184,9 +184,11 @@ function fix_precutoff_nodes!(sched::OperatingSchedule,problem_spec::ProblemSpec
         set_path_spec!(sched,v,PathSpec(get_path_spec(sched,v), plan_path=false, fixed=true))
     end
     # verify that all vertices following active_vtxs have a start time > t
-    @assert all([get_node(sched,v).spec.fixed==false for v in active_vtxs]) ""
-    @assert all(map(v->get_t0(sched,v), collect(fixed_vtxs)) .<= t)
-    @assert all(map(v->get_tF(sched,v) + minimum(get_local_slack(sched,v)), collect(active_vtxs)) .>= t)
+    @assert all(get_node(sched,v).spec.fixed==false for v in active_vtxs)
+    @assert all(get_t0(sched,v) <= t for v in fixed_vtxs)
+    @assert all(
+        get_tF(sched,v) + minimum(get_local_slack(sched,v)) >= t for v in collect(active_vtxs)
+            )
     sched
 end
 function fix_precutoff_nodes!(env::SearchEnv,t=minimum(map(length, get_paths(get_route_plan(env)))))
@@ -198,7 +200,7 @@ function break_assignments!(sched::OperatingSchedule,problem_spec,v)
     n_id = get_vtx_id(sched,v)
     node = get_node_from_id(sched,n_id)
     if isa(node, AbstractRobotAction)
-        new_node = replace_robot_id(node,RobotID(-1)) # TODO Why is this line here? I don't think the robot id should be replaced in this node--just it's successors
+        new_node = replace_robot_id(node,RobotID(-1)) # All replaced ids will be filled back when propagate_valid_ids!(sched) is called again
         if isa(node,BOT_GO)
             for v2 in outneighbors(sched,v)
                 if isa(get_node_from_vtx(sched,v2),Union{BOT_COLLECT,TEAM_COLLECT})
@@ -678,7 +680,7 @@ function replan!(solver, replan_model, search_env, request;
     reset_solver!(solver)
     set_time_limits!(replan_model,solver,t_request,t_commit)
     # Update operating schedule
-    new_sched = prune_schedule(replan_model,search_env,t_split)
+    new_sched = prune_schedule(replan_model,search_env,t_split) # Maybe this should be at t_request instead?
     @assert sanity_check(new_sched," after prune_schedule()")
     # split active nodes
     # new_sched = split_active_vtxs!(replan_model,new_sched,problem_spec,t_split;robot_positions=robot_positions)

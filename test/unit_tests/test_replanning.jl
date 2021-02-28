@@ -41,15 +41,11 @@ let
     prob = pctapf_problem_1(solver)
     env,cost = solve!(solver,prob)
     let
-        request = ProjectRequest(
-            OperatingSchedule(),
-            4,
-            4,
-        )
         search_env = deepcopy(env)
-        new_env = replan!(solver,MergeAndBalance(),search_env,request,
-            commit_threshold=10,)
-        
+        sched = get_schedule(env)
+
+        fix_precutoff_nodes!(sched,get_problem_spec(env),4)
+
     end
     let 
         search_env = deepcopy(env)
@@ -60,8 +56,12 @@ let
     let 
         search_env = deepcopy(env)
         sched = get_schedule(env)
-        fix_precutoff_nodes!(sched,get_problem_spec(env),1)
-        GraphUtils.log_graph_edges(sched)
+        vgo = outneighbors(sched,RobotID(1))[1]
+        fix_precutoff_nodes!(sched,get_problem_spec(env),2)
+        @test get_path_spec(sched,vgo).fixed == true
+        fix_precutoff_nodes!(sched,get_problem_spec(env),0)
+        @test get_path_spec(sched,vgo).fixed == false
+        # GraphUtils.log_graph_edges(sched)
     end
     let
         search_env = deepcopy(env)
