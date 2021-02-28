@@ -241,7 +241,7 @@ end
     prune_schedule(sched::OperatingSchedule,
         problem_spec::ProblemSpec,t)
 
-    remove nodes that don't need to be kept around any longer
+remove nodes that don't need to be kept around any longer
 """
 function prune_schedule(sched::OperatingSchedule,
         problem_spec::ProblemSpec,
@@ -674,13 +674,14 @@ function replan!(solver, replan_model, search_env, request;
     t_commit = get_commit_time(replan_model, search_env, request, commit_threshold)
     t_final = minimum(map(length, get_paths(get_route_plan(search_env))))
     t_split = min(t_commit,t_final)
-    @info "t_commit" t_commit t_split
+    # @info "t_commit" t_commit t_split
 
     robot_positions=get_env_snapshot(search_env,t_split)
     reset_solver!(solver)
     set_time_limits!(replan_model,solver,t_request,t_commit)
     # Update operating schedule
     new_sched = prune_schedule(replan_model,search_env,t_split) # Maybe this should be at t_request instead?
+    # new_sched = prune_schedule(replan_model,search_env,min(t_split,t_request)) # Maybe this should be at t_request instead?
     @assert sanity_check(new_sched," after prune_schedule()")
     # split active nodes
     # new_sched = split_active_vtxs!(replan_model,new_sched,problem_spec,t_split;robot_positions=robot_positions)

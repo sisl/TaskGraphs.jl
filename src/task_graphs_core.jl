@@ -113,6 +113,16 @@ function get_pickup_wait_time(spec::ProjectSpec,o::ObjectID)
     end
     return 0.0
 end
+function Base.merge!(spec1::ProjectSpec,spec2::ProjectSpec)
+    remap_object_ids!(spec2,spec1)
+    for v in vertices(spec2)
+        id = get_vtx_id(spec2,v)
+        node = get_node(spec2,v)
+        add_node!(spec1,node,id)
+    end
+    merge(get_initial_conditions(spec1),get_initial_conditions(spec2))
+    merge(get_final_conditions(spec1),get_final_conditions(spec2))
+end
 """
     get_duration_vector(spec::ProjectSpec)
 

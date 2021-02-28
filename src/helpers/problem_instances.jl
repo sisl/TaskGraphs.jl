@@ -904,6 +904,7 @@ function random_pctapf_def(env::GridFactoryEnvironment,
         config;
         N                   = get(config,:N,30),
         M                   = get(config,:M,10),
+        num_unique_projects = get(config,:num_unique_projects,1),
         max_parents         = get(config,:max_parents,3),
         depth_bias          = get(config,:depth_bias,0.4),
         dt_min              = get(config,:dt_min,0),

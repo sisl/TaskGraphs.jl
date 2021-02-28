@@ -93,7 +93,16 @@ function remap_object_ids!(sched::OperatingSchedule,args...)
     @assert sanity_check(sched," after remap_object_ids!()")
     sched
 end
-function remap_object_ids!(new_schedule::OperatingSchedule,old_schedule::OperatingSchedule)
+function remap_object_ids!(spec::ProjectSpec,args...)
+    remap_object_ids!(get_vtx_ids(spec),args...)
+    remap_object_ids!(get_nodes(spec),args...)
+    remap_object_ids!(get_vtx_map(spec),args...)
+    remap_object_ids!(get_initial_conditions(spec),args...)
+    remap_object_ids!(get_final_conditions(spec),args...)
+    # @assert sanity_check(sched," after remap_object_ids!()")
+    sched
+end
+function remap_object_ids!(new_schedule::Union{ProjectSpec,OperatingSchedule},old_schedule::Union{ProjectSpec,OperatingSchedule})
     max_obj_id = 0
     for id in get_vtx_ids(old_schedule)
         if typeof(id) <: ObjectID

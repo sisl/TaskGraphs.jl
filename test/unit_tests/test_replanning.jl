@@ -40,12 +40,11 @@ let
     solver = NBSSolver()
     prob = pctapf_problem_1(solver)
     env,cost = solve!(solver,prob)
-    let
+    let 
         search_env = deepcopy(env)
         sched = get_schedule(env)
-
-        fix_precutoff_nodes!(sched,get_problem_spec(env),4)
-
+        break_assignments!(sched,get_problem_spec(search_env))
+        GraphUtils.log_graph_edges(sched)
     end
     let 
         search_env = deepcopy(env)
