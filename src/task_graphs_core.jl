@@ -123,8 +123,9 @@ function Base.merge!(spec1::ProjectSpec,spec2::ProjectSpec)
     for e in edges(spec2)
         add_edge!(spec1,get_vtx_id(spec2,e.src),get_vtx_id(spec2,e.dst))
     end
-    merge(get_initial_conditions(spec1),get_initial_conditions(spec2))
-    merge(get_final_conditions(spec1),get_final_conditions(spec2))
+    merge!(get_initial_conditions(spec1),get_initial_conditions(spec2))
+    merge!(get_final_conditions(spec1),get_final_conditions(spec2))
+    spec1
 end
 """
     get_duration_vector(spec::ProjectSpec)

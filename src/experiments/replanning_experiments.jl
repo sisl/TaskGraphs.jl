@@ -374,7 +374,8 @@ export
     replanning_config_2,
     replanning_config_3,
     replanning_config_4,
-    replanning_config_5
+    replanning_config_5,
+    replanning_config_6
 
 """
     replanning_config_1

@@ -620,7 +620,11 @@ function get_commit_time(replan_model::ConstrainedMergeAndBalance, search_env, r
         for n in node_iterator(sched,reverse(sortperm(get_tF(sched))))
             if matches_template(BOT_COLLECT,n)
                 if n_tasks > replan_model.max_tasks || get_tF(n) <= t_commit
-                    @show t_commit = max(t_commit, get_tF(n))
+                    old_t_commit = t_commit
+                    t_commit = max(t_commit, get_tF(n))
+                    if old_t_commit != t_commit
+                        @info "Bumping t_commit from $(old_t_commit) to $(t_commit) to respect ConstrainedMergeAndBalance.max_tasks ($(replan_model.max_tasks))"
+                    end
                     break
                 end
             end
