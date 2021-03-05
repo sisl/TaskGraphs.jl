@@ -1211,10 +1211,24 @@ function build_table(df;
     obj=:tasks_per_second,
     xkey=:M,
     ykey = :arrival_interval,
+    include_keys=[],
+    exclude_keys=[],
     xvals = sort(unique(df[!,xkey])),
     yvals = sort(unique(df[!,ykey])),
     aggregator = vals -> sum(vals)/length(vals),
     )
+
+    base_idxs = trues(nrow(df))
+    if !isempty(include_keys)
+        @show base_idxs = .&(base_idxs, [(df[!,k] .== v) for (k,v) in include_keys]...)
+    end
+    if !isempty(exclude_keys)
+        base_idxs = .&(base_idxs, [(df[!,k] .!= v) for (k,v) in exclude_keys]...)
+    end
+    if !isempty(include_keys) || !isempty(exclude_keys)
+        xvals = sort(unique(df[base_idxs,xkey]))
+        yvals = sort(unique(df[base_idxs,ykey]))
+    end
 
     xkeys = map(x->Dict(xkey=>x), xvals)
     ykeys = map(y->Dict(ykey=>y), yvals)
@@ -1222,9 +1236,9 @@ function build_table(df;
     tab = ResultsTable(xkeys, ykeys, tab)
     for (i,x) in enumerate(xvals)
         for (j,y) in enumerate(yvals)
-            idxs = .&((df[!,xkey] .== x),(df[!,ykey] .== y))
+            idxs = .&(base_idxs,(df[!,xkey] .== x),(df[!,ykey] .== y))
             # if any(idxs)
-                vals = df[idxs,obj]
+                @show vals = df[idxs,obj]
                 tab.data[i,j] = aggregator(vals)
             # else
             #     tab.data[i,j] = nothing

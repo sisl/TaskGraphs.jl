@@ -588,8 +588,6 @@ function replanning_config_5()
     ]
     product_config_dicts(base_configs,robot_configs,project_configs,stream_configs)
 end
-
-
 function replanning_config_6()
     base_configs = [
         Dict(
@@ -613,35 +611,35 @@ function replanning_config_6()
         Dict(:num_projects=>30),
     ]
     stream_configs = [
-        Dict(:M=>10, :arrival_interval=>20, ),
-        Dict(:M=>10, :arrival_interval=>30, ),
-        Dict(:M=>10, :arrival_interval=>40, ),
+        Dict(:M=>10, :num_unique_projects=>1, :arrival_interval=>20, ),
+        Dict(:M=>10, :num_unique_projects=>1, :arrival_interval=>30, ),
+        Dict(:M=>10, :num_unique_projects=>1, :arrival_interval=>40, ),
 
-        Dict(:M=>15, :arrival_interval=>20, ),
-        Dict(:M=>15, :arrival_interval=>30, ),
-        Dict(:M=>15, :arrival_interval=>40, ),
-        Dict(:M=>15, :arrival_interval=>50, ),
+        Dict(:M=>15, :num_unique_projects=>1, :arrival_interval=>20, ),
+        Dict(:M=>15, :num_unique_projects=>1, :arrival_interval=>30, ),
+        Dict(:M=>15, :num_unique_projects=>1, :arrival_interval=>40, ),
+        Dict(:M=>15, :num_unique_projects=>1, :arrival_interval=>50, ),
 
-        Dict(:M=>20, :arrival_interval=>20, ),
-        Dict(:M=>20, :arrival_interval=>30, ),
-        Dict(:M=>20, :arrival_interval=>40, ),
-        Dict(:M=>20, :arrival_interval=>50, ),
-        Dict(:M=>20, :arrival_interval=>60, ),
+        Dict(:M=>20, :num_unique_projects=>1, :arrival_interval=>20, ),
+        Dict(:M=>20, :num_unique_projects=>1, :arrival_interval=>30, ),
+        Dict(:M=>20, :num_unique_projects=>1, :arrival_interval=>40, ),
+        Dict(:M=>20, :num_unique_projects=>1, :arrival_interval=>50, ),
+        Dict(:M=>20, :num_unique_projects=>1, :arrival_interval=>60, ),
 
-        Dict(:M=>25, :arrival_interval=>20, ),
-        Dict(:M=>25, :arrival_interval=>30, ),
-        Dict(:M=>25, :arrival_interval=>40, ),
-        Dict(:M=>25, :arrival_interval=>50, ),
-        Dict(:M=>25, :arrival_interval=>60, ),
-        Dict(:M=>25, :arrival_interval=>70, ),
+        Dict(:M=>25, :num_unique_projects=>1, :arrival_interval=>20, ),
+        Dict(:M=>25, :num_unique_projects=>1, :arrival_interval=>30, ),
+        Dict(:M=>25, :num_unique_projects=>1, :arrival_interval=>40, ),
+        Dict(:M=>25, :num_unique_projects=>1, :arrival_interval=>50, ),
+        Dict(:M=>25, :num_unique_projects=>1, :arrival_interval=>60, ),
+        Dict(:M=>25, :num_unique_projects=>1, :arrival_interval=>70, ),
 
-        Dict(:M=>30, :arrival_interval=>20, ),
-        Dict(:M=>30, :arrival_interval=>30, ),
-        Dict(:M=>30, :arrival_interval=>40, ),
-        Dict(:M=>30, :arrival_interval=>50, ),
-        Dict(:M=>30, :arrival_interval=>60, ),
-        Dict(:M=>30, :arrival_interval=>70, ),
-        Dict(:M=>30, :arrival_interval=>80, ),
+        Dict(:M=>30, :num_unique_projects=>1, :arrival_interval=>20, ),
+        Dict(:M=>30, :num_unique_projects=>1, :arrival_interval=>30, ),
+        Dict(:M=>30, :num_unique_projects=>1, :arrival_interval=>40, ),
+        Dict(:M=>30, :num_unique_projects=>1, :arrival_interval=>50, ),
+        Dict(:M=>30, :num_unique_projects=>1, :arrival_interval=>60, ),
+        Dict(:M=>30, :num_unique_projects=>1, :arrival_interval=>70, ),
+        Dict(:M=>30, :num_unique_projects=>1, :arrival_interval=>80, ),
         # medium-sized projects
         Dict(:M=>30, :num_unique_projects=>6, :arrival_interval=>20, ),
         Dict(:M=>30, :num_unique_projects=>6, :arrival_interval=>30, ),
@@ -727,14 +725,32 @@ function setup_replanning_experiments(base_problem_dir,base_results_dir)
     return loader, planners
 end
 
+
+function construct_replanning_results_dataframe(loader,solver_config,feats)
+    results_df = init_dataframe(feats)
+    for results_file in readdir(solver_config.results_path;join=true)
+        results = load_results(loader,results_file)
+        prob_name = results[:problem_name]
+        prob_file = joinpath(solver_config.problem_path,prob_name)
+        config = CRCBS.load_config(loader,prob_file)
+        TaskGraphs.post_process_replanning_results!(results,config)
+        push!(results_df,results;cols=:intersect)
+    end
+    results_df
+end
+
 """
     add start_time, completion_time, and makespan for each stage
 """
 function post_process_replanning_results!(results,config)
     M = config[:M]
+    results[:backup_planner] = align_stage_results!(results[:primary_planner],results[:backup_planner])
     for k in [:primary_planner,:backup_planner]
         for (i,stage_dict) in enumerate(results[k])
+            stage_dict === nothing ? continue : nothing
             id_range = (1+(i-1)*M,i*M)
+            # todo this doesn't work for the new results where the backup planner
+            # doesn't run every time
             stage_dict[:start_time] = i*config[:arrival_interval]
             completion_time = 0
             if stage_dict[:FeasibleFlag]
@@ -766,17 +782,22 @@ function post_process_replanning_results!(results,config)
     backup_flags = Bool[]
     primary_runtimes = Float64[]
     backup_runtimes = Float64[]
-    runtime_gaps = Float64[]
-    if length(results[:primary_planner]) == length(results[:backup_planner])
-        for (resultsA,resultsB) in zip(results[:primary_planner],results[:backup_planner])
+    # runtime_gaps = Float64[]
+    primary_results = results[:primary_planner]
+    backup_results = results[:backup_planner]
+    @assert length(primary_results) == length(backup_results)
+    # if length(results[:primary_planner]) == length(results[:backup_planner])
+        # for (resultsA,resultsB) in zip(results[:primary_planner],results[:backup_planner])
+        for (resultsA,resultsB) in zip(primary_results,backup_results)
             push!(primary_runtimes,resultsA[:RunTime])
-            push!(backup_runtimes,resultsB[:RunTime])
-            push!(runtime_gaps,(resultsA[:RunTime])/(resultsA[:RunTime]+resultsB[:RunTime]))
+            # push!(runtime_gaps,(resultsA[:RunTime])/(resultsA[:RunTime]+resultsB[:RunTime]))
             if resultsA[:FeasibleFlag] == true
+                push!(backup_runtimes,0.0)
                 push!(makespans,resultsA[:makespan])
                 push!(arrival_times,resultsA[:start_time])
                 push!(backup_flags,false)
             elseif resultsB[:FeasibleFlag] == true
+                push!(backup_runtimes,resultsB[:RunTime])
                 push!(makespans,resultsB[:makespan])
                 push!(arrival_times,resultsB[:start_time])
                 push!(backup_flags,true)
@@ -784,47 +805,58 @@ function post_process_replanning_results!(results,config)
                 break
             end
         end
-    else
-        j = 1
-        resultsB = get(results[:backup_planner],j,nothing)
-        for (stage,resultsA) in enumerate(results[:primary_planner])
-            push!(primary_runtimes,resultsA[:RunTime])
-            if resultsA[:FeasibleFlag] == true
-                push!(makespans,resultsA[:makespan])
-                push!(arrival_times,resultsA[:start_time])
-                push!(backup_flags,false)
-            elseif !(resultsB === nothing) && resultsB[:FeasibleFlag] == true
-                push!(makespans,resultsB[:makespan])
-                push!(arrival_times,resultsB[:start_time])
-                push!(backup_flags,true)
-                j += 1
-                resultsB = get(results[:backup_planner],j,nothing)
-            else
-                @warn "Cannot load a full set of results. Both the primary and backup planners fails at stage $(stage)."
-                break
-            end
-        end
-    end
+    # else
+    #     j = 1
+    #     resultsB = get(results[:backup_planner],j,nothing)
+    #     for (stage,resultsA) in enumerate(results[:primary_planner])
+    #         push!(primary_runtimes,resultsA[:RunTime])
+    #         if resultsA[:FeasibleFlag] == true
+    #             push!(makespans,resultsA[:makespan])
+    #             push!(arrival_times,resultsA[:start_time])
+    #             push!(backup_flags,false)
+    #         elseif !(resultsB === nothing) && resultsB[:FeasibleFlag] == true
+    #             push!(makespans,resultsB[:makespan])
+    #             push!(arrival_times,resultsB[:start_time])
+    #             push!(backup_flags,true)
+    #             j += 1
+    #             resultsB = get(results[:backup_planner],j,nothing)
+    #         else
+    #             @warn "Cannot load a full set of results. Both the primary and backup planners fails at stage $(stage)."
+    #             break
+    #         end
+    #     end
+    # end
     results[:makespans] = makespans
     results[:arrival_times] = arrival_times
     results[:backup_flags] = backup_flags
-    results[:runtime_gaps] = runtime_gaps
+    # results[:runtime_gaps] = runtime_gaps
     results[:primary_runtimes] = primary_runtimes
     results[:backup_runtimes] = backup_runtimes
     results[:completion_times] = arrival_times .+ makespans
     return results
 end
 
+"""
+    align_stage_results!(primary_results,backup_results)
 
-function construct_replanning_results_dataframe(loader,solver_config,feats)
-    results_df = init_dataframe(feats)
-    for results_file in readdir(solver_config.results_path;join=true)
-        results = load_results(loader,results_file)
-        prob_name = results[:problem_name]
-        prob_file = joinpath(solver_config.problem_path,prob_name)
-        config = CRCBS.load_config(loader,prob_file)
-        TaskGraphs.post_process_replanning_results!(results,config)
-        push!(results_df,results;cols=:intersect)
+Align results dicts when they stages aren't aligned (i.e., if the backup planner
+only runs some of the time.)
+"""
+function align_stage_results!(primary_results,backup_results)
+    if length(primary_results) == length(backup_results)
+        return primary_results, backup_results
     end
-    results_df
+    j = 1
+    new_backup_results = []
+    for (stage,resultsA) in enumerate(primary_results)
+        if resultsA[:FeasibleFlag] == true
+            push!(new_backup_results,nothing)
+        else
+            resultsB = get(backup_results,j,nothing)
+            push!(new_backup_results,resultsB)
+            j += 1
+        end
+    end
+    return new_backup_results
 end
+

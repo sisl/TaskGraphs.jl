@@ -475,60 +475,111 @@ end
 
 export pctapf_problem_10
 
+# """
+#     pctapf_problem_10(;cost_function=MakeSpan(),verbose=false,Δt_op=0,Δt_collect=[0,0,0,0,0,0],Δt_deposit=[0,0,0,0,0,0])
+
+# Motivation for backtracking in ISPS
+# The makespan optimal solution is T = 8. However, the optimistic schedule
+# will always prioritize task route planning for tasks 1,2, and 3 before 4.
+# This leads to a double delay that will not be caught without backtracking
+# in ISPS. Hence, the solver will return a solution with T = 9.
+# """
+# function pctapf_problem_10(;cost_function=MakeSpan(),verbose=false,Δt_op=0,Δt_collect=[0,0,0,0,0,0],Δt_deposit=[0,0,0,0,0,0])
+#     N = 4                  # num robots
+#     M = 4                  # num delivery tasks
+#     vtx_grid = initialize_dense_vtx_grid(13,11)
+
+#     #   1  12  23  34  45  56  67  78  89  100  111  122  133
+#     #   2  13  24  35  46  57  68  79  90  101  112  123  134
+#     #   3  14  25  36  47  58  69  80  91  102  113  124  135
+#     #   4  15  26  37  48  59  70  81  92  103  114  125  136
+#     #   5  16  27  38  49  60  71  82  93  104  115  126  137
+#     #   6  17  28  39  50  61  72  83  94  105  116  127  138
+#     #   7  18  29  40  51  62  73  84  95  106  117  128  139
+#     #   8  19  30  41  52  63  74  85  96  107  118  129  140
+#     #   9  20  31  42  53  64  75  86  97  108  119  130  141
+#     #  10  21  32  43  54  65  76  87  98  109  120  131  142
+#     #  11  22  33  44  55  66  77  88  99  110  121  132  143
+
+#     #   .   .   .  (2)  .   .   .   .   .   .   .   .   .
+#     #   .   .   .   .   .   .   .   .   .   .   .   .   .
+#     #   .  (1)  .   .   .   .   .   .   .   .   .   .   .
+#     #  (4)  .  [4]  .  [5] [3] [6]  .   .   .   .   .  (3)
+#     #   .   .   .   .   .   .   .   .   .   .   .   .   .
+#     #   .   .   .   .   .   .   .   .   .   .   .   .   .
+#     #   .   .   .   .   .   .   .   .   .   .   .   .   .
+#     #   .   .   .   .   .   .   .   .   .   .   .   .   .
+#     #   .   .   .  [2]  .   .   .   .   .   .   .   .   .
+#     #   .   .   .   .   .   .   .   .   .   .   .   .   .
+#     #   .  [1]  .   .   .   .   .   .   .   .   .   .   .
+
+#     r0 = [15,34,137, 5       ]
+#     s0 = [15,34,137, 5, 27,49 ]
+#     sF = [22,42,60,  27,49,71]
+#     env_graph = construct_factory_env_from_vtx_grid(
+#         vtx_grid;
+#     )
+
+#     project_spec, robot_ICs = empty_pctapf_problem(r0,s0,sF)
+#     add_operation!(project_spec,construct_operation(project_spec,-1,[1,2,3,6],[],Δt_op))
+#     # add_operation!(project_spec,construct_operation(project_spec,-1,[2],[],Δt_op))
+#     add_operation!(project_spec,construct_operation(project_spec,-1,[4],[5],Δt_op))
+#     add_operation!(project_spec,construct_operation(project_spec,-1,[5],[6],Δt_op))
+#     # add_operation!(project_spec,construct_operation(project_spec,-1,[4],[],Δt_op))
+#     assignment_dict = Dict(1=>[1],2=>[2],3=>[3],4=>[4,5,6])
+
+#     def = SimpleProblemDef(project_spec,r0,s0,sF)
+#     sched, problem_spec = construct_task_graphs_problem(
+#         def,env_graph;cost_function=cost_function,Δt_collect=Δt_collect,Δt_deposit=Δt_deposit)
+
+#     return sched, problem_spec, env_graph, assignment_dict
+# end
+
 """
     pctapf_problem_10(;cost_function=MakeSpan(),verbose=false,Δt_op=0,Δt_collect=[0,0,0,0,0,0],Δt_deposit=[0,0,0,0,0,0])
 
 Motivation for backtracking in ISPS
-The makespan optimal solution is T = 8. However, the optimistic schedule
-will always prioritize task route planning for tasks 1,2, and 3 before 4.
-This leads to a double delay that will not be caught without backtracking
-in ISPS. Hence, the solver will return a solution with T = 9.
+The makespan optimal solution is T = 6. However, the optimistic schedule will 
+always prioritize robot 2 over robot 1, causing robot 1 to get stuck waiting for 
+3, 4, and 5 to pass all in a row. This creates an unavoidable delay in the 
+schedule, leading to a +1 delay that will not be caught without backtracking in
+ISPS. Hence, the solver will return a solution with T = 7.
 """
 function pctapf_problem_10(;cost_function=MakeSpan(),verbose=false,Δt_op=0,Δt_collect=[0,0,0,0,0,0],Δt_deposit=[0,0,0,0,0,0])
-    N = 4                  # num robots
-    M = 4                  # num delivery tasks
-    vtx_grid = initialize_dense_vtx_grid(13,11)
+    vtx_grid = initialize_dense_vtx_grid(10,5)
 
-    #   1    2    3    4    5    6    7    8    9   10   11
-    #  12   13   14   15   16   17   18   19   20   21   22
-    #  23   24   25   26   27   28   29   30   31   32   33
-    #  34   35   36   37   38   39   40   41   42   43   44
-    #  45   46   47   48   49   50   51   52   53   54   55
-    #  56   57   58   59   60   61   62   63   64   65   66
-    #  67   68   69   70   71   72   73   74   75   76   77
-    #  78   79   80   81   82   83   84   85   86   87   88
-    #  89   90   91   92   93   94   95   96   97   98   99
-    # 100  101  102  103  104  105  106  107  108  109  110
-    # 111  112  113  114  115  116  117  118  119  120  121
-    # 122  123  124  125  126  127  128  129  130  131  132
-    # 133  134  135  136  137  138  139  140  141  142  143
+    #   1   2   3   4   5
+    #   6   7   8   9  10
+    #  11  12  13  14  15
+    #  16  17  18  19  20
+    #  21  22  23  24  25
+    #  26  27  28  29  30
+    #  31  32  33  34  35
+    #  36  37  38  39  40
+    #  41  42  43  44  45
+    #  46  47  48  49  50
 
-    #            (2)
-    #
-    #
-    #     (1)
-    # (4)    [4]     [4] [3] [4]                         [3]
-    #
-    #
-    #
-    #            [2]
-    #
-    #     [1]
+    #   .   .  (5)   .   . 
+    #   .   .  (4)  .   . 
+    #   .   .  (3)  .   . 
+    #   .   .   .   .   . 
+    #   .  (2)  .   .   . 
+    #  (1) [1]  .  [6]  .
+    #   .   .  [5]  .   . 
+    #   .   .  [4]  .   . 
+    #   .   .  [3]  .   . 
+    #   .  [2]  .   .   . 
 
-    r0 = [15,34,137, 5       ]
-    s0 = [15,34,137, 5, 27,49 ]
-    sF = [22,42,60,  27,49,71]
+    r0 = [26,22,13, 8, 3]
+    s0 = [26,22,13, 8, 3,27]
+    sF = [27,47,43,38,33,29]
     env_graph = construct_factory_env_from_vtx_grid(
         vtx_grid;
     )
 
     project_spec, robot_ICs = empty_pctapf_problem(r0,s0,sF)
-    add_operation!(project_spec,construct_operation(project_spec,-1,[1,2,3,6],[],Δt_op))
-    # add_operation!(project_spec,construct_operation(project_spec,-1,[2],[],Δt_op))
-    add_operation!(project_spec,construct_operation(project_spec,-1,[4],[5],Δt_op))
-    add_operation!(project_spec,construct_operation(project_spec,-1,[5],[6],Δt_op))
-    # add_operation!(project_spec,construct_operation(project_spec,-1,[4],[],Δt_op))
-    assignment_dict = Dict(1=>[1],2=>[2],3=>[3],4=>[4,5,6])
+    add_operation!(project_spec,construct_operation(project_spec,-1,[1,2,3,4,5,6],[],Δt_op))
+    assignment_dict = Dict(1=>[1,6],2=>[2],3=>[3],4=>[4],5=>[5],6=>[6])
 
     def = SimpleProblemDef(project_spec,r0,s0,sF)
     sched, problem_spec = construct_task_graphs_problem(
