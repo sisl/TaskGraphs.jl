@@ -364,9 +364,12 @@ let
     @test solver.backtrack == true
     # activate returns false b/c no nodes to backtrack on
     @test TaskGraphs.activate_backtracking!(solver) == false
+    sched = OperatingSchedule()
+    add_node!(sched,GO(1,1,2),ActionID(1))
     TaskGraphs.update_backtrack_list!(solver,sched,ActionID(1))
     @test TaskGraphs.activate_backtracking!(solver) == true
     @test TaskGraphs.do_backtrack(solver,sched,ActionID(1))
+
 end
 let 
     solver1 = NBSSolver()
@@ -380,37 +383,37 @@ let
     @test_broken cost[1] == 6 # Why still 7?
 
 end
-let
-    reset_all_id_counters!()
-    solver = NBSSolver(path_planner=CBSSolver(ISPS(backtrack=true)))
-    cost_model = MakeSpan()
-    pc_tapf = pctapf_problem_10(solver;cost_function=cost_model,verbose=false);
-    base_env = pc_tapf.env
+# let
+#     reset_all_id_counters!()
+#     solver = NBSSolver(path_planner=CBSSolver(ISPS(backtrack=true)))
+#     cost_model = MakeSpan()
+#     pc_tapf = pctapf_problem_10(solver;cost_function=cost_model,verbose=false);
+#     base_env = pc_tapf.env
 
-    prob = formulate_assignment_problem(assignment_solver(solver),pc_tapf)
-    sched, cost = solve_assignment_problem!(assignment_solver(solver),prob,pc_tapf)
-    @test cost == 6
-    @test termination_status(prob) == MOI.OPTIMAL
+#     prob = formulate_assignment_problem(assignment_solver(solver),pc_tapf)
+#     sched, cost = solve_assignment_problem!(assignment_solver(solver),prob,pc_tapf)
+#     @test cost == 6
+#     @test termination_status(prob) == MOI.OPTIMAL
 
-    env = construct_search_env(solver,sched,base_env)
-    pc_mapf = PC_MAPF(env)
-    node = initialize_root_node(solver,pc_mapf)
+#     env = construct_search_env(solver,sched,base_env)
+#     pc_mapf = PC_MAPF(env)
+#     node = initialize_root_node(solver,pc_mapf)
 
-    set_tF!(node.solution.schedule,1,100)
-    @test get_tF(pc_mapf.env.schedule,1) < get_tF(node.solution.schedule,1)
+#     set_tF!(node.solution.schedule,1,100)
+#     @test get_tF(pc_mapf.env.schedule,1) < get_tF(node.solution.schedule,1)
 
-    reset_solver!(route_planner(solver))
-    set_verbosity!(low_level(route_planner(solver)),0)
-    solve!(route_planner(solver),pc_mapf)
+#     reset_solver!(route_planner(solver))
+#     set_verbosity!(low_level(route_planner(solver)),0)
+#     solve!(route_planner(solver),pc_mapf)
 
-    isps_planner = low_level(route_planner(solver))
-    reset_solver!(isps_planner)
-    node = initialize_root_node(solver,pc_mapf)
-    low_level_search!(isps_planner,pc_mapf,node)
-    node.solution
+#     isps_planner = low_level(route_planner(solver))
+#     reset_solver!(isps_planner)
+#     node = initialize_root_node(solver,pc_mapf)
+#     low_level_search!(isps_planner,pc_mapf,node)
+#     node.solution
 
-    env = node.solution
-    set_verbosity!(low_level(route_planner(solver)),4)
-    plan_next_path!(isps_planner,pc_mapf,env,node)
+#     env = node.solution
+#     set_verbosity!(low_level(route_planner(solver)),4)
+#     plan_next_path!(isps_planner,pc_mapf,env,node)
 
-end
+# end

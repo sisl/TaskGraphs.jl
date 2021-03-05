@@ -235,6 +235,42 @@ let
     end
 
 end
+# test copy(::OperatingSchedule)
+let
+    sched = OperatingSchedule()
+    add_node!(sched,GO(1,1,1),ActionID(1))
+    sched2 = copy(sched)
+    set_tF!(sched,1,100)
+    set_tF!(sched2,1,0)
+    @test get_tF(sched,1) == 100
+    @test get_tF(sched2,1) == 0
+    add_node!(sched,GO(2,2,2),ActionID(2))
+    @test !has_vertex(sched2,ActionID(2))
+    replace_in_schedule!(sched,GO(3,3,3),ActionID(1))
+    @test get_robot_id(get_node(sched,ActionID(1)).node) == RobotID(3)
+    @test get_robot_id(get_node(sched2,ActionID(1)).node) == RobotID(1)
+
+end
+# test copy(::SearchEnv)
+let 
+    reset_all_id_counters!()
+    prob = pctapf_problem_1(NBSSolver())
+    env = get_env(prob)
+    sched = get_schedule(env)
+    n1 = add_node!(sched,GO(1,1,1),get_unique_action_id())
+    env2 = copy(env)
+    sched2 = get_schedule(env2)
+    set_tF!(sched,1,100)
+    set_tF!(sched2,1,0)
+    @test get_tF(sched,1) == 100
+    @test get_tF(sched2,1) == 0
+    n2 = add_node!(sched,GO(2,2,2),get_unique_action_id())
+    @test !has_vertex(sched2,node_id(n2))
+    replace_in_schedule!(sched,GO(3,3,3),node_id(n1))
+    @test get_robot_id(get_node(sched,node_id(n1)).node) == RobotID(3)
+    @test get_robot_id(get_node(sched2,node_id(n1)).node) == RobotID(1)
+
+end
 let
     sched, = pctapf_problem_1()
     for n in get_nodes(sched)
