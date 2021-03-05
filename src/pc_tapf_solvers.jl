@@ -325,20 +325,27 @@ for op in [:set_deadline!,:set_runtime_limit!,:set_verbosity!]
         end
     end)
 end
-function do_backtrack(solver::ISPS,id) 
+function do_backtrack(solver::ISPS,sched,id) 
     flag = get_toggle_status(solver.backtracking_activated) && get(solver.backtrack_list,id,false)
     if flag
-        @info "do_backtrack(solver,$(summary(id))) = true"
+        @info "do_backtrack = true for $(summary(get_node(sched,id)))"
+    end
+    return flag
+end
+function needs_backtrack(solver::ISPS,sched,id) 
+    flag = solver.backtrack && get(solver.backtrack_list,id,false)
+    if flag
+        @info "needs_backtrack = true for $(summary(get_node(sched,id)))"
     end
     return flag
 end
 """
-    update_backtrack_list!(solver::ISPS,id,val=false)
+    update_backtrack_list!(solver::ISPS,sched,id,val=false)
 
 Add to backtrack_list.
 """
-function update_backtrack_list!(solver::ISPS,id,val=true)
-    @info "setting backtrack_list[$(summary(id))] = $(val)"
+function update_backtrack_list!(solver::ISPS,sched,id,val=true)
+    # @info "adding to backtrack list: $(summary(get_node(sched,id)))"
     solver.backtrack_list[id] = val
 end
 function activate_backtracking!(solver::ISPS)
@@ -361,7 +368,7 @@ Allow prioritization of nodes flagged for backtracking.
 """
 function isps_queue_cost(solver::ISPS,sched::OperatingSchedule,v::Int)
     path_spec = get_path_spec(sched,v)
-    if do_backtrack(solver,get_vtx_id(sched,v))
+    if do_backtrack(solver,sched,get_vtx_id(sched,v))
         override = 0
     else
         override = Int(path_spec.plan_path)
@@ -394,12 +401,12 @@ function plan_next_path!(solver::ISPS, pc_mapf::AbstractPC_MAPF, env::SearchEnv,
                     get_tF(sched,v): $(get_tF(env,v))
                     maximum(get_cache(env).tF): $(makespan(get_schedule(env)))
                 """)
-                tF = get_tF(get_schedule(env),n_id)
+                dt = get_duration(get_schedule(env),n_id)
                 valid_flag = plan_path!(low_level(solver),pc_mapf,env,node,schedule_node,v;
-                    backtrack=do_backtrack(solver,n_id),
+                    backtrack=do_backtrack(solver,get_schedule(env),n_id),
                 )
-                if solver.backtrack && get_tF(get_schedule(env),n_id) > tF
-                    update_backtrack_list!(solver,n_id)
+                if solver.backtrack && get_duration(get_schedule(env),n_id) > dt
+                    update_backtrack_list!(solver,get_schedule(env),n_id)
                 end
                 @log_info(2,verbosity(solver),"""
                 ISPS:
@@ -460,6 +467,7 @@ function CRCBS.low_level_search!(solver::ISPS, pc_mapf::AbstractPC_MAPF,
     end
     valid_flag = true
     search_env = node.solution
+    conflict_table = deepcopy(node.conflict_table)
     for i in 1:iteration_limit(solver)
         increment_iteration_count!(solver)
         # reset solution
@@ -470,22 +478,38 @@ function CRCBS.low_level_search!(solver::ISPS, pc_mapf::AbstractPC_MAPF,
         if valid_flag == false
             @log_info(0,verbosity(solver),"ISPS: failed on iteration $i.")
             break
-        elseif count_conflicts(detect_conflicts(node.solution)) == 0 # if route plan is valid, break
-            @log_info(2,verbosity(solver),"ISPS: returning valid solution on iteration $i.")
-            break
+        else
+            conflict_table = detect_conflicts(node.solution)
+            if count_conflicts(conflict_table) == 0 # if route plan is valid, break
+                @log_info(2,verbosity(solver),"ISPS: returning valid solution on iteration $i.")
+                break
+            end
         end
     end
-    if solver.backtrack 
+    if solver.backtrack && valid_flag && count_conflicts(conflict_table) > 0
         # How to identify need for backtracking (i.e., with optimality_gap)?
         need_backtrack = false
         sched = get_schedule(search_env)
         base_sched = get_schedule(get_env(pc_mapf))
-        for node in node_iterator(sched,get_all_terminal_nodes(sched))
-            if get_tF(node) > get_tF(base_sched,node_id(node))
-                need_backtrack = true
-                break
+        # c = get_next_conflict(node)
+        for c in get_all_conflicts(conflict_table)
+            for id in [RobotID(c.agent1_id),RobotID(c.agent2_id)]
+                for e in edges(bfs_tree(sched,id))
+                    # @info "$(summary(get_node(sched,e.dst)))"
+                    if needs_backtrack(solver,sched,get_vtx_id(sched,e.dst))
+                        need_backtrack = true
+                        break
+                    end
+                end
             end
         end
+        # for node in node_iterator(sched,get_all_terminal_nodes(sched))
+        #     if get_tF(node) > get_tF(base_sched,node_id(node))
+        #         need_backtrack = true
+        #         break
+        #     end
+        # end
+        need_backtrack = true
         if need_backtrack && activate_backtracking!(solver)
             reset_schedule_times!(get_schedule(search_env),get_schedule(get_env(pc_mapf)))
             reset_cache!(get_cache(search_env),get_schedule(search_env),)

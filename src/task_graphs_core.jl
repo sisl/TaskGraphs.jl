@@ -416,6 +416,7 @@ get_tF(spec::PathSpec) = spec.tF
 set_tF!(spec::PathSpec,val) = begin spec.tF = val end
 get_min_duration(spec::PathSpec) = spec.min_duration
 set_min_duration!(spec::PathSpec,val) = begin spec.min_duration = val end
+get_duration(spec::PathSpec) = get_tF(spec) - get_t0(spec)
 get_slack(spec::PathSpec) = spec.slack
 set_slack!(spec::PathSpec,val) = begin spec.slack = val end
 get_local_slack(spec::PathSpec) = spec.local_slack
@@ -428,6 +429,7 @@ const path_spec_accessor_interface = [
     :get_slack,
     :get_local_slack,
     :get_min_duration,
+    :get_duration,
     ]
 const path_spec_mutator_interface = [
     :set_min_duration!,
