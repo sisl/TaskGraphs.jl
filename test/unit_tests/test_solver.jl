@@ -354,3 +354,29 @@ let
     cost
     # @show get_route_plan(env)
 end
+# test ISPS backtracking
+let
+    solver = ISPS()
+    @test TaskGraphs.activate_backtracking!(solver) == false
+    @test solver.backtrack == false
+
+    solver = ISPS(backtrack=true)
+    @test solver.backtrack == true
+    # activate returns false b/c no nodes to backtrack on
+    @test TaskGraphs.activate_backtracking!(solver) == false
+    TaskGraphs.update_backtrack_list!(solver,ActionID(1))
+    @test TaskGraphs.activate_backtracking!(solver) == true
+    @test TaskGraphs.do_backtrack(solver,ActionID(1))
+end
+let 
+    solver1 = NBSSolver()
+    prob = pctapf_problem_10(solver1)
+    # prob = pctapf_problem_1(solver1)
+    env,cost = solve!(solver1,prob)
+    @test cost[1] == 7
+
+    solver2 = NBSSolver(path_planner=CBSSolver(ISPS(backtrack=true)))
+    env,cost = solve!(solver2,prob)
+    @test_broken cost[1] == 6 # Why still 7?
+
+end

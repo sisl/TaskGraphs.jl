@@ -130,12 +130,20 @@ search!
 """
 function construct_cost_model(trait::NonPrioritized,
         solver, sched, cache, problem_spec, env_graph, primary_objective=SumOfMakeSpans();
+        use_conflict_cost::Bool=true,
         extra_T::Int=400)
     N = length(get_robot_ICs(sched))
     @assert N > 0 "num_robots should be > 0. We need at least one robot!"
+    if use_conflict_cost
+        conflict_cost = HardConflictCost(env_graph,makespan(sched)+extra_T, N)
+    else
+        # @info "Forgoing conflict cost"
+        conflict_cost = NullCost()
+    end
     cost_model = construct_composite_cost_model(
         typeof(primary_objective)(sched,cache),
-        HardConflictCost(env_graph,makespan(sched)+extra_T, N),
+        # HardConflictCost(env_graph,makespan(sched)+extra_T, N),
+        conflict_cost,
         SumOfTravelDistance(),
         FullCostModel(sum,NullCost()), # SumOfTravelTime(),
         FullCostModel(sum,TransformCostModel(c->-1*c,TravelTime()))
@@ -216,13 +224,20 @@ path_finder(solver::AStarSC,args...) = CRCBS.a_star!(solver,args...)
 """
 function plan_path!(solver::AStarSC, pc_mapf::AbstractPC_MAPF, env::SearchEnv, node::N,
         schedule_node::T, v::Int;
+        backtrack::Bool=false,
         kwargs...) where {N<:ConstraintTreeNode,T}
 
     cache = get_cache(env)
     # n_id = get_vtx_id(get_schedule(env),v)
 
     reset_solver!(solver)
-    cbs_env = build_env(solver, pc_mapf, env, node, VtxID(v)) #schedule_node, v)
+    if backtrack
+        # Construct cost model without collision cost
+        cost_model, _ = construct_cost_model(solver, env, use_conflict_cost=false)
+        cbs_env = build_env(solver, pc_mapf, env, node, VtxID(v);cost_model=cost_model)
+    else
+        cbs_env = build_env(solver, pc_mapf, env, node, VtxID(v)) 
+    end
     base_path = get_base_path(solver,env,cbs_env)
     ### PATH PLANNING ###
     # solver.DEBUG ? validate(base_path,v) : nothing
@@ -284,6 +299,10 @@ Path planner that employs Incremental Slack-Prioritized Search.
         iteration_limit = 2
     )
     tighten_paths::Bool = true
+    # backtracking for completeness
+    backtrack::Bool     = false
+    backtracking_activated = Toggle(false)
+    backtrack_list::Dict{AbstractID,Bool} = Dict{AbstractID,Bool}()
 end
 ISPS(planner) = ISPS(low_level_planner=planner)
 construct_cost_model(solver::ISPS,args...;kwargs...) = construct_cost_model(low_level(solver),args...;kwargs...)
@@ -305,6 +324,49 @@ for op in [:set_deadline!,:set_runtime_limit!,:set_verbosity!]
             $op(low_level(solver),args...)
         end
     end)
+end
+function do_backtrack(solver::ISPS,id) 
+    flag = get_toggle_status(solver.backtracking_activated) && get(solver.backtrack_list,id,false)
+    if flag
+        @info "do_backtrack(solver,$(summary(id))) = true"
+    end
+    return flag
+end
+"""
+    update_backtrack_list!(solver::ISPS,id,val=false)
+
+Add to backtrack_list.
+"""
+function update_backtrack_list!(solver::ISPS,id,val=true)
+    @info "setting backtrack_list[$(summary(id))] = $(val)"
+    solver.backtrack_list[id] = val
+end
+function activate_backtracking!(solver::ISPS)
+    @info "activating backtracking"
+    if isempty(solver.backtrack_list) || solver.backtrack == false
+        return false
+    end
+    set_toggle_status!(solver.backtracking_activated,true)
+    @info "backtracking activated"
+    return get_toggle_status(solver.backtracking_activated)
+end
+function clear_backtrack_list!(solver::ISPS)
+    set_toggle_status!(solver.backtracking_activated,false)
+    empty!(solver.backtrack_list)
+end
+"""
+    isps_queue_cost(solver::ISPS,sched::OperatingSchedule,v::Int)
+
+Allow prioritization of nodes flagged for backtracking.
+"""
+function isps_queue_cost(solver::ISPS,sched::OperatingSchedule,v::Int)
+    path_spec = get_path_spec(sched,v)
+    if do_backtrack(solver,get_vtx_id(sched,v))
+        override = 0
+    else
+        override = Int(path_spec.plan_path)
+    end
+    return (override, minimum(get_slack(sched,v)))
 end
 
 export
@@ -332,7 +394,13 @@ function plan_next_path!(solver::ISPS, pc_mapf::AbstractPC_MAPF, env::SearchEnv,
                     get_tF(sched,v): $(get_tF(env,v))
                     maximum(get_cache(env).tF): $(makespan(get_schedule(env)))
                 """)
-                valid_flag = plan_path!(low_level(solver),pc_mapf,env,node,schedule_node,v)
+                tF = get_tF(get_schedule(env),n_id)
+                valid_flag = plan_path!(low_level(solver),pc_mapf,env,node,schedule_node,v;
+                    backtrack=do_backtrack(solver,n_id),
+                )
+                if solver.backtrack && get_tF(get_schedule(env),n_id) > tF
+                    update_backtrack_list!(solver,n_id)
+                end
                 @log_info(2,verbosity(solver),"""
                 ISPS:
                     routes:
@@ -386,7 +454,10 @@ function CRCBS.low_level_search!(solver::ISPS, pc_mapf::AbstractPC_MAPF,
         idxs::Vector{Int}=Vector{Int}()
     ) where {N<:ConstraintTreeNode}
 
-    reset_solver!(solver)
+    reset_solver!(solver) # problematic because the lower_bound from assignment is not stored?
+    if solver.backtrack
+        clear_backtrack_list!(solver)
+    end
     valid_flag = true
     search_env = node.solution
     for i in 1:iteration_limit(solver)
@@ -404,9 +475,24 @@ function CRCBS.low_level_search!(solver::ISPS, pc_mapf::AbstractPC_MAPF,
             break
         end
     end
-    # If optimality_gap > 0 && solver.backtrack == true
-    #   # backtrack
-    # end
+    if solver.backtrack 
+        # How to identify need for backtracking (i.e., with optimality_gap)?
+        need_backtrack = false
+        sched = get_schedule(search_env)
+        base_sched = get_schedule(get_env(pc_mapf))
+        for node in node_iterator(sched,get_all_terminal_nodes(sched))
+            if get_tF(node) > get_tF(base_sched,node_id(node))
+                need_backtrack = true
+                break
+            end
+        end
+        if need_backtrack && activate_backtracking!(solver)
+            reset_schedule_times!(get_schedule(search_env),get_schedule(get_env(pc_mapf)))
+            reset_cache!(get_cache(search_env),get_schedule(search_env),)
+            reset_route_plan!(node,get_route_plan(get_env(pc_mapf)))
+            valid_flag = compute_route_plan!(solver, pc_mapf, node)
+        end
+    end
     return valid_flag
 end
 function CRCBS.low_level_search!(solver::CBSSolver, pc_mapf::AbstractPC_MAPF,node::ConstraintTreeNode,args...;kwargs...)
@@ -508,6 +594,8 @@ for op in [:set_deadline!,:set_runtime_limit!,:set_verbosity!]
         end
     end)
 end
+isps_queue_cost(solver::CBSSolver,args...) = isps_queue_cost(low_level(solver),args...)
+isps_queue_cost(solver::NBSSolver,args...) = isps_queue_cost(route_planner(solver),args...)
 
 """
     solve!(solver, base_env::SearchEnv;kwargs...) where {A,P}
