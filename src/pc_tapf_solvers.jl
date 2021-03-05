@@ -373,11 +373,6 @@ function compute_route_plan!(solver::ISPS, pc_mapf::AbstractPC_MAPF, node::N, en
 
     while length(get_cache(env).node_queue) > 0
         status = plan_next_path!(solver,pc_mapf,env,node)
-        # @log_info(-1,verbosity(solver),"ISPS status = ",status)
-        # if status == false
-        #     @log_info(-1,verbosity(solver),"Exiting ISPS with failed status")
-        #     return false
-        # end
         status ? nothing : return false
         status = tighten_gaps!(solver,pc_mapf,env,node)
         status ? nothing : return false
@@ -398,14 +393,7 @@ function CRCBS.low_level_search!(solver::ISPS, pc_mapf::AbstractPC_MAPF,
         increment_iteration_count!(solver)
         # reset solution
         reset_schedule_times!(get_schedule(search_env),get_schedule(get_env(pc_mapf)))
-        reset_cache!(
-            get_cache(search_env),
-            get_schedule(search_env),
-            # get_cache(get_env(pc_mapf)).t0,
-            # get_cache(get_env(pc_mapf)).tF,
-            # map(v->get_t0(search_env,v),vertices(get_schedule(get_env(pc_mapf)))),
-            # map(v->get_tF(search_env,v),vertices(get_schedule(get_env(pc_mapf)))),
-            )
+        reset_cache!(get_cache(search_env),get_schedule(search_env),)
         reset_route_plan!(node,get_route_plan(get_env(pc_mapf)))
         valid_flag = compute_route_plan!(solver, pc_mapf, node)
         if valid_flag == false
@@ -416,6 +404,9 @@ function CRCBS.low_level_search!(solver::ISPS, pc_mapf::AbstractPC_MAPF,
             break
         end
     end
+    # If optimality_gap > 0 && solver.backtrack == true
+    #   # backtrack
+    # end
     return valid_flag
 end
 function CRCBS.low_level_search!(solver::CBSSolver, pc_mapf::AbstractPC_MAPF,node::ConstraintTreeNode,args...;kwargs...)

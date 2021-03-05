@@ -559,7 +559,7 @@ function pctapf_problem_10(;cost_function=MakeSpan(),verbose=false,Δt_op=0,Δt_
     #  41  42  43  44  45
     #  46  47  48  49  50
 
-    #   .   .  (5)   .   . 
+    #   .   .  (5)  .   . 
     #   .   .  (4)  .   . 
     #   .   .  (3)  .   . 
     #   .   .   .   .   . 
