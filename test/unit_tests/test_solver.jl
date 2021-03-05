@@ -380,40 +380,48 @@ let
 
     solver2 = NBSSolver(path_planner=CBSSolver(ISPS(backtrack=true)))
     env,cost = solve!(solver2,prob)
-    @test_broken cost[1] == 6 # Why still 7?
+    @test cost[1] == 6 # Why still 7?
 
 end
 # let
 #     reset_all_id_counters!()
 #     solver = NBSSolver(path_planner=CBSSolver(ISPS(backtrack=true)))
-#     cost_model = MakeSpan()
-#     pc_tapf = pctapf_problem_10(solver;cost_function=cost_model,verbose=false);
+#     pc_tapf = pctapf_problem_10(solver;cost_function=MakeSpan(),verbose=false);
 #     base_env = pc_tapf.env
 
 #     prob = formulate_assignment_problem(assignment_solver(solver),pc_tapf)
 #     sched, cost = solve_assignment_problem!(assignment_solver(solver),prob,pc_tapf)
 #     @test cost == 6
-#     @test termination_status(prob) == MOI.OPTIMAL
 
 #     env = construct_search_env(solver,sched,base_env)
 #     pc_mapf = PC_MAPF(env)
-#     node = initialize_root_node(solver,pc_mapf)
 
-#     set_tF!(node.solution.schedule,1,100)
-#     @test get_tF(pc_mapf.env.schedule,1) < get_tF(node.solution.schedule,1)
-
-#     reset_solver!(route_planner(solver))
-#     set_verbosity!(low_level(route_planner(solver)),0)
-#     solve!(route_planner(solver),pc_mapf)
+#     # reset_solver!(route_planner(solver))
+#     # set_verbosity!(low_level(route_planner(solver)),0)
+#     # solve!(route_planner(solver),pc_mapf)
 
 #     isps_planner = low_level(route_planner(solver))
 #     reset_solver!(isps_planner)
+#     TaskGraphs.clear_backtrack_list!(isps_planner)
+#     set_verbosity!(isps_planner,2)
+#     set_verbosity!(low_level(isps_planner),0)
 #     node = initialize_root_node(solver,pc_mapf)
-#     low_level_search!(isps_planner,pc_mapf,node)
-#     node.solution
+#     compute_route_plan!(isps_planner,pc_mapf,node)
+#     search_env = node.solution
 
-#     env = node.solution
-#     set_verbosity!(low_level(route_planner(solver)),4)
-#     plan_next_path!(isps_planner,pc_mapf,env,node)
+#     TaskGraphs.activate_backtracking!(isps_planner)
+#     TaskGraphs.reset_schedule_times!(get_schedule(search_env),get_schedule(get_env(pc_mapf)))
+#     TaskGraphs.reset_cache!(get_cache(search_env),get_schedule(search_env),)
+#     TaskGraphs.reset_route_plan!(node,get_route_plan(get_env(pc_mapf)))
+#     # compute_route_plan!(isps_planner,pc_mapf,node)
+#     # node.solution
+
+#     set_verbosity!(isps_planner,4)
+#     while !TaskGraphs.do_backtrack(isps_planner, get_schedule(search_env), get_vtx_id(get_schedule(search_env), peek(search_env.cache.node_queue).first))
+#         plan_next_path!(isps_planner,pc_mapf,search_env,node)
+#     end
+#     set_verbosity!(low_level(isps_planner),5)
+#     plan_next_path!(isps_planner,pc_mapf,search_env,node)
+
 
 # end

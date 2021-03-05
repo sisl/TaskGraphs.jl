@@ -848,6 +848,8 @@ function CRCBS.build_env(
         agent_idx   = agent_id, # this is only used for the HardConflictTable, which can be updated via the combined search node
         constraints = get_constraints(constraint_node, agent_id), # agent_id represents the whole path
         goal        = state_type(env)(goal_vtx,goal_time),
+        cost_model  = cost_model,
+        heuristic   = heuristic,
         )
     # update deadline in DeadlineCost
     set_deadline!(get_cost_model(cbs_env),deadline)
@@ -957,7 +959,8 @@ end
 function CRCBS.discrete_constraint_table(env::SearchEnv,agent_id=-1,tf=2*makespan(get_schedule(env))+100*num_agents(env))
     discrete_constraint_table(num_states(env),num_actions(env),agent_id,tf)
 end
-CRCBS.initialize_root_node(solver,pc_mapf::AbstractPC_MAPF) = initialize_root_node(get_env(pc_mapf))
+# CRCBS.initialize_root_node(solver,pc_mapf::AbstractPC_MAPF) = initialize_root_node(get_env(pc_mapf))
+CRCBS.initialize_root_node(solver,pc_mapf::AbstractPC_MAPF) = initialize_root_node(copy(get_env(pc_mapf)))
 function Base.copy(env::SearchEnv)
     SearchEnv(
         env,

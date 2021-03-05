@@ -32,8 +32,8 @@ export PCCBSEnv
     cost_model::C                   = get_cost_model(search_env)
     heuristic::H                    = get_heuristic_model(search_env)
 end
-CRCBS.get_cost_model(env::PCCBSEnv)       = get_cost_model(env.search_env)
-CRCBS.get_heuristic_model(env::PCCBSEnv)  = get_heuristic_model(env.search_env)
+CRCBS.get_cost_model(env::PCCBSEnv)       = env.cost_model
+CRCBS.get_heuristic_model(env::PCCBSEnv)  = env.heuristic
 GraphUtils.get_node(env::PCCBSEnv)        = env.schedule_node
 GraphUtils.get_graph(env::PCCBSEnv)       = get_graph(env.search_env,graph_key(get_node(env))) #graph
 
@@ -46,8 +46,6 @@ end
 
 CRCBS.get_next_state(s::State,a::Action)    = State(get_e(a).dst,get_t(s)+get_dt(a))
 CRCBS.get_next_state(env::PCCBSEnv,s,a)  = get_next_state(s,a)
-# CRCBS.get_next_state(s::State,a::Action)    = State(get_e(a).dst,get_t(s)+get_dt(a),s.node)
-# CRCBS.get_next_state(env::PCCBSEnv,s,a)  = State(get_e(a).dst,get_t(s)+get_dt(a),env.schedule_node)
 CRCBS.wait(env::PCCBSEnv,s)              = Action(e=Edge(get_vtx(s),get_vtx(s)))
 
 CRCBS.get_possible_actions(env::PCCBSEnv,s::State) = get_possible_actions(get_node(env),env,s)

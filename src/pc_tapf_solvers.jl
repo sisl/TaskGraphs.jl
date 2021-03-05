@@ -137,7 +137,7 @@ function construct_cost_model(trait::NonPrioritized,
     if use_conflict_cost
         conflict_cost = HardConflictCost(env_graph,makespan(sched)+extra_T, N)
     else
-        # @info "Forgoing conflict cost"
+        # @log_info(1,verbosity(solver),"Forgoing conflict cost for node")
         conflict_cost = NullCost()
     end
     cost_model = construct_composite_cost_model(
@@ -232,7 +232,7 @@ function plan_path!(solver::AStarSC, pc_mapf::AbstractPC_MAPF, env::SearchEnv, n
 
     reset_solver!(solver)
     if backtrack
-        # Construct cost model without collision cost
+        # Construct cost model without collision cost (Currently, this does not work)
         cost_model, _ = construct_cost_model(solver, env, use_conflict_cost=false)
         cbs_env = build_env(solver, pc_mapf, env, node, VtxID(v);cost_model=cost_model)
     else
@@ -328,14 +328,14 @@ end
 function do_backtrack(solver::ISPS,sched,id) 
     flag = get_toggle_status(solver.backtracking_activated) && get(solver.backtrack_list,id,false)
     if flag
-        @info "do_backtrack = true for $(summary(get_node(sched,id)))"
+        @log_info(1,verbosity(solver),"do_backtrack = true for $(summary(get_node(sched,id)))")
     end
     return flag
 end
 function needs_backtrack(solver::ISPS,sched,id) 
     flag = solver.backtrack && get(solver.backtrack_list,id,false)
     if flag
-        @info "needs_backtrack = true for $(summary(get_node(sched,id)))"
+        @log_info(1,verbosity(solver),"needs_backtrack = true for $(summary(get_node(sched,id)))")
     end
     return flag
 end
@@ -345,16 +345,17 @@ end
 Add to backtrack_list.
 """
 function update_backtrack_list!(solver::ISPS,sched,id,val=true)
-    # @info "adding to backtrack list: $(summary(get_node(sched,id)))"
+    @log_info(1,verbosity(solver),"adding to backtrack list: $(summary(get_node(sched,id)))")
     solver.backtrack_list[id] = val
 end
 function activate_backtracking!(solver::ISPS)
-    @info "activating backtracking"
+    @log_info(1,verbosity(solver),"activating backtracking ...")
     if isempty(solver.backtrack_list) || solver.backtrack == false
+        @log_info(1,verbosity(solver),"backtracking not activated")
         return false
     end
     set_toggle_status!(solver.backtracking_activated,true)
-    @info "backtracking activated"
+    @log_info(1,verbosity(solver),"backtracking activated")
     return get_toggle_status(solver.backtracking_activated)
 end
 function clear_backtrack_list!(solver::ISPS)
@@ -491,11 +492,9 @@ function CRCBS.low_level_search!(solver::ISPS, pc_mapf::AbstractPC_MAPF,
         need_backtrack = false
         sched = get_schedule(search_env)
         base_sched = get_schedule(get_env(pc_mapf))
-        # c = get_next_conflict(node)
         for c in get_all_conflicts(conflict_table)
             for id in [RobotID(c.agent1_id),RobotID(c.agent2_id)]
                 for e in edges(bfs_tree(sched,id))
-                    # @info "$(summary(get_node(sched,e.dst)))"
                     if needs_backtrack(solver,sched,get_vtx_id(sched,e.dst))
                         need_backtrack = true
                         break
@@ -503,13 +502,6 @@ function CRCBS.low_level_search!(solver::ISPS, pc_mapf::AbstractPC_MAPF,
                 end
             end
         end
-        # for node in node_iterator(sched,get_all_terminal_nodes(sched))
-        #     if get_tF(node) > get_tF(base_sched,node_id(node))
-        #         need_backtrack = true
-        #         break
-        #     end
-        # end
-        need_backtrack = true
         if need_backtrack && activate_backtracking!(solver)
             reset_schedule_times!(get_schedule(search_env),get_schedule(get_env(pc_mapf)))
             reset_cache!(get_cache(search_env),get_schedule(search_env),)

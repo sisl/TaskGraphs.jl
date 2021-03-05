@@ -244,6 +244,8 @@ let
     set_tF!(sched2,1,0)
     @test get_tF(sched,1) == 100
     @test get_tF(sched2,1) == 0
+    TaskGraphs.reset_schedule_times!(sched,sched2)
+    @test get_tF(sched,1) == 0
     add_node!(sched,GO(2,2,2),ActionID(2))
     @test !has_vertex(sched2,ActionID(2))
     replace_in_schedule!(sched,GO(3,3,3),ActionID(1))
@@ -269,6 +271,36 @@ let
     replace_in_schedule!(sched,GO(3,3,3),node_id(n1))
     @test get_robot_id(get_node(sched,node_id(n1)).node) == RobotID(3)
     @test get_robot_id(get_node(sched2,node_id(n1)).node) == RobotID(1)
+
+end
+# test initialize_root_node(::PC_MAPF)
+let 
+    reset_all_id_counters!()
+    solver = NBSSolver()
+    pc_tapf = pctapf_problem_1(solver)
+    base_env = pc_tapf.env
+    prob = formulate_assignment_problem(assignment_solver(solver),pc_tapf)
+    sched, cost = solve_assignment_problem!(assignment_solver(solver),prob,pc_tapf)
+    env = construct_search_env(solver,sched,base_env)
+    pc_mapf = PC_MAPF(env)
+    # solving the problem should not affect pc_mapf
+    solution, cost = solve!(route_planner(solver),pc_mapf)
+    @test maximum(map(length, get_paths(get_route_plan(get_env(pc_mapf))))) == 0
+    @test maximum(map(length, get_paths(get_route_plan(solution)))) > 0
+    # The solution stored in node should not be shared with pc_mapf
+    node = initialize_root_node(solver,pc_mapf)
+    env = get_env(pc_mapf)
+    sched = get_schedule(env)
+    # this node should only be added to sched--not sched2
+    n1 = add_node!(sched,GO(1,1,1),get_unique_action_id())
+    env2 = node.solution
+    sched2 = get_schedule(env2)
+    @test !has_vertex(sched2,node_id(n1))
+    # should only affect sched--not sched2
+    set_tF!(sched,1,100)
+    set_tF!(sched2,1,0)
+    @test get_tF(sched,1) == 100
+    @test get_tF(sched2,1) == 0
 
 end
 let
