@@ -374,13 +374,29 @@ end
 let 
     solver1 = NBSSolver()
     prob = pctapf_problem_10(solver1)
-    # prob = pctapf_problem_1(solver1)
     env,cost = solve!(solver1,prob)
     @test cost[1] == 7
 
     solver2 = NBSSolver(path_planner=CBSSolver(ISPS(backtrack=true)))
     env,cost = solve!(solver2,prob)
-    @test cost[1] == 6 # Why still 7?
+    @test cost[1] == 6 
+
+end
+let 
+    ## Needs Gurobi (or assignment by hand) otherwise too slow 
+    using Gurobi
+    set_default_milp_optimizer!(Gurobi.Optimizer)
+
+    solver1 = NBSSolver()
+    set_iteration_limit!(solver1,1)
+    # set_iteration_limit!(route_planner(solver1),1)
+    prob = TaskGraphs.pctapf_problem_multi_backtrack(solver1)
+    env,cost = solve!(solver1,prob)
+    @test cost[1] == 9
+
+    solver2 = NBSSolver(path_planner=CBSSolver(ISPS(backtrack=true)))
+    env,cost = solve!(solver2,prob)
+    @test cost[1] == 8 
 
 end
 # let

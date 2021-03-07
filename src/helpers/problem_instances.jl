@@ -588,6 +588,66 @@ function pctapf_problem_10(;cost_function=MakeSpan(),verbose=false,Δt_op=0,Δt_
     return sched, problem_spec, env_graph, assignment_dict
 end
 
+"""
+    pctapf_problem_multi_backtrack(;cost_function=MakeSpan(),verbose=false,Δt_op=0,Δt_collect=[0,0,0,0,0,0],Δt_deposit=[0,0,0,0,0,0])
+
+Motivation for backtracking in ISPS
+The makespan optimal solution is T = 8, and requires that robots 2,3, and 4 
+allow robot 1 to pass before them. However, the slack-based priority schedme of 
+ISPS will always prioritize robot 2, 3, and 4 over robot 1, causing robot 1 to 
+get stuck waiting for 5, 6, and 7 to pass all in a row. 
+Without backtracking, CBS+ISPS will eventually return a plan with makespan T = 9.
+With recursive backtracking (not just a single pass)
+"""
+function pctapf_problem_multi_backtrack(;cost_function=MakeSpan(),verbose=false,Δt_op=0,Δt_collect=[0,0,0,0,0,0],Δt_deposit=[0,0,0,0,0,0])
+    vtx_grid = initialize_dense_vtx_grid(13,7)
+
+    #   1   2   3   4   5   6   7
+    #   8   9  10  11  12  13  14
+    #  15  16  17  18  19  20  21
+    #  22  23  24  25  26  27  28
+    #  29  30  31  32  33  34  35
+    #  36  37  38  39  40  41  42
+    #  43  44  45  46  47  48  49
+    #  50  51  52  53  54  55  56
+    #  57  58  59  60  61  62  63
+    #  64  65  66  67  68  69  70
+    #  71  72  73  74  75  76  77
+    #  78  79  80  81  82  83  84
+    #  85  86  87  88  89  90  91
+
+    #   .   .   .   .  (5)  .   . 
+    #   .   .   .   .  (6)  .   . 
+    #   .   .   .   .  (7)  .   . 
+    #   .   .   .   .   .   .   . 
+    #   .   .   .  (4)  .   .   . 
+    #   .   .  (3)  .   .   .   . 
+    #   .  (2)  .   .   .   .   . 
+    #  (1) [1] [8] [9]  .  [10] .
+    #   .   .   .   .  [5]  .   . 
+    #   .   .   .   .  [6]  .   . 
+    #   .   .   .  [4] [7]  .   . 
+    #   .   .  [3]  .   .   .   . 
+    #   .  [2]  .   .   .   .   . 
+    assignment_dict = Dict(1=>[1,8.9,10],2=>[2],3=>[3],4=>[4],5=>[5],6=>[6],7=>[7])
+
+    r0 = [50,44,38,32,5,12,19]
+    s0 = [50,44,38,32,5,12,19,51,52,53]
+    sF = [51,86,80,74,61,68,75,52,53,55]
+    env_graph = construct_factory_env_from_vtx_grid(
+        vtx_grid;
+    )
+
+    project_spec, robot_ICs = empty_pctapf_problem(r0,s0,sF)
+    add_operation!(project_spec,construct_operation(project_spec,-1,[1,2,3,4,5,6,7,8,9,10],[],Δt_op))
+
+    def = SimpleProblemDef(project_spec,r0,s0,sF)
+    sched, problem_spec = construct_task_graphs_problem(
+        def,env_graph;cost_function=cost_function,Δt_collect=Δt_collect,Δt_deposit=Δt_deposit)
+
+    return sched, problem_spec, env_graph, assignment_dict
+end
+
 export pctapf_problem_11
 
 """
@@ -759,6 +819,7 @@ for op in [
         :pctapf_problem_8,
         :pctapf_problem_9,
         :pctapf_problem_10,
+        :pctapf_problem_multi_backtrack,
         :pctapf_problem_11,
         :pctapf_problem_12,
         :pctapf_problem_13,
