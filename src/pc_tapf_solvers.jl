@@ -487,6 +487,7 @@ function CRCBS.low_level_search!(solver::ISPS, pc_mapf::AbstractPC_MAPF,
             end
         end
     end
+    # Needs to happen in while loop
     if solver.backtrack && valid_flag && count_conflicts(conflict_table) > 0
         # How to identify need for backtracking (i.e., with optimality_gap)?
         need_backtrack = false
