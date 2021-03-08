@@ -107,6 +107,13 @@ function PC_TAPF(solver,def::SimpleProblemDef,env::GridFactoryEnvironment)
     pctapf = pctapf_problem(solver,sched,prob_spec,env)
     return pctapf
 end
+function PC_MAPF(solver,def::SimplePCMAPFDef,env::GridFactoryEnvironment)
+    prob = PC_TAPF(solver,def.pctapf_def,env)
+    sched = get_schedule(get_env(prob))
+    prob_spec = get_problem_spec(get_env(prob))
+    apply_assignment_dict!(sched,def.assignments,prob_spec)
+    return prob
+end
 
 function pcta_problem(
         # project_spec::ProjectSpec,
@@ -1072,6 +1079,18 @@ function random_multihead_pctapf_def(env::GridFactoryEnvironment,
     end
     shapes = choose_random_object_sizes(M,Dict(task_sizes...))
     problem_def = SimpleProblemDef(project_spec,r0,s0,sF,shapes)
+end
+
+function random_pcmapf_def(env,config;
+        objective=MakeSpan(),
+        solver=TaskGraphsMILPSolver(GreedyAssignment(greedy_cost=GreedyFinalTimeCost())),
+        kwargs...
+        )
+    pctapf_def = random_multihead_pctapf_def(env,config;kwargs...)
+    pcta = PC_TA(pctapf_def,env,objective)
+    sched, cost = solve!(solver,pcta)
+    @assert validate(sched)
+    return SimplePCMAPFDef(pctapf_def,get_assignment_dict(sched))
 end
 
 ## Stochastic PCTAPF problems

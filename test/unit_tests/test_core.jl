@@ -350,6 +350,9 @@ let
     project_spec, robot_ICs = TaskGraphs.empty_pctapf_problem(r0,s0,sF)
     add_operation!(project_spec,construct_operation(project_spec,-1,[1,2],[3],0))
     add_operation!(project_spec,construct_operation(project_spec,-1,[3],  [], 0))
+    assignment_dict = Dict(1=>[1,3],2=>[2])
+    def = SimpleProblemDef(project_spec,r0,s0,sF)
+    pcmapf_def = SimplePCMAPFDef(def,assignment_dict)
 
     filename = "/tmp/project_spec.toml"
     open(filename, "w") do io
@@ -358,17 +361,32 @@ let
     project_spec_mod = read_project_spec(filename)
     # @show project_spec_mod.object_id_to_idx
     # run(`rm $filename`)
-
-    r0 = [get_id(get_initial_location_id(robot_ICs[k])) for k in sort(collect(keys(robot_ICs)))]
-    s0 = map(pred->get_id(get_initial_location_id(pred)),TaskGraphs.initial_conditions_vector(project_spec))
-    sF = map(pred->get_id(get_initial_location_id(pred)),TaskGraphs.final_conditions_vector(project_spec))
-    problem_def = SimpleProblemDef(project_spec,r0,s0,sF)
     filename = "/tmp/problem_def.toml"
     open(filename, "w") do io
-        TOML.print(io, TOML.parse(problem_def))
+        TOML.print(io, TOML.parse(def))
     end
-    problem_def = read_problem_def(filename)
+    def_mod = read_problem_def(filename)
     # run(`rm $filename`)
+    filename = "/tmp/pcmapf_problem_def.toml"
+    open(filename, "w") do io
+        TOML.print(io, TOML.parse(pcmapf_def))
+    end
+    pcmapf_def_mod = read_problem_def(filename)
+end
+# test apply_assignment_dict!
+let
+    prob = pctapf_problem_1(NBSSolver())
+    sched = get_schedule(get_env(prob))
+    prob_spec = get_problem_spec(get_env(prob))
+    assignment_dict = Dict(1=>[1,3],2=>[2])
+    TaskGraphs.apply_assignment_dict!(sched,assignment_dict,prob_spec)
+    @test validate(sched)
+    for n in get_nodes(sched)
+        if matches_template(BOT_COLLECT,n)
+            @test get_id(get_object_id(n.node)) in assignment_dict[get_id(get_robot_id(n.node))]
+        end
+    end
+
 end
 let
     solver = NBSSolver()

@@ -273,7 +273,9 @@ end
 
 export
     SimpleProblemDef,
-    read_problem_def
+    SimplePCMAPFDef,
+    read_problem_def,
+    read_pcmapf_problem_def
 
 @with_kw struct SimpleProblemDef
     project_spec::ProjectSpec       = ProjectSpec()
@@ -284,6 +286,16 @@ export
 end
 SimpleProblemDef(project_spec,r0,s0,sF) = SimpleProblemDef(project_spec=project_spec,r0=r0,s0=s0,sF=sF)
 
+"""
+    SimplePCMAPFDef
+
+Simple definition of a PC_MAPF problem (PC_TAPF) with assignments already made.
+"""
+@with_kw struct SimplePCMAPFDef
+    pctapf_def::SimpleProblemDef
+    assignments::Dict{Int,Vector{Int}}
+end
+
 function TOML.parse(def::SimpleProblemDef)
     toml_dict = TOML.parse(def.project_spec)
     toml_dict["r0"] = def.r0
@@ -292,19 +304,27 @@ function TOML.parse(def::SimpleProblemDef)
     toml_dict["shapes"] = map(s->[s...], def.shapes)
     toml_dict
 end
+function TOML.parse(def::SimplePCMAPFDef)
+    dict = TOML.parse(def.pctapf_def)
+    dict["assignments"] = def.assignments
+    dict
+end
 function read_problem_def(toml_dict::Dict)
     SimpleProblemDef(
         read_project_spec(toml_dict),
         toml_dict["r0"],
         toml_dict["s0"],
         toml_dict["sF"],
-        # map(s->tuple(s...), toml_dict["shapes"])
         map(s->tuple(s...), get(toml_dict,"shapes",[[1,1] for o in toml_dict["s0"]]) )
     )
 end
-function read_problem_def(io)
-    read_problem_def(TOML.parsefile(io))
+read_problem_def(io) = read_problem_def(TOML.parsefile(io))
+function read_pcmapf_problem_def(toml_dict::Dict)
+    pctapf_def = read_problem_def(toml_dict)
+    assignments = Dict(parse(Int,k)=>v for (k,v) in toml_dict["assignments"])
+    SimplePCMAPFDef(pctapf_def,assignments)
 end
+read_pcmapf_problem_def(io) = read_pcmapf_problem_def(TOML.parsefile(io))
 
 # export
 #     DeliveryTask,
@@ -1210,4 +1230,45 @@ function get_assignment_dict(assignment_matrix,N,M)
         end
     end
     assignment_dict
+end
+
+"""
+    get_assignment_dict(sched::OperatingSchedule)
+
+Return a dictionary mapping robot id to a sequence of object_ids.
+"""
+function get_assignment_dict(sched::OperatingSchedule)
+    dict = Dict{Int,Vector{Int}}()
+    for n in node_iterator(sched,topological_sort_by_dfs(sched))
+        if matches_template(BOT_COLLECT,n)
+            node = n.node
+            r = get_id(get_robot_id(node))
+            o = get_id(get_object_id(node))
+            push!(get!(dict,r,Int[]),o)
+        end
+    end
+    return dict
+end
+
+"""
+    apply_assignment_dict!(sched::OperatingSchedule,assignment_dict)
+
+Make the assignments encoded in assignment_dict.
+"""
+function apply_assignment_dict!(sched::OperatingSchedule,assignment_dict,prob_spec)
+    tips = robot_tip_map(sched)
+    collect_nodes = Dict(get_object_id(n.node)=>n for n in get_nodes(sched) if matches_template(BOT_COLLECT,n))
+    for (robot_idx,itinerary) in assignment_dict
+        r = RobotID(robot_idx)
+        for object_idx in itinerary
+            tip = get_node(sched,tips[r])
+            o = ObjectID(object_idx)
+            c = collect_nodes[o]
+            add_edge!(sched,tip,c)
+            propagate_valid_ids!(sched,prob_spec)
+            # update tips
+            tips = robot_tip_map(sched)
+        end
+    end
+    sched
 end
