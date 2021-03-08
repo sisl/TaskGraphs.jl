@@ -306,7 +306,7 @@ function TOML.parse(def::SimpleProblemDef)
 end
 function TOML.parse(def::SimplePCMAPFDef)
     dict = TOML.parse(def.pctapf_def)
-    dict["assignments"] = def.assignments
+    dict["assignments"] = Dict(string(k)=>v for (k,v) in def.assignments)
     dict
 end
 function read_problem_def(toml_dict::Dict)
@@ -1270,5 +1270,6 @@ function apply_assignment_dict!(sched::OperatingSchedule,assignment_dict,prob_sp
             tips = robot_tip_map(sched)
         end
     end
+    process_schedule!(sched)
     sched
 end

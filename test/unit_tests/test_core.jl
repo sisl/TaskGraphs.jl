@@ -343,6 +343,7 @@ let
         @test get_vtx(sched, id) == v
     end
 end
+# test I/O for problem defs
 let
     r0 = [1,4]
     s0 = [5,8,14]
@@ -371,7 +372,8 @@ let
     open(filename, "w") do io
         TOML.print(io, TOML.parse(pcmapf_def))
     end
-    pcmapf_def_mod = read_problem_def(filename)
+    pcmapf_def_mod = read_pcmapf_problem_def(filename)
+
 end
 # test apply_assignment_dict!
 let

@@ -2,13 +2,20 @@
 CRCBS.extract_feature(solver::NBSSolver,::LowLevelIterationCount, args...) = max_iterations(route_planner(solver))
 
 export
-    ObjectPathSummaries
+    ObjectPathSummaries,
+    TaskAssignmentDict
 
 struct ObjectPathSummaries <: FeatureExtractor{Dict{Int,Vector{}}} end
 function get_object_path_summaries end
 function CRCBS.extract_feature(solver,::ObjectPathSummaries,pc_mapf,env,timer_results)
     summaries = get_object_path_summaries(env)
     to_string_dict(to_string_dict(Dict(k=>to_string_dict(v) for (k,v) in summaries)))
+end
+struct TaskAssignmentDict <: FeatureExtractor{Dict{Int,Vector{}}} end
+function CRCBS.extract_feature(solver,::TaskAssignmentDict,pc_tapf,env,timer_results)
+    assignment_dict = get_assignment_dict(get_schedule(env))
+    to_string_dict(assignment_dict)
+    # dict = Dict
 end
 
 extract_object_data(node,t0,tF) = Dict{Symbol,Union{Vector{Int},Int}}()
@@ -156,6 +163,7 @@ function write_problem(loader::TaskGraphsProblemLoader,problem_def,prob_path,env
 end
 
 init_random_problem(loader::TaskGraphsProblemLoader,env,config) = random_pctapf_def(env,config)
+init_random_problem(loader::PCMAPF_Loader,env,config) = random_pcmapf_def(env,config)
 function write_problems!(loader::TaskGraphsProblemLoader,config::Dict,base_path::String,prob_counter::Int=1)
     env = get_env!(loader,config[:env_id])
     num_trials = get(config,:num_trials,1)
@@ -177,6 +185,30 @@ function write_problems!(loader::TaskGraphsProblemLoader,configs::Vector{D},base
         prob_counter = write_problems!(loader,config,base_path,prob_counter)
     end
     return prob_counter
+end
+
+"""
+    write_pcmapf_from_pctapf!(loader,solver_config,pcmapf_dir)
+
+Copy assignments from `PCTAPF` or `PCTA` results into problems in `pcmapf_dir`. 
+"""
+function write_pcmapf_from_pctapf!(loader,solver_config,pcmapf_dir)
+    for prob_path in readdir(pcmapf_dir;join=true)
+        is_problem_file(loader,prob_path) ? nothing : continue
+        results_path = get_results_path(loader,solver_config,prob_path)
+        isfile(results_path) || isdir(results_path) ? nothing : continue 
+        results_path = get_results_path(loader,solver_config,prob_path)
+        results_dict = load_results(loader,results_path)
+        if haskey(results_dict,:TaskAssignmentDict)
+            toml_dict = Dict("assignments"=>results_dict[:TaskAssignmentDict])
+            open(joinpath(prob_path,"problem.toml"), "a") do io # append
+                TOML.print(io, toml_dict)
+            end
+        else
+            @warn "assignments not stored in results at $(results_path)."
+            @show results_dict
+        end
+    end
 end
 
 """
@@ -204,10 +236,23 @@ function CRCBS.load_problem(loader::PCTA_Loader,solver_config,prob_path)
     env = get_env!(loader,env_id)
     problem_type(loader)(def,env,solver_config.objective)
 end
+function CRCBS.load_problem(loader::PCMAPF_Loader,solver_config,prob_path)
+    if !isfile(prob_path)
+        prob_path = joinpath(prob_path,"problem.toml")
+    end
+    toml_dict = TOML.parsefile(prob_path)
+    def = read_pcmapf_problem_def(toml_dict)
+    env_id = toml_dict["env_id"]
+    env = get_env!(loader,env_id)
+    problem_type(loader)(solver_config.solver,def,env)
+end
 function is_problem_file(loader::PCTA_Loader,path)
     isfile(joinpath(path,"problem.toml")) && isfile(joinpath(path,"config.toml"))
 end
 function is_problem_file(loader::PCTAPF_Loader,path)
+    isfile(joinpath(path,"problem.toml")) && isfile(joinpath(path,"config.toml"))
+end
+function is_problem_file(loader::PCMAPF_Loader,path)
     isfile(joinpath(path,"problem.toml")) && isfile(joinpath(path,"config.toml"))
 end
 

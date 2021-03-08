@@ -112,6 +112,7 @@ function PC_MAPF(solver,def::SimplePCMAPFDef,env::GridFactoryEnvironment)
     sched = get_schedule(get_env(prob))
     prob_spec = get_problem_spec(get_env(prob))
     apply_assignment_dict!(sched,def.assignments,prob_spec)
+    process_schedule!(sched)
     return prob
 end
 
@@ -1081,6 +1082,12 @@ function random_multihead_pctapf_def(env::GridFactoryEnvironment,
     problem_def = SimpleProblemDef(project_spec,r0,s0,sF,shapes)
 end
 
+"""
+    random_pcmapf_def(env,config;objective=MakeSpan(),solver,kwargs...)
+
+Return a random `SimplePCMAPFDef`. Same arguments for `config` as in 
+`random_multihead_pctapf_def`.
+"""
 function random_pcmapf_def(env,config;
         objective=MakeSpan(),
         solver=TaskGraphsMILPSolver(GreedyAssignment(greedy_cost=GreedyFinalTimeCost())),
