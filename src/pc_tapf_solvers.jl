@@ -28,10 +28,6 @@ struct Prioritized <: SearchTrait end
 struct NonPrioritized <: SearchTrait end
 function search_trait end
 
-# get_primary_cost(::NonPrioritized,model,cost) = cost[1]
-# get_primary_cost(::Prioritized,model,cost) = cost[2]
-# get_primary_cost(solver,cost) = get_primary_cost(search_trait(solver),solver,cost)
-
 primary_cost(solver,cost) = cost[1]
 primary_cost_type(solver) = Float64
 
@@ -49,6 +45,8 @@ Fields:
 @with_kw struct AStarSC{C} <: AbstractAStarPlanner
     logger::SolverLogger{C} = SolverLogger{C}(iteration_limit=1000)
     replan::Bool            = false
+    use_slack_cost          = true
+    use_conflict_cost       = true
 end
 search_trait(solver::AStarSC) = NonPrioritized()
 function CRCBS.logger_step_a_star!(solver::AStarSC, env, base_path, s, q_cost)
@@ -79,7 +77,7 @@ function CRCBS.logger_step_a_star!(solver::AStarSC, env, base_path, s, q_cost)
 end
 
 export DefaultAStarSC
-DefaultAStarSC() = AStarSC{NTuple{5,Float64}}()
+const DefaultAStarSC = AStarSC{NTuple{5,Float64}}
 
 export
     PrioritizedAStarSC
@@ -102,8 +100,7 @@ primary_cost(::PrioritizedAStarSC,cost::NTuple{5,Float64}) = cost[2]
 Construct the heuristic model to be used by solver.
 """
 function construct_heuristic_model(trait::NonPrioritized,solver,env_graph,
-        # ph = PerfectHeuristic(get_dist_matrix(env_graph))
-        ph = EnvDistanceHeuristic(),
+        ph = EnvDistanceHeuristic(), # coupled with slack cost
         )
     construct_composite_heuristic(ph,NullHeuristic(),ph,ph,NullHeuristic())
 end
@@ -130,7 +127,8 @@ search!
 """
 function construct_cost_model(trait::NonPrioritized,
         solver, sched, cache, problem_spec, env_graph, primary_objective=SumOfMakeSpans();
-        use_conflict_cost::Bool=true,
+        use_conflict_cost::Bool=solver.use_conflict_cost,
+        use_slack_cost::Bool=solver.use_slack_cost,
         extra_T::Int=400)
     N = length(get_robot_ICs(sched))
     @assert N > 0 "num_robots should be > 0. We need at least one robot!"
@@ -138,17 +136,27 @@ function construct_cost_model(trait::NonPrioritized,
         conflict_cost = HardConflictCost(env_graph,makespan(sched)+extra_T, N)
     else
         # @log_info(1,verbosity(solver),"Forgoing conflict cost for node")
-        conflict_cost = NullCost()
+        # conflict_cost = NullCost()
+        conflict_cost = FullCostModel(sum,NullCost())
     end
     cost_model = construct_composite_cost_model(
         typeof(primary_objective)(sched,cache),
-        # HardConflictCost(env_graph,makespan(sched)+extra_T, N),
         conflict_cost,
         SumOfTravelDistance(),
         FullCostModel(sum,NullCost()), # SumOfTravelTime(),
         FullCostModel(sum,TransformCostModel(c->-1*c,TravelTime()))
     )
     heuristic_model = construct_heuristic_model(trait,solver,env_graph)
+    if !use_slack_cost
+        # reorder so that travel distance is prioritized ahead of conflicts
+        ordering = [1,3,2,4,5]
+        cost_model = construct_composite_cost_model(
+            cost_model.cost_models[ordering]...
+            )
+        heuristic_model = construct_composite_heuristic(
+            heuristic_model.cost_models[ordering]...
+            )
+    end
     cost_model, heuristic_model
 end
 function construct_cost_model(trait::SearchTrait,
@@ -228,8 +236,6 @@ function plan_path!(solver::AStarSC, pc_mapf::AbstractPC_MAPF, env::SearchEnv, n
         kwargs...) where {N<:ConstraintTreeNode,T}
 
     cache = get_cache(env)
-    # n_id = get_vtx_id(get_schedule(env),v)
-
     reset_solver!(solver)
     if backtrack
         # Construct cost model without collision cost (Currently, this does not work)
@@ -294,15 +300,17 @@ export
 Path planner that employs Incremental Slack-Prioritized Search.
 """
 @with_kw struct ISPS{L,C} <: BiLevelPlanner
-    low_level_planner::L = DefaultAStarSC()
+    low_level_planner::L    = DefaultAStarSC()
     logger::SolverLogger{C} = SolverLogger{cost_type(low_level_planner)}(
         iteration_limit = 2
     )
-    tighten_paths::Bool = true
+    tighten_paths::Bool     = true
     # backtracking for completeness
-    backtrack::Bool     = false
-    backtracking_activated = Toggle(false)
+    backtrack::Bool         = false
+    backtracking_activated  = Toggle(false)
     backtrack_list::Dict{AbstractID,Bool} = Dict{AbstractID,Bool}()
+    # slack priority toggle (for ablation studies)
+    random_prioritization::Bool = false
 end
 ISPS(planner) = ISPS(low_level_planner=planner)
 construct_cost_model(solver::ISPS,args...;kwargs...) = construct_cost_model(low_level(solver),args...;kwargs...)
@@ -374,7 +382,19 @@ function isps_queue_cost(solver::ISPS,sched::OperatingSchedule,v::Int)
     else
         override = Int(path_spec.plan_path)
     end
-    return (override, minimum(get_slack(sched,v)))
+    if solver.random_prioritization
+        slack_cost = rand()
+    else
+        slack_cost = minimum(get_slack(sched,v))
+    end
+    return (override, slack_cost)
+end
+
+update_isps_queue!(solver::ISPS,env::SearchEnv) = update_isps_queue!(solver,get_cache(env),get_schedule(env))
+function update_isps_queue!(solver::ISPS,cache,sched)
+    for v in cache.active_set
+        cache.node_queue[v] = isps_queue_cost(solver,sched,v)
+    end
 end
 
 export
@@ -409,6 +429,8 @@ function plan_next_path!(solver::ISPS, pc_mapf::AbstractPC_MAPF, env::SearchEnv,
                 if solver.backtrack && get_duration(get_schedule(env),n_id) > dt
                     update_backtrack_list!(solver,get_schedule(env),n_id)
                 end
+                # update priority queue using isps_queue_cost(solver,...)
+                update_isps_queue!(solver,env)
                 @log_info(2,verbosity(solver),"""
                 ISPS:
                     routes:
@@ -463,12 +485,13 @@ function CRCBS.low_level_search!(solver::ISPS, pc_mapf::AbstractPC_MAPF,
     ) where {N<:ConstraintTreeNode}
 
     reset_solver!(solver) # problematic because the lower_bound from assignment is not stored?
+    search_env = node.solution
+    conflict_table = deepcopy(node.conflict_table)
+    update_isps_queue!(solver,search_env)
     if solver.backtrack
         clear_backtrack_list!(solver)
     end
     valid_flag = true
-    search_env = node.solution
-    conflict_table = deepcopy(node.conflict_table)
     for i in 1:iteration_limit(solver)
         increment_iteration_count!(solver)
         # reset solution

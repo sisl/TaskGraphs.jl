@@ -587,7 +587,7 @@ function pctapf_problem_10(;cost_function=MakeSpan(),verbose=false,Δt_op=0,Δt_
 
     project_spec, robot_ICs = empty_pctapf_problem(r0,s0,sF)
     add_operation!(project_spec,construct_operation(project_spec,-1,[1,2,3,4,5,6],[],Δt_op))
-    assignment_dict = Dict(1=>[1,6],2=>[2],3=>[3],4=>[4],5=>[5],6=>[6])
+    assignment_dict = Dict(1=>[1,6],2=>[2],3=>[3],4=>[4],5=>[5])
 
     def = SimpleProblemDef(project_spec,r0,s0,sF)
     sched, problem_spec = construct_task_graphs_problem(
@@ -637,7 +637,7 @@ function pctapf_problem_multi_backtrack(;cost_function=MakeSpan(),verbose=false,
     #   .   .   .  [4] [7]  .   . 
     #   .   .  [3]  .   .   .   . 
     #   .  [2]  .   .   .   .   . 
-    assignment_dict = Dict(1=>[1,8.9,10],2=>[2],3=>[3],4=>[4],5=>[5],6=>[6],7=>[7])
+    assignment_dict = Dict(1=>[1,8,9,10],2=>[2],3=>[3],4=>[4],5=>[5],6=>[6],7=>[7])
 
     r0 = [50,44,38,32,5,12,19]
     s0 = [50,44,38,32,5,12,19,51,52,53]
@@ -833,7 +833,15 @@ for op in [
         :pctapf_problem_13,
         :pctapf_problem_14,
     ]
-    @eval $op(solver,args...;kwargs...) = pctapf_problem(solver,$op(args...;kwargs...)...)
+    @eval begin
+        $op(solver,args...;kwargs...) = pctapf_problem(solver,$op(args...;kwargs...)...)
+        function $op(::Type{PC_MAPF},solver,args...;kwargs...) 
+            prob = pctapf_problem(solver,$op(args...;kwargs...)...)
+            _,_,_, assignment_dict = $op()
+            apply_assignment_dict!(get_schedule(get_env(prob)),assignment_dict,get_problem_spec(get_env(prob)))
+            PC_MAPF(get_env(prob))
+        end
+    end
 end
 
 ################################################################################

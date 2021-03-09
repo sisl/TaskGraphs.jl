@@ -371,32 +371,59 @@ let
     @test TaskGraphs.do_backtrack(solver,sched,ActionID(1))
 
 end
+# Test completeness of ISPS with/without backtracking
 let 
-    solver1 = NBSSolver()
-    prob = pctapf_problem_10(solver1)
+    solver1 = CBSSolver(ISPS())
+    prob = pctapf_problem_10(PC_MAPF,solver1)
     env,cost = solve!(solver1,prob)
     @test cost[1] == 7
 
-    solver2 = NBSSolver(path_planner=CBSSolver(ISPS(backtrack=true)))
+    solver2 = CBSSolver(ISPS(backtrack=true))
     env,cost = solve!(solver2,prob)
     @test cost[1] == 6 
 
 end
 let 
-    ## Needs Gurobi (or assignment by hand) otherwise too slow 
-    using Gurobi
-    set_default_milp_optimizer!(Gurobi.Optimizer)
-
-    solver1 = NBSSolver()
-    set_iteration_limit!(solver1,1)
-    # set_iteration_limit!(route_planner(solver1),1)
-    prob = TaskGraphs.pctapf_problem_multi_backtrack(solver1)
+    solver1 = CBSSolver(ISPS())
+    prob = TaskGraphs.pctapf_problem_multi_backtrack(PC_MAPF,solver1)
     env,cost = solve!(solver1,prob)
     @test cost[1] == 9
 
-    solver2 = NBSSolver(path_planner=CBSSolver(ISPS(backtrack=true)))
+    solver2 = CBSSolver(ISPS(backtrack=true))
     env,cost = solve!(solver2,prob)
     @test cost[1] == 8 
+
+end
+# Test ISPS and A* with different options 
+let
+    # ISPS - normal vs. no slack prioritization in queue
+    # A*sc - normal vs. no collision-avoidance vs. no slack allowance
+    for (i, f) in enumerate([
+        pctapf_problem_1,
+        pctapf_problem_2,
+        pctapf_problem_3,
+        pctapf_problem_4,
+        pctapf_problem_5,
+        pctapf_problem_6,
+        pctapf_problem_7,
+        pctapf_problem_8,
+        ])
+        for (use_slack_cost, use_conflict_cost, random_prioritization
+            ) in Base.Iterators.product(
+                [true,false],[true,false],[true,false]
+            )
+            solver = ISPS(
+                low_level_planner=DefaultAStarSC(
+                        use_slack_cost=use_slack_cost,
+                        use_conflict_cost=use_conflict_cost
+                    ),
+                    random_prioritization=random_prioritization
+                    )
+
+            prob = f(PC_MAPF,solver)
+            env, cost = solve!(solver,prob)
+        end
+    end
 
 end
 # let
