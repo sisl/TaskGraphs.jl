@@ -426,6 +426,10 @@ let
     end
 
 end
+# Investigate why A*sc is failing
+let 
+        
+end
 # let
 #     reset_all_id_counters!()
 #     solver = NBSSolver(path_planner=CBSSolver(ISPS(backtrack=true)))

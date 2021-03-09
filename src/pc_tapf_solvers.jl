@@ -44,7 +44,7 @@ Fields:
 """
 @with_kw struct AStarSC{C} <: AbstractAStarPlanner
     logger::SolverLogger{C} = SolverLogger{C}(iteration_limit=1000)
-    replan::Bool            = false
+    replan::Bool            = true # false
     use_slack_cost          = true
     use_conflict_cost       = true
 end
@@ -254,7 +254,7 @@ function plan_path!(solver::AStarSC, pc_mapf::AbstractPC_MAPF, env::SearchEnv, n
             @log_info(-1,verbosity(solver),"A*: replanning without conflict cost", string(schedule_node))
             reset_solver!(solver)
             cost_model, _ = construct_cost_model(solver, env;
-                primary_objective=get_problem_spec(env).cost_function)
+                use_conflict_cost=false,)
             cbs_env = build_env(solver, pc_mapf, env, node, VtxID(v);cost_model=cost_model)
             base_path = get_base_path(solver,env,cbs_env)
             path, cost = path_finder(solver, cbs_env, base_path)
