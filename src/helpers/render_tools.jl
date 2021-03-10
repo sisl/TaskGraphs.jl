@@ -1435,13 +1435,27 @@ function show_times(sched::OperatingSchedule,v,scalar_slack=true)
     return string(get_t0(sched,v),", ",get_tF(sched,v),", ",slack_string)
 end
 
-GraphPlottingBFS._title_string(n::BOT_GO)       = "G"
-GraphPlottingBFS._title_string(n::BOT_COLLECT)  = "C"
-GraphPlottingBFS._title_string(n::BOT_CARRY)    = "T"
-GraphPlottingBFS._title_string(n::BOT_DEPOSIT)  = "D"
-GraphPlottingBFS._title_string(::Operation)     = "OP"
-GraphPlottingBFS._title_string(::OBJECT_AT)     = "O"
-GraphPlottingBFS._title_string(::BOT_AT)        = "R"
+global TITLE_MODE = Dict()
+_title_mode(n) = get(TITLE_MODE,typeof(n),get(TITLE_MODE,Any,:TYPE))
+function _set_title_mode!(n,val)
+    global TITLE_MODE 
+    TITLE_MODE[n] = val
+end
+
+global SUBTITLE_MODE = Dict()
+_subtitle_mode(n) = get(SUBTITLE_MODE,typeof(n),get(SUBTITLE_MODE,Any,:TYPE))
+function _set_subtitle_mode!(n,val)
+    global SUBTITLE_MODE 
+    SUBTITLE_MODE[n] = val
+end
+
+GraphPlottingBFS._title_string(n::BOT_GO)       = _title_mode(n) == :TYPE ? "G" : "G"
+GraphPlottingBFS._title_string(n::BOT_COLLECT)  = _title_mode(n) == :TYPE ? "C" : "C"
+GraphPlottingBFS._title_string(n::BOT_CARRY)    = _title_mode(n) == :TYPE ? "T" : "T"
+GraphPlottingBFS._title_string(n::BOT_DEPOSIT)  = _title_mode(n) == :TYPE ? "D" : "D"
+GraphPlottingBFS._title_string(n::Operation)    = _title_mode(n) == :TYPE ? "OP" : get_id(get_operation_id(n))
+GraphPlottingBFS._title_string(n::OBJECT_AT)    = _title_mode(n) == :TYPE ? "O" : get_id(get_object_id(n))
+GraphPlottingBFS._title_string(n::BOT_AT)       = _title_mode(n) == :TYPE ? "R" : get_id(get_robot_id(n))
 
 for op in (
     :(GraphPlottingBFS._node_shape),
@@ -1454,11 +1468,12 @@ for op in (
 end
 
 # GraphPlottingBFS._subtitle_string(n::AbstractPlanningPredicate) = "$(get_id(node_id(n)))"
-GraphPlottingBFS._subtitle_string(n::BOT_AT) = "r$(get_id(get_robot_id(n))),x$(get_id(get_initial_location_id(n)))"
-GraphPlottingBFS._subtitle_string(n::OBJECT_AT) = "o$(get_id(get_object_id(n))),x$(get_id(get_initial_location_id(n)))"
-GraphPlottingBFS._subtitle_string(n::BOT_GO) = "r$(get_id(get_robot_id(n))),x$(get_id(get_initial_location_id(n)))=>x$(get_id(get_destination_location_id(n)))"
-GraphPlottingBFS._subtitle_string(n::Union{BOT_COLLECT,BOT_DEPOSIT}) = "r$(get_id(get_robot_id(n))),o$(get_id(get_object_id(n))),x$(get_id(get_initial_location_id(n)))"
-GraphPlottingBFS._subtitle_string(n::BOT_CARRY) = "r$(get_id(get_robot_id(n))),o$(get_id(get_object_id(n))),x$(get_id(get_initial_location_id(n)))=>x$(get_id(get_destination_location_id(n)))"
+GraphPlottingBFS._subtitle_string(n::BOT_AT)        = _subtitle_mode(n) == :INFO ? "r$(get_id(get_robot_id(n))),x$(get_id(get_initial_location_id(n)))" : ""
+GraphPlottingBFS._subtitle_string(n::OBJECT_AT)     = _subtitle_mode(n) == :INFO ? "o$(get_id(get_object_id(n))),x$(get_id(get_initial_location_id(n)))" : ""
+GraphPlottingBFS._subtitle_string(n::BOT_GO)        = _subtitle_mode(n) == :INFO ? "r$(get_id(get_robot_id(n))),x$(get_id(get_initial_location_id(n)))=>x$(get_id(get_destination_location_id(n)))" : ""
+GraphPlottingBFS._subtitle_string(n::BOT_COLLECT)   = _subtitle_mode(n) == :INFO ? "r$(get_id(get_robot_id(n))),o$(get_id(get_object_id(n))),x$(get_id(get_initial_location_id(n)))" : ""
+GraphPlottingBFS._subtitle_string(n::BOT_DEPOSIT)   = _subtitle_mode(n) == :INFO ? "r$(get_id(get_robot_id(n))),o$(get_id(get_object_id(n))),x$(get_id(get_initial_location_id(n)))" : ""
+GraphPlottingBFS._subtitle_string(n::BOT_CARRY)     = _subtitle_mode(n) == :INFO ? "r$(get_id(get_robot_id(n))),o$(get_id(get_object_id(n))),x$(get_id(get_initial_location_id(n)))=>x$(get_id(get_destination_location_id(n)))" : ""
 
 # global SPACE_GRAY = RGB(0.2,0.2,0.2)
 # global BRIGHT_RED = RGB(0.6,0.0,0.2)
