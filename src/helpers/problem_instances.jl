@@ -113,7 +113,7 @@ function PC_MAPF(solver,def::SimplePCMAPFDef,env::GridFactoryEnvironment)
     prob_spec = get_problem_spec(get_env(prob))
     apply_assignment_dict!(sched,def.assignments,prob_spec)
     process_schedule!(sched)
-    return prob
+    return PC_MAPF(get_env(prob))
 end
 
 function pcta_problem(

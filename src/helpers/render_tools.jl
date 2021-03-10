@@ -5,6 +5,9 @@ using Colors
 using Gadfly
 using DataFrames
 using GraphUtils
+using FactoryRendering
+
+const FR = FactoryRendering
 
 using PGFPlotsX
 latexengine!(PGFPlotsX.PDFLATEX)
@@ -1463,15 +1466,24 @@ GraphPlottingBFS._subtitle_string(n::BOT_CARRY) = "r$(get_id(get_robot_id(n))),o
 # global LIME_GREEN = RGB(0.2,0.6,0.2)
 # global BRIGHT_BLUE = RGB(0.0,0.4,1.0)
 
-GraphPlottingBFS._node_color(::BOT_AT)                      = RGB(0.2,0.6,0.2)
-GraphPlottingBFS._node_color(::OBJECT_AT)                   = RGB(0.2,0.2,0.2)
-GraphPlottingBFS._node_color(::Operation)                   = RGB(0.6,0.0,0.2)
+GraphPlottingBFS._node_color(::BOT_AT)                      = FactoryRendering.default_robot_color()
+GraphPlottingBFS._node_color(::OBJECT_AT)                   = FactoryRendering.default_object_color()
+GraphPlottingBFS._node_color(::Operation)                   = RGB(0.8,0.0,0.2)
+GraphPlottingBFS._node_bg_color(n::AbstractPlanningPredicate)= GraphPlottingBFS._node_color(n)
+GraphPlottingBFS._node_shape(::Operation,args...)           = Compose.rectangle(0.0,0.0,1.0,1.0)
 GraphPlottingBFS._node_color(::AbstractSingleRobotAction)   = RGB(0.0,0.4,1.0)
 
 GraphPlottingBFS._subtitle_text_scale(n::AbstractPlanningPredicate) = 0.3
 GraphPlottingBFS._text_color(n::AbstractPlanningPredicate) = "black"
 
+# function GraphPlottingBFS.display_graph(g::OperatingSchedule;
+#         kwargs...) 
+#     draw_node_func=(_,v)->GraphPlottingBFS.draw_node(g,v)
+# end
 function GraphPlottingBFS.draw_node(g::OperatingSchedule,v,args...;kwargs...) 
+    draw_node(get_node(g,v))
+end
+function GraphPlottingBFS.draw_node(g::ProjectSpec,v,args...;kwargs...) 
     draw_node(get_node(g,v))
 end
 
