@@ -213,7 +213,8 @@ function construct_task_graphs_problem(
                 op.station_id,
                 collect(keys(preconditions(op))),
                 collect(keys(postconditions(op))),
-                duration(op)
+                duration(op),
+                op.id
             )
         )
     end
@@ -389,8 +390,18 @@ end
 function get_random_problem_instantiation(N::Int,M::Int,pickup_zones,dropoff_zones,robot_zones)
     ##### Random Problem Initialization #####
     r0 = robot_zones[sortperm(rand(length(robot_zones)))][1:N]
-    s0 = pickup_zones[sortperm(rand(length(pickup_zones)))][1:M]
-    sF = dropoff_zones[sortperm(rand(length(dropoff_zones)))][1:M]
+    pickup_idxs = sortperm(rand(length(pickup_zones)))
+    while length(pickup_idxs) < M
+        pickup_idxs = vcat(pickup_idxs,sortperm(rand(length(pickup_zones))))
+    end
+    s0 = map(i->pickup_zones[i], pickup_idxs[1:M])
+    # s0 = pickup_zones[sortperm(rand(length(pickup_zones)))][1:M]
+    dropoff_idxs = sortperm(rand(length(dropoff_zones)))
+    while length(dropoff_idxs) < M
+        dropoff_idxs = vcat(dropoff_idxs,sortperm(rand(length(dropoff_zones))))
+    end
+    sF = map(i->dropoff_zones[i], dropoff_idxs[1:M])
+    # sF = dropoff_zones[sortperm(rand(length(dropoff_zones)))][1:M]
     return r0,s0,sF
 end
 

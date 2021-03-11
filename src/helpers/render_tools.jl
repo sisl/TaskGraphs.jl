@@ -67,8 +67,9 @@ function record_video(outfile_name,render_function,
         t_history=t0:dt:tf,
         fps = 10,
         ext = "png",
-        s = (4inch, 4inch),
-        res = "1080x1080",
+        s = (Compose.default_graphic_width,Compose.default_graphic_height),
+        res1=1080,
+        res = "$(res1)x$(Int(round(res1*s[2]/s[1])))",
     )
     tmpdir = mktempdir()
     for (i,t) in enumerate(t_history)
@@ -1481,8 +1482,8 @@ GraphPlottingBFS._subtitle_string(n::BOT_CARRY)     = _subtitle_mode(n) == :INFO
 # global LIME_GREEN = RGB(0.2,0.6,0.2)
 # global BRIGHT_BLUE = RGB(0.0,0.4,1.0)
 
-GraphPlottingBFS._node_color(::BOT_AT)                      = FactoryRendering.default_robot_color()
-GraphPlottingBFS._node_color(::OBJECT_AT)                   = FactoryRendering.default_object_color()
+GraphPlottingBFS._node_color(::BOT_AT)                      = FactoryRendering.get_render_param(:Color,:Robot)
+GraphPlottingBFS._node_color(::OBJECT_AT)                   = FactoryRendering.get_render_param(:Color,:Object)
 GraphPlottingBFS._node_color(::Operation)                   = RGB(0.8,0.0,0.2)
 GraphPlottingBFS._node_bg_color(n::AbstractPlanningPredicate)= GraphPlottingBFS._node_color(n)
 GraphPlottingBFS._node_shape(::Operation,args...)           = Compose.rectangle(0.0,0.0,1.0,1.0)
