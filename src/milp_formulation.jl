@@ -31,18 +31,10 @@ end
 """
     GadgetGraph
 
-Represents a time-extended graph useful for MILP formulations
+Represents a time-extended graph useful for MILP formulations. Each vertex of
+the `GadgetGraph` corresponds to a "flow edge"
 """
 const GadgetGraph = NGraph{DiGraph,FlowNode,VtxID}
-# const GadgetGraph = NGraph{DiGraph,Tuple{Int,Int},VtxID}
-# LightGraphs.add_vertex!(graph::GadgetGraph,t=-1,v=-1) = add_node!(graph,(Int(round(t)),v),VtxID(nv(graph)+1))
-# LightGraphs.add_vertex!(graph::GadgetGraph,t=-1,v=-1) = add_node!(graph,(Int(round(t)),v),VtxID(nv(graph)+1))
-
-# get_vtx_from_var(G::GadgetGraph,v) = has_vertex(G,v) ? node_val(get_node(G,v))[2] : -1
-# get_t_from_var(G::GadgetGraph,v) = has_vertex(G,v) ? node_val(get_node(G,v))[1] : -1
-# is_movement_vtx(graph::GadgetGraph,v) = get_vtx_from_var(graph,v) == 0
-# is_stay_vtx(graph::GadgetGraph,v)   = !is_movement_vtx(graph,v) && get_t_from_var(graph,v) == -1
-# is_bridge_vtx(graph::GadgetGraph,v)     = !is_movement_vtx(graph,v) && !is_bridge_vtx(graph,v)
 get_vtx_from_var(G::GadgetGraph,v)      = has_vertex(G,v) ? node_val(get_node(G,v)).v : -1
 get_t_from_var(G::GadgetGraph,v)        = has_vertex(G,v) ? node_val(get_node(G,v)).t : -1
 is_movement_vtx(graph::GadgetGraph,v)   = node_val(get_node(graph,v)).type == _EDGE
