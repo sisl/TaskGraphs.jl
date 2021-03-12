@@ -1,11 +1,4 @@
 """
-The number of edges in each "gadget" per original edge
-"""
-const GADGET_EDGE_MULTIPLIER = 5
-const GADGET_VTX_MULTIPLIER = 2
-
-
-"""
     convert_env_graph_to_undirected(G)
 
 It is necessary to convert the env graph to an undirected graph because the
@@ -16,7 +9,20 @@ function convert_env_graph_to_undirected(G)
     env_graph = Graph(G)
 end
 
+# [START]-----------------<_STAY>------------------[MID]--<_BRIDGE>--[START]
+#   |                                               |
+#    |--<_EDGE>--|                     |--<_EDGE>--|
+#              [GADGET]--<_EDGE>--[GADGET]             
+#    |--<_EDGE>--|                     |--<_EDGE>--|
+#   |                                               |
+# [START]-----------------<_STAY>------------------[MID]--<_BRIDGE>--[START]
 @enum FlowNodeType begin
+    _START  # beginning of a new time step
+    _GADGET # inside of gadget layer
+    _MID    # end of gadget layer
+end
+
+@enum FlowEdgeType begin
     _STAY # wait for a time step
     _BRIDGE # carry over between gadget layers
     _EDGE # edge vtx
@@ -28,42 +34,51 @@ struct FlowNode
     t::Int # time step of node
 end
 
+struct FlowEdge
+    type::FlowEdgeType
+    e::Edge
+    # t::Int
+end
+
+export FlowGraph
 """
-    GadgetGraph
+    FlowGraph
 
 Represents a time-extended graph useful for MILP formulations. Each vertex of
-the `GadgetGraph` corresponds to a "flow edge"
+the `FlowGraph` corresponds to a "flow edge"
 """
-const GadgetGraph = NGraph{DiGraph,FlowNode,VtxID}
-get_vtx_from_var(G::GadgetGraph,v)      = has_vertex(G,v) ? node_val(get_node(G,v)).v : -1
-get_t_from_var(G::GadgetGraph,v)        = has_vertex(G,v) ? node_val(get_node(G,v)).t : -1
-is_movement_vtx(graph::GadgetGraph,v)   = node_val(get_node(graph,v)).type == _EDGE
-is_stay_vtx(graph::GadgetGraph,v)       = node_val(get_node(graph,v)).type == _STAY
-is_bridge_vtx(graph::GadgetGraph,v)     = node_val(get_node(graph,v)).type == _BRIDGE
+const FlowGraph = NEGraph{DiGraph,FlowNode,FlowEdge,VtxID}
+GraphUtils.add_node!(graph::FlowGraph,n::FlowNode) = add_node!(graph,n,get_unique_id(VtxID))
+get_vtx_from_var(G::FlowGraph,v)      = has_vertex(G,v) ? node_val(get_node(G,v)).v : -1
+get_t_from_var(G::FlowGraph,v)        = has_vertex(G,v) ? node_val(get_node(G,v)).t : -1
+# is_movement_vtx(graph::FlowGraph,v)   = node_val(get_node(graph,v)).type == _EDGE
+# is_stay_vtx(graph::FlowGraph,v)       = node_val(get_node(graph,v)).type == _STAY
+# is_bridge_vtx(graph::FlowGraph,v)     = node_val(get_node(graph,v)).type == _BRIDGE
+is_movement_edge(graph::FlowGraph,e)  = edge_val(get_edge(graph,e)).type == _EDGE
+is_stay_edge(graph::FlowGraph,e)      = edge_val(get_edge(graph,e)).type == _STAY
+is_bridge_edge(graph::FlowGraph,e)    = edge_val(get_edge(graph,e)).type == _BRIDGE
+add_movement_edge!(graph::FlowGraph,u,v)   = add_edge!(graph,u,v,FlowEdge(_EDGE,   Edge(get_vtx(graph,u),get_vtx(graph,v))))
+add_bridge_edge!(graph::FlowGraph,u,v)     = add_edge!(graph,u,v,FlowEdge(_BRIDGE, Edge(get_vtx(graph,u),get_vtx(graph,v))))
+add_stay_edge!(graph::FlowGraph,u,v)       = add_edge!(graph,u,v,FlowEdge(_STAY,   Edge(get_vtx(graph,u),get_vtx(graph,v))))
+
+is_start_vtx(graph::FlowGraph,v)      = node_val(get_node(graph,v)).type == _START
+is_gadget_vtx(graph::FlowGraph,v)     = node_val(get_node(graph,v)).type == _GADGET
+is_mid_vtx(graph::FlowGraph,v)        = node_val(get_node(graph,v)).type == _MID
+add_start_vtx!(graph::FlowGraph,v,t)  = add_node!(graph,FlowNode(_START, v,t))
+add_gadget_vtx!(graph::FlowGraph,v,t) = add_node!(graph,FlowNode(_GADGET,v,t))
+add_mid_vtx!(graph::FlowGraph,v,t)    = add_node!(graph,FlowNode(_MID,   v,t))
+
 
 """
-    add_movement_vtx!
+    get_source_map(G::FlowGraph,env_graph,TMAX)
 
-Flags a vertex of the gadget graph as corresponding to a non-"wait" edge
-"""
-GraphUtils.add_node!(graph::GadgetGraph,n::FlowNode)       = add_node!(graph,n,get_unique_id(VtxID))
-add_movement_vtx!(graph::GadgetGraph,v,t)   = add_node!(graph,FlowNode(_EDGE,   v,t))
-add_bridge_vtx!(graph::GadgetGraph,v,t)     = add_node!(graph,FlowNode(_BRIDGE, v,t))
-add_stay_vtx!(graph::GadgetGraph,v,t)       = add_node!(graph,FlowNode(_STAY,   v,t))
-
-"""
-    get_source_map(G::GadgetGraph,env_graph,TMAX)
-
-Return a source map such that source_map[v][t] points to the corresponding 
+Return a source map such that source_map[v][t] points to the corresponding _START
 vertex in the gadget graph.
 """
-function get_source_map(G::GadgetGraph,env_graph,TMAX)
-    # source_map = zeros(Int,nv(env_graph),TMAX)
+function get_source_map(G::FlowGraph,env_graph,TMAX)
     source_map = [Dict{Int,Int}() for v in 1:nv(env_graph)]
     for idx in vertices(G)
-        # if has_vertex(env_graph,v) && !is_bridge_vtx(G,idx)
-        # if has_vertex(env_graph,v) && !is_stay_vtx(G,idx)
-        if is_bridge_vtx(G,idx)
+        if is_start_vtx(G,idx) # was is_bridge_vtx
             v = get_vtx_from_var(G,idx)
             t = get_t_from_var(G,idx)
             @assert has_vertex(env_graph,v)
@@ -73,75 +88,67 @@ function get_source_map(G::GadgetGraph,env_graph,TMAX)
     return source_map
 end
 
-function add_vertex_layer!(G::GadgetGraph,incoming::Dict{Int,Vector{Int}},t)
-    outgoing = Dict{Int,Int}()
-    for v in sort(collect(keys(incoming)))
-        # add_stay_vtx!(G,t,v)
-        add_bridge_vtx!(G,v,t)
-        outgoing[v] = nv(G)
-        for v2 in incoming[v]
-            add_edge!(G,v2,nv(G))
+"""
+    add_vertex_layer!(G::FlowGraph,incoming::Dict{Int,Vector{Int}},t)
+
+`incoming` points to `_MID` vertices.
+        [MID (already added)]--<_BRIDGE>--[START]
+"""
+function add_vertex_layer!(G::FlowGraph,incoming::Vector{Int},t)
+    outgoing = zeros(Int,length(incoming))
+    for (v,np) in enumerate(incoming)
+        n = add_start_vtx!(G,v,t)
+        if has_vertex(G,np)
+            add_bridge_edge!(G,np,n)
         end
+        outgoing[v] = get_vtx(G,n)
     end
     return outgoing
 end
-function add_gadget_layer!(G::GadgetGraph,edge_list,t,vtx_map=Dict{Int,Int}())
-    outgoing = Dict{Int,Vector{Int}}()
+
+"""
+    add_gadget_layer!(G::FlowGraph,edge_list,t,vtx_map=Dict{Int,Int}())
+
+vtx_map points to `_START` vertices
+
+[START (already added)]-----------------<_STAY>------------------[MID]
+             |                                               |
+              |--<_EDGE>--|                     |--<_EDGE>--|
+                        [GADGET]--<_EDGE>--[GADGET]             
+              |--<_EDGE>--|                     |--<_EDGE>--|
+             |                                               |
+[START (already added)]-----------------<_STAY>------------------[MID]
+"""
+function add_gadget_layer!(G::FlowGraph,edge_list,t,incoming=Vector{Int}())
+    outgoing = zeros(Int,length(incoming)) # maps original env vtx to mid layer of flow graph
+    for (v,n) in enumerate(incoming)
+        np = add_mid_vtx!(G,v,t+1)
+        add_stay_edge!(G,n,np)
+        outgoing[v] = nv(G)
+    end
     for e in edge_list
-        if !haskey(vtx_map,e.src) && !haskey(vtx_map,e.dst)
-            continue
-        end
-        if e.src == e.dst
-            # shortcut
-            # |
-            # add_bridge_vtx!(G,t)
-            # add_stay_vtx!(G,t)
-            add_stay_vtx!(G,e.src,t)
-            add_edge!(G,vtx_map[e.src],nv(G))
-            push!(get!(outgoing,e.dst,Int[]),nv(G))
-        else
-            if !haskey(vtx_map,e.src)
-                e = reverse(e)
-            end
-            # Gadget
-            # \ /
-            #  |
-            # / \
-            # add_movement_vtx!(G,t)
-            add_movement_vtx!(G,e.src,t)
-            v1 = nv(G)
-            add_edge!(G,vtx_map[e.src],v1)
-            if haskey(vtx_map,e.dst)
-                # add_movement_vtx!(G,t)
-                add_movement_vtx!(G,e.dst,t)
-                v2 = nv(G)
-                add_edge!(G,vtx_map[e.dst],v2)
-            end
-            # add_movement_vtx!(G,t)
-            add_movement_vtx!(G,-1,t)
-            v3 = nv(G)
-            add_edge!(G,v1,v3)
-            if haskey(vtx_map,e.dst)
-                add_edge!(G,v2,v3)
-                # add_movement_vtx!(G,t)
-                add_movement_vtx!(G,e.src,t)
-                v4 = nv(G)
-                add_edge!(G,v3,v4)
-                push!(get!(outgoing,e.src,Int[]),v4)
-            end
-            # add_movement_vtx!(G,t)
-            add_movement_vtx!(G,e.dst,t)
-            v5 = nv(G)
-            add_edge!(G,v3,v5)
-            push!(get!(outgoing,e.dst,Int[]),v5)
+        if !(e.src == e.dst)
+            s1 = incoming[e.src]
+            s2 = incoming[e.dst]
+            m1 = outgoing[e.src]
+            m2 = outgoing[e.dst]
+            g1 = add_gadget_vtx!(G,-1,t)
+            g2 = add_gadget_vtx!(G,-1,t)
+            # gadget edges
+            add_movement_edge!(G,s1,g1)
+            add_movement_edge!(G,s2,g1)
+            add_movement_edge!(G,g1,g2)
+            add_movement_edge!(G,g2,m1)
+            add_movement_edge!(G,g2,m2)
         end
     end
     return outgoing
 end
 
 function construct_gadget_graph(env_graph,TMAX,t0=0,cap=true)
-    G = GadgetGraph()
-    incoming = Dict(v=>Int[] for v in vertices(env_graph))
+    @assert !is_directed(env_graph)
+    G = FlowGraph()
+    incoming = zeros(Int,nv(env_graph))
     edge_list = collect(edges(env_graph))
     for t in t0:TMAX-1
         outgoing = add_vertex_layer!(G,incoming,t)
@@ -153,88 +160,187 @@ function construct_gadget_graph(env_graph,TMAX,t0=0,cap=true)
     return G
 end
 
-"""
-    add_point_constraint!(model,source_map,flow,v,t=0)
-
-Constrain flow to be equal to 1 at vertex `v`, time `t`
-"""
-function add_point_constraint!(model,source_map,flow,v,t=0)
-    idx = source_map[v][t]
-    @constraint(model, flow[idx] == 1)
-    return model
-end
-function add_continuity_constraints!(model,G,flow)
+function _get_layout_coords(G::FlowGraph;dx=1,dt=4,kwargs...)
+    x = zeros(nv(G))
+    t = zeros(nv(G))
     for v in vertices(G)
-        @constraint(model,1 >= sum(map(vp->flow[vp],outneighbors(G,v)))) # unit capacity edges
-        @constraint(model,1 >= sum(map(vp->flow[vp],inneighbors(G,v)))) # unit capacity edges
-        if outdegree(G,v) > 0
-            @constraint(model,
-                flow[v] <= sum(map(vp->flow[vp],outneighbors(G,v))) # No disappearing robots
-                )
-        end
-        if indegree(G,v) > 0
-            @constraint(model,
-                flow[v] <= sum(map(vp->flow[vp],inneighbors(G,v))) # No appearing robots
-                )
+        n = node_val(get_node(G,v))
+        if TaskGraphs.is_start_vtx(G,v)
+            x[v] = dx*n.v
+            t[v] = dt*n.t
+        elseif TaskGraphs.is_gadget_vtx(G,v)
+            if indegree(G,v) == 2
+                x[v] = dx*sum(node_val(get_node(G,vp)).v for vp in inneighbors(G,v))/2
+                t[v] = dt*(n.t + 1/4)
+            else
+                x[v] = dx*sum(node_val(get_node(G,vp)).v for vp in outneighbors(G,v))/2
+                t[v] = dt*(n.t + 1/2)
+            end
+        elseif TaskGraphs.is_mid_vtx(G,v)
+            x[v] = dx*n.v
+            t[v] = dt*(n.t - 1/4)
         end
     end
+    x,t
+end
+
+# """
+#     add_point_constraint!(model,source_map,flow,v,t=0)
+
+# Constrain flow to be equal to 1 at vertex `v`, time `t`
+# """
+# function add_point_constraint!(model,source_map,flow,v,t=0)
+#     idx = source_map[v][t]
+#     if outdegree(G,idx) > 0
+#         @constraint(model,1 == sum(map(vp->flow[vp],outneighbors(G,idx))))
+#     end
+#     if indegree(G,idx) > 0
+#         @constraint(model,1 == sum(map(vp->flow[vp],inneighbors(G,idx))))
+#     end
+#     # @constraint(model, flow[idx] == 1)
+#     return model
+# end
+_out_edge_idxs(G,edge_map,v) = [edge_map[Edge(v,vp)] for vp in outneighbors(G,v)]
+_in_edge_idxs(G,edge_map,v) = [edge_map[Edge(vp,v)] for vp in inneighbors(G,v)]
+"""
+    add_source_constraint!(model,source_map,flow,v,t=0)
+
+Constrain flow to be equal to 1 leaving vertex `v`, time `t`
+"""
+function add_source_constraint!(model,G,source_map,edge_map,flow,v,t=0)
+    idx = source_map[v][t]
+    if outdegree(G,idx) > 0
+        @constraint(model,1 == sum(flow[_out_edge_idxs(G,edge_map,idx)]))
+    else
+        @warn "vertex $v cannot be a source at time $t--it has no outneighbors"
+    end
+    return model
+end
+"""
+    add_sink_constraint!(model,source_map,flow,v,t=0)
+
+Constrain flow to be equal to 1 leaving vertex `v`, time `t`
+"""
+function add_sink_constraint!(model,G,source_map,edge_map,flow,v,t=0)
+    idx = source_map[v][t]
+    if indegree(G,idx) > 0
+        @constraint(model,1 == sum(flow[_in_edge_idxs(G,edge_map,idx)]))
+    else
+        @warn "vertex $v cannot be a source at time $t--it has no outneighbors"
+    end
+    return model
+end
+
+"""
+    add_capacity_constraint!(model,edge_idx)
+"""
+function add_capacity_constraint!(model,flow,edge_idx,limit=1)
+    @constraint(model, flow[edge_idx] <= limit)
+end
+
+function add_continuity_constraints!(model,G,edge_map,flow,
+    vtx_list=(v for v in vertices(G) if indegree(G,v) > 0 && outdegree(G,v) > 0),
+    )
+    for v in vtx_list
+        in_idxs = _in_edge_idxs(G,edge_map,v)
+        out_idxs = _out_edge_idxs(G,edge_map,v)
+        @constraint(model, sum(flow[in_idxs]) == sum(flow[out_idxs])) # unit capacity edges
+    end
+    #     @constraint(model,1 >= sum(map(vp->flow[vp],outneighbors(G,v)))) # unit capacity edges
+    #     @constraint(model,1 >= sum(map(vp->flow[vp],inneighbors(G,v)))) # unit capacity edges
+    #     if outdegree(G,v) > 0
+    #         @constraint(model,
+    #             flow[v] <= sum(map(vp->flow[vp],outneighbors(G,v))) # No disappearing robots
+    #             )
+    #     end
+    #     if indegree(G,v) > 0
+    #         @constraint(model,
+    #             flow[v] <= sum(map(vp->flow[vp],inneighbors(G,v))) # No appearing robots
+    #             )
+    #     end
+    # end
     return model
 end
 function add_single_transporter_constraint!(model,G,source_map,robot_flow,object_flow,start,goal)
     T = length(source_map[goal])-1
-    for v in vertices(G)
-        if is_bridge_vtx(G,v) || is_stay_vtx(G,v)
-            vtx = get_vtx_from_var(G,v)
+    for (idx,e) in enumerate(edges(G))
+        # edge = edge_val(get_edge(G,e))
+        if is_bridge_edge(G,e) || is_stay_edge(G,e)
+            vtx = get_vtx_from_var(G,e.src)
             if !(vtx == start || vtx == goal)
                 # if object is not at its start or goal, it cannot be without a robot
-                @constraint(model, object_flow[v] <= robot_flow[v])
+                @constraint(model, object_flow[idx] <= robot_flow[idx])
             end
         end
     end
+    # for v in vertices(G)
+    #     if is_bridge_vtx(G,v) || is_stay_vtx(G,v)
+    #         vtx = get_vtx_from_var(G,v)
+    #         if !(vtx == start || vtx == goal)
+    #             # if object is not at its start or goal, it cannot be without a robot
+    #             @constraint(model, object_flow[v] <= robot_flow[v])
+    #         end
+    #     end
+    # end
     return model
 end
 function add_single_object_per_robot_constraints!(model,G,object_flows)
-    for v in vertices(G)
-        if is_movement_vtx(G,v)
+    for (idx,e) in enumerate(edges(G))
+        if is_movement_edge(G,e)
+    # for v in vertices(G)
+    #     if is_movement_vtx(G,v)
             # objects may not overlap on movement vtxs (meaning that robot may not
             # collect multiple objects at once)
-            @constraint(model, sum(flow[v] for flow in values(object_flows)) <= 1)
+            @constraint(model, sum(flow[idx] for flow in values(object_flows)) <= 1)
+            # @constraint(model, sum(flow[v] for flow in values(object_flows)) <= 1)
         end
     end
     return model
 end
 function add_carrying_constraints!(model,G,robot_flow,object_flow)
-    for v in vertices(G)
-        if is_movement_vtx(G,v)
+    for (idx,e) in enumerate(edges(G))
+        if is_movement_edge(G,e)
             # object may not traverse an edge unless it is being carried
-            @constraint(model, object_flow[v] - robot_flow[v] <= 0)
+            @constraint(model, object_flow[idx] - robot_flow[idx] <= 0)
+    # for v in vertices(G)
+    #     if is_movement_vtx(G,v)
+            # object may not traverse an edge unless it is being carried
+            # @constraint(model, object_flow[v] - robot_flow[v] <= 0)
         end
     end
     return model
 end
-function add_precedence_constraints!(model,source_map,inflow,outflow,goal,start,Δt=0)
+function add_precedence_constraints!(model,G,source_map,edge_map,inflow,outflow,goal,start,Δt=0)
     T = length(source_map[goal])-1
     for t in 0:T-(1+Δt) 
         vtx1 = source_map[goal][t]
         vtx2 = source_map[start][t+1+Δt]
-        # if flow1 is not at vtx1, flow2 must still be at vtx2
-        @constraint(model,outflow[vtx2] + inflow[vtx1] >= 1)
+        idxs1 = _in_edge_idxs(G,edge_map,vtx1)
+        idxs2 = _in_edge_idxs(G,edge_map,vtx2)
+        # if inflow is not at vtx1, outflow must still be at vtx2
+        @constraint(model,sum(outflow[idxs2]) + sum(inflow[idxs1]) >= 1)
+        # @constraint(model,outflow[vtx2] + inflow[vtx1] >= 1)
     end
 end
-function add_makespan_constraint!(model,T,flow,source_map,goal,op_duration=0)
+function add_makespan_constraint!(model,T,flow,G,source_map,edge_map,goal,op_duration=0)
     for (t,v) in source_map[goal]
-        @constraint(model,T >= 1+t*(1-flow[v])+op_duration)
+        idxs = _in_edge_idxs(G,edge_map,v)
+        @constraint(model,T >= 1+t*(1-sum(flow[idxs]))+op_duration)
+        # @constraint(model,T >= 1+t*(1-flow[v])+op_duration)
     end
     return model
 end
-function add_total_flow_constraint!(model,source_map,flow,n,t=0)
-    @constraint(model,sum(map(d->flow[d[t]],source_map)) == n)
+function add_total_flow_constraint!(model,G,source_map,edge_map,flow,n,t=0)
+    edge_idxs = (edge_map[Edge(v,vp)] for v in get_all_root_nodes(G) for vp in outneighbors(G,v))
+    @constraint(model,sum(flow[i] for i in edge_idxs) == n)
+    # @constraint(model,sum(map(d->flow[d[t]],source_map)) == n)
 end
 
 struct PCTAPF_MILP
     model::JuMP.Model
-    G::GadgetGraph
+    G::FlowGraph
     source_map::Vector{Dict{Int,Int}}
+    edge_map::Dict{Edge,Int}
     robot_flow::Vector{VariableRef}
     object_flows::Dict{ObjectID,Vector{VariableRef}}
 end
@@ -255,7 +361,9 @@ function extract_flow_path(m::PCTAPF_MILP,flow,v0,t0)
     path = Int[vtx]
     while outdegree(m.G,vtx) > 0
         for vp in outneighbors(m.G,vtx)
-            if flow[vp] == 1
+            # idx = m.edge_map[Edge(vtx,vp)]
+            if flow[m.edge_map[Edge(vtx,vp)]] == 1
+            # if flow[vp] == 1
                 vtx = vp
                 break
             end
@@ -267,8 +375,8 @@ end
 function extract_true_path(m::PCTAPF_MILP,flow_path)
     path = Int[]
     for vtx in flow_path
-        # if get_vtx_from_var(m.G,vtx) > 0
-        if is_bridge_vtx(m.G,vtx)
+        if is_start_vtx(m.G,vtx)
+        # if is_bridge_vtx(m.G,vtx)
             push!(path,get_vtx_from_var(m.G,vtx))
         end
     end
@@ -325,6 +433,7 @@ function formulate_big_milp(prob::PC_TAPF,EXTRA_T=1;
     set_optimizer_attributes(model,default_optimizer_attributes()...)
 
     sched = get_schedule(get_env(prob))
+    route_plan = get_route_plan(get_env(prob))
     robot_ICs = get_robot_ICs(sched)
     object_ICs = get_object_ICs(sched)
     env_graph = convert_env_graph_to_undirected(get_graph(get_env(prob)).graph)
@@ -332,28 +441,30 @@ function formulate_big_milp(prob::PC_TAPF,EXTRA_T=1;
     TMAX = makespan_lower_bound(sched,get_problem_spec(get_env(prob)))+EXTRA_T
     G = construct_gadget_graph(env_graph,TMAX) # for robot flow
     source_map = get_source_map(G,env_graph,TMAX)
+    edge_map = Dict(e=>idx for (idx,e) in enumerate(edges(G)))
     # Robot flows
-    @variable(model,robot_flow[1:nv(G)], binary=true)
+    @variable(model,robot_flow[1:ne(G)], binary=true)
     # Object flows
-    object_flows = Dict(id=>@variable(model,[1:nv(G)], binary=true) for (id,pred) in object_ICs)
+    object_flows = Dict(id=>@variable(model,[1:ne(G)], binary=true) for (id,pred) in object_ICs)
     # Flow constraints
-    add_continuity_constraints!(model,G,robot_flow)
+    add_continuity_constraints!(model,G,edge_map,robot_flow)
     # initial constraints
     for (id,pred) in robot_ICs
         v0 = get_id(get_initial_location_id(pred))
         t0 = Int(round(get_t0(get_env(prob),id)))
-        add_point_constraint!(model,source_map,robot_flow,v0,t0)
+        add_source_constraint!(model,G,source_map,edge_map,robot_flow,v0,t0)
     end
-    add_total_flow_constraint!(model,source_map,robot_flow,length(robot_ICs))
+    add_total_flow_constraint!(model,G,source_map,edge_map,robot_flow,length(robot_ICs))
     # Object constraints
     for (id,pred) in object_ICs
         object_flow = object_flows[id]
-        add_total_flow_constraint!(model,source_map,object_flow,1)
+        add_total_flow_constraint!(model,G,source_map,edge_map,object_flow,1)
         # initial location
         v0 = get_id(get_initial_location_id(pred))
         t0 = Int(round(get_t0(get_env(prob),id)))
-        add_point_constraint!(model,source_map,object_flow,v0,t0)
-        add_continuity_constraints!(model,G,object_flow)
+        # add_point_constraint!(model,source_map,object_flow,v0,t0)
+        add_source_constraint!(model,G,source_map,edge_map,object_flow,v0,t0)
+        add_continuity_constraints!(model,G,edge_map,object_flow)
         add_carrying_constraints!(model,G,robot_flow,object_flow)
     end
     add_single_object_per_robot_constraints!(model,G,object_flows)
@@ -377,7 +488,8 @@ function formulate_big_milp(prob::PC_TAPF,EXTRA_T=1;
                 inflow = object_flows[id1]
                 goal = get_id(get_destination_location_id(o1))
                 # @show string(id1)=>string(id2)
-                add_precedence_constraints!(model,source_map,inflow,outflow,goal,start,duration(op))
+                add_precedence_constraints!(model,G,source_map,edge_map,
+                    inflow,outflow,goal,start,duration(op))
             end
         end
     end
@@ -389,12 +501,13 @@ function formulate_big_milp(prob::PC_TAPF,EXTRA_T=1;
             object_flow = object_flows[id]
             goal = get_id(get_destination_location_id(o))
             # @show string(o)
-            add_point_constraint!(model,source_map,object_flow,goal,TMAX)
-            add_makespan_constraint!(model,T,object_flow,source_map,goal,duration(op))
+            # add_point_constraint!(model,source_map,object_flow,goal,TMAX)
+            add_sink_constraint!(model,G,source_map,edge_map,object_flow,goal,TMAX)
+            add_makespan_constraint!(model,T,object_flow,G,source_map,edge_map,goal,duration(op))
         end
     end
     @objective(model,Min,T)
-    return PCTAPF_MILP(model, G, source_map, robot_flow, object_flows)
+    return PCTAPF_MILP(model, G, source_map, edge_map, robot_flow, object_flows)
 end
 
 
