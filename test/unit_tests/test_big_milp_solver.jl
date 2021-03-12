@@ -67,24 +67,3 @@ let
     # object_path = object_paths[ObjectID(1)]
     # TaskGraphs.extract_solution(prob,milp)
 end
-let 
-    env = Graph(4)
-    for v in vertices(env)
-        add_edge!(env,v,v)
-        add_edge!(env,v,min(v+1,nv(env)))
-    end
-    G = TaskGraphs.construct_gadget_graph(env,1)
-    coords = TaskGraphs._get_layout_coords(G)
-    display_graph(G,coords)
-
-    edge_list = edges(env)
-
-    G = FlowGraph()
-    incoming = zeros(Int,nv(env))
-    outgoing = add_vertex_layer!(G,incoming,0)
-
-    function GraphPlottingBFS.get_layout_coords(G::FlowGraph;kwargs...)
-        TaskGraphs._get_layout_coords(G;kwargs...)
-    end
-
-end

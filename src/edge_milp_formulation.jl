@@ -264,7 +264,6 @@ end
 function add_single_transporter_constraint!(model,G,source_map,robot_flow,object_flow,start,goal)
     T = length(source_map[goal])-1
     for (idx,e) in enumerate(edges(G))
-        # edge = edge_val(get_edge(G,e))
         if is_bridge_edge(G,e) || is_stay_edge(G,e)
             vtx = get_vtx_from_var(G,e.src)
             if !(vtx == start || vtx == goal)
@@ -273,39 +272,26 @@ function add_single_transporter_constraint!(model,G,source_map,robot_flow,object
             end
         end
     end
-    # for v in vertices(G)
-    #     if is_bridge_vtx(G,v) || is_stay_vtx(G,v)
-    #         vtx = get_vtx_from_var(G,v)
-    #         if !(vtx == start || vtx == goal)
-    #             # if object is not at its start or goal, it cannot be without a robot
-    #             @constraint(model, object_flow[v] <= robot_flow[v])
-    #         end
-    #     end
-    # end
     return model
 end
 function add_single_object_per_robot_constraints!(model,G,object_flows)
     for (idx,e) in enumerate(edges(G))
         if is_movement_edge(G,e)
-    # for v in vertices(G)
-    #     if is_movement_vtx(G,v)
             # objects may not overlap on movement vtxs (meaning that robot may not
             # collect multiple objects at once)
             @constraint(model, sum(flow[idx] for flow in values(object_flows)) <= 1)
-            # @constraint(model, sum(flow[v] for flow in values(object_flows)) <= 1)
         end
     end
     return model
 end
-function add_carrying_constraints!(model,G,robot_flow,object_flow)
+function add_carrying_constraints!(model,G,robot_flow,object_flows)
     for (idx,e) in enumerate(edges(G))
         if is_movement_edge(G,e)
+            # simultaneously constrains object motion (must be on a robot to move)
+            # and robot capacity (only one object at a time)
+            @constraint(model, sum(flow[idx] for flow in values(object_flows)) <= robot_flow[idx])
             # object may not traverse an edge unless it is being carried
-            @constraint(model, object_flow[idx] - robot_flow[idx] <= 0)
-    # for v in vertices(G)
-    #     if is_movement_vtx(G,v)
-            # object may not traverse an edge unless it is being carried
-            # @constraint(model, object_flow[v] - robot_flow[v] <= 0)
+            # @constraint(model, object_flow[idx] - robot_flow[idx] <= 0)
         end
     end
     return model
@@ -331,6 +317,7 @@ function add_makespan_constraint!(model,T,flow,G,source_map,edge_map,goal,op_dur
     return model
 end
 function add_total_flow_constraint!(model,G,source_map,edge_map,flow,n,t=0)
+    # ensure that the sum of the flow across a given time step is equal to n
     edge_idxs = (edge_map[Edge(v,vp)] for v in get_all_root_nodes(G) for vp in outneighbors(G,v))
     @constraint(model,sum(flow[i] for i in edge_idxs) == n)
     # @constraint(model,sum(map(d->flow[d[t]],source_map)) == n)
@@ -445,16 +432,20 @@ function formulate_big_milp(prob::PC_TAPF,EXTRA_T=1;
     # Robot flows
     @variable(model,robot_flow[1:ne(G)], binary=true)
     # Object flows
-    object_flows = Dict(id=>@variable(model,[1:ne(G)], binary=true) for (id,pred) in object_ICs)
+    object_flows = Dict(id=>@variable(model, [1:ne(G)], binary=true) for id in keys(object_ICs))
     # Flow constraints
     add_continuity_constraints!(model,G,edge_map,robot_flow)
+    # Total constraints
+    add_total_flow_constraint!(model,G,source_map,edge_map,robot_flow,length(robot_ICs))
+    # Carry constraints
+    add_carrying_constraints!(model,G,robot_flow,object_flows)
+    # add_single_object_per_robot_constraints!(model,G,object_flows)
     # initial constraints
     for (id,pred) in robot_ICs
         v0 = get_id(get_initial_location_id(pred))
         t0 = Int(round(get_t0(get_env(prob),id)))
         add_source_constraint!(model,G,source_map,edge_map,robot_flow,v0,t0)
     end
-    add_total_flow_constraint!(model,G,source_map,edge_map,robot_flow,length(robot_ICs))
     # Object constraints
     for (id,pred) in object_ICs
         object_flow = object_flows[id]
@@ -465,9 +456,8 @@ function formulate_big_milp(prob::PC_TAPF,EXTRA_T=1;
         # add_point_constraint!(model,source_map,object_flow,v0,t0)
         add_source_constraint!(model,G,source_map,edge_map,object_flow,v0,t0)
         add_continuity_constraints!(model,G,edge_map,object_flow)
-        add_carrying_constraints!(model,G,robot_flow,object_flow)
+        # add_carrying_constraints!(model,G,robot_flow,object_flow)
     end
-    add_single_object_per_robot_constraints!(model,G,object_flows)
     for node in get_nodes(sched)
         if matches_template(BOT_CARRY,node)
             pred = node.node
@@ -539,32 +529,18 @@ function extract_solution(prob::PC_TAPF,m::PCTAPF_MILP)
     unmatched_object_ids = Set{ObjectID}(keys(object_paths))
     for (object_id,object_path) in object_paths
         object_id in unmatched_object_ids ? nothing : continue
-        # t_collect = -1
-        # t_deposit = -1
-        # for (t,o_vtx) in zip(Base.Iterators.countfrom(0),object_path)
-        #     if !(o_vtx == object_path[1])
-        #         t_collect = t-1
-        #         break
-        #     end
-        # end
-        # for (t,o_vtx) in zip(Base.Iterators.countfrom(length(object_path)-1,-1),reverse(object_path))
-        #     if !(o_vtx == object_path[end])
-        #         t_deposit = t+1
-        #         break
-        #     end
-        # end
-        # @show t_collect, t_deposit
         for (robot_id,robot_path) in robot_paths
             object_id in unmatched_object_ids ? nothing : continue
             for (t,(r_vtx,o_vtx)) in enumerate(zip(robot_path,object_path)) 
                 if (o_vtx != object_path[1])
                     if r_vtx == o_vtx 
                         assignment = (t,robot_id,object_id)
-                        # @show assignment
+                        # @show string(robot_id), string(object_id), r_vtx, o_vtx, assignment
                         push!(assignments,assignment)
                         delete!(unmatched_object_ids, object_id)
-                        break
                     end
+                    # there must be different robot
+                    break
                 end
             end
         end
@@ -614,25 +590,6 @@ function extract_solution(prob::PC_TAPF,m::PCTAPF_MILP)
         end
     end
     process_schedule!(sched)
-    # for node in node_iterator(sched,topological_sort_by_dfs(sched))
-    #     if matches_template(Union{BOT_COLLECT,BOT_CARRY,BOT_DEPOSIT},node)
-    #         pred = node.node
-    #         robot_path = robot_paths[get_robot_id(pred)]
-    #         for (t,vtx) in enumerate(robot_path)
-    #             t <= get_t0(node) ? continue : nothing
-    #             if vtx == get_id(get_initial_location_id(pred))
-    #                 set_t0!(node,t-1)
-    #                 # for n in node_iterator(sched,inneighbors(sched,node))
-    #                 #     if matches_template(Union{BOT_CARRY,BOT_GO},n)
-    #                 #         set_tF!(n,get_t0(node))
-    #                 #     end
-    #                 # end
-    #                 break
-    #             end
-    #         end
-    #         update_schedule_times!(sched,Set{Int}(get_vtx(sched,node)))
-    #     end
-    # end
     for node in get_nodes(sched)
         if matches_template(Union{BOT_CARRY,BOT_GO},node)
             if outdegree(sched,node) > 0
