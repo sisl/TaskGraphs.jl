@@ -267,7 +267,7 @@ function add_single_transporter_constraint!(model,G,source_map,robot_flow,object
         if is_bridge_edge(G,e) || is_stay_edge(G,e)
             vtx = get_vtx_from_var(G,e.src)
             if !(vtx == start || vtx == goal)
-                # if object is not at its start or goal, it cannot be without a robot
+                # if object not at start or goal, it cannot be without a robot
                 @constraint(model, object_flow[idx] <= robot_flow[idx])
             end
         end
@@ -287,8 +287,9 @@ end
 function add_carrying_constraints!(model,G,robot_flow,object_flows)
     for (idx,e) in enumerate(edges(G))
         if is_movement_edge(G,e)
-            # simultaneously constrains object motion (must be on a robot to move)
-            # and robot capacity (only one object at a time)
+            # simultaneously constrains object motion (must be on a robot to 
+            # move) and robot capacity (only one object at a time). This 
+            # constraint therefore subsumes `add_single_object_per_robot_constraints`
             @constraint(model, sum(flow[idx] for flow in values(object_flows)) <= robot_flow[idx])
             # object may not traverse an edge unless it is being carried
             # @constraint(model, object_flow[idx] - robot_flow[idx] <= 0)
@@ -423,6 +424,15 @@ function formulate_big_milp(prob::PC_TAPF,EXTRA_T=1;
     route_plan = get_route_plan(get_env(prob))
     robot_ICs = get_robot_ICs(sched)
     object_ICs = get_object_ICs(sched)
+    object_starts = Dict{ObjectID,Int}()
+    object_goals = Dict{ObjectID,Int}()
+    for node in get_nodes(sched)
+        if matches_template(BOT_CARRY,node)
+            id = get_object_id(node)
+            object_starts[id] = get_id(get_initial_location_id(node))
+            object_goals[id] = get_id(get_destination_location_id(node))
+        end
+    end
     env_graph = convert_env_graph_to_undirected(get_graph(get_env(prob)).graph)
     # Choose the time horizon to fix for the flow formulation
     TMAX = makespan_lower_bound(sched,get_problem_spec(get_env(prob)))+EXTRA_T
@@ -453,20 +463,11 @@ function formulate_big_milp(prob::PC_TAPF,EXTRA_T=1;
         # initial location
         v0 = get_id(get_initial_location_id(pred))
         t0 = Int(round(get_t0(get_env(prob),id)))
-        # add_point_constraint!(model,source_map,object_flow,v0,t0)
         add_source_constraint!(model,G,source_map,edge_map,object_flow,v0,t0)
         add_continuity_constraints!(model,G,edge_map,object_flow)
-        # add_carrying_constraints!(model,G,robot_flow,object_flow)
-    end
-    for node in get_nodes(sched)
-        if matches_template(BOT_CARRY,node)
-            pred = node.node
-            start = get_id(get_initial_location_id(pred))
-            goal = get_id(get_destination_location_id(pred))
-            id = get_object_id(pred)
-            add_single_transporter_constraint!(model,G,source_map,robot_flow,
-                object_flows[id],start,goal)
-        end
+        add_single_transporter_constraint!(model,G,source_map,robot_flow,
+            object_flow,object_starts[id],object_goals[id])
+        add_sink_constraint!(model,G,source_map,edge_map,object_flow,object_goals[id],TMAX)
     end
     # precedence constraints
     for op in values(get_operations(sched))
@@ -489,10 +490,9 @@ function formulate_big_milp(prob::PC_TAPF,EXTRA_T=1;
         for (id,o) in preconditions(op)
             # makespans
             object_flow = object_flows[id]
-            goal = get_id(get_destination_location_id(o))
+            goal = object_goals[id]
             # @show string(o)
-            # add_point_constraint!(model,source_map,object_flow,goal,TMAX)
-            add_sink_constraint!(model,G,source_map,edge_map,object_flow,goal,TMAX)
+            # add_sink_constraint!(model,G,source_map,edge_map,object_flow,goal,TMAX)
             add_makespan_constraint!(model,T,object_flow,G,source_map,edge_map,goal,duration(op))
         end
     end
