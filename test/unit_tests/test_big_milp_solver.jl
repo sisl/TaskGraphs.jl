@@ -23,6 +23,7 @@ let
                     set_iteration_limit!(solver,1)
                     pc_tapf = f(solver;cost_function=cost_model,verbose=false);
                     env, cost = solve!(solver,pc_tapf)
+                    @test cost[1] == get_cost(env)[1]
                     # @show convert_to_vertex_lists(get_route_plan(env))
                     push!(costs, cost[1])
                     @test validate(env.schedule)
@@ -49,7 +50,7 @@ let
     convert_to_vertex_lists(env.route_plan)
     validate(env.schedule)
 
-    milp = TaskGraphs.formulate_big_milp(prob,solver.EXTRA_T);
+    milp = TaskGraphs.formulate_big_milp(prob;EXTRA_T=get_counter_status(solver.EXTRA_T));
     optimize!(milp)
     @test termination_status(milp) == MOI.OPTIMAL
     robot_paths = TaskGraphs.extract_robot_paths(prob,milp)

@@ -307,7 +307,7 @@ function warmup(loader::TaskGraphsProblemLoader,solver_config,problem_dir,dummy_
             timer_results
             )
         results_dict["problem_file"] = dummy_path
-        write_results(loader,solver_config,prob,prob_path,results_dict)
+        # write_results(loader,solver_config,prob,prob_path,results_dict)
         break
     end
     run(`rm -rf $dummy_path`)

@@ -400,8 +400,10 @@ end
 export BigMILPSolver
 
 @with_kw struct BigMILPSolver <: AbstractPCTAPFSolver
-    EXTRA_T::Int                       = 2
+    # EXTRA_T::Int                       = 2
+    EXTRA_T::GraphUtils.Counter        = GraphUtils.Counter(2)
     LIMIT_EXTRA_T::Int                 = 64
+    direct::Bool                       = false
     logger::SolverLogger{Float64}   = SolverLogger{Float64}()
 end
 
@@ -410,7 +412,10 @@ end
 
 Formulate a PCTAPF problem as a giant network flow MILP.
 """
-function formulate_big_milp(prob::PC_TAPF,EXTRA_T=1;
+function formulate_big_milp(prob::PC_TAPF;
+        EXTRA_T=1,
+        TMAX = makespan_lower_bound(get_schedule(get_env(prob)),
+            get_problem_spec(get_env(prob)))+EXTRA_T,
         direct::Bool = true,
     )
     if direct
@@ -435,7 +440,7 @@ function formulate_big_milp(prob::PC_TAPF,EXTRA_T=1;
     end
     env_graph = convert_env_graph_to_undirected(get_graph(get_env(prob)).graph)
     # Choose the time horizon to fix for the flow formulation
-    TMAX = makespan_lower_bound(sched,get_problem_spec(get_env(prob)))+EXTRA_T
+    # TMAX = makespan_lower_bound(sched,get_problem_spec(get_env(prob)))+EXTRA_T
     G = construct_gadget_graph(env_graph,TMAX) # for robot flow
     source_map = get_source_map(G,env_graph,TMAX)
     edge_map = Dict(e=>idx for (idx,e) in enumerate(edges(G)))
@@ -597,21 +602,27 @@ function extract_solution(prob::PC_TAPF,m::PCTAPF_MILP)
             end
         end
     end
+    update_cost_model!(search_env)
+    set_cost!(search_env,makespan(sched))
     return search_env
 end
 
 function CRCBS.solve!(solver::BigMILPSolver,prob::PC_TAPF)
     set_runtime_limit!(solver,max(0,min(runtime_limit(solver),1000)))
-    EXTRA_T = solver.EXTRA_T
-    milp = formulate_big_milp(prob, EXTRA_T)
+    EXTRA_T = get_counter_status(solver.EXTRA_T)
+    milp = formulate_big_milp(prob; EXTRA_T=EXTRA_T, direct=solver.direct)
     set_time_limit_sec(milp, runtime_limit(solver))
     optimize!(milp)
     while !(primal_status(milp) == MOI.FEASIBLE_POINT)
+        if termination_status(milp) in Set([MOI.TIME_LIMIT, MOI.NODE_LIMIT, MOI.MEMORY_LIMIT, MOI.OTHER_LIMIT])
+            @warn "time or node limit reached: status = $(termination_status(milp))"
+            break
+        end
         @show EXTRA_T = max(EXTRA_T,1) * 2
         if EXTRA_T > solver.LIMIT_EXTRA_T
             break
         end
-        milp = formulate_big_milp(prob, EXTRA_T)
+        milp = formulate_big_milp(prob; EXTRA_T=EXTRA_T, direct=solver.direct)
         set_time_limit_sec(milp, runtime_limit(solver))
         optimize!(milp)
     end
