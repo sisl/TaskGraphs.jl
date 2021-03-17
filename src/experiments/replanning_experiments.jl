@@ -733,7 +733,7 @@ function construct_replanning_results_dataframe(loader,solver_config,feats)
         prob_name = results[:problem_name]
         prob_file = joinpath(solver_config.problem_path,prob_name)
         config = CRCBS.load_config(loader,prob_file)
-        TaskGraphs.post_process_replanning_results!(results,config)
+        TaskGraphs.post_process_replanning_results!(results,config,feats)
         push!(results_df,results;cols=:intersect)
     end
     results_df
@@ -742,7 +742,7 @@ end
 """
     add start_time, completion_time, and makespan for each stage
 """
-function post_process_replanning_results!(results,config)
+function post_process_replanning_results!(results,config,feats)
     M = config[:M]
     results[:backup_planner] = align_stage_results!(results[:primary_planner],results[:backup_planner])
     for k in [:primary_planner,:backup_planner]
@@ -833,6 +833,11 @@ function post_process_replanning_results!(results,config)
     results[:primary_runtimes] = primary_runtimes
     results[:backup_runtimes] = backup_runtimes
     results[:completion_times] = arrival_times .+ makespans
+    for (k,_feat_type) in feats
+        if !haskey(results,k)
+            results[k] = [dict[k] for dict in primary_results]
+        end
+    end
     return results
 end
 

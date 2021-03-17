@@ -1224,7 +1224,7 @@ function build_table(df;
 
     base_idxs = trues(nrow(df))
     if !isempty(include_keys)
-        @show base_idxs = .&(base_idxs, [(df[!,k] .== v) for (k,v) in include_keys]...)
+        base_idxs = .&(base_idxs, [(df[!,k] .== v) for (k,v) in include_keys]...)
     end
     if !isempty(exclude_keys)
         base_idxs = .&(base_idxs, [(df[!,k] .!= v) for (k,v) in exclude_keys]...)
@@ -1242,7 +1242,7 @@ function build_table(df;
         for (j,y) in enumerate(yvals)
             idxs = .&(base_idxs,(df[!,xkey] .== x),(df[!,ykey] .== y))
             # if any(idxs)
-                @show vals = df[idxs,obj]
+                vals = df[idxs,obj]
                 tab.data[i,j] = aggregator(vals)
             # else
             #     tab.data[i,j] = nothing
@@ -1302,8 +1302,22 @@ function print_multi_value_real(io,vals;
         end
     end
 end
-function print_latex_header(io,tab;span=length(get_data(tab)[1,1]),delim=" & ",newline=" \\\\\n",start_char="& ")
-    print(io,"\\begin{tabular}{",map(i->"l ",1:size(tab,2)*span+1)...,"}","\n")
+function print_latex_header(io,tab;
+        span=length(get_data(tab)[1,1]),
+        delim=" & ",
+        newline=" \\\\\n",
+        start_char="& ",
+        group_delim=" | ",
+        )
+    print(io,"\\begin{tabular}{","l ",)#map(i->"l ",1:size(tab,2)*span+1)...,"}","\n")
+    for i in 1:size(tab,2)
+        print(io, group_delim)
+        for j in 1:span
+            print(io,"l ")
+        end
+    end
+    # print(io,"\\begin{tabular}{",map(i->"l ",1:size(tab,2)*span+1)...,"}","\n")
+    print(io,"}","\n")
     print(io,start_char)
     for (j,ykeys) in enumerate(get_ykeys(tab))
         print(io,"\\multicolumn{$span}{c}{",
@@ -1317,9 +1331,9 @@ function print_latex_header(io,tab;span=length(get_data(tab)[1,1]),delim=" & ",n
 end
 function print_latex_row_start(io,tab,i;span=length(get_data(tab)[1,1]),delim=" & ")
     xkeys = get_xkeys(tab)[i]
-    for (k,v) in xkeys
+    for (idx,(k,v)) in enumerate(xkeys)
         print(io,"\$$(k)=$(v)\$")
-        if !isempty(xkeys)
+        if !(idx == length(xkeys))
             print(io,",")
         end
     end
