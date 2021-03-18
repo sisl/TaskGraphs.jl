@@ -1217,8 +1217,10 @@ function build_table(df;
     ykey = :arrival_interval,
     include_keys=[],
     exclude_keys=[],
-    xvals = sort(unique(df[!,xkey])),
-    yvals = sort(unique(df[!,ykey])),
+    xsort_reverse=false,
+    ysort_reverse=false,
+    xvals = sort(unique(df[!,xkey]);rev=xsort_reverse),
+    yvals = sort(unique(df[!,ykey]);rev=ysort_reverse),
     aggregator = vals -> sum(vals)/length(vals),
     )
 
@@ -1230,8 +1232,8 @@ function build_table(df;
         base_idxs = .&(base_idxs, [(df[!,k] .!= v) for (k,v) in exclude_keys]...)
     end
     if !isempty(include_keys) || !isempty(exclude_keys)
-        xvals = sort(unique(df[base_idxs,xkey]))
-        yvals = sort(unique(df[base_idxs,ykey]))
+        xvals = sort(unique(df[base_idxs,xkey]);rev=xsort_reverse)
+        yvals = sort(unique(df[base_idxs,ykey]);rev=ysort_reverse)
     end
 
     xkeys = map(x->Dict(xkey=>x), xvals)

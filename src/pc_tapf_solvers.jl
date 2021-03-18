@@ -129,7 +129,7 @@ function construct_cost_model(trait::NonPrioritized,
         solver, sched, cache, problem_spec, env_graph, primary_objective=SumOfMakeSpans();
         use_conflict_cost::Bool=solver.use_conflict_cost,
         use_slack_cost::Bool=solver.use_slack_cost,
-        extra_T::Int=400)
+        extra_T::Int=2000)
     N = length(get_robot_ICs(sched))
     @assert N > 0 "num_robots should be > 0. We need at least one robot!"
     if use_conflict_cost

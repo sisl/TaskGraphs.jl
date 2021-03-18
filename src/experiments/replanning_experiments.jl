@@ -833,6 +833,7 @@ function post_process_replanning_results!(results,config,feats)
     results[:primary_runtimes] = primary_runtimes
     results[:backup_runtimes] = backup_runtimes
     results[:completion_times] = arrival_times .+ makespans
+    # to incorporate per-stage features like OptimalityGap, etc.
     for (k,_feat_type) in feats
         if !haskey(results,k)
             results[k] = [dict[k] for dict in primary_results]

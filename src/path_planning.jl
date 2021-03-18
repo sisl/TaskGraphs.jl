@@ -591,7 +591,7 @@ function construct_search_env(
         cache::PlanningCache=initialize_planning_cache(sched),
         primary_objective=problem_spec.cost_function,
         ;
-        extra_T=400,
+        extra_T=2000,
         kwargs...
     )
     cost_model, heuristic_model = construct_cost_model(
@@ -631,7 +631,7 @@ function construct_search_env(
         primary_objective = problem_spec.cost_function,
         args...
         ;
-        extra_T=400,
+        extra_T=2000,
         kwargs...
     )
     cost_model, heuristic_model = construct_cost_model(
