@@ -723,8 +723,9 @@ function get_box_plot_group_plot(df;
         xmax=length(inner_range)+1,
         ymin=minimum(df[!,obj]),
         ymax=maximum(df[!,obj]),
-        xtick=[10,20,30,40],
-        xticklabels=[10,20,30,40],
+        xtick=[],
+        # xtick=sort(unique(df[!,inner_key])),
+        xticklabels=xtick,
         tickpos="left",
         ytick=[0.1,1,10,100],
         ylabel_shift="0pt",
@@ -744,17 +745,16 @@ function get_box_plot_group_plot(df;
         legend_x_shift="2pt",
         mark="*",
         axis_bg_color="white",
+        plot_type="boxplot",
     )
     @pgf gp = PGFPlotsX.GroupPlot({group_style = {
                 "group name"="myPlots",
-                "group size"=string(length(outer_range)," by 1"),
+                "group size"="$(length(outer_range)) by 1",
                 "xlabels at"="edge bottom",
                 "xticklabels at"="edge bottom",
                 "vertical sep"="0pt",
                 "horizontal sep"="2pt"
             },
-            boxplot,
-            "boxplot/draw direction"="y",
             ymode=ymode,
             footnotesize,
             width=width,
@@ -769,33 +769,20 @@ function get_box_plot_group_plot(df;
             ytick=ytick,
             yticklabels=[],
             "axis background/.style"="{fill=$axis_bg_color}",
-            # "set layers"="standard",
             "ylabel shift"=ylabel_shift,
             "ytick align"="outside",
             "xtick align"="outside",
-            # "legend entries"={map(j->@sprintf("\$%s\$",ylabels[j]),1:length(inner_range))...},
-            # "legend cell align"="left",
-            # "legend to name"="grouplegend",
-            # "legend style"={
-            #     draw=legend_draw,
-            #     fill=legend_fill,
-            #     xshift=legend_x_shift,
-            #     "inner sep"="1pt",
-            #     yshift="0pt",
-            #     font="\\scriptsize"
-            # },
-            # "legend pos"="north west"
         }
 
         );
+        
+        if plot_type == "boxplot"
+            gp.options[plot_type] = nothing
+            gp.options["boxplot/draw_direction"] = "y"
+        end
 
     @pgf for (i,m) in enumerate(outer_range)
         if i == 1 && draw_labels
-            # push!(gp,
-            #     """
-            #     \\coordinate (leg) at (rel axis cs:0,1);
-            #     """
-            # )
             push!(gp,
                 {xlabel=@sprintf("\$%s\$",xlabels[i]),
                 ylabel=ylabel,
@@ -809,23 +796,40 @@ function get_box_plot_group_plot(df;
                 },
                 map(j->PGFPlotsX.LegendEntry({},@sprintf("\$%s\$",ylabels[j]),false),1:length(inner_range))...,
                 """
-                \\addlegendimage{no markers,blue}
-                \\addlegendimage{no markers,red}
-                \\addlegendimage{no markers,brown}
-                \\addlegendimage{no markers,black}
+                \\addlegendimage{only marks, blue}
+                \\addlegendimage{only marks, red}
+                \\addlegendimage{only marks, brown}
+                \\addlegendimage{only marks, black}
                 """,
-                map(n->PGFPlotsX.PlotInc({boxplot,mark=mark},PGFPlotsX.Table(
-                            {"y index"=0},
-                            [:data=>df[(df[:,outer_key] .== m) .& (df[:,inner_key] .== n),obj]])),inner_range)...)
+                # """
+                # \\addlegendimage{no markers,blue}
+                # \\addlegendimage{no markers,red}
+                # \\addlegendimage{no markers,brown}
+                # \\addlegendimage{no markers,black}
+                # """,
+            )
         else
             push!(gp, {
                     xlabel=@sprintf("\$%s\$",xlabels[i]),
                     ymajorticks="false",
                     yminorticks="false"
-                },
-                map(n->PGFPlotsX.PlotInc({boxplot,mark=mark},PGFPlotsX.Table(
-                            {"y index"=0},
-                            [:data=>df[(df[:,outer_key] .== m) .& (df[:,inner_key] .== n),obj]])),inner_range)...)
+                })
+        end
+        for (i,n) in enumerate(inner_range)
+            y = df[(df[:,outer_key] .== m) .& (df[:,inner_key] .== n),obj]
+            if plot_type == "boxplot"
+                p = PGFPlotsX.PlotInc({boxplot,mark=mark},PGFPlotsX.Table(
+                    {"y index"=0},
+                    [:data=>y]
+                    )
+                )
+            else
+                p = PGFPlotsX.PlotInc({"only marks",mark=mark},PGFPlotsX.Table(
+                    [:x=>[i for _ in y],:y=>y]
+                    )
+                )
+            end
+            push!(gp,p)
         end
     end;
     gp

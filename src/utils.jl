@@ -192,11 +192,15 @@ function construct_task_graphs_problem(
         Δt_deposit=zeros(length(sF)),
         cost_function=SumOfMakeSpans(),
         task_shapes=map(o->(1,1),s0),
-        shape_dict=Dict{Int,Dict{Tuple{Int,Int},Vector{Int}}}(s=>Dict{Tuple{Int,Int},Vector{Int}}() for s in vcat(s0,sF))
+        shape_dict=Dict{Int,Dict{Tuple{Int,Int},Vector{Int}}}(
+            s=>Dict{Tuple{Int,Int},Vector{Int}}() for s in vcat(s0,sF)
+            )
         ) 
     N = length(r0)
     M = length(s0)
     for j in 1:M
+        get!(shape_dict,s0[j],Dict{Tuple{Int,Int},Vector{Int}}())
+        get!(shape_dict,sF[j],Dict{Tuple{Int,Int},Vector{Int}}())
         @assert haskey(shape_dict, s0[j]) "shape_dict has no key for s0[$j] = $(s0[j])"
         @assert haskey(shape_dict, sF[j]) "shape_dict has no key for sF[$j] = $(sF[j])"
         @assert length(task_shapes) >= j "task_shapes has no key for j = $j"
