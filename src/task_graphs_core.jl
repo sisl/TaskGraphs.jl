@@ -935,7 +935,7 @@ function add_headless_team_delivery_task!(
         ) where {R<:AbstractRobotType}
 
     robot_id = BotID{R}(-1)
-    @assert length(pickup_station_ids) == length(dropoff_station_ids)
+    @assert length(pickup_station_ids) == length(dropoff_station_ids) "$(summary(object_id)): pickup_station_ids = $(pickup_station_ids), but dropoff_station_ids = $(dropoff_station_ids)"
     n = length(pickup_station_ids)
 
     object_node = get_node_from_id(sched,object_id)

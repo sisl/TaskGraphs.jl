@@ -36,11 +36,8 @@ function CRCBS.pibt_priority_law(solver,pc_mapf::PC_MAPF,cache,i)
     env = CRCBS.get_envs(cache)[i]
     return (
         ~CRCBS.is_valid(env,get_goal(env)),
-        ~isa(get_node(env),DEPOSIT),
-        ~isa(get_node(env),CARRY),
-        ~isa(get_node(env),COLLECT),
-        # minimum(cache.solution.cache.slack[get_vtx(
-        #     cache.solution.schedule,env.node_id)]),
+        # ~isa(get_node(env),DEPOSIT),~isa(get_node(env),CARRY),~isa(get_node(env),COLLECT),
+        ~isa(get_node(env),DEPOSIT),~isa(get_node(env),COLLECT),~isa(get_node(env),CARRY),
         minimum(get_slack(cache.solution,env.node_id)),
         -CRCBS.get_timers(cache)[i],
         i

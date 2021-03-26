@@ -1044,12 +1044,12 @@ function random_pctapf_def(env::GridFactoryEnvironment,
 
     r0,s0,sF = get_random_problem_instantiation(N,M,get_pickup_zones(env),
         get_dropoff_zones(env),get_free_zones(env))
+    shapes = choose_random_object_sizes(M,Dict(task_sizes...))
     project_spec = construct_random_project_spec(M,s0,sF;
         max_parents=max_parents,
         depth_bias=depth_bias,
         Δt_min=dt_min,
         Δt_max=dt_max)
-    shapes = choose_random_object_sizes(M,Dict(task_sizes...))
     problem_def = SimpleProblemDef(project_spec,r0,s0,sF,shapes)
 end
 function random_multihead_pctapf_def(env::GridFactoryEnvironment,

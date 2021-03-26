@@ -1366,9 +1366,40 @@ function construct_schedule_distance_matrix(sched,problem_spec)
     D
 end
 
+function update_greedy_sets_vectors!(model,G,cache,Ai=falses(nv(G)),Ao=falses(nv(G)),C=falses(nv(G));
+        frontier::Vector{Bool}=map(v->indegree(G,v)==0,vertices(G)),
+        )
+    # TODO greedy sets should be boolean vectors instead of sets. Much more efficient
+    frontier_idxs = findall(frontier)
+    while !isempty(frontier_idxs)
+        v = pop!(frontier_idxs)
+        if frontier[v]
+            frontier[v] = false
+        else
+            continue
+        end
+        if all((C[vp] for vp in inneighbors(G,v)))
+            if indegree(G,v) >= cache.n_required_predecessors[v]
+                C[v] = true
+                for vp in outneighbors(G,v)
+                    frontier[vp] = true
+                end
+                append(frontier_idxs,outneighbors(G,v))
+            else
+                Ai[v] = true
+            end
+        end
+        if (outdegree(G,v) < cache.n_eligible_successors[v]) && C[v]
+            Ao[v] = true
+        end
+    end
+    return Ai, Ao, C
+end
+
 function update_greedy_sets!(model,G,cache,Ai=Set{Int}(),Ao=Set{Int}(),C=Set{Int}();
         frontier::Set{Int}=get_all_root_nodes(G),
         )
+    # TODO greedy sets should be boolean vectors instead of sets. Much more efficient
     while !isempty(frontier)
         v = pop!(frontier)
         if issubset(inneighbors(G,v),C)
@@ -1392,6 +1423,7 @@ get_edge_cost(::GreedyFinalTimeCost,model,D,v,v2) = get_tF(model.schedule,v) + D
 update_greedy_cost_model!(::GreedyCost,model,new_edges) = nothing
 update_greedy_cost_model!(model::AbstractGreedyAssignment,args...) = update_greedy_cost_model!(model.greedy_cost,model,args...) 
 function update_greedy_cost_model!(::GreedyFinalTimeCost,model,new_edges) 
+    # @info "Updating GreedyFinalTimeCost"
     update_schedule_times!(
         model.schedule,
         Set{Int}([e[1] for e in new_edges]),
@@ -1471,10 +1503,13 @@ function greedy_assignment!(model)
         for (v,v2) in new_edges
             setdiff!(Ao,v)
             setdiff!(Ai,v2)
+            # Ao[v] = false
+            # Ai[v] = false
             add_edge!(sched,v,v2)
             # @info "$(string(node_id(get_node(sched,v)))), $(string(node_id(entity(get_node(sched,v))))) => $(string(node_id(get_node(sched,v2)))), $(string(node_id(entity(get_node(sched,v2)))))"
         end
         update_greedy_sets!(model,sched,cache,Ai,Ao,C;frontier=Set{Int}([e[1] for e in new_edges]))
+        # update_greedy_sets_vector!(model,sched,cache,Ai,Ao,C;frontier=Set{Int}([e[1] for e in new_edges]))
         update_greedy_cost_model!(model,new_edges)
     end
     set_leaf_operation_vtxs!(sched)
