@@ -88,14 +88,15 @@ function CRCBS.pibt_update_envs!(solver,pc_mapf::PC_MAPF,cache)
     while true
         done = true
         for (i,p) in enumerate(get_paths(solution))
-            v_next = get_next_vtx_matching_agent_id(solution,RobotID(i))
-            if has_vertex(solution.schedule,v_next)
-                # rebuild env to ensure that the goal time is up to date
-                CRCBS.get_envs(cache)[i] = build_env(solver,pc_mapf,solution,node,AgentID(i))
-            end
             env = CRCBS.get_envs(cache)[i]
             v = get_vtx(solution.schedule,env.node_id)
             sp = get_final_state(p)
+            v_next = get_next_vtx_matching_agent_id(solution,RobotID(i))
+            if has_vertex(solution.schedule,v_next) && is_goal(env,sp)
+                # rebuild env to ensure that the goal time is up to date
+                CRCBS.get_envs(cache)[i] = build_env(solver,pc_mapf,solution,node,AgentID(i))
+                env = CRCBS.get_envs(cache)[i]
+            end
             if (v in solution.cache.active_set) && is_goal(env,sp) && CRCBS.is_valid(env,get_goal(env))
                 done = false
                 update_env!(solver,solution,v,p)
