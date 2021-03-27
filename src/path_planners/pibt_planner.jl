@@ -92,7 +92,10 @@ function CRCBS.pibt_update_envs!(solver,pc_mapf::PC_MAPF,cache)
             v = get_vtx(solution.schedule,env.node_id)
             sp = get_final_state(p)
             v_next = get_next_vtx_matching_agent_id(solution,RobotID(i))
-            if has_vertex(solution.schedule,v_next) && is_goal(env,sp)
+            # NOTE: Adding the "is_goal" condition below sometimes causes PIBT 
+            # to allow robots to begin DEPOSIT tasks before they are in place. 
+            # No idea why, but for now: DO NOT TOUCH!
+            if has_vertex(solution.schedule,v_next) #&& is_goal(env,sp) 
                 # rebuild env to ensure that the goal time is up to date
                 CRCBS.get_envs(cache)[i] = build_env(solver,pc_mapf,solution,node,AgentID(i))
                 env = CRCBS.get_envs(cache)[i]

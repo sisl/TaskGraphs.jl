@@ -284,11 +284,14 @@ function prune_schedule(sched::OperatingSchedule,
     end
     # Initialize new cache
     # draw new ROBOT_AT -> GO edges where necessary
+    _robot_ids_replaced = Set{RobotID}()
     for v in vertices(new_sched)
         node = get_node(new_sched, v)
         pred = node.node
         if isa(pred,BOT_GO) && indegree(new_sched,v) == 0
             robot_id = get_robot_id(pred)
+            @assert !(robot_id in _robot_ids_replaced) "Already replaced ROBOT_AT node for $(summary(robot_id))"
+            push!(_robot_ids_replaced,robot_id)
             robot_node = replace_in_schedule!(new_sched, BOT_AT(robot_id, pred.x1), robot_id)
             set_t0!(robot_node,get_t0(node))
             add_edge!(new_sched, robot_node, node)
@@ -600,13 +603,17 @@ function get_commit_time(replan_model::ReassignFreeRobots, search_env, request, 
     max(request.t_request + commit_threshold,free_time)
 end
 function get_commit_time(replan_model::ConstrainedMergeAndBalance, search_env, request, commit_threshold)
-    nv_max = replan_model.max_problem_size - nv(request.schedule)
+    nv_max = max(1,replan_model.max_problem_size - nv(request.schedule))
     t_commit = request.t_request + commit_threshold
     sched = get_schedule(search_env)
     # constrain the total number of unfrozen nodes
     if replan_model.constrain_nodes
+        old_t_commit = t_commit
         if 0 < nv_max < nv(sched)
             t_commit = max(t_commit, sort(get_tF(sched); rev=true)[nv_max])
+        end
+        if old_t_commit != t_commit
+            @info "Bumping t_commit from $(old_t_commit) to $(t_commit) to respect ConstrainedMergeAndBalance.max_problem_size = $(replan_model.max_tasks)"
         end
     end
     # constrain the total number of delivery tasks
@@ -619,11 +626,12 @@ function get_commit_time(replan_model::ConstrainedMergeAndBalance, search_env, r
         end
         for n in node_iterator(sched,reverse(sortperm(get_tF(sched))))
             if matches_template(BOT_COLLECT,n)
+                n_tasks += 1
                 if n_tasks > replan_model.max_tasks || get_tF(n) <= t_commit
                     old_t_commit = t_commit
                     t_commit = max(t_commit, get_tF(n))
                     if old_t_commit != t_commit
-                        @info "Bumping t_commit from $(old_t_commit) to $(t_commit) to respect ConstrainedMergeAndBalance.max_tasks ($(replan_model.max_tasks))"
+                        @info "Bumping t_commit from $(old_t_commit) to $(t_commit) to respect ConstrainedMergeAndBalance.max_tasks = $(replan_model.max_tasks)"
                     end
                     break
                 end

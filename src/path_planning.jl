@@ -426,8 +426,6 @@ function get_next_vtx_matching_agent_id(env::SearchEnv,agent_id)
         n = get_node(get_schedule(env),v)
         has_robot_id(n) ? nothing : continue
         if agent_id == get_robot_id(n)
-        # if agent_id == get_path_spec(get_schedule(env), v).agent_id
-        # if agent_id == get_robot_id(get_node_from_vtx(get_schedule(env), v))
             return v
         end
     end

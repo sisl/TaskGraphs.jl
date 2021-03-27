@@ -1209,6 +1209,39 @@ Base.size(tab::ResultsTable) = size(get_data(tab))
 Base.size(tab::ResultsTable,dim) = size(get_data(tab),dim)
 Base.transpose(tab::ResultsTable) = ResultsTable(get_ykeys(tab),get_xkeys(tab),transpose(get_data(tab)))
 
+_dict_vec(d::Dict) = Vector{Dict{Any,Any}}([d])
+_dict_vec(d::Vector) = d
+Base.getindex(tab::ResultsTable,idxs1,idxs2) = ResultsTable(
+    _dict_vec(tab.xkeys[idxs1]),
+    _dict_vec(tab.ykeys[idxs2]),
+    Matrix{Any}(reshape([tab.data[idxs1,idxs2]...],(length(idxs1),length(idxs2)))),
+    )
+function index_by_keys(tab::ResultsTable,include_keys::Dict=Dict(),exclude_keys::Dict=Dict())
+    x_idxs = Int[]
+    y_idxs = Int[]
+    for (idxs,keylist) in [(x_idxs,get_xkeys(tab)),(y_idxs,get_ykeys(tab))]
+        for (i,dict) in enumerate(keylist)
+            keep = true
+            for (k,v) in dict 
+                if haskey(include_keys,k) && !(v in include_keys[k])
+                    keep = false
+                    break
+                end
+                if haskey(exclude_keys,k) && (v in exclude_keys[k])
+                    keep = false
+                    break
+                end
+            end
+            if keep
+                push!(idxs,i)
+            end
+        end
+    end
+    tab[x_idxs,y_idxs]
+end
+
+
+
 """
     build_table
 
