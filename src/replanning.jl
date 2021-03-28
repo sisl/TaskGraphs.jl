@@ -714,6 +714,7 @@ function replan!(solver, replan_model, search_env, request;
     # Freeze route_plan and schedule at t_commit
     t_commit = get_commit_time(replan_model, search_env, request, commit_threshold)
     t_final = minimum(map(length, get_paths(get_route_plan(search_env))))
+    @assert(all(length(p) == t_final for p in get_paths(get_route_plan(search_env))))
     t_split = min(t_commit,t_final)
     # @info "t_commit" t_commit t_split
 
@@ -721,11 +722,11 @@ function replan!(solver, replan_model, search_env, request;
     reset_solver!(solver)
     set_time_limits!(replan_model,solver,t_request,t_commit)
     # Update operating schedule
-    # new_sched = prune_schedule(replan_model,search_env,t_split) # Maybe this should be at t_request instead?
+    new_sched = prune_schedule(replan_model,search_env,t_split) # Maybe this should be at t_request instead?
     # NOTE If we prune at t_commit or t_split, we may actually cut out unfinished
     # nodes when using ReassignFreeRobots. Ideally, ReassignFreeRobots would prune at the earliest free time
     # NOTE again -- actually, the above is not true. ReassignFreeRobots only increases t_commit to the earliest free node.
-    new_sched = prune_schedule(replan_model,search_env,min(t_split,t_request)) # Maybe this should be at t_request instead?
+    # new_sched = prune_schedule(replan_model,search_env,min(t_split,t_request)) # Maybe this should be at t_request instead?
     @assert sanity_check(new_sched," after prune_schedule()")
     # split active nodes
     # new_sched = split_active_vtxs!(replan_model,new_sched,problem_spec,t_split;robot_positions=robot_positions)
