@@ -78,7 +78,6 @@ let
             rp,
             base_env,request
         )
-        @show max_tasks, tc
     end
     for max_problem_size in 20:30
         rp = ConstrainedMergeAndBalance(max_problem_size=max_problem_size,constrain_nodes=true)
@@ -87,10 +86,7 @@ let
             rp,
             base_env,request
         )
-        @show max_problem_size, tc
     end
-
-
 end
 let 
     reset_all_id_counters!()
@@ -196,7 +192,7 @@ let
         replanner = MergeAndBalance()
     )
     set_real_time_flag!(planner,false) # turn off real-time op constraints
-    # set_commit_threshold!(replan_model,40) # setting high commit threshold to allow for warmup
+    # set_commit_threshold!(replan_model,4) # setting high commit threshold to allow for warmup
     prob = replanning_problem_1(planner.solver)
     env = prob.env
     stage = 0
@@ -211,6 +207,42 @@ let
         @test get_t0(base_env,node) >= get_commit_time(planner,env,request)
     end
     # env, cost = solve!(planner.solver,PC_TAPF(base_env))
+end
+# test ReassignFreeRobots
+let
+
+    planner = FullReplanner(
+        solver = NBSSolver(assignment_model=
+            TaskGraphsMILPSolver(ExtendedAssignmentMILP())),
+        replanner = ReassignFreeRobots(),
+    )
+    set_real_time_flag!(planner,false) # turn off real-time op constraints
+    set_commit_threshold!(planner,1)
+    prob = replanning_problem_1(planner.solver)
+    env = prob.env
+    stage = 0
+    t = 1
+
+    search_env = env
+    stage += 1
+    t += 1
+    if stage > length(prob.requests)
+        stage = 1
+    end
+    request = prob.requests[stage]
+    request = ProjectRequest(request.schedule,t,t)
+    remap_object_ids!(request.schedule,env.schedule)
+    base_env = replan!(planner,env,request)
+    @show get_commit_time(planner.replanner,base_env,request) 
+    @test get_commit_time(planner.replanner,base_env,request) >= minimum(get_t0(n) for n in get_nodes(get_schedule(base_env)) if matches_template(BOT_GO,n) && get_id(get_destination_location_id(n)) == -1)
+
+    env, cost = solve!(planner.solver,PC_TAPF(base_env))
+    @show optimality_gap(planner.solver)
+    plt1 = display_graph(base_env.schedule,scale=2,aspect_stretch=(2.5,1.0),pad=(1.0,1.0))
+    ctx1 = build_frame(plt1)
+    plt2 = display_graph(env.schedule,scale=2,aspect_stretch=(2.5,1.0),pad=(1.0,1.0))
+    ctx2 = build_frame(plt2)
+    hstack_canvases(ctx1,ctx2)
 end
 let
 

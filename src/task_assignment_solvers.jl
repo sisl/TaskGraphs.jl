@@ -129,11 +129,13 @@ function formulate_milp(milp_model::AssignmentMILP,
     @constraint(model, X * ones(M) .<= 1)         # each robot may have no more than 1 task
     @constraint(model, X' * ones(N+M) .== 1)     # each task must have exactly 1 assignment
     for (id,node) in robot_ics # robot start times
-        @constraint(model, tr0[robot_map[id]] == get_t0(node))
+        # @constraint(model, tr0[robot_map[id]] == get_t0(node))
+        @constraint(model, tr0[robot_map[id]] == get_tF(node))
     end
     for (id,node) in object_ics # task start times
         if is_root_node(sched,id) # only applies to root tasks (with no prereqs)
-            @constraint(model, to0[object_map[id]] == get_t0(node))
+            # @constraint(model, to0[object_map[id]] == get_t0(node))
+            @constraint(model, to0[object_map[id]] == get_tF(node))
         end
     end
     precedence_graph = CustomNDiGraph{Nothing,ObjectID}()
@@ -256,6 +258,7 @@ function formulate_milp(milp_model::ExtendedAssignmentMILP,
             sF[object_map[get_object_id(n)]] = get_id(get_destination_location_id(n))
         end
     end
+    @assert all(sF .> 0) "sF should be a list of valid vtx ids, but some of these are invalid: $sF"
     # from ProblemSpec
     D = (x,y) -> get_distance(problem_spec,x,y)
     

@@ -1293,12 +1293,18 @@ function build_table(df;
     # return ResultsTable(xkeys, ykeys, tab)
     return tab
 end
-function table_product(tables,mode=:horizontal)
+function table_product(tables;
+        mode=:horizontal,
+        # _xheader_keys=[Dict() for i in 1:length(tables)],
+        # _yheader_keys=[Dict() for j in 1:length(tables)],
+    )
     @assert length(unique(size.(tables))) == 1 "All tables must have same dimensions"
     if mode == :horizontal
         data = collect(zip(map(get_data, tables)...))
         xkeys = map(tup->merge(tup...), collect(zip(map(get_xkeys, tables)...)))
+        # xkeys = [merge(a,b) for (a,b) in zip(_xkeys,_xheader_keys)]
         ykeys = map(tup->merge(tup...), collect(zip(map(get_ykeys, tables)...)))
+        # ykeys = [merge(a,b) for (a,b) in zip(_ykeys,_yheader_keys)]
         return ResultsTable(xkeys,ykeys,data)
     else
         return transpose(table_product(map(transpose,tables),:horizontal))
@@ -1307,9 +1313,23 @@ end
 function table_reduce(table,op)
     return ResultsTable(get_xkeys(table),get_ykeys(table),map(op,get_data(table)))
 end
+function flatten_table(tab;
+        axis = :y,
+        _header_keys = Dict(), 
+    )
+    if axis == :y
+        data = reshape(vcat([tab.data[:,j] for j in 1:size(tab,2)]...),prod(size(tab)),1)
+        xkeys = [[merge(xk,yk) for (i,xk) in enumerate(get_xkeys(tab)), (j,yk) in enumerate(get_ykeys(tab))]...]
+        ykeys = [_header_keys]
+        return ResultsTable(xkeys,ykeys,data)
+    else
+        return transpose(flatten_table(transpose(tab);axis=:y,_header_keys=_header_keys))
+    end
+end
 """ utility for printing real-valued elements of a table """
 function print_real(io,v;
         precision=3,
+        kwargs...,
         )
     if isa(v,Int)
         print(io,v)
@@ -1327,7 +1347,11 @@ function print_multi_value_real(io,vals;
         comp_func=vals->-1,
         kwargs...)
     best_idx = comp_func(vals)
-    best_idxs = findall(vals .== vals[best_idx])
+    if 1 <= best_idx <= length(vals) 
+        best_idxs = findall(vals .== vals[best_idx])
+    else
+        best_idxs = []
+    end
     for (i,v) in enumerate(vals)
         print(io,surround[1])
         i in best_idxs ? print(io,"\\textbf{") : nothing
@@ -1341,22 +1365,37 @@ function print_multi_value_real(io,vals;
         end
     end
 end
+print_multi_value_real(io,v::Real;kwargs...) = print_real(io,v;kwargs...)
+span_length(::Real) = 1
+span_length(v::Union{Vector,Tuple}) = length(v)
+span_length(::ResultsTable) = 1
+span_length(::String) = 1
 function print_latex_header(io,tab;
-        span=length(get_data(tab)[1,1]),
+        span=span_length(get_data(tab)[1,1]),
         delim=" & ",
         newline=" \\\\\n",
         start_char="& ",
         group_delim=" | ",
+        kwargs...
         )
-    print(io,"\\begin{tabular}{","l ",)#map(i->"l ",1:size(tab,2)*span+1)...,"}","\n")
+    print(io,"\\begin{tabular}{","l ",)
     for i in 1:size(tab,2)
         print(io, group_delim)
         for j in 1:span
             print(io,"l ")
         end
     end
-    # print(io,"\\begin{tabular}{",map(i->"l ",1:size(tab,2)*span+1)...,"}","\n")
     print(io,"}","\n")
+end
+function print_latex_column_labels(io,tab;
+        span=span_length(get_data(tab)[1,1]),
+        delim=" & ",
+        newline=" \\\\\n",
+        start_char="& ",
+        group_delim=" | ",
+        kwargs...
+    )
+    # labels
     print(io,start_char)
     for (j,ykeys) in enumerate(get_ykeys(tab))
         print(io,"\\multicolumn{$span}{c}{",
@@ -1368,7 +1407,10 @@ function print_latex_header(io,tab;
         end
     end
 end
-function print_latex_row_start(io,tab,i;span=length(get_data(tab)[1,1]),delim=" & ")
+function print_latex_row_start(io,tab,i;
+        delim=" & ",
+        kwargs...
+        )
     xkeys = get_xkeys(tab)[i]
     for (idx,(k,v)) in enumerate(xkeys)
         print(io,"\$$(k)=$(v)\$")
@@ -1376,36 +1418,107 @@ function print_latex_row_start(io,tab,i;span=length(get_data(tab)[1,1]),delim=" 
             print(io,",")
         end
     end
-    # print(io,["\$$(k)=$(v)\$" for (k,v) in xkeys]...)
     print(io,delim)
 end
 function write_tex_table(io,tab;
-        delim = " & ",
-        newline = " \\\\\n",
-        print_func = (io,v) -> print_real(io,v),
+        delim=" & ",
+        newline=" \\\\\n",
+        # print_func = (io,v) -> print_real(io,v),
+        print_func = print_multi_value_real,
         header_printer = print_latex_header,
         row_start_printer = print_latex_row_start,
+        print_header=true,
+        print_column_labels=true,
+        print_row_start=true,
+        print_footer=true,
         kwargs...,
     )
-    header_printer(io,tab)
+    if print_header
+        header_printer(io,tab)
+    end
+    if print_column_labels
+        print_latex_column_labels(io,tab;kwargs...)
+    end
     for (i,xkeys) in enumerate(get_xkeys(tab))
-        row_start_printer(io,tab,i)
+        if print_row_start
+            row_start_printer(io,tab,i)
+        end
         for (j,ykeys) in enumerate(get_ykeys(tab))
             print_func(io,get_data(tab)[i,j];kwargs...)
             if j < size(tab,2)
                 print(io,delim)
             else
-                print(io,newline)
+                if i < size(tab,1)
+                    print(io,newline)
+                else
+                    print(io, "\n")
+                end
             end
         end
     end
-    print(io,"\\end{tabular}")
+    if print_footer
+        print(io,"\\end{tabular}")
+    end
 end
 function write_tex_table(fname::String,args...;kwargs...)
     open(fname,"w") do io
         write_tex_table(io,args...;kwargs...)
     end
 end
+
+print_nested_tex_table(io,tab::ResultsTable;kwargs...,) = write_nested_tex_table(io,tab;kwargs...)
+print_nested_tex_table(io,data;print_func = print_multi_value_real,kwargs...,) = print_func(io,data;kwargs...)
+print_nested_tex_table(io,data::String;kwargs...,) = print(io,data)
+function write_nested_tex_table(f::String,tab;kwargs...)
+    open(f,"w") do io
+        write_nested_tex_table(io,tab;kwargs...)
+    end
+end
+function write_nested_tex_table(io,tab;
+        delim=" & ",
+        newline=" \\\\\n",
+        print_func = print_nested_tex_table,
+        header_printer = print_latex_header,
+        row_start_printer = print_latex_row_start,
+        print_header=true,
+        print_column_labels=true,
+        print_row_start=true,
+        print_footer=true,
+        kwargs...,
+    )
+    if print_header
+        header_printer(io,tab)
+    end
+    if print_column_labels
+        print_latex_column_labels(io,tab;kwargs...)
+    end
+    for (i,xkeys) in enumerate(get_xkeys(tab))
+        if print_row_start
+            row_start_printer(io,tab,i)
+        else
+            print(io,delim)
+        end
+        for (j,ykeys) in enumerate(get_ykeys(tab))
+            print_func(io,get_data(tab)[i,j];
+                print_column_labels = (i == 1),
+                print_row_start = (j == 1),
+                kwargs...)
+            if j < size(tab,2)
+                print(io,delim)
+            else
+                if i < size(tab,1)
+                    print(io,newline)
+                else
+                    print(io, "\n")
+                end
+            end
+        end
+    end
+    if print_footer
+        print(io,"\\end{tabular}")
+    end
+end
+
 
 # For rendering the factory floor as a custom ImageAppearance in Webots
 function caution_tape(d,n;yellow_color=RGB(0.8,0.7,0.0),black_color=RGB(0.0,0.0,0.0))
@@ -1514,20 +1627,28 @@ GraphPlottingBFS._title_string(n::BOT_AT)       = _title_mode(n) == :TYPE ? "R" 
 for op in (
     :(GraphPlottingBFS._node_shape),
     :(GraphPlottingBFS._node_color),
+    # :(GraphPlottingBFS._node_bg_color),
     :(GraphPlottingBFS._title_string),
-    :(GraphPlottingBFS._subtitle_string),
-    :(GraphPlottingBFS.draw_node)
+    :(GraphPlottingBFS._text_color),
+    :(GraphPlottingBFS._subtitle_text_scale),
+    # :(GraphPlottingBFS._subtitle_string),
+    # :(GraphPlottingBFS.draw_node)
     )
     @eval $op(n::ScheduleNode,args...) = $op(n.node,args...)
 end
 
-# GraphPlottingBFS._subtitle_string(n::AbstractPlanningPredicate) = "$(get_id(node_id(n)))"
-GraphPlottingBFS._subtitle_string(n::BOT_AT)        = _subtitle_mode(n) == :INFO ? "r$(get_id(get_robot_id(n))),x$(get_id(get_initial_location_id(n)))" : ""
-GraphPlottingBFS._subtitle_string(n::OBJECT_AT)     = _subtitle_mode(n) == :INFO ? "o$(get_id(get_object_id(n))),x$(get_id(get_initial_location_id(n)))" : ""
-GraphPlottingBFS._subtitle_string(n::BOT_GO)        = _subtitle_mode(n) == :INFO ? "r$(get_id(get_robot_id(n))),x$(get_id(get_initial_location_id(n)))=>x$(get_id(get_destination_location_id(n)))" : ""
-GraphPlottingBFS._subtitle_string(n::BOT_COLLECT)   = _subtitle_mode(n) == :INFO ? "r$(get_id(get_robot_id(n))),o$(get_id(get_object_id(n))),x$(get_id(get_initial_location_id(n)))" : ""
-GraphPlottingBFS._subtitle_string(n::BOT_DEPOSIT)   = _subtitle_mode(n) == :INFO ? "r$(get_id(get_robot_id(n))),o$(get_id(get_object_id(n))),x$(get_id(get_initial_location_id(n)))" : ""
-GraphPlottingBFS._subtitle_string(n::BOT_CARRY)     = _subtitle_mode(n) == :INFO ? "r$(get_id(get_robot_id(n))),o$(get_id(get_object_id(n))),x$(get_id(get_initial_location_id(n)))=>x$(get_id(get_destination_location_id(n)))" : ""
+
+_info_string(n::AbstractPlanningPredicate)     = ""
+_info_string(n::BOT_AT)        = "r$(get_id(get_robot_id(n))),x$(get_id(get_initial_location_id(n)))" 
+_info_string(n::OBJECT_AT)     = "o$(get_id(get_object_id(n))),x$(get_id(get_initial_location_id(n)))"
+_info_string(n::BOT_GO)        = "r$(get_id(get_robot_id(n))),x$(get_id(get_initial_location_id(n)))=>x$(get_id(get_destination_location_id(n)))" 
+_info_string(n::BOT_COLLECT)   = "r$(get_id(get_robot_id(n))),o$(get_id(get_object_id(n))),x$(get_id(get_initial_location_id(n)))"
+_info_string(n::BOT_DEPOSIT)   = "r$(get_id(get_robot_id(n))),o$(get_id(get_object_id(n))),x$(get_id(get_initial_location_id(n)))"
+_info_string(n::BOT_CARRY)     = "r$(get_id(get_robot_id(n))),o$(get_id(get_object_id(n))),x$(get_id(get_initial_location_id(n)))=>x$(get_id(get_destination_location_id(n)))"
+_time_summary(n::ScheduleNode) = "t: $(get_t0(n)), $(get_tF(n))"
+_info_string(n::ScheduleNode) = string(_info_string(n.node),",",_time_summary(n))
+GraphPlottingBFS._subtitle_string(n::ScheduleNode) = _subtitle_mode(n) == :INFO ? _info_string(n) : ""
+GraphPlottingBFS._subtitle_string(n::AbstractPlanningPredicate) = _subtitle_mode(n) == :INFO ? _info_string(n) : ""
 
 # global SPACE_GRAY = RGB(0.2,0.2,0.2)
 # global BRIGHT_RED = RGB(0.6,0.0,0.2)
@@ -1554,6 +1675,58 @@ function GraphPlottingBFS.draw_node(g::OperatingSchedule,v,args...;kwargs...)
 end
 function GraphPlottingBFS.draw_node(g::ProjectSpec,v,args...;kwargs...) 
     draw_node(get_node(g,v))
+end
+
+function build_frame(ctx;
+        h1 = Compose.default_graphic_height,
+        w1 = Compose.default_graphic_width,
+    )
+    frame = (dims = (w1,h1),ctx=ctx)
+end
+function hstack_canvases(frame1,frame2;
+        stackmode=:horizontal,
+        align_mode=:centered_align,
+        bgcolor="white",
+    )
+    dims1 = frame1.dims
+    dims2 = frame2.dims
+
+    max_dims = max.(dims1,dims2)
+    sum_dims = dims1 .+ dims2
+
+    # horizontal stack
+    if stackmode == :horizontal
+        dx = sum_dims[1]
+        dy = max_dims[2]
+    else
+        dx = max_dims[1]
+        dy = sum_dims[2]
+    end
+    _dims = (dx,dy) # of new canvas
+    set_default_graphic_size(_dims...)
+    _dims1 = dims1 ./ _dims
+    _dims2 = dims2 ./ _dims
+
+
+    if stackmode == :horizontal
+        ctx1 = Compose.context(0.0, (1.0 - _dims1[2])/2, _dims1...)
+        ctx2 = Compose.context(_dims1[1], (1.0 - _dims2[2])/2, _dims2...)
+    else
+        ctx1 = Compose.context((1.0 - _dims1[1])/2, 0.0,        _dims1...)
+        ctx2 = Compose.context((1.0 - _dims2[1])/2, _dims1[2],  _dims2...)
+    end
+    
+    if !(bgcolor === nothing)
+        bg = (context(),Compose.rectangle(0,0,1,1),fill(bgcolor))
+    else
+        bg = (contect(),)
+    end
+    # composed context
+    Compose.compose(context(),
+        (ctx1,frame1.ctx),
+        (ctx2,frame2.ctx),
+        bg
+    )
 end
 
 # function show_times(cache::PlanningCache,v)

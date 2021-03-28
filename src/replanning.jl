@@ -589,17 +589,29 @@ end
 get_commit_time(replan_model::Oracle, search_env, request, args...) = request.t_request
 get_commit_time(replan_model::DeferUntilCompletion, search_env, request, commit_threshold) = max(request.t_request + commit_threshold, maximum(get_tF(get_schedule(search_env))))
 get_commit_time(replan_model::NullReplanner,args...) = get_commit_time(DeferUntilCompletion(),args...)
-function get_commit_time(replan_model::ReassignFreeRobots, search_env, request, commit_threshold)
+function get_earliest_free_time(search_env)
     free_time = makespan(get_schedule(search_env))
-    for v in vertices(get_schedule(search_env))
-        # node = get_node_from_vtx(get_schedule(search_env),v)
-        node = get_node(get_schedule(search_env),v)
+    for node in get_nodes(get_schedule(search_env))
         if isa(node.node,GO)
             if get_id(get_destination_location_id(node.node)) == -1
                 free_time = min(free_time, get_t0(node))
             end
         end
     end
+    return free_time
+end
+function get_commit_time(replan_model::ReassignFreeRobots, search_env, request, commit_threshold)
+    # free_time = makespan(get_schedule(search_env))
+    # for v in vertices(get_schedule(search_env))
+    #     # node = get_node_from_vtx(get_schedule(search_env),v)
+    #     node = get_node(get_schedule(search_env),v)
+    #     if isa(node.node,GO)
+    #         if get_id(get_destination_location_id(node.node)) == -1
+    #             free_time = min(free_time, get_t0(node))
+    #         end
+    #     end
+    # end
+    free_time = get_earliest_free_time(search_env)
     max(request.t_request + commit_threshold,free_time)
 end
 function get_commit_time(replan_model::ConstrainedMergeAndBalance, search_env, request, commit_threshold)
@@ -641,6 +653,11 @@ function get_commit_time(replan_model::ConstrainedMergeAndBalance, search_env, r
     return t_commit
 end
 
+function prune_schedule(::ReassignFreeRobots,env::SearchEnv,t)
+    t_free = get_earliest_free_time(env)
+    prune_schedule(env,min(t_free,t))
+end
+
 break_assignments!(replan_model::ReplannerModel,args...) = break_assignments!(args...)
 break_assignments!(replan_model::ReassignFreeRobots,args...) = nothing
 break_assignments!(replan_model::DeferUntilCompletion,args...) = nothing
@@ -654,25 +671,13 @@ function set_time_limits!(replan_model,solver,t_request,t_commit)
 end
 
 function set_time_limits!(flag::Bool,replan_model,solver,t_request,t_commit)
-    # set_runtime_limit!(solver, (t_commit - t_request) - get_timeout_buffer(replan_model))
-    # # set_runtime_limit!(assignment_solver(solver), solver.time_limit - get_route_planning_buffer(replan_model))
-    # set_runtime_limit!(solver.assignment_model, runtime_limit(solver) - get_route_planning_buffer(replan_model))
-    # @assert runtime_limit(solver) > 0.0
-    # solver
     set_runtime_limit!(solver, (t_commit - t_request) - get_timeout_buffer(replan_model))
-    set_runtime_limit!(solver, min(runtime_limit(solver),get_max_time_limit(replan_model)))
+    set_runtime_limit!(solver, min(runtime_limit(solver), get_max_time_limit(replan_model)))
     set_runtime_limit!(assignment_solver(solver), runtime_limit(solver) - get_route_planning_buffer(replan_model))
     @assert runtime_limit(solver) > 0.0
     set_deadline!(solver, time() + (t_commit - t_request))
     solver
 end
-# function set_time_limits!(flag::Bool,replan_model::DeferUntilCompletion,solver,t_request,t_commit)
-#     set_runtime_limit!(solver, (t_commit - t_request) - get_timeout_buffer(replan_model))
-#     set_runtime_limit!(solver, min(runtime_limit(solver),get_max_time_limit(replan_model)))
-#     set_runtime_limit!(assignment_solver(solver), runtime_limit(solver) - get_route_planning_buffer(replan_model))
-#     @assert runtime_limit(solver) > 0.0
-#     solver
-# end
 function set_time_limits!(flag::Bool,replan_model::NullReplanner,solver,t_request,t_commit)
     set_runtime_limit!(solver,-1.0)
     return solver
@@ -716,8 +721,11 @@ function replan!(solver, replan_model, search_env, request;
     reset_solver!(solver)
     set_time_limits!(replan_model,solver,t_request,t_commit)
     # Update operating schedule
-    new_sched = prune_schedule(replan_model,search_env,t_split) # Maybe this should be at t_request instead?
-    # new_sched = prune_schedule(replan_model,search_env,min(t_split,t_request)) # Maybe this should be at t_request instead?
+    # new_sched = prune_schedule(replan_model,search_env,t_split) # Maybe this should be at t_request instead?
+    # NOTE If we prune at t_commit or t_split, we may actually cut out unfinished
+    # nodes when using ReassignFreeRobots. Ideally, ReassignFreeRobots would prune at the earliest free time
+    # NOTE again -- actually, the above is not true. ReassignFreeRobots only increases t_commit to the earliest free node.
+    new_sched = prune_schedule(replan_model,search_env,min(t_split,t_request)) # Maybe this should be at t_request instead?
     @assert sanity_check(new_sched," after prune_schedule()")
     # split active nodes
     # new_sched = split_active_vtxs!(replan_model,new_sched,problem_spec,t_split;robot_positions=robot_positions)
