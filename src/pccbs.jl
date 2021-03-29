@@ -35,7 +35,9 @@ end
 CRCBS.get_cost_model(env::PCCBSEnv)       = env.cost_model
 CRCBS.get_heuristic_model(env::PCCBSEnv)  = env.heuristic
 GraphUtils.get_node(env::PCCBSEnv)        = env.schedule_node
-GraphUtils.get_graph(env::PCCBSEnv)       = get_graph(env.search_env,graph_key(get_node(env))) #graph
+GraphUtils.get_graph(env::PCCBSEnv)       = get_graph(env.search_env,
+    graph_key(get_node(env))
+    )
 
 function Base.show(io::IO, env::PCCBSEnv)
     print(io,"PCCBSEnv: \n",

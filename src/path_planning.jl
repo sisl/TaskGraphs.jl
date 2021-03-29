@@ -112,7 +112,6 @@ function construct_environment_layer(env::GridFactoryEnvironment,problem_spec::P
     env_graph = GridFactoryEnvironment(env, graph=deepcopy(env.graph),
         dist_function=deepcopy(get_dist_matrix(env))
         )
-    # prob_spec = ProblemSpec(problem_spec, D=get_dist_matrix(env_graph))
     prob_spec = ProblemSpec(problem_spec, D=env_graph)
     EnvironmentLayer(env_graph,prob_spec)
 end
