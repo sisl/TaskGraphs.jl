@@ -83,8 +83,7 @@ end
 
 function initialize_route_plan end
 
-const State = CRCBS.GraphState
-const Action = CRCBS.GraphAction
+include("pccbs.jl")
 
 export
     construct_cost_model,
@@ -721,7 +720,6 @@ end
 ############################### Low Level Search ###############################
 ################################################################################
 
-include("pccbs.jl")
 
 export evaluate_path_gap
 

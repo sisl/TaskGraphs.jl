@@ -523,9 +523,9 @@ function extract_solution(prob::PC_TAPF,m::PCTAPF_MILP)
     for (robot_id,robot_path) in robot_paths
         path = get_paths(route_plan)[get_id(robot_id)]
         for (t,(v1,v2)) in enumerate(zip(robot_path[1:end-1],robot_path[2:end]))
-            s = GraphState(v1,t-1)
+            s = State(v1,t-1)
             a = GraphAction(LightGraphs.Edge(v1,v2),1)
-            sp = GraphState(v2,t)
+            sp = State(v2,t)
             push!(path,PathNode(s,a,sp))
         end
     end

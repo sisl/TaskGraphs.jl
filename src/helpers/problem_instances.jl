@@ -554,33 +554,32 @@ schedule, leading to a +1 delay that will not be caught without backtracking in
 ISPS. Hence, the solver will return a solution with T = 7.
 """
 function pctapf_problem_10(;cost_function=MakeSpan(),verbose=false,Δt_op=0,Δt_collect=[0,0,0,0,0,0],Δt_deposit=[0,0,0,0,0,0])
-    vtx_grid = initialize_dense_vtx_grid(10,5)
+    vtx_grid = initialize_dense_vtx_grid(10,4)
+    #   1   2   3   4
+    #   5   6   7   8
+    #   9  10  11  12
+    #  13  14  15  16
+    #  17  18  19  20
+    #  21  22  23  24
+    #  25  26  27  28
+    #  29  30  31  32
+    #  33  34  35  36
+    #  37  38  39  40
 
-    #   1   2   3   4   5
-    #   6   7   8   9  10
-    #  11  12  13  14  15
-    #  16  17  18  19  20
-    #  21  22  23  24  25
-    #  26  27  28  29  30
-    #  31  32  33  34  35
-    #  36  37  38  39  40
-    #  41  42  43  44  45
-    #  46  47  48  49  50
+    #   .   .  (5)  .  
+    #   .   .  (4)  .  
+    #   .   .  (3)  .  
+    #   .   .   .   .  
+    #   .  (2)  .   .  
+    #  (1) [1]  .  [6]
+    #   .   .  [5]  .  
+    #   .   .  [4]  .  
+    #   .   .  [3]  .  
+    #   .  [2]  .   .  
 
-    #   .   .  (5)  .   . 
-    #   .   .  (4)  .   . 
-    #   .   .  (3)  .   . 
-    #   .   .   .   .   . 
-    #   .  (2)  .   .   . 
-    #  (1) [1]  .  [6]  .
-    #   .   .  [5]  .   . 
-    #   .   .  [4]  .   . 
-    #   .   .  [3]  .   . 
-    #   .  [2]  .   .   . 
-
-    r0 = [26,22,13, 8, 3]
-    s0 = [26,22,13, 8, 3,27]
-    sF = [27,47,43,38,33,29]
+    r0 = [21,18,11, 7, 3]
+    s0 = [21,18,11, 7, 3,22]
+    sF = [22,38,35,31,27,24]
     env_graph = construct_factory_env_from_vtx_grid(
         vtx_grid;
     )

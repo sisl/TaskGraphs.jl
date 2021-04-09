@@ -211,38 +211,38 @@ end
 # test ReassignFreeRobots
 let
 
-    planner = FullReplanner(
-        solver = NBSSolver(assignment_model=
-            TaskGraphsMILPSolver(ExtendedAssignmentMILP())),
-        replanner = ReassignFreeRobots(),
-    )
-    set_real_time_flag!(planner,false) # turn off real-time op constraints
-    set_commit_threshold!(planner,1)
-    prob = replanning_problem_1(planner.solver)
-    env = prob.env
-    stage = 0
-    t = 1
+    # planner = FullReplanner(
+    #     solver = NBSSolver(assignment_model=
+    #         TaskGraphsMILPSolver(ExtendedAssignmentMILP())),
+    #     replanner = ReassignFreeRobots(),
+    # )
+    # set_real_time_flag!(planner,false) # turn off real-time op constraints
+    # set_commit_threshold!(planner,1)
+    # prob = replanning_problem_1(planner.solver)
+    # env = prob.env
+    # stage = 0
+    # t = 1
 
-    search_env = env
-    stage += 1
-    t += 1
-    if stage > length(prob.requests)
-        stage = 1
-    end
-    request = prob.requests[stage]
-    request = ProjectRequest(request.schedule,t,t)
-    remap_object_ids!(request.schedule,env.schedule)
-    base_env = replan!(planner,env,request)
-    @show get_commit_time(planner.replanner,base_env,request) 
-    @test get_commit_time(planner.replanner,base_env,request) >= minimum(get_t0(n) for n in get_nodes(get_schedule(base_env)) if matches_template(BOT_GO,n) && get_id(get_destination_location_id(n)) == -1)
+    # search_env = env
+    # stage += 1
+    # t += 1
+    # if stage > length(prob.requests)
+    #     stage = 1
+    # end
+    # request = prob.requests[stage]
+    # request = ProjectRequest(request.schedule,t,t)
+    # remap_object_ids!(request.schedule,env.schedule)
+    # base_env = replan!(planner,env,request)
+    # @show get_commit_time(planner.replanner,base_env,request) 
+    # @test get_commit_time(planner.replanner,base_env,request) >= minimum(get_t0(n) for n in get_nodes(get_schedule(base_env)) if matches_template(BOT_GO,n) && get_id(get_destination_location_id(n)) == -1)
 
-    env, cost = solve!(planner.solver,PC_TAPF(base_env))
-    @show optimality_gap(planner.solver)
-    plt1 = display_graph(base_env.schedule,scale=2,aspect_stretch=(2.5,1.0),pad=(1.0,1.0))
-    ctx1 = build_frame(plt1)
-    plt2 = display_graph(env.schedule,scale=2,aspect_stretch=(2.5,1.0),pad=(1.0,1.0))
-    ctx2 = build_frame(plt2)
-    hstack_canvases(ctx1,ctx2)
+    # env, cost = solve!(planner.solver,PC_TAPF(base_env))
+    # @show optimality_gap(planner.solver)
+    # plt1 = display_graph(base_env.schedule,scale=2,aspect_stretch=(2.5,1.0),pad=(1.0,1.0))
+    # ctx1 = build_frame(plt1)
+    # plt2 = display_graph(env.schedule,scale=2,aspect_stretch=(2.5,1.0),pad=(1.0,1.0))
+    # ctx2 = build_frame(plt2)
+    # hstack_canvases(ctx1,ctx2)
 end
 let
 
@@ -267,8 +267,8 @@ let
 
     for f in problem_generators
         for solver in solvers
-            @show f
-            @show solver
+            # @show f
+            # @show solver
             cache = ReplanningProfilerCache(features=features)
             prob = f(solver)
             env, cache = profile_replanner!(solver,replan_model,prob,cache)
@@ -311,76 +311,76 @@ let
 end
 let    
 
-    Revise.includet(joinpath(pathof(TaskGraphs),"..","helpers/render_tools.jl"))
+    # Revise.includet(joinpath(pathof(TaskGraphs),"..","helpers/render_tools.jl"))
     
-    MAX_TIME_LIMIT = 30
-    MAX_BACKUP_TIME_LIMIT = 20
-    COMMIT_THRESHOLD = 10
-    ASTAR_ITERATION_LIMIT = 5000
-    PIBT_ITERATION_LIMIT = 5000
-    CBS_ITERATION_LIMIT = 1000
-    NBS_ITERATION_LIMIT = 10
-    primary_replanner = MergeAndBalance()
-    backup_replanner = ConstrainedMergeAndBalance(max_problem_size=300)
-    path_finder = DefaultAStarSC()
-    set_iteration_limit!(path_finder,ASTAR_ITERATION_LIMIT)
-    primary_route_planner = CBSSolver(ISPS(path_finder))
-    set_iteration_limit!(primary_route_planner,CBS_ITERATION_LIMIT)
-    primary_assignment_solver = TaskGraphsMILPSolver(ExtendedAssignmentMILP())
-    set_iteration_limit!(primary_assignment_solver,NBS_ITERATION_LIMIT)
-    primary_planner = FullReplanner(
-        solver = NBSSolver(
-            assignment_model=primary_assignment_solver,
-            path_planner=primary_route_planner,
-            return_first_feasible = true, # return if a feasible solution has been found
-            ),
-        replanner = primary_replanner,
-        )
-    set_max_time_limit!(primary_planner,MAX_TIME_LIMIT)
-    set_commit_threshold!(primary_planner,COMMIT_THRESHOLD)
-    # Backup planner
-    backup_planner = FullReplanner(
-        solver = NBSSolver(
-            assignment_model = TaskGraphsMILPSolver(GreedyAssignment(
-                greedy_cost = GreedyFinalTimeCost(),
-            )),
-            path_planner = PIBTPlanner{NTuple{3,Float64}}(partial=true) # allow partial solutions
-            ),
-        replanner = backup_replanner,
-        )
-    set_iteration_limit!(backup_planner,1)
-    set_iteration_limit!(route_planner(backup_planner.solver),PIBT_ITERATION_LIMIT)
-    set_commit_threshold!(backup_planner,COMMIT_THRESHOLD)
-    set_debug!(backup_planner,true)
+    # MAX_TIME_LIMIT = 30
+    # MAX_BACKUP_TIME_LIMIT = 20
+    # COMMIT_THRESHOLD = 10
+    # ASTAR_ITERATION_LIMIT = 5000
+    # PIBT_ITERATION_LIMIT = 5000
+    # CBS_ITERATION_LIMIT = 1000
+    # NBS_ITERATION_LIMIT = 10
+    # primary_replanner = MergeAndBalance()
+    # backup_replanner = ConstrainedMergeAndBalance(max_problem_size=300)
+    # path_finder = DefaultAStarSC()
+    # set_iteration_limit!(path_finder,ASTAR_ITERATION_LIMIT)
+    # primary_route_planner = CBSSolver(ISPS(path_finder))
+    # set_iteration_limit!(primary_route_planner,CBS_ITERATION_LIMIT)
+    # primary_assignment_solver = TaskGraphsMILPSolver(ExtendedAssignmentMILP())
+    # set_iteration_limit!(primary_assignment_solver,NBS_ITERATION_LIMIT)
+    # primary_planner = FullReplanner(
+    #     solver = NBSSolver(
+    #         assignment_model=primary_assignment_solver,
+    #         path_planner=primary_route_planner,
+    #         return_first_feasible = true, # return if a feasible solution has been found
+    #         ),
+    #     replanner = primary_replanner,
+    #     )
+    # set_max_time_limit!(primary_planner,MAX_TIME_LIMIT)
+    # set_commit_threshold!(primary_planner,COMMIT_THRESHOLD)
+    # # Backup planner
+    # backup_planner = FullReplanner(
+    #     solver = NBSSolver(
+    #         assignment_model = TaskGraphsMILPSolver(GreedyAssignment(
+    #             greedy_cost = GreedyFinalTimeCost(),
+    #         )),
+    #         path_planner = PIBTPlanner{NTuple{3,Float64}}(partial=true) # allow partial solutions
+    #         ),
+    #     replanner = backup_replanner,
+    #     )
+    # set_iteration_limit!(backup_planner,1)
+    # set_iteration_limit!(route_planner(backup_planner.solver),PIBT_ITERATION_LIMIT)
+    # set_commit_threshold!(backup_planner,COMMIT_THRESHOLD)
+    # set_debug!(backup_planner,true)
 
-    planner = ReplannerWithBackup(primary_planner,backup_planner)
+    # planner = ReplannerWithBackup(primary_planner,backup_planner)
 
-    set_real_time_flag!(planner,false) # turn off real-time op constraints
-    # set_commit_threshold!(replan_model,40) # setting high commit threshold to allow for warmup
-    prob = replanning_problem_1(planner.primary_planner.solver)
-    env = prob.env
-    display_graph(env.schedule;grow_mode=:from_left)
+    # set_real_time_flag!(planner,false) # turn off real-time op constraints
+    # # set_commit_threshold!(replan_model,40) # setting high commit threshold to allow for warmup
+    # prob = replanning_problem_1(planner.primary_planner.solver)
+    # env = prob.env
+    # display_graph(env.schedule;grow_mode=:from_left)
 
-    @show [summary(n) for n in get_nodes(env.schedule) if n.spec.fixed]
-    stage = 0
+    # @show [summary(n) for n in get_nodes(env.schedule) if n.spec.fixed]
+    # stage = 0
 
-    set_real_time_flag!(primary_planner,true) # turn off real-time op constraints
+    # set_real_time_flag!(primary_planner,true) # turn off real-time op constraints
 
-    stage += 1
-    request = prob.requests[stage]
-    remap_object_ids!(request.schedule,env.schedule)
-    # @show [v for v in vertices(env.schedule) if get_node(env.schedule,v).spec.fixed]
-    base_envA = replan!(primary_planner,env,request)
-    # @show [v for v in vertices(env.schedule) if get_node(env.schedule,v).spec.fixed]
-    envA, costA = solve!(primary_planner.solver,TaskGraphs.construct_pctapf_problem(prob,base_envA))
+    # stage += 1
+    # request = prob.requests[stage]
+    # remap_object_ids!(request.schedule,env.schedule)
+    # # @show [v for v in vertices(env.schedule) if get_node(env.schedule,v).spec.fixed]
+    # base_envA = replan!(primary_planner,env,request)
+    # # @show [v for v in vertices(env.schedule) if get_node(env.schedule,v).spec.fixed]
+    # envA, costA = solve!(primary_planner.solver,TaskGraphs.construct_pctapf_problem(prob,base_envA))
 
-    base_envB = replan!(backup_planner,env,request)
-    envB, costB = solve!(backup_planner.solver,TaskGraphs.construct_pctapf_problem(prob,base_envB))
+    # base_envB = replan!(backup_planner,env,request)
+    # envB, costB = solve!(backup_planner.solver,TaskGraphs.construct_pctapf_problem(prob,base_envB))
 
-    env = envA
-    display_graph(env.schedule;grow_mode=:from_left)
-    # env = envB
-    # @show [v for v in vertices(env.schedule) if get_node(env.schedule,v).spec.fixed]
+    # env = envA
+    # display_graph(env.schedule;grow_mode=:from_left)
+    # # env = envB
+    # # @show [v for v in vertices(env.schedule) if get_node(env.schedule,v).spec.fixed]
 end
 # Debug
 # let

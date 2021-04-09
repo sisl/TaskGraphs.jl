@@ -178,6 +178,23 @@ struct HasRobot <: PredicateTrait end
 # initial condition preds: OBJECT_AT, ROBOT_AT
 # event preds: Operation
 
+@with_kw struct LargeObjectDef
+	footprint::Matrix{Bool} = ones(Int,1,1)
+	origin::Tuple{Int,Int} 	= (0,0)
+	carrying_positions::Vector{Tuple{Int,Int}} = [(0,0)]
+end
+struct LARGE_OBJECT_AT <: AbstractPlanningPredicate
+	o::ObjectID
+	x::LocationID
+	def::LargeObjectDef
+end
+get_object_id(pred::LARGE_OBJECT_AT) = pred.o
+GraphUtils.node_id(n::LARGE_OBJECT_AT) = get_object_id(n)
+get_location_id(pred::LARGE_OBJECT_AT) = pred.x
+get_initial_location_id(pred::LARGE_OBJECT_AT) = pred.x
+get_destination_location_id(pred::LARGE_OBJECT_AT) = pred.x
+LARGE_OBJECT_AT(o::ObjectID,x::LocationID) = LARGE_OBJECT_AT(o,x,LargeObjectDef())
+
 export
 	OBJECT_AT,
 	BOT_AT,
@@ -336,6 +353,31 @@ Encodes the event "robot `r` collects object `o` from `x`
     x::LocationID 	= LocationID()
 end
 const DEPOSIT = BOT_DEPOSIT{DeliveryBot}
+
+@with_kw struct COLLABORATIVE_TRANSPORT_ACTION{R,A<:AbstractRobotAction{R}} <: AbstractTeamRobotAction{R}
+	action::A 				   = A()
+	object_def::LargeObjectDef = LargeObjectDef() # defines object shape, carrying config
+	start_positions::Vector{Pair{BotID{R},LocationID}} = Vector{Pair{BotID{R},LocationID}}()
+	goal_positions::Vector{Pair{BotID{R},LocationID}}	= Vector{Pair{BotID{R},LocationID}}()
+end
+function init_collaborative_action(env::GridFactoryEnvironment, action::A, def::LargeObjectDef) where {R<:AbstractRobotType,A<:AbstractRobotAction{R}}
+	x0 = get_initial_location_id(action)
+	xF = get_destination_location_id(action)
+	starts = Vector{Pair{BotID{R},LocationID}}()
+	goals = Vector{Pair{BotID{R},LocationID}}()
+	for p in def.carrying_positions
+		id = get_unique_invalid_id(RobotID)
+		offset = p .- def.origin
+		push!(starts,id=>GraphUtils.idx_from_offset(env, get_id(x0), offset))
+		push!(goals,id=>GraphUtils.idx_from_offset(env, get_id(xF), offset))
+	end
+	COLLABORATIVE_TRANSPORT_ACTION{R,A}(action,def,starts,goals)
+end
+# sub_nodes(n) = [n]
+# sub_nodes(n::COLLABORATIVE_TRANSPORT_ACTION) = n.instructions
+# team_configuration(n) = (1,1)
+# team_configuration(n::COLLABORATIVE_TRANSPORT_ACTION) = n.shape
+# team_action_type(n::COLLABORATIVE_TRANSPORT_ACTION{R,A}) where {R,A} = A
 
 export
 	CleanUpBot,
