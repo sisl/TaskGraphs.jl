@@ -227,6 +227,7 @@ struct BOT_AT{R<:AbstractRobotType} <: AbstractPlanningPredicate
     r::BotID{R}
     x::LocationID
 end
+robot_type(id::BotID{R}) where {R} = R
 robot_type(a::BOT_AT{R}) where {R} = R
 get_location_id(pred::BOT_AT) 	= pred.x
 get_robot_id(pred::BOT_AT) 		= pred.r

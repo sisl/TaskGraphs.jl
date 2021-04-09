@@ -84,6 +84,7 @@ end
 function initialize_route_plan end
 
 include("pccbs.jl")
+include("path_planners/multi_goal_astar_sc.jl")
 
 export
     construct_cost_model,

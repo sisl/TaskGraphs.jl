@@ -178,6 +178,35 @@ function robot_tip_map(sched::OperatingSchedule,vtxs=get_all_terminal_nodes(sche
     robot_tips
 end
 
+"""
+    extract_robot_itinerary(sched::OperatingSchedule,id::BotID)
+
+Return the sequence of tasks assigned to `id`
+"""
+function extract_robot_itinerary(sched::OperatingSchedule,id::BotID)
+    itinerary = Vector{ScheduleNode}()
+    if !has_vertex(sched,id)
+        return itinerary 
+    end
+    n = get_node(sched,id) # Robot start node
+    push!(itinerary,n)
+    while outdegree(sched,n) > 0
+        done = true
+        for np in node_iterator(sched,outneighbors(sched,n))
+            if has_robot_id(np) && get_robot_id(np) == id
+                push!(itinerary,np)
+                n = np
+                done = false
+                break
+            end
+        end
+        if done
+            break
+        end
+    end
+    return itinerary
+end
+
 export construct_task_graphs_problem
 """
     `construct_task_graphs_problem`
