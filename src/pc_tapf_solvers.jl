@@ -79,20 +79,20 @@ end
 export DefaultAStarSC
 const DefaultAStarSC = AStarSC{NTuple{5,Float64}}
 
-export
-    PrioritizedAStarSC
+# export
+#     PrioritizedAStarSC
 
-"""
-    PrioritizedAStarSC
+# """
+#     PrioritizedAStarSC
 
-Low-level proritized path planner that employs Slack-and-Collision-Aware A*.
-"""
-@with_kw struct PrioritizedAStarSC{C}
-    logger::SolverLogger{C} = SolverLogger{C}()
-    replan::Bool            = false
-end
-search_trait(solver::PrioritizedAStarSC) = Prioritized()
-primary_cost(::PrioritizedAStarSC,cost::NTuple{5,Float64}) = cost[2]
+# Low-level proritized path planner that employs Slack-and-Collision-Aware A*.
+# """
+# @with_kw struct PrioritizedAStarSC{C}
+#     logger::SolverLogger{C} = SolverLogger{C}()
+#     replan::Bool            = false
+# end
+# search_trait(solver::PrioritizedAStarSC) = Prioritized()
+# primary_cost(::PrioritizedAStarSC,cost::NTuple{5,Float64}) = cost[2]
 
 """
     construct_heuristic_model(solver,env_graph;kwargs...)
@@ -104,14 +104,14 @@ function construct_heuristic_model(trait::NonPrioritized,solver,env_graph,
         )
     construct_composite_heuristic(ph,NullHeuristic(),ph,ph,NullHeuristic())
 end
-function construct_heuristic_model(trait::Prioritized,args...)
-    h = construct_heuristic_model(NonPrioritized(),args...)
-    construct_composite_heuristic(
-        h.cost_models[2],
-        h.cost_models[1],
-        h.cost_models[3:end]...
-    )
-end
+# function construct_heuristic_model(trait::Prioritized,args...)
+#     h = construct_heuristic_model(NonPrioritized(),args...)
+#     construct_composite_heuristic(
+#         h.cost_models[2],
+#         h.cost_models[1],
+#         h.cost_models[3:end]...
+#     )
+# end
 function construct_heuristic_model(solver, args...)
     construct_heuristic_model(search_trait(solver),solver,args...)
 end
@@ -168,21 +168,21 @@ function construct_cost_model(trait::SearchTrait,
         get_schedule(env), get_cache(env), get_problem_spec(env), get_graph(env),
         primary_objective;kwargs...)
 end
-function construct_cost_model(trait::Prioritized,args...;kwargs...)
-    c, h = construct_cost_model(NonPrioritized(),args...;kwargs...)
-    # switch the first two elements of the cost and heuristic models
-    cost_model = construct_composite_cost_model(
-        c.cost_models[2],
-        c.cost_models[1],
-        c.cost_models[3:end]...
-    )
-    heuristic = construct_composite_heuristic(
-        h.cost_models[2],
-        h.cost_models[1],
-        h.cost_models[3:end]...
-    )
-    cost_model, heuristic
-end
+# function construct_cost_model(trait::Prioritized,args...;kwargs...)
+#     c, h = construct_cost_model(NonPrioritized(),args...;kwargs...)
+#     # switch the first two elements of the cost and heuristic models
+#     cost_model = construct_composite_cost_model(
+#         c.cost_models[2],
+#         c.cost_models[1],
+#         c.cost_models[3:end]...
+#     )
+#     heuristic = construct_composite_heuristic(
+#         h.cost_models[2],
+#         h.cost_models[1],
+#         h.cost_models[3:end]...
+#     )
+#     cost_model, heuristic
+# end
 function construct_cost_model(solver, args...;kwargs...)
     construct_cost_model(search_trait(solver),solver,args...;kwargs...)
 end
@@ -833,7 +833,7 @@ CRCBS.solver_type(::CBSSolver)          = "CBSSolver"
 CRCBS.solver_type(::PIBTPlanner)        = "PIBTPlanner"
 CRCBS.solver_type(::ISPS)               = "ISPS"
 CRCBS.solver_type(::AStarSC)            = "AStarSC"
-CRCBS.solver_type(::PrioritizedAStarSC) = "PrioritizedAStarSC"
+# CRCBS.solver_type(::PrioritizedAStarSC) = "PrioritizedAStarSC"
 CRCBS.solver_type(::AStar)              = "AStar"
 CRCBS.solver_type(::TaskGraphsMILPSolver{M,C}) where {M,C} = "TaskGraphsMILPSolver{$M}"
 

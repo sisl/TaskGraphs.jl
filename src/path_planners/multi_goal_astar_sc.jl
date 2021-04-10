@@ -1,8 +1,8 @@
-@with_kw struct MState{N} <: CRCBS.AbstractGraphState
+@with_kw struct MState <: CRCBS.AbstractGraphState
     vtx     ::Int           = -1
     t       ::Int           = -1
     stage   ::Int           = -1
-    node    ::N             = nothing
+    node    ::ScheduleNode  = ScheduleNode(RobotID(-1),ROBOT_AT(-1,-1))
     active  ::Bool          = true
 end
 MState(s::GraphState) = MState(s.vtx,s.t)
@@ -11,6 +11,7 @@ Base.convert(::Type{MState},s::GraphState) = MState(s)
 MState(vtx,t) = MState(vtx=vtx,t=t)
 _state_active(s) = true
 _state_active(s::MState) = s.active
+Base.string(s::MState) = "(v=$(get_vtx(s)),t=$(get_t(s)),stage=$(get_stage(s)),node=$(summary(s.node)))"
 const MAction = CRCBS.GraphAction
 
 function CRCBS.detect_state_conflict(n1::N,n2::N) where {S<:MState,A<:AbstractGraphAction,N<:PathNode{S,A}}
@@ -33,7 +34,9 @@ end
 @with_kw struct MPCCBSEnv{E,I<:BotID,T,C<:AbstractCostModel,H<:AbstractCostModel} <: GraphEnv{MState,MAction,C}
     search_env::E                   = nothing
     agent_id::I                     = I(-1)
-    goal_sequence::Vector{ScheduleNode} = Vector{ScheduleNode}() # robot mission
+    agent_idx::Int                  = get_id(agent_id)
+    itinerary::Vector{ScheduleNode} = Vector{ScheduleNode}() # robot mission
+    # goal_sequence::Vector{GraphState} = map(construct_goal,itinerary)
     constraints::T                  = discrete_constraint_table(search_env,get_id(agent_id))
     cost_model::C                   = get_cost_model(search_env)
     heuristic::H                    = get_heuristic_model(search_env)
@@ -42,22 +45,34 @@ CRCBS.get_cost_model(env::MPCCBSEnv)       = env.cost_model
 CRCBS.get_heuristic_model(env::MPCCBSEnv)  = env.heuristic
 GraphUtils.get_graph(env::MPCCBSEnv)       = get_graph(env.search_env,graph_key(env.agent_id))
 
-# function Base.show(io::IO, env::MPCCBSEnv)
-#     print(io,"MPCCBSEnv: \n",
-#         "\t","schedule_node: ",string(get_node(env)),"\n",
-#         "\t","agent_idx:     ",get_agent_id(env),"\n",
-#         "\t","goal:          ",string(get_goal(env)),"\n")
-# end
+function CRCBS.get_heuristic_cost(m::MultiStageEnvDistanceHeuristic,
+    env::MPCCBSEnv,
+    s::MState)
+    goal_vtx = get_id(get_destination_location_id(env.itinerary[get_stage(s)]))
+    d = get_distance(get_graph(env),get_vtx(s),goal_vtx)
+    d + CRCBS.cost_from_stage(m,get_id(env.agent_id),get_stage(s))
+end
 
-construct_goal(env::MPCCBSEnv,s::MState) = construct_goal(env,s.node)
-function construct_goal(env::MPCCBSEnv,node::ScheduleNode)
+CRCBS.EnvDeadlineCost(sched::OperatingSchedule,args...) = EnvDeadlineCost()
+CRCBS.EnvDeadlineCost{T}(sched::OperatingSchedule,args...) where {T} = EnvDeadlineCost{T}()
+function CRCBS.compute_heuristic_cost(m::EnvDeadlineCost,h::MultiStageEnvDistanceHeuristic,env::MPCCBSEnv,cost,sp)
+    # cost is travel time, h_cost is cost to go
+    # need information about the current stage here...
+    goal_vtx = get_id(get_destination_location_id(env.itinerary[get_stage(sp)]))
+    d = get_distance(get_graph(env),get_vtx(sp),goal_vtx)
+    c = cost .+ d .- (get_tF(sp.node) .+ get_slack(sp.node))
+    return m.f(max.(0.0, c))
+end
+
+construct_goal(::MPCCBSEnv,s::MState) = construct_goal(s.node)
+function construct_goal(node::ScheduleNode)
     goal_idx = get_id(get_destination_location_id(node))
     goal_time = get_tF(node)
     GraphState(goal_idx,goal_time)
 end
-function check_stage_goal(env::MPCCBSEnv,s,node=s.node)
+function check_stage_goal(::MPCCBSEnv,s,node=s.node)
     if get_t(s) >= get_tF(node)
-        goal = construct_goal(env,node)
+        goal = construct_goal(node)
         if states_match(s, goal)
             return true
         elseif !CRCBS.is_valid(goal)
@@ -69,14 +84,15 @@ end
 function CRCBS.get_next_state(env::MPCCBSEnv,s::MState,a::MAction)
     stage = get_stage(s)
     node = s.node
+    sp = GraphState(get_e(a).dst,get_t(s)+get_dt(a))
     # update multiple nodes at once, if possible
-    while check_stage_goal(env,s,node) && get_stage(s) < length(env.goal_sequence)
-        stage = get_stage(s) + 1
-        node = env.goal_sequence[stage]
+    while (check_stage_goal(env,s,node) || check_stage_goal(env,sp,node)) && stage < length(env.itinerary)
+        stage = stage + 1
+        node = env.itinerary[stage]
     end
     MState(
-        get_e(a).dst,
-        get_t(s)+get_dt(a),
+        get_vtx(sp),
+        get_t(sp),
         stage,
         node,
         _state_active(s))
@@ -102,7 +118,7 @@ function CRCBS.get_possible_actions(node::Union{COLLECT,DEPOSIT},env::MPCCBSEnv,
 end
 
 function CRCBS.is_goal(env::MPCCBSEnv,s)
-    if get_stage(s) >= length(env.goal_sequence)
+    if get_stage(s) >= length(env.itinerary)
         return check_stage_goal(env,s)
     end
     return false

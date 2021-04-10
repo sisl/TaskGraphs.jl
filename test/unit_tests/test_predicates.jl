@@ -212,43 +212,43 @@ let
     @test validate_edge(COLLECT(1,2,4),COLLECT(1,2,4))
 end
 # Collaborative
-let
-    vtx_grid = initialize_dense_vtx_grid(4,4)
-    env_graph = construct_factory_env_from_vtx_grid(vtx_grid)
+# let
+#     vtx_grid = initialize_dense_vtx_grid(4,4)
+#     env_graph = construct_factory_env_from_vtx_grid(vtx_grid)
 
-    sched = OperatingSchedule()
+#     sched = OperatingSchedule()
 
-    object_def = TaskGraphs.LargeObjectDef()
-    object_node = TaskGraphs.LARGE_OBJECT_AT(ObjectID(1),LocationID(1),object_def)
-    o_id = get_object_id(object_node)
-    x0 = get_initial_location_id(object_node)
-    xF = LocationID(4)
+#     object_def = TaskGraphs.LargeObjectDef()
+#     object_node = TaskGraphs.LARGE_OBJECT_AT(ObjectID(1),LocationID(1),object_def)
+#     o_id = get_object_id(object_node)
+#     x0 = get_initial_location_id(object_node)
+#     xF = LocationID(4)
 
-    # Still need to take care of making the PathSpecs 
-    o = add_node!(sched,object_node,o_id)
-    collect_node = add_node!(sched,
-        TaskGraphs.init_collaborative_action(env_graph,COLLECT(-1,o_id,x0),object_def),
-        get_unique_id(ActionID),
-        )
-    add_edge!(sched,o,collect_node)
-    carry_node = add_node!(sched,
-        TaskGraphs.init_collaborative_action(env_graph,CARRY(-1,o_id,x0,xF),object_def),
-        get_unique_id(ActionID),
-        )
-    add_edge!(sched,collect_node,carry_node)
-    deposit_node = add_node!(sched,
-        TaskGraphs.init_collaborative_action(env_graph,DEPOSIT(-1,o_id,xF),object_def),
-        get_unique_id(ActionID),
-        )
-    add_edge!(sched,collect_node,deposit_node)
+#     # Still need to take care of making the PathSpecs 
+#     o = add_node!(sched,object_node,o_id)
+#     collect_node = add_node!(sched,
+#         TaskGraphs.init_collaborative_action(env_graph,COLLECT(-1,o_id,x0),object_def),
+#         get_unique_id(ActionID),
+#         )
+#     add_edge!(sched,o,collect_node)
+#     carry_node = add_node!(sched,
+#         TaskGraphs.init_collaborative_action(env_graph,CARRY(-1,o_id,x0,xF),object_def),
+#         get_unique_id(ActionID),
+#         )
+#     add_edge!(sched,collect_node,carry_node)
+#     deposit_node = add_node!(sched,
+#         TaskGraphs.init_collaborative_action(env_graph,DEPOSIT(-1,o_id,xF),object_def),
+#         get_unique_id(ActionID),
+#         )
+#     add_edge!(sched,collect_node,deposit_node)
 
     
-    collect_node = COLLECT(-1,o_id,x0)
+#     collect_node = COLLECT(-1,o_id,x0)
 
-    carry_node = CARRY(-1,o_id,x0,xF)
-    deposit_node = DEPOSIT(-1,o_id,xF)
-    for n in [collect_node,carry_node,deposit_node]
-        TaskGraphs.init_collaborative_action(env_graph,n,object_def)
-    end
+#     carry_node = CARRY(-1,o_id,x0,xF)
+#     deposit_node = DEPOSIT(-1,o_id,xF)
+#     for n in [collect_node,carry_node,deposit_node]
+#         TaskGraphs.init_collaborative_action(env_graph,n,object_def)
+#     end
 
-end
+# end
