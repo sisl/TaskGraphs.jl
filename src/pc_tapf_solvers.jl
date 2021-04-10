@@ -104,14 +104,6 @@ function construct_heuristic_model(trait::NonPrioritized,solver,env_graph,
         )
     construct_composite_heuristic(ph,NullHeuristic(),ph,ph,NullHeuristic())
 end
-# function construct_heuristic_model(trait::Prioritized,args...)
-#     h = construct_heuristic_model(NonPrioritized(),args...)
-#     construct_composite_heuristic(
-#         h.cost_models[2],
-#         h.cost_models[1],
-#         h.cost_models[3:end]...
-#     )
-# end
 function construct_heuristic_model(solver, args...)
     construct_heuristic_model(search_trait(solver),solver,args...)
 end
@@ -168,21 +160,6 @@ function construct_cost_model(trait::SearchTrait,
         get_schedule(env), get_cache(env), get_problem_spec(env), get_graph(env),
         primary_objective;kwargs...)
 end
-# function construct_cost_model(trait::Prioritized,args...;kwargs...)
-#     c, h = construct_cost_model(NonPrioritized(),args...;kwargs...)
-#     # switch the first two elements of the cost and heuristic models
-#     cost_model = construct_composite_cost_model(
-#         c.cost_models[2],
-#         c.cost_models[1],
-#         c.cost_models[3:end]...
-#     )
-#     heuristic = construct_composite_heuristic(
-#         h.cost_models[2],
-#         h.cost_models[1],
-#         h.cost_models[3:end]...
-#     )
-#     cost_model, heuristic
-# end
 function construct_cost_model(solver, args...;kwargs...)
     construct_cost_model(search_trait(solver),solver,args...;kwargs...)
 end
@@ -547,7 +524,7 @@ Solve a PC-MAPF problem with the ISPS algorithm.
 
 function CRCBS.solve!(solver::ISPS,pc_mapf::PC_MAPF)
     node = initialize_root_node(solver,pc_mapf)
-    valid_flag = compute_route_plan!(solver,pc_mapf,node)#,node)
+    valid_flag = compute_route_plan!(solver,pc_mapf,node)
     return node.solution, get_cost(node.solution)
 end
 
@@ -556,6 +533,8 @@ search_trait(solver::CBSSolver) = search_trait(low_level(solver))
 primary_cost(solver::CBSSolver,cost) = primary_cost(low_level(solver),cost)
 primary_cost_type(solver::CBSSolver) = primary_cost_type(low_level(solver))
 CRCBS.solve!(solver::CBSSolver,pc_mapf::PC_MAPF) = CRCBS.cbs!(solver,pc_mapf)
+
+
 
 export
     TaskGraphsMILPSolver

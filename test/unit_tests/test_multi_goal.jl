@@ -11,43 +11,15 @@ let
     # 
     pcta = PC_TA(prob.env)
     sched, cost = solve!(solver.assignment_model,pcta)
-    search_env = construct_search_env(solver,sched,get_env(prob))
-    env_graph = get_graph(search_env)
-    cost_model, _ = construct_cost_model(solver,search_env,EnvDeadlineCost())
+    pc_mapf = construct_routing_problem(prob,construct_search_env(solver,sched,get_env(prob)))
 
-    # init pc_mapf
-    pc_mapf = construct_routing_problem(prob,search_env)
+    base_env = TaskGraphs.build_base_multi_goal_env(solver,pc_mapf)
 
     # build MPCCBSEnv for robot 1
     agent_id = RobotID(1)
-    itineraries = Dict(id=>TaskGraphs.extract_robot_itinerary(sched,id) for id in keys(get_robot_ICs(sched)))
-    vtx_sequences = Dict(get_id(k)=>map(n->get_vtx(TaskGraphs.construct_goal(n)),v) for (k,v) in itineraries)
-    cost_to_go = CRCBS.construct_multi_stage_env_distance_heuristic(get_graph(search_env),vtx_sequences)
-    heuristic = construct_composite_heuristic(
-        cost_to_go,
-        NullHeuristic(),
-        cost_to_go,
-        cost_to_go,
-        NullHeuristic(),
-    )
-    env = TaskGraphs.MPCCBSEnv(
-        search_env = get_env(pc_mapf),
-        agent_id = agent_id,
-        itinerary = TaskGraphs.extract_robot_itinerary(sched,agent_id),
-        cost_model = cost_model,
-        heuristic = heuristic 
-        )
-    # construct first goal
-    s0 = get_final_state(get_paths(get_route_plan(search_env))[get_id(agent_id)])
-    s = TaskGraphs.MState(
-        vtx=s0.vtx,
-        t=s0.t,
-        stage=1,
-        node=get_node(sched,env.itinerary[1]),
-    )
-    TaskGraphs.construct_goal(env,s)
-    TaskGraphs.check_stage_goal(env,s)
-    # Test cost and heuristic_model
+    env = TaskGraphs.MPCCBSEnv(base_env,agent_id = agent_id)
+
+    s = get_initial_state(get_paths(get_route_plan(env.search_env))[get_id(agent_id)])
     c = get_initial_cost(env)
     @test c[1] == 0.0
     h = CRCBS.compute_heuristic_cost(env,c,s)
