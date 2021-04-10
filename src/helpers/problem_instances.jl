@@ -96,8 +96,16 @@ function pctapf_problem(
         problem_spec,
         env_graph
         )
-    PC_TAPF(env)
+    prob = PC_TAPF(env)
+    return post_process_problem_type(solver,prob)
 end
+"""
+    post_process_problem_type(solver,prob)
+
+An overridable helper function for potentially modifying prob based on solver.
+Default behavior is to return `prob` with no changes.
+"""
+post_process_problem_type(solver,prob) = prob
 function pctapf_problem(solver,spec::ProjectSpec,env,robot_ics,prob_spec=ProblemSpec(D=env))
     sched = construct_partial_project_schedule(spec,prob_spec,robot_ics)
     return pctapf_problem(solver,sched,prob_spec,env)

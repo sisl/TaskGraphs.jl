@@ -55,8 +55,9 @@ let
         ]
         @show f
         solver = NBSSolver(path_planner=CBSSolver(MultiGoalPCMAPFSolver(DefaultAStarSC())))
-        prob = TaskGraphs.convert_to_multi_goal_problem(PC_TAPF,solver,f(solver))
+        prob = f(solver)
         env, cost = solve!(solver,prob)
+        @test validate(env)
     end
 
 end
@@ -67,6 +68,14 @@ let
     prob = TaskGraphs.convert_to_multi_goal_problem(PC_TAPF,solver,pctapf_problem_4(solver))
     solve!(solver,prob)
 
+end
+
+let 
+    solver = NBSSolver(path_planner=CBSSolver(MultiGoalPCMAPFSolver(DefaultAStarSC())))
+    # set_verbosity!(solver.path_planner,3)
+    prob = pctapf_problem_4(solver)
+    solution, results = profile_solver!(solver,prob)
+    
 end
 
 let
@@ -88,8 +97,6 @@ let
     low_level_search!(solver.path_planner,prob,node)
     detect_conflicts!(node)
 
-
-
     env = TaskGraphs.solve_with_multi_goal_solver!(solver,pc_mapf);
 
     for (id,itinerary) in env.itineraries
@@ -97,8 +104,6 @@ let
             @show string(n.s), string(n.sp)
         end
     end
-
-    env.search_env
 
     base_env = TaskGraphs.build_base_multi_goal_env(solver,pc_mapf) 
 

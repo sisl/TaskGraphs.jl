@@ -242,6 +242,16 @@ default_multi_goal_solver() = MultiGoalPCMAPFSolver(DefaultAStarSC())
 search_trait(::MultiGoalPCMAPFSolver) = NonPrioritized()
 construct_cost_model(solver::MultiGoalPCMAPFSolver,args...;kwargs...) = construct_cost_model(low_level(solver),args...;kwargs...)
 
+post_process_problem_type(m::NBSSolver,args...) = post_process_problem_type(m.path_planner,args...) 
+post_process_problem_type(m::CBSSolver,args...) = post_process_problem_type(low_level(m),args...) 
+for T in [:PC_MAPF,:PC_TAPF]
+    @eval begin 
+        function post_process_problem_type(m::MultiGoalPCMAPFSolver,prob::$T) 
+            convert_to_multi_goal_problem($T,m,prob)
+        end
+    end
+end
+
 """
     multi_goal_queue_priority(solver,env::MPCCBSEnv,id::BotID)
 
