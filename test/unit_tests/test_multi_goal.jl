@@ -25,21 +25,71 @@ let
         sched, cost = solve!(solver.assignment_model,pcta)
         pc_mapf = construct_routing_problem(prob,construct_search_env(solver,sched,get_env(prob)))
 
-        solver = AStarSC{NTuple{5,Float64}}()
-        env = TaskGraphs.solve_with_multi_goal_solver!(solver,pc_mapf)
+        solver = TaskGraphs.MultiGoalPCMAPFSolver(DefaultAStarSC())
+        pc_mapf_mod = TaskGraphs.convert_to_multi_goal_problem(PC_MAPF,
+            low_level(solver),
+            pc_mapf)
+        env = TaskGraphs.solve_with_multi_goal_solver!(solver,pc_mapf_mod)
+        for (id,itinerary) in env.itineraries
+            for (n1,n2) in zip(itinerary,itinerary[2:end])
+                @test get_tF(n1) == get_t0(n2)
+            end
+        end
         env.search_env
     end
+
+end
+# solve everything
+let
+    for f in [
+            pctapf_problem_1,
+            pctapf_problem_2,
+            pctapf_problem_3,
+            pctapf_problem_4,
+            pctapf_problem_5,
+            pctapf_problem_6,
+            pctapf_problem_7,
+            pctapf_problem_8,
+            pctapf_problem_9,
+            pctapf_problem_10,
+        ]
+        @show f
+        solver = NBSSolver(path_planner=CBSSolver(MultiGoalPCMAPFSolver(DefaultAStarSC())))
+        prob = TaskGraphs.convert_to_multi_goal_problem(PC_TAPF,solver,f(solver))
+        env, cost = solve!(solver,prob)
+    end
+
+end
+
+let 
+    solver = NBSSolver(path_planner=CBSSolver(MultiGoalPCMAPFSolver(DefaultAStarSC())))
+    set_verbosity!(solver.path_planner,3)
+    prob = TaskGraphs.convert_to_multi_goal_problem(PC_TAPF,solver,pctapf_problem_4(solver))
+    solve!(solver,prob)
 
 end
 
 let
     solver = NBSSolver()
-    prob = pctapf_problem_2(NBSSolver())
-    solution,cost = solve!(solver,prob)
-    pcta = PC_TA(prob.env)
-    sched, cost = solve!(solver.assignment_model,pcta)
+    prob = pctapf_problem_3(NBSSolver())
+    solution, cost = solve!(solver,prob)
+
+    # pcta = PC_TA(prob.env)
+    # sched, cost = solve!(solver.assignment_model,pcta)
     pc_mapf = construct_routing_problem(prob,construct_search_env(solver,sched,get_env(prob)))
-    solver = AStarSC{NTuple{5,Float64}}()
+
+    # solver = CBSSolver(MultiGoalPCMAPFSolver(DefaultAStarSC()))
+    solver = NBSSolver(path_planner=CBSSolver(MultiGoalPCMAPFSolver(DefaultAStarSC())))
+    prob = TaskGraphs.convert_to_multi_goal_problem(PC_MAPF,solver,pc_mapf)
+
+    solve!(solver.path_planner,prob)
+
+    node = initialize_root_node(solver,prob)
+    low_level_search!(solver.path_planner,prob,node)
+    detect_conflicts!(node)
+
+
+
     env = TaskGraphs.solve_with_multi_goal_solver!(solver,pc_mapf);
 
     for (id,itinerary) in env.itineraries

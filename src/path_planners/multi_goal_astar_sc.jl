@@ -50,6 +50,7 @@ end
 for op in [
     :(CRCBS.get_paths),
     :(CRCBS.get_path_costs),
+    :(CRCBS.num_agents),
     ]
     @eval $op(env::MPCCBSEnv) = $op(get_route_plan(env))
 end
@@ -63,7 +64,7 @@ function CRCBS.get_heuristic_cost(m::MultiStageEnvDistanceHeuristic,
 end
 
 CRCBS.EnvDeadlineCost(sched::OperatingSchedule,args...) = EnvDeadlineCost()
-CRCBS.EnvDeadlineCost{T}(sched::OperatingSchedule,args...) where {T} = EnvDeadlineCost{T}()
+CRCBS.EnvDeadlineCost{E,T}(sched::OperatingSchedule,args...) where {E,T} = EnvDeadlineCost()
 function CRCBS.compute_heuristic_cost(m::EnvDeadlineCost,h::MultiStageEnvDistanceHeuristic,env::MPCCBSEnv,cost,sp)
     # cost is travel time, h_cost is cost to go
     # need information about the current stage here...
@@ -145,6 +146,11 @@ function CRCBS.is_goal(env::MPCCBSEnv,s)
     return false
 end
 
+"""
+    align_route_plan_tips!(env::MPCCBSEnv)   
+
+Extend all paths to match the length of the longest path.
+"""
 function align_route_plan_tips!(env::MPCCBSEnv)   
     T = maximum(map(p->get_t(get_final_state(p)), get_paths(env)))
     trim_solution!(env,get_route_plan(env),T)
@@ -158,23 +164,6 @@ Align all node completion times align with the associated robots' paths.
 function align_schedule_node_times!(env::MPCCBSEnv,sched=get_schedule(env))
     for (id,itinerary) in env.itineraries
         path = get_paths(env)[get_id(id)]
-        #
-        # idx = 1
-        # for (stage,node) in enumerate(itinerary)
-        #     while idx <= length(path.path_nodes)
-        #         n = path.path_nodes[idx]
-        #         if can_advance_stage(env,n.s,node,stage)
-        #             set_tF!(node,get_t(n.s))
-        #             break
-        #         elseif can_advance_stage(env,n.sp,node,stage)
-        #             set_tF!(node,get_t(n.sp))
-        #             break
-        #         else
-        #             idx += 1
-        #         end
-        #     end
-        # end
-        #
         stage = 1
         for (idx,n) in enumerate(path.path_nodes)
             while stage <= length(itinerary)
@@ -202,6 +191,7 @@ function CRCBS.is_consistent(env::MPCCBSEnv,prob::PC_MAPF)
     # check that schedule is otherwise consistent
     return validate(env.search_env)
 end
+
 """
     find_inconsistencies(env::MPCCBSEnv;
 
@@ -237,6 +227,21 @@ function CRCBS.get_start(env::MPCCBSEnv,id::BotID)
     get_initial_state(get_paths(get_route_plan(env))[get_id(id)])
 end
 
+
+export MultiGoalPCMAPFSolver
+"""
+    MultiGoalPCMAPFSolver
+"""
+@with_kw struct MultiGoalPCMAPFSolver{C}
+    low_level_planner::AStarSC{C}   = AStarSC{C}()
+    logger::SolverLogger{C}         = SolverLogger{cost_type(low_level_planner)}()
+end
+CRCBS.low_level(m::MultiGoalPCMAPFSolver) = m.low_level_planner
+MultiGoalPCMAPFSolver(s) = MultiGoalPCMAPFSolver(low_level_planner=s)
+default_multi_goal_solver() = MultiGoalPCMAPFSolver(DefaultAStarSC())
+search_trait(::MultiGoalPCMAPFSolver) = NonPrioritized()
+construct_cost_model(solver::MultiGoalPCMAPFSolver,args...;kwargs...) = construct_cost_model(low_level(solver),args...;kwargs...)
+
 """
     multi_goal_queue_priority(solver,env::MPCCBSEnv,id::BotID)
 
@@ -251,16 +256,6 @@ function multi_goal_queue_priority(solver,env::MPCCBSEnv,id::BotID)
     return slack_score
 end
 
-TaskGraphs.search_trait(::AStar) = NonPrioritized()
-### 
-###
-###
-# """
-#     MultiGoalPCMAPFSolver
-# """
-# struct MultiGoalPCMAPFSolver{C}
-#     logger::SolverException{C}
-# end
 """
     solve_with_multi_goal_solver!(solver,pc_mapf,
 
@@ -268,25 +263,34 @@ Compute a consistent solution to the PC_MAPF problem using the "multi-goal"
 appoach.
 """
 function solve_with_multi_goal_solver!(solver,pc_mapf,
-        base_env = build_base_multi_goal_env(solver,pc_mapf),
+        base_env = build_multi_goal_env(solver,pc_mapf),
+        node = initialize_root_node(solver,pc_mapf),
+        ;
+        start_ids::Set{BotID} = Set{BotID}(keys(base_env.itineraries)),
         )
-    # TODO How to prioritize?
+    # TODO Is there a better way to prioritize?
     priority_queue = PriorityQueue{BotID,Float64}()
-    for id in keys(base_env.itineraries)
+    for id in start_ids
         priority_queue[id] = multi_goal_queue_priority(solver,base_env,id)
+        trim_path!(base_env,get_paths(base_env)[get_id(id)],0)
     end
     # compute all paths
     while !isempty(priority_queue)
         while !isempty(priority_queue)
             id = dequeue!(priority_queue)
             # TODO build_env
-            env = MPCCBSEnv(base_env,agent_id = id,agent_idx=get_id(id))
+            env = MPCCBSEnv(
+                base_env,
+                agent_id = id,
+                constraints=get_constraints(node,get_id(id)),
+                )
             base_path = get_paths(env)[get_id(id)]
             # compute path
-            reset_solver!(solver)
-            path, cost = a_star!(solver,env,base_path)
+            reset_solver!(low_level(solver))
+            path, cost = a_star!(low_level(solver),env,base_path)
             # store path in solution
             set_solution_path!(get_route_plan(env),path,get_id(id))
+            set_path_cost!(get_route_plan(env),cost,get_id(id))
             # update conflict table
             partially_set_path!(get_cost_model(env),get_id(id),convert_to_vertex_lists(path))
         end
@@ -359,7 +363,7 @@ function backtrack_to_previous_node(path,node,tf)
     return t, prev_node
 end
 
-function build_base_multi_goal_env(solver,pc_mapf;
+function build_base_multi_goal_search_env(solver,pc_mapf;
     kwargs...
     )
     # unpack
@@ -389,15 +393,46 @@ function build_base_multi_goal_env(solver,pc_mapf;
         num_agents = search_env.num_agents,
         route_plan = initialize_multi_goal_route_plan(sched,cost_model)
     )
+end
+
+function build_multi_goal_env(solver,pc_mapf,
+        search_env=get_env(pc_mapf),
+        # node = initialize_root_node(solver,pc_mapf),
+    )
+    sched = get_schedule(search_env)
+    # itineraries 
+    itineraries = Dict(
+        id=>TaskGraphs.extract_robot_itinerary(sched,id) for id in keys(get_robot_ICs(sched)))
     # base env
     env = TaskGraphs.MPCCBSEnv(
         search_env = search_env,
         itineraries = itineraries,
-        cost_model = cost_model,
-        heuristic = heuristic 
+        # constraints=node.constraints,
         )
-    return env
 end
+
+function CRCBS.low_level_search!(solver::CBSSolver{L,C}, prob::PC_MAPF, node::N, idxs=collect(1:num_agents(prob))) where {C,L<:MultiGoalPCMAPFSolver,N<:ConstraintTreeNode}
+    # TODO are constraints be passed correctly?
+    start_ids = Set{BotID}([RobotID(i) for i in idxs])
+    base_env = build_multi_goal_env(low_level(solver),prob,node.solution)
+    base_env = solve_with_multi_goal_solver!(solver,prob,base_env,node;start_ids=start_ids)
+    # hack to set first cost element to makespan
+    cost = aggregate_costs(get_cost_model(base_env),get_path_costs(node.solution))
+    fixed_cost = typeof(cost)([makespan(get_schedule(base_env)),cost[2:end]...])
+    set_cost!(node, fixed_cost)
+    return is_consistent(base_env,prob)
+end
+
+function convert_to_multi_goal_problem(::Type{T},solver,prob) where {T}
+    search_env = build_base_multi_goal_search_env(solver,prob)
+    T(search_env)
+end
+
+"""
+    initialize_multi_goal_route_plan(sched::OperatingSchedule,cost_model)
+
+Init route plan with `MState` as the state type.
+"""
 function initialize_multi_goal_route_plan(sched::OperatingSchedule,cost_model)
     starts = MState[]
     robot_ics = get_robot_ICs(sched)
@@ -415,3 +450,54 @@ function initialize_multi_goal_route_plan(sched::OperatingSchedule,cost_model)
     cost = aggregate_costs(cost_model, costs)
     LowLevelSolution(paths=paths, cost_model=cost_model,costs=costs, cost=cost)
 end
+
+
+# struct MG_PC_MAPF
+#     env::MPCCBSEnv
+# end
+################################################################################
+############################## CBS Wrapper Stuff ###############################
+################################################################################
+
+# function low_level_search!()
+
+function CRCBS.initialize_root_node(solver::CBSSolver{L,C},pc_mapf::AbstractPC_MAPF) where {L<:MultiGoalPCMAPFSolver,C}
+    env = build_base_multi_goal_search_env(solver,pc_mapf)
+    solution = env
+    # solution = build_base_multi_goal_env(solver,pc_mapf)
+    ConstraintTreeNode(
+        solution    = solution,
+        constraints = Dict(
+            i=>discrete_constraint_table(env,i) for i in 1:num_agents(env)
+            ),
+        id = 1)
+end
+# CRCBS.discrete_constraint_table(env::MPCCBSEnv,args...) = discrete_constraint_table(env.search_env,args...)
+# CRCBS.detect_conflicts!(table,env::MPCCBSEnv,args...) = detect_conflicts!(table,get_route_plan(env),args...)
+
+# function CRCBS.build_env(solver::MultiGoalPCMAPFSolver, pc_mapf::AbstractPC_MAPF, args...) 
+#     build_env(solver,pc_mapf,get_env(pc_mapf),args...)
+# end
+# CRCBS.build_env(prob::Union{PC_TAPF,PC_MAPF}) = build_env(get_env(prob))
+# CRCBS.get_initial_solution(pc_mapf::PC_MAPF) = get_env(pc_mapf)
+# function Base.copy(env::SearchEnv)
+#     SearchEnv(
+#         env,
+#         schedule=deepcopy(get_schedule(env)),
+#         cache=deepcopy(get_cache(env)),
+#         route_plan=deepcopy(get_route_plan(env))
+#         )
+# end
+# function CRCBS.default_solution(env::SearchEnv)
+#     solution = deepcopy(env)
+#     set_cost!(get_route_plan(solution),get_infeasible_cost(get_route_plan(solution)))
+#     solution, get_cost(solution)
+# end
+# CRCBS.default_solution(pc_mapf::M) where {M<:AbstractPC_MAPF} = default_solution(get_env(pc_mapf))
+# function CRCBS.cbs_update_conflict_table!(solver,mapf::AbstractPC_MAPF,node,constraint)
+#     search_env = node.solution
+#     idxs = collect(1:num_agents(search_env))
+#     # t0 = max(minimum(get_cache(search_env).t0), 1) # This is particularly relevant for replanning, where we don't care to look for conflicts way back in the past.
+#     t0 = max(minimum(get_t0(get_schedule(search_env))),1) # This is particularly relevant for replanning, where we don't care to look for conflicts way back in the past.
+#     detect_conflicts!(node.conflict_table,get_route_plan(search_env),idxs,Int(floor(t0)))
+# end

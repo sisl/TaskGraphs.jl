@@ -817,3 +817,9 @@ CRCBS.solver_type(::AStar)              = "AStar"
 CRCBS.solver_type(::TaskGraphsMILPSolver{M,C}) where {M,C} = "TaskGraphsMILPSolver{$M}"
 
 # end
+
+################################################################################
+##############################  Multi Goal Solver  #############################
+################################################################################
+
+include("path_planners/multi_goal_astar_sc.jl")
