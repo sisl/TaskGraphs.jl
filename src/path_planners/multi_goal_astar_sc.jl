@@ -152,16 +152,19 @@ function align_schedule_node_times!(env::MPCCBSEnv,sched=get_schedule(env))
         # like they ought to be.
         stage = 1
         for (idx,n) in enumerate(path.path_nodes)
-            while stage <= length(itinerary)
-                node = itinerary[stage]
-                if can_advance_stage(env,n.s,node,stage)
-                    set_tF!(node,get_t(n.s))
-                    stage += 1
-                elseif can_advance_stage(env,n.sp,node,stage)
-                    set_tF!(node,get_t(n.sp))
-                    stage += 1
-                else
-                    break
+            # at transitions only?
+            if node_id(n.s.node) != node_id(n.sp.node)
+                while stage <= length(itinerary)
+                    node = itinerary[stage]
+                    if can_advance_stage(env,n.s,node,stage)
+                        set_tF!(node,get_t(n.s))
+                        stage += 1
+                    elseif can_advance_stage(env,n.sp,node,stage)
+                        set_tF!(node,get_t(n.sp))
+                        stage += 1
+                    else
+                        break
+                    end
                 end
             end
         end
@@ -211,14 +214,42 @@ function find_inconsistencies(env::MPCCBSEnv;
             s = get_sp(n)
             sp = get_sp(n)
             if s.node != sp.node # if path node spans a transition time
-                if get_tF(s.node) != get_t(s)
+                if get_tF(s.node) != get_t(s) || get_id(get_destination_location_id(s.node)) != get_vtx(s) 
                     delay = Int(round(get_tF(s.node) - get_t(s)))
-                    @assert delay > 0
+                    # @assert delay > 0
                     inconsistencies[node_id(s.node)] = delay
                     if break_on_first
                         return inconsistencies
                     end
                 end
+            end
+        end
+    end
+    for (id,itinerary) in env.itineraries
+        path = get_paths(env)[get_id(id)]
+        for node in itinerary
+            t0 = get_t0(node)
+            v0 = get_id(get_initial_location_id(node))
+            tF = get_tF(node)
+            vF = get_id(get_destination_location_id(node))
+            # check correspondence
+            if t0 <= get_t(get_final_state(path))
+                n0 = get_path_node(path,t0)
+                if get_vtx(get_sp(n0)) != v0
+                    # @info "inconsistency at t0 for node $(summary(node)) with n $(string(n0)) path $(convert_to_vertex_lists(path))"
+                    inconsistencies[node_id(node)] = 0.0
+                end
+            else
+                inconsistencies[node_id(node)] = 0.0
+            end
+            if tF <= get_t(get_final_state(path))
+                nF = get_path_node(path,tF)
+                if !(get_vtx(get_sp(nF)) == vF || get_vtx(get_s(nF)) == vF) && valid_id(get_destination_location_id(node))
+                    # @info "inconsistency at tF for node $(summary(node)) with and path $(convert_to_vertex_lists(path))"
+                    inconsistencies[node_id(node)] = 0.0
+                end
+            else
+                inconsistencies[node_id(node)] = 0.0
             end
         end
     end
@@ -242,6 +273,7 @@ CRCBS.low_level(m::MultiGoalPCMAPFSolver) = m.low_level_planner
 MultiGoalPCMAPFSolver(s) = MultiGoalPCMAPFSolver(low_level_planner=s)
 default_multi_goal_solver() = MultiGoalPCMAPFSolver(DefaultAStarSC())
 search_trait(::MultiGoalPCMAPFSolver) = NonPrioritized()
+CRCBS.solver_type(::MultiGoalPCMAPFSolver) = "MultiGoalPCMAPFSolver"
 construct_cost_model(solver::MultiGoalPCMAPFSolver,args...;kwargs...) = construct_cost_model(low_level(solver),args...;kwargs...)
 
 post_process_problem_type(m::NBSSolver,args...) = post_process_problem_type(m.path_planner,args...) 
@@ -287,50 +319,63 @@ function solve_with_multi_goal_solver!(solver,pc_mapf,
         trim_path!(base_env,get_paths(base_env)[get_id(id)],0)
     end
     # compute all paths
-    while !isempty(priority_queue)
+    try
         while !isempty(priority_queue)
-            id = dequeue!(priority_queue)
-            @log_info(2,verbosity(solver),"Planning for $(summary(id))")
-            # TODO build_env
-            env = MPCCBSEnv(
-                base_env,
-                agent_id = id,
-                constraints=get_constraints(node,get_id(id)),
-                )
-            base_path = get_paths(env)[get_id(id)]
-            @log_info(2,verbosity(solver),"Base path = $(convert_to_vertex_lists(base_path))")
-            # compute path
-            reset_solver!(low_level(solver))
-            path, cost = a_star!(low_level(solver),env,base_path)
-            if cost == get_infeasible_cost(env)
-                @log_info(-1,verbosity(solver),"A* failed to find a feasible path. Iterations: $(iterations(low_level(solver)))")
-                return base_env
+            while !isempty(priority_queue)
+                id = dequeue!(priority_queue)
+                @log_info(2,verbosity(solver),"Planning for $(summary(id))")
+                # TODO build_env
+                env = MPCCBSEnv(
+                    base_env,
+                    agent_id = id,
+                    constraints=get_constraints(node,get_id(id)),
+                    )
+                base_path = get_paths(env)[get_id(id)]
+                @log_info(2,verbosity(solver),"Base path = $(convert_to_vertex_lists(base_path))")
+                # compute path
+                reset_solver!(low_level(solver))
+                path, cost = a_star!(low_level(solver),env,base_path)
+                if cost == get_infeasible_cost(env)
+                    @log_info(-1,verbosity(solver),"A* failed to find a feasible path. Iterations: $(iterations(low_level(solver)))")
+                    return base_env
+                end
+                # store path in solution
+                set_solution_path!(get_route_plan(env),path,get_id(id))
+                set_path_cost!(get_route_plan(env),cost,get_id(id))
+                # update conflict table
+                # partially_set_path!(get_cost_model(env),get_id(id),convert_to_vertex_lists(path))
+                set_path!(get_cost_model(env),get_id(id),convert_to_vertex_lists(path))
             end
-            # store path in solution
-            set_solution_path!(get_route_plan(env),path,get_id(id))
-            set_path_cost!(get_route_plan(env),cost,get_id(id))
-            # update conflict table
-            # partially_set_path!(get_cost_model(env),get_id(id),convert_to_vertex_lists(path))
-            set_path!(get_cost_model(env),get_id(id),convert_to_vertex_lists(path))
-        end
-        align_route_plan_tips!(base_env)
-        align_schedule_node_times!(base_env)
-        process_schedule!(get_schedule(base_env))
-        # # if inconsistent
-        if !is_consistent(base_env,pc_mapf)
-            inconsistencies = find_inconsistencies(base_env)
-            trim_points = select_trim_points(base_env,inconsistencies)
-            @log_info(-1,verbosity(solver),"Route plan is not yet consistent. Trimming $(length(trim_points)) paths to replan")
-            for (agent_id,t) in trim_points
-                path = get_paths(base_env)[get_id(agent_id)]
-                trim_path!(base_env,path,t)
-                priority_queue[agent_id] = multi_goal_queue_priority(solver,base_env,agent_id)
-            end
-            # reset schedule in prep for next round
-            reset_schedule_times!(get_schedule(base_env),get_schedule(get_env(pc_mapf)))
+            align_route_plan_tips!(base_env)
             align_schedule_node_times!(base_env)
             process_schedule!(get_schedule(base_env))
+
+            # Check time and iterations
+            enforce_time_limit!(solver)
+            increment_iteration_count!(solver)
+            if check_iterations(solver)
+                @log_info(1,verbosity(solver), "Reached $(iteration_limit(solver))-iteration limit.")
+                break
+            end
+
+            # # if inconsistent
+            if !is_consistent(base_env,pc_mapf)
+                inconsistencies = find_inconsistencies(base_env)
+                trim_points = select_trim_points(base_env,inconsistencies)
+                @log_info(-1,verbosity(solver),"Route plan is not yet consistent. Trimming $(length(trim_points)) paths to replan")
+                for (agent_id,t) in trim_points
+                    path = get_paths(base_env)[get_id(agent_id)]
+                    trim_path!(base_env,path,t)
+                    priority_queue[agent_id] = multi_goal_queue_priority(solver,base_env,agent_id)
+                end
+                # reset schedule in prep for next round
+                reset_schedule_times!(get_schedule(base_env),get_schedule(get_env(pc_mapf)))
+                align_schedule_node_times!(base_env)
+                process_schedule!(get_schedule(base_env))
+            end
         end
+    catch e
+        isa(e, SolverException) ? handle_solver_exception(solver,e) : rethrow(e)
     end
     # TODO how to get cost?
     return base_env

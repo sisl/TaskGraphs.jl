@@ -64,9 +64,14 @@ end
 
 let 
     solver = NBSSolver(path_planner=CBSSolver(MultiGoalPCMAPFSolver(DefaultAStarSC())))
-    set_verbosity!(solver.path_planner,3)
-    prob = TaskGraphs.convert_to_multi_goal_problem(PC_TAPF,solver,pctapf_problem_4(solver))
-    solve!(solver,prob)
+    # set_verbosity!(solver.path_planner,3)
+    # set_verbosity!(solver.path_planner.low_level_planner,3)
+    # set_verbosity!(solver.path_planner.low_level_planner.low_level_planner,5)
+    # set_iteration_limit!(solver.path_planner.low_level_planner,2)
+    # set_iteration_limit!(solver.path_planner,1)
+    # prob = TaskGraphs.convert_to_multi_goal_problem(PC_TAPF,solver,pctapf_problem_4(solver))
+    prob = pctapf_problem_4(solver)
+    env, cost = solve!(solver,prob)
 
 end
 
