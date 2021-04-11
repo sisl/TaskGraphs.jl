@@ -12,6 +12,7 @@ Base.convert(::Type{MState},s::GraphState) = MState(s)
 MState(vtx,t) = MState(vtx=vtx,t=t)
 _state_active(s::MState) = s.active
 Base.string(s::MState) = "(v=$(get_vtx(s)),t=$(get_t(s)),stage=$(get_stage(s)),node=$(summary(s.node)))"
+Base.summary(s::MState) = "(v=$(get_vtx(s)),t=$(get_t(s)),stage=$(get_stage(s)),node=$(summary(s.node)))"
 const MAction = CRCBS.GraphAction
 
 @with_kw struct MPCCBSEnv{E,ID<:BotID,T,C<:AbstractCostModel,H<:AbstractCostModel} <: GraphEnv{MState,MAction,C}
@@ -147,6 +148,8 @@ Align all node completion times align with the associated robots' paths.
 function align_schedule_node_times!(env::MPCCBSEnv,sched=get_schedule(env))
     for (id,itinerary) in env.itineraries
         path = get_paths(env)[get_id(id)]
+        # TODO: Something is wrong in here. Start and end times are not tight
+        # like they ought to be.
         stage = 1
         for (idx,n) in enumerate(path.path_nodes)
             while stage <= length(itinerary)
@@ -163,6 +166,21 @@ function align_schedule_node_times!(env::MPCCBSEnv,sched=get_schedule(env))
             end
         end
         set_tF!(itinerary[end],get_t(get_final_state(path)))
+        # stage = length(itinerary)
+        # for (idx,n) in reverse(collect(enumerate(path.path_nodes)))
+        #     while stage >= 1
+        #         node = itinerary[stage]
+        #         if can_advance_stage(env,n.s,node,stage)
+        #             set_tF!(node,get_t(n.s))
+        #             stage -= 1
+        #         elseif can_advance_stage(env,n.sp,node,stage)
+        #             set_tF!(node,get_t(n.sp))
+        #             stage -= 1
+        #         else
+        #             break
+        #         end
+        #     end
+        # end
     end
     return sched
 end
@@ -272,6 +290,7 @@ function solve_with_multi_goal_solver!(solver,pc_mapf,
     while !isempty(priority_queue)
         while !isempty(priority_queue)
             id = dequeue!(priority_queue)
+            @log_info(2,verbosity(solver),"Planning for $(summary(id))")
             # TODO build_env
             env = MPCCBSEnv(
                 base_env,
@@ -279,6 +298,7 @@ function solve_with_multi_goal_solver!(solver,pc_mapf,
                 constraints=get_constraints(node,get_id(id)),
                 )
             base_path = get_paths(env)[get_id(id)]
+            @log_info(2,verbosity(solver),"Base path = $(convert_to_vertex_lists(base_path))")
             # compute path
             reset_solver!(low_level(solver))
             path, cost = a_star!(low_level(solver),env,base_path)
