@@ -208,16 +208,32 @@ function find_inconsistencies(env::MPCCBSEnv;
         break_on_first::Bool=false,
     )
     # stores the time step offsets for nodes in the schedule
+    # Should there be any way for an inconsistency to not be detected this way?
     inconsistencies = Dict{AbstractID,Int}() 
     for path in get_paths(env)
         for n in path.path_nodes
-            s = get_sp(n)
+            s = get_s(n)
             sp = get_sp(n)
             if s.node != sp.node # if path node spans a transition time
-                if get_tF(s.node) != get_t(s) || get_id(get_destination_location_id(s.node)) != get_vtx(s) 
+                t0 = Int(round(get_t0(sp.node)))
+                tF = Int(round(get_tF(s.node)))
+                # if get_tF(s.node) != get_t(s) # || get_id(get_destination_location_id(s.node)) != get_vtx(s) 
+                if !(tF == get_t(s) || tF == get_t(sp))
+                    @info "inconsistency at tF for node $(summary(sp.node)) with n $(string(n)) path $(convert_to_vertex_lists(path))"
                     delay = Int(round(get_tF(s.node) - get_t(s)))
                     # @assert delay > 0
                     inconsistencies[node_id(s.node)] = delay
+                    if break_on_first
+                        return inconsistencies
+                    end
+                # elseif get_id(get_destination_location_id(s.node)) != get_vtx(s)
+                end
+                # if !(t0 == get_t(sp))
+                if !(t0 == get_t(s) || t0 == get_t(sp))
+                    @info "inconsistency at t0 for node $(summary(sp.node)) with n $(string(n)) path $(convert_to_vertex_lists(path))"
+                    delay = t0 - get_t(sp)
+                    # @assert delay > 0
+                    inconsistencies[node_id(sp.node)] = delay
                     if break_on_first
                         return inconsistencies
                     end
@@ -225,34 +241,35 @@ function find_inconsistencies(env::MPCCBSEnv;
             end
         end
     end
-    for (id,itinerary) in env.itineraries
-        path = get_paths(env)[get_id(id)]
-        for node in itinerary
-            t0 = get_t0(node)
-            v0 = get_id(get_initial_location_id(node))
-            tF = get_tF(node)
-            vF = get_id(get_destination_location_id(node))
-            # check correspondence
-            if t0 <= get_t(get_final_state(path))
-                n0 = get_path_node(path,t0)
-                if get_vtx(get_sp(n0)) != v0
-                    # @info "inconsistency at t0 for node $(summary(node)) with n $(string(n0)) path $(convert_to_vertex_lists(path))"
-                    inconsistencies[node_id(node)] = 0.0
-                end
-            else
-                inconsistencies[node_id(node)] = 0.0
-            end
-            if tF <= get_t(get_final_state(path))
-                nF = get_path_node(path,tF)
-                if !(get_vtx(get_sp(nF)) == vF || get_vtx(get_s(nF)) == vF) && valid_id(get_destination_location_id(node))
-                    # @info "inconsistency at tF for node $(summary(node)) with and path $(convert_to_vertex_lists(path))"
-                    inconsistencies[node_id(node)] = 0.0
-                end
-            else
-                inconsistencies[node_id(node)] = 0.0
-            end
-        end
-    end
+    # for (id,itinerary) in env.itineraries
+    #     path = get_paths(env)[get_id(id)]
+    #     for node in itinerary
+    #         t0 = get_t0(node)
+    #         v0 = get_id(get_initial_location_id(node))
+    #         tF = get_tF(node)
+    #         vF = get_id(get_destination_location_id(node))
+    #         # check correspondence
+    #         if t0 <= get_t(get_final_state(path))
+    #             n0 = get_path_node(path,t0)
+    #             if get_vtx(get_sp(n0)) != v0
+    #                 # @info "inconsistency at t0 for node $(summary(node)) with n $(string(n0)) path $(convert_to_vertex_lists(path))"
+    #                 inconsistencies[node_id(node)] = 0.0
+    #             end
+    #         else
+    #             inconsistencies[node_id(node)] = 0.0
+    #         end
+    #         if tF <= get_t(get_final_state(path))
+    #             nF = get_path_node(path,tF)
+    #             # if !(get_vtx(get_sp(nF)) == vF || get_vtx(get_s(nF)) == vF) && valid_id(get_destination_location_id(node))
+    #             if get_vtx(get_sp(nF)) != vF && valid_id(get_destination_location_id(node))
+    #                 # @info "inconsistency at tF for node $(summary(node)) with and path $(convert_to_vertex_lists(path))"
+    #                 inconsistencies[node_id(node)] = 0.0
+    #             end
+    #         else
+    #             inconsistencies[node_id(node)] = 0.0
+    #         end
+    #     end
+    # end
     return inconsistencies
 end
 
@@ -412,7 +429,7 @@ Returns:
  * `previous::ScheduleNode` : the previous node
 """
 function backtrack_to_previous_node(path,node,tf)
-    t = tf
+    t = min(tf,length(path))
     prev_node = node
     while t > 0
         n = get_path_node(path,t)
@@ -479,6 +496,7 @@ function CRCBS.low_level_search!(solver::CBSSolver{L,C}, prob::PC_MAPF, node::N,
     # TODO are constraints be passed correctly?
     start_ids = Set{BotID}([RobotID(i) for i in idxs])
     base_env = build_multi_goal_env(low_level(solver),prob,node.solution)
+    reset_solver!(low_level(solver))
     base_env = solve_with_multi_goal_solver!(low_level(solver),prob,base_env,node;start_ids=start_ids)
     # hack to set first cost element to makespan
     cost = aggregate_costs(get_cost_model(base_env),get_path_costs(node.solution))
