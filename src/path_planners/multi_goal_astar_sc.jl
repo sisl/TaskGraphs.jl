@@ -14,23 +14,6 @@ _state_active(s::MState) = s.active
 Base.string(s::MState) = "(v=$(get_vtx(s)),t=$(get_t(s)),stage=$(get_stage(s)),node=$(summary(s.node)))"
 const MAction = CRCBS.GraphAction
 
-# function CRCBS.detect_state_conflict(n1::N,n2::N) where {S<:MState,A<:AbstractGraphAction,N<:PathNode{S,A}}
-#     if _state_active(n1.sp) && _state_active(n2.sp)
-#         if get_vtx(n1.sp) == get_vtx(n2.sp) && get_t(n1.sp) == get_t(n2.sp)
-#             return true
-#         end
-#     end
-#     return false
-# end
-# function CRCBS.detect_action_conflict(n1::N,n2::N) where {S<:MState,A<:AbstractGraphAction,N<:PathNode{S,A}}
-#     if _state_active(n1.sp) && _state_active(n2.sp)
-#         if (get_e(n1.a).src == get_e(n2.a).dst) && (get_e(n1.a).dst == get_e(n2.a).src) && (get_t(n1.sp) == get_t(n2.sp))
-#             return true
-#         end
-#     end
-#     return false
-# end
-
 @with_kw struct MPCCBSEnv{E,ID<:BotID,T,C<:AbstractCostModel,H<:AbstractCostModel} <: GraphEnv{MState,MAction,C}
     search_env::E                   = nothing
     agent_id::ID                    = RobotID(-1)
@@ -189,6 +172,7 @@ function CRCBS.is_consistent(env::MPCCBSEnv,prob::PC_MAPF)
         return false
     end
     # check that schedule is otherwise consistent
+    # return validate(env.search_env;quiet=true)
     return validate(env.search_env)
 end
 
@@ -298,20 +282,25 @@ function solve_with_multi_goal_solver!(solver,pc_mapf,
             # compute path
             reset_solver!(low_level(solver))
             path, cost = a_star!(low_level(solver),env,base_path)
+            if cost == get_infeasible_cost(env)
+                @log_info(-1,verbosity(solver),"A* failed to find a feasible path. Iterations: $(iterations(low_level(solver)))")
+                return base_env
+            end
             # store path in solution
             set_solution_path!(get_route_plan(env),path,get_id(id))
             set_path_cost!(get_route_plan(env),cost,get_id(id))
             # update conflict table
-            partially_set_path!(get_cost_model(env),get_id(id),convert_to_vertex_lists(path))
+            # partially_set_path!(get_cost_model(env),get_id(id),convert_to_vertex_lists(path))
+            set_path!(get_cost_model(env),get_id(id),convert_to_vertex_lists(path))
         end
         align_route_plan_tips!(base_env)
         align_schedule_node_times!(base_env)
         process_schedule!(get_schedule(base_env))
         # # if inconsistent
         if !is_consistent(base_env,pc_mapf)
-            @log_info(-1,verbosity(solver),"Route plan is not yet consistent. Trimming paths to replan")
             inconsistencies = find_inconsistencies(base_env)
             trim_points = select_trim_points(base_env,inconsistencies)
+            @log_info(-1,verbosity(solver),"Route plan is not yet consistent. Trimming $(length(trim_points)) paths to replan")
             for (agent_id,t) in trim_points
                 path = get_paths(base_env)[get_id(agent_id)]
                 trim_path!(base_env,path,t)
@@ -425,7 +414,7 @@ function CRCBS.low_level_search!(solver::CBSSolver{L,C}, prob::PC_MAPF, node::N,
     # TODO are constraints be passed correctly?
     start_ids = Set{BotID}([RobotID(i) for i in idxs])
     base_env = build_multi_goal_env(low_level(solver),prob,node.solution)
-    base_env = solve_with_multi_goal_solver!(solver,prob,base_env,node;start_ids=start_ids)
+    base_env = solve_with_multi_goal_solver!(low_level(solver),prob,base_env,node;start_ids=start_ids)
     # hack to set first cost element to makespan
     cost = aggregate_costs(get_cost_model(base_env),get_path_costs(node.solution))
     fixed_cost = typeof(cost)([makespan(get_schedule(base_env)),cost[2:end]...])
@@ -462,14 +451,9 @@ function initialize_multi_goal_route_plan(sched::OperatingSchedule,cost_model)
 end
 
 
-# struct MG_PC_MAPF
-#     env::MPCCBSEnv
-# end
 ################################################################################
 ############################## CBS Wrapper Stuff ###############################
 ################################################################################
-
-# function low_level_search!()
 
 function CRCBS.initialize_root_node(solver::CBSSolver{L,C},pc_mapf::AbstractPC_MAPF) where {L<:MultiGoalPCMAPFSolver,C}
     env = build_base_multi_goal_search_env(solver,pc_mapf)
@@ -482,32 +466,3 @@ function CRCBS.initialize_root_node(solver::CBSSolver{L,C},pc_mapf::AbstractPC_M
             ),
         id = 1)
 end
-# CRCBS.discrete_constraint_table(env::MPCCBSEnv,args...) = discrete_constraint_table(env.search_env,args...)
-# CRCBS.detect_conflicts!(table,env::MPCCBSEnv,args...) = detect_conflicts!(table,get_route_plan(env),args...)
-
-# function CRCBS.build_env(solver::MultiGoalPCMAPFSolver, pc_mapf::AbstractPC_MAPF, args...) 
-#     build_env(solver,pc_mapf,get_env(pc_mapf),args...)
-# end
-# CRCBS.build_env(prob::Union{PC_TAPF,PC_MAPF}) = build_env(get_env(prob))
-# CRCBS.get_initial_solution(pc_mapf::PC_MAPF) = get_env(pc_mapf)
-# function Base.copy(env::SearchEnv)
-#     SearchEnv(
-#         env,
-#         schedule=deepcopy(get_schedule(env)),
-#         cache=deepcopy(get_cache(env)),
-#         route_plan=deepcopy(get_route_plan(env))
-#         )
-# end
-# function CRCBS.default_solution(env::SearchEnv)
-#     solution = deepcopy(env)
-#     set_cost!(get_route_plan(solution),get_infeasible_cost(get_route_plan(solution)))
-#     solution, get_cost(solution)
-# end
-# CRCBS.default_solution(pc_mapf::M) where {M<:AbstractPC_MAPF} = default_solution(get_env(pc_mapf))
-# function CRCBS.cbs_update_conflict_table!(solver,mapf::AbstractPC_MAPF,node,constraint)
-#     search_env = node.solution
-#     idxs = collect(1:num_agents(search_env))
-#     # t0 = max(minimum(get_cache(search_env).t0), 1) # This is particularly relevant for replanning, where we don't care to look for conflicts way back in the past.
-#     t0 = max(minimum(get_t0(get_schedule(search_env))),1) # This is particularly relevant for replanning, where we don't care to look for conflicts way back in the past.
-#     detect_conflicts!(node.conflict_table,get_route_plan(search_env),idxs,Int(floor(t0)))
-# end

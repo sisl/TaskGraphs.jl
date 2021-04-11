@@ -837,7 +837,9 @@ function log_schedule_edges(sched,v=-1;
         end
     end
 end
-function validate(node::ScheduleNode,paths::Vector{Vector{Int}})
+function validate(node::ScheduleNode,paths::Vector{Vector{Int}};
+        quiet::Bool=false,
+    )
     if matches_template(TEAM_ACTION,node)
         for n in sub_nodes(node)
             sub_node = ScheduleNode(node.id,n,node.spec)
@@ -870,7 +872,9 @@ function validate(node::ScheduleNode,paths::Vector{Vector{Int}})
                 end
             catch e
                 if typeof(e) <: AssertionError
-                    print(e.msg)
+                    if !quiet
+                        println(e.msg)
+                    end
                 else
                     rethrow(e)
                 end
@@ -880,10 +884,12 @@ function validate(node::ScheduleNode,paths::Vector{Vector{Int}})
     end
     return true
 end
-function validate(sched::OperatingSchedule,paths::Vector{Vector{Int}})
+function validate(sched::OperatingSchedule,paths::Vector{Vector{Int}};
+        kwargs...
+    )
     for v in vertices(sched)
         node = get_node(sched,v)
-        if !validate(node,paths)
+        if !validate(node,paths;kwargs...)
             return false
         end
     end
