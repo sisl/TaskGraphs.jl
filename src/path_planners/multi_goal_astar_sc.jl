@@ -2,7 +2,6 @@
     vtx     ::Int           = -1
     t       ::Int           = -1
     stage   ::Int           = -1
-    # node    ::ScheduleNode  = ScheduleNode(RobotID(-1),ROBOT_AT(-1,-1))
     node    ::Union{Nothing,ScheduleNode}  = nothing
     active  ::Bool          = true
 end
@@ -80,6 +79,8 @@ function can_advance_stage(env::MPCCBSEnv,s,node=s.node,stage=s.stage)
         itinerary = get_itinerary(env,get_robot_id(node))
         if stage < length(itinerary)
             next_node = itinerary[stage + 1]
+            # TODO wondering if something is wrong here...?
+            # check position too (already taken care of by check_stage_goal...)?
             return (get_t0(next_node) <= get_t(s))
         end 
         return true
@@ -91,18 +92,32 @@ function CRCBS.get_next_state(env::MPCCBSEnv,s::MState,a::MAction)
     node = s.node
     itinerary = get_itinerary(env,get_robot_id(node))
     sp = GraphState(get_e(a).dst,get_t(s)+get_dt(a))
+    tF = get_t(sp)
     # update multiple nodes at once, if possible
-    # while (check_stage_goal(env,s,node) || check_stage_goal(env,sp,node)) && stage < length(itinerary)
-    while (can_advance_stage(env,s,node,stage) || can_advance_stage(env,sp,node,stage)) && stage < length(itinerary)
-        stage = stage + 1
-        node = itinerary[stage]
+    while stage < length(itinerary)
+        if can_advance_stage(env,s,node,stage)
+            # Should only ever happen if isa(node,BOT_AT)
+            # @assert matches_template(BOT_AT,node) "node should not advance at s $(summary(node))"
+            @assert get_t(s) == 0
+            stage = stage + 1
+            node = itinerary[stage]
+            # tf = get_s(t) # track tF here for first 
+        elseif can_advance_stage(env,sp,node,stage)
+            stage = stage + 1
+            node = itinerary[stage]
+        else
+            break
+        end
     end
+    # TODO resolve ambiguity about the completion and start times for all nodes
     MState(
         get_vtx(sp),
         get_t(sp),
         stage,
         node,
-        _state_active(s))
+        _state_active(s),
+        # prev_stage_completion=tF,
+        )
 end
 CRCBS.wait(::MPCCBSEnv,s)              = MAction(e=Edge(get_vtx(s),get_vtx(s)))
 
@@ -158,9 +173,11 @@ function align_schedule_node_times!(env::MPCCBSEnv,sched=get_schedule(env))
                     node = itinerary[stage]
                     if can_advance_stage(env,n.s,node,stage)
                         set_tF!(node,get_t(n.s))
+                        update_schedule_times!(sched,Set{Int}(get_vtx(sched,node)))
                         stage += 1
                     elseif can_advance_stage(env,n.sp,node,stage)
                         set_tF!(node,get_t(n.sp))
+                        update_schedule_times!(sched,Set{Int}(get_vtx(sched,node)))
                         stage += 1
                     else
                         break
@@ -173,12 +190,12 @@ function align_schedule_node_times!(env::MPCCBSEnv,sched=get_schedule(env))
         # for (idx,n) in reverse(collect(enumerate(path.path_nodes)))
         #     while stage >= 1
         #         node = itinerary[stage]
-        #         if can_advance_stage(env,n.s,node,stage)
+        #         if can_advance_stage(env,n.s,node,stage) && !can_advance_stage(env,n.sp,node,stage) 
         #             set_tF!(node,get_t(n.s))
         #             stage -= 1
-        #         elseif can_advance_stage(env,n.sp,node,stage)
-        #             set_tF!(node,get_t(n.sp))
-        #             stage -= 1
+        #         # elseif can_advance_stage(env,n.sp,node,stage) 
+        #         #     set_tF!(node,get_t(n.sp))
+        #         #     stage -= 1
         #         else
         #             break
         #         end
@@ -217,27 +234,53 @@ function find_inconsistencies(env::MPCCBSEnv;
             if s.node != sp.node # if path node spans a transition time
                 t0 = Int(round(get_t0(sp.node)))
                 tF = Int(round(get_tF(s.node)))
-                # if get_tF(s.node) != get_t(s) # || get_id(get_destination_location_id(s.node)) != get_vtx(s) 
-                if !(tF == get_t(s) || tF == get_t(sp))
-                    @info "inconsistency at tF for node $(summary(sp.node)) with n $(string(n)) path $(convert_to_vertex_lists(path))"
-                    delay = Int(round(get_tF(s.node) - get_t(s)))
-                    # @assert delay > 0
-                    inconsistencies[node_id(s.node)] = delay
-                    if break_on_first
-                        return inconsistencies
+                if get_t(s) == 0 # first step
+                    # R: 0 => 0 can start and end at 0
+                    # As can a string of zero duration successors, even R=>GO=>COLLECT=>CARRY=>DEPOSIT...
+                    if get_t0(s.node) != get_t(s)
+                        @info "node $(summary(s.node)) should have t0 == get_t(s) == $(get_t(s))"
                     end
-                # elseif get_id(get_destination_location_id(s.node)) != get_vtx(s)
-                end
-                # if !(t0 == get_t(sp))
-                if !(t0 == get_t(s) || t0 == get_t(sp))
-                    @info "inconsistency at t0 for node $(summary(sp.node)) with n $(string(n)) path $(convert_to_vertex_lists(path))"
-                    delay = t0 - get_t(sp)
-                    # @assert delay > 0
-                    inconsistencies[node_id(sp.node)] = delay
-                    if break_on_first
-                        return inconsistencies
+                    if !(get_t0(sp.node) == get_t(s) || get_t0(sp.node) == get_t(sp))
+                        @info "node $(summary(sp.node)) should have t0 equal to get_t(s) == $(get_t(s)) or get_t(sp) == $(get_t(sp))"
+                    end
+                else
+                    if get_t0(sp.node) != get_t(sp)
+                        @info "node $(summary(sp.node)) should have t0 == get_t(sp) == $(get_t(sp))"
+                        @info "inconsistency at t0 for node $(summary(sp.node)) with n $(string(n)) path $(convert_to_vertex_lists(path))"
+                        delay = t0 - get_t(sp)
+                        inconsistencies[node_id(sp.node)] = delay
+                    end
+                    if get_tF(s.node) != get_t(sp)
+                        @info "node $(summary(s.node)) should have tF == get_t(sp) == $(get_t(sp))"
+                        @info "inconsistency at tF for node $(summary(sp.node)) with n $(string(n)) path $(convert_to_vertex_lists(path))"
+                        delay = Int(round(get_tF(s.node) - get_t(s)))
+                        inconsistencies[node_id(s.node)] = delay
                     end
                 end
+                # # if get_tF(s.node) != get_t(s) # || get_id(get_destination_location_id(s.node)) != get_vtx(s) 
+                # if !(tF == get_t(s) || tF == get_t(sp))
+                #     @info "inconsistency at tF for node $(summary(sp.node)) with n $(string(n)) path $(convert_to_vertex_lists(path))"
+                #     delay = Int(round(get_tF(s.node) - get_t(s)))
+                #     # @assert delay > 0
+                #     inconsistencies[node_id(s.node)] = delay
+                #     if break_on_first
+                #         return inconsistencies
+                #     end
+                # # elseif get_id(get_destination_location_id(s.node)) != get_vtx(s)
+                # end
+                # # if !(t0 == get_t(sp))
+                # if !(t0 == get_t(s) || t0 == get_t(sp))
+                #     @info "inconsistency at t0 for node $(summary(sp.node)) with n $(string(n)) path $(convert_to_vertex_lists(path))"
+                #     delay = t0 - get_t(sp)
+                #     # @assert delay > 0
+                #     inconsistencies[node_id(sp.node)] = delay
+                #     if break_on_first
+                #         return inconsistencies
+                #     end
+                # end
+            end
+            if (length(inconsistencies) > 0) && break_on_first
+                return inconsistencies
             end
         end
     end
@@ -364,6 +407,7 @@ function solve_with_multi_goal_solver!(solver,pc_mapf,
                 set_path!(get_cost_model(env),get_id(id),convert_to_vertex_lists(path))
             end
             align_route_plan_tips!(base_env)
+            # When we call align_schedule_node_times!(...) before process_schedule!, some nodes can "cheat" on can_advance_stage  
             align_schedule_node_times!(base_env)
             process_schedule!(get_schedule(base_env))
 
@@ -378,6 +422,7 @@ function solve_with_multi_goal_solver!(solver,pc_mapf,
             # # if inconsistent
             if !is_consistent(base_env,pc_mapf)
                 inconsistencies = find_inconsistencies(base_env)
+                @log_info(-1,verbosity(solver),"length(inconsistencies) = $(length(inconsistencies))")
                 trim_points = select_trim_points(base_env,inconsistencies)
                 @log_info(-1,verbosity(solver),"Route plan is not yet consistent. Trimming $(length(trim_points)) paths to replan")
                 for (agent_id,t) in trim_points

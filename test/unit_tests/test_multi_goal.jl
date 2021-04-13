@@ -58,20 +58,76 @@ let
         prob = f(solver)
         env, cost = solve!(solver,prob)
         @test validate(env)
+
+        let 
+            # test align_schedule_node_times
+            mg_env = TaskGraphs.build_multi_goal_env(solver,prob,deepcopy(env))
+            @test is_consistent(mg_env,PC_MAPF(get_env(prob)))
+            # now "unalign" schedule times and realign them
+            sched = get_schedule(mg_env)
+            t0 = deepcopy(get_t0(sched))
+            tF = deepcopy(get_tF(sched))
+            # reset schedule
+            TaskGraphs.reset_schedule_times!(sched,get_schedule(get_env(prob)))
+            # set_t0!(sched,0.0)
+            # set_tF!(sched,0.0)
+            # TaskGraphs.update_schedule_times!(sched)
+            TaskGraphs.align_schedule_node_times!(mg_env)
+            # TaskGraphs.update_schedule_times!(sched)
+            # TaskGraphs.align_schedule_node_times!(mg_env)
+            TaskGraphs.update_schedule_times!(sched)
+            t0_err = Int.(round.(t0 .- get_t0(sched)))
+            tF_err = Int.(round.(tF .- get_tF(sched)))
+            err_set = findall((t0_err .!= 0) .| (tF_err .!= 0))
+            if !isempty(err_set)
+                for v in err_set
+                    node = get_node(sched,v)
+                    @show v, t0[v], tF[v], summary(node)
+                end
+                @show get_route_plan(mg_env)
+            end
+            @test is_consistent(mg_env,PC_MAPF(get_env(prob)))
+        end
     end
 
 end
 
+# test align_schedule_node_times
 let 
-    solver = NBSSolver(path_planner=CBSSolver(MultiGoalPCMAPFSolver(DefaultAStarSC())))
+
+end
+
+# Test case designed to challenge the multi-goal solver
+let
+
+end
+
+let 
+    # solver = NBSSolver(path_planner=CBSSolver(MultiGoalPCMAPFSolver(DefaultAStarSC())))
     # set_verbosity!(solver.path_planner,3)
     # set_verbosity!(solver.path_planner.low_level_planner,3)
     # set_verbosity!(solver.path_planner.low_level_planner.low_level_planner,5)
     # set_iteration_limit!(solver.path_planner.low_level_planner,2)
     # set_iteration_limit!(solver.path_planner,1)
     # prob = TaskGraphs.convert_to_multi_goal_problem(PC_TAPF,solver,pctapf_problem_4(solver))
-    prob = pctapf_problem_4(solver)
+    # prob = pctapf_problem_4(solver)
+    solver = CBSSolver(MultiGoalPCMAPFSolver(DefaultAStarSC()))
+    prob = TaskGraphs.generate_prob(PC_MAPF,TaskGraphs.pctapf_problem_15,solver)
+    # add_constraint!(node,)
     env, cost = solve!(solver,prob)
+    for p in get_paths(get_route_plan(env))
+        for t in 0:get_t(get_final_state(p))
+            println(string(get_path_node(p,t)))
+        end
+        println("")
+    end
+
+    # n = get_path_node(get_paths(env)[1],1)
+    # c = state_constraint(1,n,get_t(get_sp(n)))
+    # node = initialize_root_node(solver,prob)
+    # add_constraint!(env,node,c)
+    # @show low_level_search!(solver,prob,node)
+    # node.solution
 
 end
 

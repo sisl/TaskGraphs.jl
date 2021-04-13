@@ -742,6 +742,38 @@ function pctapf_problem_14(;
     return sched, problem_spec, env_graph, assignment_dict
 end
 
+"""
+    pctapf_problem_15(;cost_function=SumOfMakeSpans(),verbose=false)
+
+Trying to stress the multi goal algorithm
+"""
+function pctapf_problem_15(;cost_function=SumOfMakeSpans(),verbose=false)
+    N = 2                  # num robots
+    M = 4                  # num delivery tasks
+    vtx_grid = initialize_dense_vtx_grid(4,8)
+    #  1   2   3   4   5   6   7   8
+    #  9  10  11  12  13  14  15  16
+    # 17  18  19  20  21  22  23  24
+    # 25  26  27  28  29  30  31  32
+    r0 = [1,25]
+    s0 = [1,25,5,29]
+    sF = [3,28,7,31]
+    env_graph = construct_factory_env_from_vtx_grid(
+        vtx_grid;
+    )
+
+    project_spec, robot_ICs = empty_pctapf_problem(r0,s0,sF)
+    add_operation!(project_spec,construct_operation(project_spec,-1,[1],[3],0))
+    add_operation!(project_spec,construct_operation(project_spec,-1,[2],[4],0))
+    add_operation!(project_spec,construct_operation(project_spec,-1,[3,4],[],0))
+    assignment_dict = Dict(1=>[1,3],2=>[2,4])
+
+    def = SimpleProblemDef(project_spec,r0,s0,sF)
+    sched, problem_spec = construct_task_graphs_problem(
+        def,env_graph;cost_function=cost_function)
+
+    return sched, problem_spec, env_graph, assignment_dict
+end
 
 export
     pctapf_test_problems,
@@ -763,6 +795,16 @@ collaborative_pctapf_test_problems() = [
     pctapf_problem_11,
 ]
 
+function generate_prob(recipe,solver,args...;kwargs...)
+    pctapf_problem(solver,recipe(args...;kwargs...)...)
+end
+function generate_prob(::Type{PC_MAPF},recipe,solver,args...;kwargs...)
+    prob = pctapf_problem(solver,recipe(args...;kwargs...)...)
+    _,_,_, assignment_dict = recipe()
+    apply_assignment_dict!(get_schedule(get_env(prob)),assignment_dict,get_problem_spec(get_env(prob)))
+    PC_MAPF(get_env(prob))
+end
+
 for op in [
         :pctapf_problem_1,
         :pctapf_problem_2,
@@ -779,6 +821,7 @@ for op in [
         :pctapf_problem_12,
         :pctapf_problem_13,
         :pctapf_problem_14,
+        :pctapf_problem_15,
     ]
     @eval begin
         $op(solver,args...;kwargs...) = pctapf_problem(solver,$op(args...;kwargs...)...)
