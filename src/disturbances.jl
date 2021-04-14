@@ -129,7 +129,7 @@ function remove_vtxs(sched,remove_set)
     keep_vtxs = setdiff(Set{Int}(collect(vertices(sched))), remove_set)
     # add all non-deleted nodes to new project schedule
     for v in keep_vtxs
-        add_to_schedule!(new_sched,get_node(sched,v))
+        add_node!(new_sched,get_node(sched,v))
     end
     # add all edges between nodes that still exist
     for e in edges(get_graph(sched))

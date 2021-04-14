@@ -1,7 +1,7 @@
 @with_kw struct MState <: CRCBS.AbstractGraphState
     vtx     ::Int           = -1
     t       ::Int           = -1
-    stage   ::Int           = -1
+    stage   ::Int           = -1 # track more nodes than one?
     node    ::Union{Nothing,ScheduleNode}  = nothing
     active  ::Bool          = true
 end
@@ -37,6 +37,8 @@ for op in [
     ]
     @eval $op(env::MPCCBSEnv) = $op(get_route_plan(env))
 end
+
+extract_itineraries(sched) = Dict(id=>extract_robot_itinerary(sched,id) for id in keys(get_robot_ICs(sched)))
 
 function CRCBS.get_heuristic_cost(m::MultiStageEnvDistanceHeuristic,
     env::MPCCBSEnv,
@@ -92,16 +94,13 @@ function CRCBS.get_next_state(env::MPCCBSEnv,s::MState,a::MAction)
     node = s.node
     itinerary = get_itinerary(env,get_robot_id(node))
     sp = GraphState(get_e(a).dst,get_t(s)+get_dt(a))
-    tF = get_t(sp)
     # update multiple nodes at once, if possible
     while stage < length(itinerary)
         if can_advance_stage(env,s,node,stage)
-            # Should only ever happen if isa(node,BOT_AT)
-            # @assert matches_template(BOT_AT,node) "node should not advance at s $(summary(node))"
-            @assert get_t(s) == 0
+            # This should only really happen at the transition from the very first state.
+            @assert matches_template(BOT_AT,s.node) "stage is $(stage), s is $(summary(s)), node is $(summary(node))"
             stage = stage + 1
             node = itinerary[stage]
-            # tf = get_s(t) # track tF here for first 
         elseif can_advance_stage(env,sp,node,stage)
             stage = stage + 1
             node = itinerary[stage]
@@ -116,7 +115,6 @@ function CRCBS.get_next_state(env::MPCCBSEnv,s::MState,a::MAction)
         stage,
         node,
         _state_active(s),
-        # prev_stage_completion=tF,
         )
 end
 CRCBS.wait(::MPCCBSEnv,s)              = MAction(e=Edge(get_vtx(s),get_vtx(s)))
@@ -235,6 +233,7 @@ function find_inconsistencies(env::MPCCBSEnv;
                 t0 = Int(round(get_t0(sp.node)))
                 tF = Int(round(get_tF(s.node)))
                 if get_t(s) == 0 # first step
+                    # This can also happen if the robot waits for a while...
                     # R: 0 => 0 can start and end at 0
                     # As can a string of zero duration successors, even R=>GO=>COLLECT=>CARRY=>DEPOSIT...
                     if get_t0(s.node) != get_t(s)
@@ -257,27 +256,6 @@ function find_inconsistencies(env::MPCCBSEnv;
                         inconsistencies[node_id(s.node)] = delay
                     end
                 end
-                # # if get_tF(s.node) != get_t(s) # || get_id(get_destination_location_id(s.node)) != get_vtx(s) 
-                # if !(tF == get_t(s) || tF == get_t(sp))
-                #     @info "inconsistency at tF for node $(summary(sp.node)) with n $(string(n)) path $(convert_to_vertex_lists(path))"
-                #     delay = Int(round(get_tF(s.node) - get_t(s)))
-                #     # @assert delay > 0
-                #     inconsistencies[node_id(s.node)] = delay
-                #     if break_on_first
-                #         return inconsistencies
-                #     end
-                # # elseif get_id(get_destination_location_id(s.node)) != get_vtx(s)
-                # end
-                # # if !(t0 == get_t(sp))
-                # if !(t0 == get_t(s) || t0 == get_t(sp))
-                #     @info "inconsistency at t0 for node $(summary(sp.node)) with n $(string(n)) path $(convert_to_vertex_lists(path))"
-                #     delay = t0 - get_t(sp)
-                #     # @assert delay > 0
-                #     inconsistencies[node_id(sp.node)] = delay
-                #     if break_on_first
-                #         return inconsistencies
-                #     end
-                # end
             end
             if (length(inconsistencies) > 0) && break_on_first
                 return inconsistencies
@@ -299,7 +277,7 @@ function find_inconsistencies(env::MPCCBSEnv;
     #                 inconsistencies[node_id(node)] = 0.0
     #             end
     #         else
-    #             inconsistencies[node_id(node)] = 0.0
+    #             inconsistencies[node_id(node)] = t0 - get_t(get_final_state(path))
     #         end
     #         if tF <= get_t(get_final_state(path))
     #             nF = get_path_node(path,tF)
@@ -497,8 +475,7 @@ function build_base_multi_goal_search_env(solver,pc_mapf;
     sched = get_schedule(search_env)
     env_graph = get_graph(search_env)
     # itineraries 
-    itineraries = Dict(
-        id=>TaskGraphs.extract_robot_itinerary(sched,id) for id in keys(get_robot_ICs(sched)))
+    itineraries = extract_itineraries(sched)
     vtx_sequences = Dict(get_id(k)=>map(n->get_vtx(TaskGraphs.construct_goal(n)),v) for (k,v) in itineraries)
     cost_to_go = CRCBS.construct_multi_stage_env_distance_heuristic(env_graph,vtx_sequences)
     # cost and heuristic models
@@ -521,19 +498,44 @@ function build_base_multi_goal_search_env(solver,pc_mapf;
     )
 end
 
+# function preprocess_multi_goal_route_plan!(env::MPCCBSEnv)
+#     route_plan = get_route_plan(env)
+#     for (id,itinerary) in env.itineraries
+#         path = get_paths(env)[get_id(id)]
+#         start = get_initial_state(path)
+#         # node = get_node(sched,k)
+#         stage = start.stage
+#         node = itinerary[stage]
+#         while stage < length(itinerary)
+#             if can_advance_stage(env,start,node,stage)
+#                 stage = stage + 1
+#                 node = itinerary[stage]
+#             else
+#                 break
+#             end
+#         end
+#         set_solution_path!(
+#             route_plan,
+#             path_type(get_route_plan(env))(s0=s, cost=get_cost(path)),
+#             get_id(id),
+#         )
+#     end
+#     costs = map(p->get_cost(p), get_paths(route_plan))
+#     cost = aggregate_costs(env, costs)
+#     set_cost!(route_plan,cost)
+#     env
+# end
+
 function build_multi_goal_env(solver,pc_mapf,
         search_env=get_env(pc_mapf),
-        # node = initialize_root_node(solver,pc_mapf),
     )
     sched = get_schedule(search_env)
     # itineraries 
-    itineraries = Dict(
-        id=>TaskGraphs.extract_robot_itinerary(sched,id) for id in keys(get_robot_ICs(sched)))
+    itineraries = extract_itineraries(sched)
     # base env
     env = TaskGraphs.MPCCBSEnv(
         search_env = search_env,
         itineraries = itineraries,
-        # constraints=node.constraints,
         )
 end
 
@@ -562,13 +564,15 @@ Init route plan with `MState` as the state type.
 """
 function initialize_multi_goal_route_plan(sched::OperatingSchedule,cost_model)
     starts = MState[]
-    robot_ics = get_robot_ICs(sched)
-    for k in sort(collect(keys(robot_ics)))
-        node = get_node(sched,k)
+    itineraries = extract_itineraries(sched)
+    for id in sort(collect(keys(itineraries)))
+        itinerary = itineraries[id]
+        stage = 1
+        node = itinerary[stage]
         push!(starts, MState(
             vtx = get_id(get_initial_location_id(node)),
             t = 0, 
-            stage = 1,
+            stage = stage,
             node = node,
             ))
     end

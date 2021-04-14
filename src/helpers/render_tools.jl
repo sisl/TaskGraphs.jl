@@ -1239,6 +1239,9 @@ function index_by_keys(tab::ResultsTable,include_keys::Dict=Dict(),exclude_keys:
     end
     tab[x_idxs,y_idxs]
 end
+function init_table(xkeys,ykeys)
+    tab = ResultsTable(xkeys, ykeys, zeros(length(xkeys),length(ykeys)))
+end
 
 
 
@@ -1326,6 +1329,26 @@ function flatten_table(tab;
         return transpose(flatten_table(transpose(tab);axis=:y,_header_keys=_header_keys))
     end
 end
+
+"""
+    table_inner_product(tables,xkeys,ykeys)
+
+Given an `m × n` matrix of tables, construct a new `m × n` table `new_tab` such 
+that `new_tab[i,j]` is a `m × n` matrix whose `a,b`th element is the `i,j`th 
+element of table `tables[a,b]`.
+"""
+function table_inner_product(tables,xkeys,ykeys)
+    # @show @assert length(unique(size.(tables))) == 1 "All tables must have same dimensions"
+    @show tab1 = tables[1]
+    @show dims = size(tab1)
+    @show tab = init_table(get_xkeys(tab1),get_ykeys(tab1))
+    for (i,x) in enumerate(get_xkeys(tab))
+        for (j,y) in enumerate(get_ykeys(tab))
+            tab.data[i,j] = ResultsTable(xkeys,ykeys,map(t->t.data[i,j],tables))
+        end
+    end
+    tab
+end
 """ utility for printing real-valued elements of a table """
 function print_real(io,v;
         precision=3,
@@ -1345,6 +1368,7 @@ function print_multi_value_real(io,vals;
         surround=["",""],
         stopchar="",
         comp_func=vals->-1,
+        print_func=print_real,
         kwargs...)
     best_idx = comp_func(vals)
     if 1 <= best_idx <= length(vals) 
@@ -1355,7 +1379,7 @@ function print_multi_value_real(io,vals;
     for (i,v) in enumerate(vals)
         print(io,surround[1])
         i in best_idxs ? print(io,"\\textbf{") : nothing
-        print_real(io,v;kwargs...)
+        print_func(io,v;kwargs...)
         i in best_idxs ? print(io,"}") : nothing
         print(io,surround[2])
         if i < length(vals)
@@ -1376,16 +1400,24 @@ function print_latex_header(io,tab;
         newline=" \\\\\n",
         start_char="& ",
         group_delim=" | ",
+        colspec="l ",
+        initial_colspec=colspec,
+        terminal_spec="",
+        print_row_start=true,
         kwargs...
         )
-    print(io,"\\begin{tabular}{","l ",)
+
+    print(io,"\\begin{tabular}{")
+    if print_row_start
+        print(io,initial_colspec,)
+    end
     for i in 1:size(tab,2)
         print(io, group_delim)
         for j in 1:span
-            print(io,"l ")
+            print(io,colspec)
         end
     end
-    print(io,"}","\n")
+    print(io,terminal_spec,"}","\n")
 end
 function print_latex_column_labels(io,tab;
         span=span_length(get_data(tab)[1,1]),
@@ -1393,13 +1425,17 @@ function print_latex_column_labels(io,tab;
         newline=" \\\\\n",
         start_char="& ",
         group_delim=" | ",
+        print_row_start=true,
+        col_label_func=(k,v)->"\$$(k)=$(v)\$",
         kwargs...
     )
     # labels
-    print(io,start_char)
+    if print_row_start
+        print(io,start_char)
+    end
     for (j,ykeys) in enumerate(get_ykeys(tab))
         print(io,"\\multicolumn{$span}{c}{",
-            ["\$$(k)=$(v)\$" for (k,v) in ykeys]...,"}")
+            [col_label_func(k,v) for (k,v) in ykeys]...,"}")
         if j < size(tab,2)
             print(io,delim)
         else
@@ -1409,11 +1445,12 @@ function print_latex_column_labels(io,tab;
 end
 function print_latex_row_start(io,tab,i;
         delim=" & ",
+        row_label_func=(k,v)->"\$$(k)=$(v)\$",
         kwargs...
         )
     xkeys = get_xkeys(tab)[i]
     for (idx,(k,v)) in enumerate(xkeys)
-        print(io,"\$$(k)=$(v)\$")
+        print(io,row_label_func(k,v))
         if !(idx == length(xkeys))
             print(io,",")
         end
@@ -1434,14 +1471,19 @@ function write_tex_table(io,tab;
         kwargs...,
     )
     if print_header
-        header_printer(io,tab)
+        # header_printer(io,tab)
+        header_printer(io,tab;
+            print_row_start=print_row_start,
+            kwargs...)
     end
     if print_column_labels
-        print_latex_column_labels(io,tab;kwargs...)
+        print_latex_column_labels(io,tab;
+            print_row_start=print_row_start,
+            kwargs...)
     end
     for (i,xkeys) in enumerate(get_xkeys(tab))
         if print_row_start
-            row_start_printer(io,tab,i)
+            row_start_printer(io,tab,i;kwargs...)
         end
         for (j,ykeys) in enumerate(get_ykeys(tab))
             print_func(io,get_data(tab)[i,j];kwargs...)
@@ -1487,14 +1529,19 @@ function write_nested_tex_table(io,tab;
         kwargs...,
     )
     if print_header
-        header_printer(io,tab)
+        # header_printer(io,tab)
+        header_printer(io,tab;
+            print_row_start=print_row_start,
+            kwargs...)
     end
     if print_column_labels
-        print_latex_column_labels(io,tab;kwargs...)
+        print_latex_column_labels(io,tab;
+            print_row_start=true,
+            kwargs...)
     end
     for (i,xkeys) in enumerate(get_xkeys(tab))
         if print_row_start
-            row_start_printer(io,tab,i)
+            row_start_printer(io,tab,i;kwargs...)
         else
             print(io,delim)
         end
@@ -1662,6 +1709,8 @@ GraphPlottingBFS._node_color(::Operation)                   = RGB(0.8,0.0,0.2)
 GraphPlottingBFS._node_bg_color(n::AbstractPlanningPredicate)= GraphPlottingBFS._node_color(n)
 GraphPlottingBFS._node_shape(::Operation,args...)           = Compose.rectangle(0.0,0.0,1.0,1.0)
 GraphPlottingBFS._node_color(::AbstractSingleRobotAction)   = RGB(0.0,0.4,1.0)
+GraphPlottingBFS._node_color(::BOT_AT{R}) where {R<:CleanUpBot} = RGB(1.0,0.0,1.0)
+GraphPlottingBFS._node_color(::A) where {R<:CleanUpBot,A<:AbstractSingleRobotAction{R}} = RGB(1.0,0.0,1.0)
 
 GraphPlottingBFS._subtitle_text_scale(n::AbstractPlanningPredicate) = 0.3
 GraphPlottingBFS._text_color(n::AbstractPlanningPredicate) = "black"

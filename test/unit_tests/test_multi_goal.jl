@@ -113,6 +113,8 @@ let
     # prob = pctapf_problem_4(solver)
     solver = CBSSolver(MultiGoalPCMAPFSolver(DefaultAStarSC()))
     prob = TaskGraphs.generate_prob(PC_MAPF,TaskGraphs.pctapf_problem_15,solver)
+    node = initialize_root_node(solver,prob)
+    low_level_search!(solver,prob,node)
     # add_constraint!(node,)
     env, cost = solve!(solver,prob)
     for p in get_paths(get_route_plan(env))
@@ -128,6 +130,27 @@ let
     # add_constraint!(env,node,c)
     # @show low_level_search!(solver,prob,node)
     # node.solution
+
+end
+
+let
+    solver = CBSSolver(MultiGoalPCMAPFSolver(DefaultAStarSC()))
+    prob = TaskGraphs.generate_prob(PC_MAPF,TaskGraphs.pctapf_problem_1,solver)
+    # node = initialize_root_node(solver,prob)
+    # low_level_search!(solver,prob,node)
+    # add_constraint!(node,)
+    env, cost = solve!(solver,prob)
+    for p in get_paths(get_route_plan(env))
+        for t in 0:get_t(get_final_state(p))
+            println(string(get_path_node(p,t)))
+        end
+        println("")
+    end
+    mg_env = TaskGraphs.build_multi_goal_env(solver,prob,deepcopy(env))
+    itineraries = TaskGraphs.extract_itineraries(get_schedule(mg_env))
+    collect_node = itineraries[RobotID(1)][3]
+    set_t0!(collect_node,get_t0(collect_node)-1)
+    TaskGraphs.find_inconsistencies(mg_env)
 
 end
 
