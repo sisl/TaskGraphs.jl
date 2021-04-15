@@ -239,8 +239,10 @@ function handle_disturbance!(solver,prob,env::SearchEnv,d::DroppedObject,t,
     # Add GO->GO edges for affected robot(s), as if they were never assigned
     stitch_disjoint_node_sets!(sched,incoming,outgoing,env_state)
     # remove old nodes
-    new_sched = remove_vtxs(sched,vtxs)
-    # new_sched = remove_vtxs!(sched,vtxs)
+    # new_sched = remove_vtxs(sched,vtxs)
+    rem_nodes!(sched,vtxs)
+    new_sched = sched
+    # rem_nodes!(sched,map(v->get_vtx_id(sched,v),vtxs))
     # add new CleanUpBot task nodes
     x = get_location_ids(object_position(env_state,o))
     replace_in_schedule!(new_sched,OBJECT_AT(o,x),o)
