@@ -108,9 +108,9 @@ end
 
 export handle_disturbance!
 
-function remove_vtxs(sched,remove_set::Set{A}) where {A<:AbstractID}
-    remove_vtxs(sched,Set{Int}(get_vtx(sched,id) for id in remove_set))
-end
+# function remove_vtxs(sched,remove_set::Set{A}) where {A<:AbstractID}
+#     remove_vtxs(sched,Set{Int}(get_vtx(sched,id) for id in remove_set))
+# end
 function remove_vtxs!(sched,remove_set)
     new_sched = sched
     rem_nodes!(new_sched,remove_set)
@@ -118,28 +118,28 @@ function remove_vtxs!(sched,remove_set)
     process_schedule!(new_sched)
     new_sched
 end
-function remove_vtxs(sched,remove_set)
-    # Construct new graph
-    # new_sched = sched
-    # rem_nodes!(new_sched,remove_set)
-    # set_leaf_operation_vtxs!(new_sched)
-    # process_schedule!(new_sched)
+# function remove_vtxs(sched,remove_set)
+#     # Construct new graph
+#     # new_sched = sched
+#     # rem_nodes!(new_sched,remove_set)
+#     # set_leaf_operation_vtxs!(new_sched)
+#     # process_schedule!(new_sched)
 
-    new_sched = OperatingSchedule()
-    keep_vtxs = setdiff(Set{Int}(collect(vertices(sched))), remove_set)
-    # add all non-deleted nodes to new project schedule
-    for v in keep_vtxs
-        add_node!(new_sched,get_node(sched,v))
-    end
-    # add all edges between nodes that still exist
-    for e in edges(get_graph(sched))
-        add_edge!(new_sched, get_vtx_id(sched, e.src), get_vtx_id(sched, e.dst))
-    end
-    set_leaf_operation_vtxs!(new_sched)
-    process_schedule!(new_sched)
-    # @assert sanity_check(new_sched)
-    new_sched
-end
+#     new_sched = OperatingSchedule()
+#     keep_vtxs = setdiff(Set{Int}(collect(vertices(sched))), remove_set)
+#     # add all non-deleted nodes to new project schedule
+#     for v in keep_vtxs
+#         add_node!(new_sched,get_node(sched,v))
+#     end
+#     # add all edges between nodes that still exist
+#     for e in edges(get_graph(sched))
+#         add_edge!(new_sched, get_vtx_id(sched, e.src), get_vtx_id(sched, e.dst))
+#     end
+#     set_leaf_operation_vtxs!(new_sched)
+#     process_schedule!(new_sched)
+#     # @assert sanity_check(new_sched)
+#     new_sched
+# end
 
 """
     get_delivery_task_vtxs(sched::OperatingSchedule,o::ObjectID)
@@ -239,24 +239,21 @@ function handle_disturbance!(solver,prob,env::SearchEnv,d::DroppedObject,t,
     # Add GO->GO edges for affected robot(s), as if they were never assigned
     stitch_disjoint_node_sets!(sched,incoming,outgoing,env_state)
     # remove old nodes
-    # new_sched = remove_vtxs(sched,vtxs)
-    rem_nodes!(sched,vtxs)
-    new_sched = sched
-    # rem_nodes!(sched,map(v->get_vtx_id(sched,v),vtxs))
+    remove_vtxs!(sched,vtxs)
     # add new CleanUpBot task nodes
     x = get_location_ids(object_position(env_state,o))
-    replace_in_schedule!(new_sched,OBJECT_AT(o,x),o)
-    set_t0!(new_sched,o,t)
+    replace_in_schedule!(sched,OBJECT_AT(o,x),o)
+    set_t0!(sched,o,t)
     add_headless_delivery_task!(
-        new_sched,get_problem_spec(env,:CleanUpBot),o,op.id,CleanUpBot;
+        sched,get_problem_spec(env,:CleanUpBot),o,op.id,CleanUpBot;
         t0=t
     )
-    process_schedule!(new_sched)
+    process_schedule!(sched)
     construct_search_env(
         solver,
-        new_sched,
+        sched,
         env,
-        initialize_planning_cache(new_sched)
+        initialize_planning_cache(sched)
     )
 end
 
@@ -349,4 +346,25 @@ function remove_robot!(env::SearchEnv,id::BotID,t::Int)
     # - remove BOT_AT node
     # set assignment ids to -1 with replace_robot_id()
     # if in the middle of CARRY, another robot needs to get the object
+end
+
+# Simulation
+
+# select_action(robot,env_state,t) = get_a(get_path_node(robot.path,Int(round(t))))
+
+function step_simulation!(env_state,robots,base_station;
+        dt::Float64=1.0,
+    )
+    actions = []
+    for robot in robots
+        # robots receive instructions from base station
+        # robots observe environment
+        # robots communicate to base station
+        # robots choose actions 
+        # push!(actions,)
+    end
+
+    # environment steps forward
+
+    # base station updates global map
 end

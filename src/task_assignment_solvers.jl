@@ -1402,7 +1402,6 @@ end
 function update_greedy_sets!(model,G,cache,Ai=Set{Int}(),Ao=Set{Int}(),C=Set{Int}();
         frontier::Set{Int}=get_all_root_nodes(G),
         )
-    # TODO greedy sets should be boolean vectors instead of sets. Much more efficient
     while !isempty(frontier)
         v = pop!(frontier)
         if issubset(inneighbors(G,v),C)
@@ -1427,10 +1426,13 @@ update_greedy_cost_model!(::GreedyCost,model,new_edges) = nothing
 update_greedy_cost_model!(model::AbstractGreedyAssignment,args...) = update_greedy_cost_model!(model.greedy_cost,model,args...) 
 function update_greedy_cost_model!(::GreedyFinalTimeCost,model,new_edges) 
     # @info "Updating GreedyFinalTimeCost"
-    update_schedule_times!(
-        model.schedule,
-        Set{Int}([e[1] for e in new_edges]),
-        local_only=true)
+    t = time()
+    update_schedule_times!(model.schedule)
+    # update_schedule_times!(
+    #     model.schedule,
+    #     Set{Int}([e[1] for e in new_edges]),
+    #     local_only=true)
+    # @info "update_greedy_cost_model!(...) took $(time() - t) seconds"
 end
 
 abstract type EdgeSelectionModel end
@@ -1447,17 +1449,10 @@ Identifies the nodes `v ∈ Ai` and `v2 ∈ Ao` with the shortest distance
 `D[v,v2]`.
 """
 function select_next_edges(::SingleBestEdge,model,D,Ao,Ai)
-    c = Inf
-    a = -1
-    b = -2
-    for (v,v2) in Base.Iterators.product(sort(collect(Ao)),sort(collect(Ai)))
-        cost = get_edge_cost(model,D,v,v2)
-        if cost < c
-            c = cost
-            a = v
-            b = v2
-        end
-    end
+    a, b, cost = get_best_pair(
+        sort(collect(Ao)),
+        sort(collect(Ai)),
+        (v,v2)->get_edge_cost(model,D,v,v2))
     if a < 0 || b < 0
         println("debugging edge selection for model ",typeof(model))
         for v in Ai
@@ -1473,6 +1468,28 @@ function select_next_edges(::SingleBestEdge,model,D,Ao,Ai)
         throw(ErrorException("GreedyAssignment is stuck"))
     end
     return [(a,b)]
+end
+
+"""
+    get_best_pair(Ao,Ai,cost_func,filt=(a,b)->true)
+
+Return `argmin v ∈ Ao, v2 ∈ Ai, cost_func(v,v2) s.t. filt(v,v2) == true`
+"""
+function get_best_pair(Ao,Ai,cost_func,filt=(a,b)->true)
+    cost = Inf
+    a = -1
+    b = -2
+    for v in Ao
+        for v2 in Ai
+            c = cost_func(v,v2)
+            if c < cost && filt(v,v2)
+                cost = c
+                a = v
+                b = v2
+            end
+        end
+    end
+    return a,b,cost
 end
 
 """
@@ -1493,7 +1510,7 @@ already be in `C`. In order for `v` to be added to `Ao`, `v` must have less than
 the allowable number of outgoing edges, and must be in `C`.
 """
 function greedy_assignment!(model)
-    sched    = model.schedule
+    sched               = model.schedule
     problem_spec        = model.problem_spec
     cache = preprocess_project_schedule(sched,true)
     C = Set{Int}() # Closed set (these nodes have enough predecessors)

@@ -569,8 +569,11 @@ end
 export
     get_object_paths
 
-function get_object_paths(solution,sched)
-    robot_paths = convert_to_vertex_lists(solution)
+function get_object_paths(
+        solution,
+        sched, 
+        robot_paths = convert_to_vertex_lists(solution),
+        )
     tF = maximum(map(length, robot_paths))
     object_paths = Vector{Vector{Int}}()
     object_intervals = Vector{Vector{Int}}()
@@ -594,11 +597,18 @@ function get_object_paths(solution,sched)
             for (idx,(agent_id,s0,sF)) in enumerate(zip(agent_id_list,s0_list,sF_list))
                 if get_id(agent_id) != -1
                     push!(object_paths,[
-                        map(t->s0,0:get_t0(sched,v)-1)...,
-                        map(t->robot_paths[agent_id][t],min(get_t0(sched,v)+1,tF):min(get_tF(sched,v)+1,tF,length(robot_paths[agent_id])))...,
-                        map(t->sF,min(get_tF(sched,v)+1,tF):tF)...
+                        map(t->s0,
+                            0:Int(round(get_t0(sched,v)))-1)...,
+                        map(t->robot_paths[agent_id][t],
+                            min(Int(round(get_t0(sched,v)))+1,tF):min(Int(round(get_tF(sched,v)))+1,
+                            tF,
+                            length(robot_paths[agent_id])))...,
+                        map(t->sF,
+                            min(Int(round(get_tF(sched,v)))+1,tF):tF)...
                     ])
-                    push!(object_intervals,[get_t0(sched,object_vtx),get_tF(sched,v)+1])
+                    push!(object_intervals,[
+                        get_t0(sched,object_vtx),
+                        get_tF(sched,v)+1])
                     push!(object_ids, get_id(object_id))
                     push!(path_idxs, idx)
                 end
@@ -607,9 +617,6 @@ function get_object_paths(solution,sched)
     end
     object_paths, object_intervals, object_ids, path_idxs
 end
-# function get_object_paths(solution,env::SearchEnv)
-#     get_object_paths(solution,get_schedule(env))
-# end
 
 export
     fill_object_path_dicts!,

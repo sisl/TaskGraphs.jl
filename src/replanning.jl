@@ -416,6 +416,7 @@ Fields:
     route_planning_buffer::Float64  = 2
     commit_threshold::Int           = 10
     max_time_limit::Int             = 100
+    prune::Bool                     = true
 end
 get_replanner_config(config::ReplannerConfig) = config
 get_replanner_config(model) = model.config
@@ -722,7 +723,11 @@ function replan!(solver, replan_model, search_env, request;
     reset_solver!(solver)
     set_time_limits!(replan_model,solver,t_request,t_commit)
     # Update operating schedule
-    new_sched = prune_schedule(replan_model,search_env,t_split) # Maybe this should be at t_request instead?
+    if get_replanner_config(replan_model).prune
+        new_sched = prune_schedule(replan_model,search_env,t_split) # Maybe this should be at t_request instead?
+    else
+        new_sched = deepcopy(get_schedule(search_env))
+    end
     # NOTE If we prune at t_commit or t_split, we may actually cut out unfinished
     # nodes when using ReassignFreeRobots. Ideally, ReassignFreeRobots would prune at the earliest free time
     # NOTE again -- actually, the above is not true. ReassignFreeRobots only increases t_commit to the earliest free node.
