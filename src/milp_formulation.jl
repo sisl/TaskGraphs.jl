@@ -30,9 +30,9 @@ Represents a time-extended graph useful for MILP formulations
     tvec::Vector{Int}   = Vector{Int}()
 end
 Base.zero(graph::GadgetGraph) = GadgetGraph()
-LightGraphs.edges(graph::GadgetGraph) = edges(graph.G)
-LightGraphs.is_directed(graph::GadgetGraph) = true
-function LightGraphs.add_vertex!(graph::GadgetGraph,t=-1,v=-1)
+Graphs.edges(graph::GadgetGraph) = edges(graph.G)
+Graphs.is_directed(graph::GadgetGraph) = true
+function Graphs.add_vertex!(graph::GadgetGraph,t=-1,v=-1)
     if add_vertex!(graph.G)
         push!(graph.vtxs,v)
         push!(graph.tvec,t)
@@ -44,7 +44,7 @@ for op in [
     :edgetype,:has_edge,:has_vertex,:inneighbors,:ne,:nv,:outneighbors,
     :vertices,:add_edge!
     ]
-    @eval LightGraphs.$op(g::GadgetGraph,args...) = $op(g.G,args...)
+    @eval Graphs.$op(g::GadgetGraph,args...) = $op(g.G,args...)
 end
 get_vtx_from_var(G::GadgetGraph,v) = get(G.vtxs,v,-1)
 get_t_from_var(G::GadgetGraph,v) = get(G.t_vec,v,-1)
