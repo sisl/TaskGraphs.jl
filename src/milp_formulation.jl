@@ -33,7 +33,7 @@ Base.zero(graph::GadgetGraph) = GadgetGraph()
 Graphs.edges(graph::GadgetGraph) = edges(graph.G)
 Graphs.is_directed(graph::GadgetGraph) = true
 function Graphs.add_vertex!(graph::GadgetGraph,t=-1,v=-1)
-    if add_vertex!(graph.G)
+    if Graphs.add_vertex!(graph.G)
         push!(graph.vtxs,v)
         push!(graph.tvec,t)
         return true
