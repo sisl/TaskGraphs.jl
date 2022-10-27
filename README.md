@@ -16,6 +16,14 @@ Type "]" to enter Pkg mode
 ```Julia
 julia> ]
 ```
+Add the dependent repository GraphUtil with the command `add https://github.com/sisl/GraphUtils.jl.git`
+```Julia
+pkg> add https://github.com/sisl/GraphUtils.jl.git
+```
+Add the dependent repository CRCBS with the command `add add https://github.com/sisl/CRCBS.jl.git`
+```Julia
+pkg> add add https://github.com/sisl/CRCBS.jl.git
+```
 Add the repository with the command `add https://github.com/kylejbrown17/TaskGraphs.jl.git`
 ```Julia
 pkg> add https://github.com/kylejbrown17/TaskGraphs.jl.git
