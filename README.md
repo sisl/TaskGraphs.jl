@@ -47,6 +47,10 @@ julia> solution, cost = solve!(solver,prob); # solve it
 julia> optimal_status(solver) # check the solution status
 ```
 
+A short tutorial can be found at:
+https://github.com/sisl/TaskGraphs.jl/blob/master/docs/TaskGraphTutorial.ipynb
+
+
 ## This package contains the source code for the following papers
 
 Optimal Sequential Task Assignment and Path Finding for Multi Agent Robotic Assembly Planning, _Kyle Brown, Oriana Peltzer, Martin Sehr, Mac Schwager, Mykel Kochenderfer_, in International Conference on Robotics and Automation (ICRA), 2020 [arXiv](https://arxiv.org/abs/2006.08845)
