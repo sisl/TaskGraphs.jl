@@ -220,8 +220,8 @@ function select_action_dfs!(solver,envs,states,actions,i,ordering,idxs,search_st
         for ai in sorted_actions(env,s)
             a = actions[idx]
             c = get_transition_cost(env,s,ai)
-            c0 = get_transition_cost(env,s,a)
-            if (i >= search_state.reset_i) || (i < search_state.pickup_i && a == ai) || ((c >= c0 || is_valid(env,a)) && a != ai)
+            c0 = get_transition_cost(env,s,a=
+            if (i >= search_state.reset_i) || (i < search_state.pickup_i && a == ai) || ((c >= c0 || CRCBS.is_valid(env,a)) && a != ai)
                 actions[idx] = ai
                 @log_info(5,verbosity(solver),"$(repeat(" ",i))i = $i, trying a=",string(ai)," from s = ",string(s),"for env ",string(get_node(env)), " with env.goal = ",string(env.goal))
                 k = get_conflict_idx(envs,states,actions,i,ordering,idxs)
