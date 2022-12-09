@@ -5,7 +5,7 @@ using JuMP, MathOptInterface
 # using Gurobi
 using Random
 using TOML
-
+using NBInclude
 using Test
 using Logging
 
@@ -41,6 +41,9 @@ end
     end
     return true
 end
+
+# Add test for jupyternotebook
+@nbinclude(joinpath(dirname(@__FILE__), "..", "doc", "TaskGraphTutorial.ipynb"))
 
 # Set logging level
 global_logger(SimpleLogger(stderr, Logging.Debug))
