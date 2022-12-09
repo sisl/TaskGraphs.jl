@@ -1,6 +1,6 @@
 using TaskGraphs
 using CRCBS
-using LightGraphs, GraphUtils
+using Graphs,GraphUtils
 using JuMP, MathOptInterface
 # using Gurobi
 using Random
