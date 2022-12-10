@@ -8,6 +8,7 @@ using TOML
 using NBInclude
 using Test
 using Logging
+using Plots
 
 # Check equality of two arrays
 @inline function array_isapprox(x::AbstractArray{F},
