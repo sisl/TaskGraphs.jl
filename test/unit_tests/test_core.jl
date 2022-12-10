@@ -241,33 +241,33 @@ let
         @test get_vtx(sched, id) == v
     end
 end
-# let
-#     r0 = [1,4]
-#     s0 = [5,8,14]
-#     sF = [13,12,15]
-#     project_spec, robot_ICs = TaskGraphs.empty_pctapf_problem(r0,s0,sF)
-#     add_operation!(project_spec,construct_operation(project_spec,-1,[1,2],[3],0))
-#     add_operation!(project_spec,construct_operation(project_spec,-1,[3],  [], 0))
+let
+    r0 = [1,4]
+    s0 = [5,8,14]
+    sF = [13,12,15]
+    project_spec, robot_ICs = TaskGraphs.empty_pctapf_problem(r0,s0,sF)
+    add_operation!(project_spec,construct_operation(project_spec,-1,[1,2],[3],0))
+    add_operation!(project_spec,construct_operation(project_spec,-1,[3],  [], 0))
 
-#     filename = "/tmp/project_spec.toml"
-#     open(filename, "w") do io
-#         TOML.print(io, TOML.parse(project_spec))
-#     end
-#     project_spec_mod = read_project_spec(filename)
-#     # @show project_spec_mod.object_id_to_idx
-#     # run(`rm $filename`)
+    filename = "/tmp/project_spec.toml"
+    open(filename, "w") do io
+        TOML.print(io, TOML.parse(project_spec))
+    end
+    project_spec_mod = read_project_spec(filename)
+    # @show project_spec_mod.object_id_to_idx
+    # run(`rm $filename`)
 
-#     r0 = [get_id(get_initial_location_id(robot_ICs[k])) for k in sort(collect(keys(robot_ICs)))]
-#     s0 = map(pred->get_id(get_initial_location_id(pred)),TaskGraphs.initial_conditions_vector(project_spec))
-#     sF = map(pred->get_id(get_initial_location_id(pred)),TaskGraphs.final_conditions_vector(project_spec))
-#     problem_def = SimpleProblemDef(project_spec,r0,s0,sF)
-#     filename = "/tmp/problem_def.toml"
-#     open(filename, "w") do io
-#         TOML.print(io, TOML.parse(problem_def))
-#     end
-#     problem_def = read_problem_def(filename)
-#     # run(`rm $filename`)
-# end
+    r0 = [get_id(get_initial_location_id(robot_ICs[k])) for k in sort(collect(keys(robot_ICs)))]
+    s0 = map(pred->get_id(get_initial_location_id(pred)),TaskGraphs.initial_conditions_vector(project_spec))
+    sF = map(pred->get_id(get_initial_location_id(pred)),TaskGraphs.final_conditions_vector(project_spec))
+    problem_def = SimpleProblemDef(project_spec,r0,s0,sF)
+    filename = "/tmp/problem_def.toml"
+    open(filename, "w") do io
+        TOML.print(io, TOML.parse(problem_def))
+    end
+    problem_def = read_problem_def(filename)
+    # run(`rm $filename`)
+end
 let
     solver = NBSSolver()
     prob = pctapf_problem_1(solver)
