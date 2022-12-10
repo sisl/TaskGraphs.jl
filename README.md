@@ -3,7 +3,7 @@
 <!-- [![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://sisl.github.io/TaskGraphs.jl/stable) -->
 [![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://sisl.github.io/TaskGraphs.jl/dev)
 [![Build Status](https://github.com/sisl/TaskGraphs.jl/workflows/CI/badge.svg)](https://github.com/sisl/TaskGraphs.jl/actions)
-[![codecov](https://codecov.io/github/sisl/GraphUtils.jl/branch/master/graph/badge.svg?token=KS4IA9UJD2)](https://codecov.io/github/sisl/
+[![codecov](https://codecov.io/github/sisl/TaskGraphs.jl/branch/master/graph/badge.svg?token=KS4IA9UJD2)](https://codecov.io/github/sisl/
 TaskGraphs.jl)
 
 
