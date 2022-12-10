@@ -194,16 +194,16 @@ let
     get_operations(sched)
 
     zero(sched)
-    LightGraphs.edges(sched)
-    LightGraphs.edgetype(sched)
-    LightGraphs.has_edge(sched,1,1)
-    LightGraphs.has_vertex(sched,1)
-    LightGraphs.inneighbors(sched,1)
-    LightGraphs.outneighbors(sched,1)
-    LightGraphs.is_directed(sched)
-    LightGraphs.ne(sched)
-    LightGraphs.nv(sched)
-    LightGraphs.vertices(sched)
+    Graphs.edges(sched)
+    Graphs.edgetype(sched)
+    Graphs.has_edge(sched,1,1)
+    Graphs.has_vertex(sched,1)
+    Graphs.inneighbors(sched,1)
+    Graphs.outneighbors(sched,1)
+    Graphs.is_directed(sched)
+    Graphs.ne(sched)
+    Graphs.nv(sched)
+    Graphs.vertices(sched)
 end
 let
     # test node deletion
