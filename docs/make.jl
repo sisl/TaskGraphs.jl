@@ -3,7 +3,6 @@ using Documenter
 
 makedocs(;
     modules=[TaskGraphs],
-    repo="https://github.com/sisl/TaskGraphs.jl",
     sitename="TaskGraphs.jl",
     format=Documenter.HTML(),
     pages=[
