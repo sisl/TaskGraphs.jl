@@ -3,14 +3,9 @@ using Documenter
 
 makedocs(;
     modules=[TaskGraphs],
-    authors="kylebrown <kylejbrown17@gmail.com> and contributors",
-    repo="https://github.com/kylejbrown17/TaskGraphs.jl",
+    repo="https://github.com/sisl/TaskGraphs.jl",
     sitename="TaskGraphs.jl",
-    format=Documenter.HTML(;
-        prettyurls=get(ENV, "CI", "false") == "true",
-        canonical="https://kylejbrown17.github.io/TaskGraphs.jl",
-        assets=String[],
-    ),
+    format=Documenter.HTML(),
     pages=[
         "Home" => "index.md",
         "Getting Started" => "getting_started.md",
@@ -21,5 +16,7 @@ makedocs(;
 )
 
 deploydocs(;
-    repo="github.com/kylejbrown17/TaskGraphs.jl",
+    repo="github.com/sisl/TaskGraphs.jl",
+    devbranch = "master",
+    devurl = "latest",
 )

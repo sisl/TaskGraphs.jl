@@ -13,7 +13,6 @@ export
 
 """
     DFSRoutePlanner
-
 Prioritized Depth-First Search route planner.
 """
 @with_kw struct DFSRoutePlanner{C}
@@ -70,7 +69,6 @@ end
 
 """
     get_conflict_idx(envs,states,actions,i,ordering,idxs)
-
 Check if the planned action for agent with priority `i` conflicts with the
     planned action of any agent with higher priority.
 """
@@ -220,7 +218,7 @@ function select_action_dfs!(solver,envs,states,actions,i,ordering,idxs,search_st
         for ai in sorted_actions(env,s)
             a = actions[idx]
             c = get_transition_cost(env,s,ai)
-            c0 = get_transition_cost(env,s,a=
+            c0 = get_transition_cost(env,s,a)
             if (i >= search_state.reset_i) || (i < search_state.pickup_i && a == ai) || ((c >= c0 || CRCBS.is_valid(env,a)) && a != ai)
                 actions[idx] = ai
                 @log_info(5,verbosity(solver),"$(repeat(" ",i))i = $i, trying a=",string(ai)," from s = ",string(s),"for env ",string(get_node(env)), " with env.goal = ",string(env.goal))
@@ -361,4 +359,4 @@ function CRCBS.solve!(
     return route_plan, get_cache(search_env), cost
 end
 
-# end
+#end
