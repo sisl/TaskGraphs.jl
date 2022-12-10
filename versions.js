@@ -1,3 +1,5 @@
 var DOC_VERSIONS = [
-  "dev",
+  "latest",
 ];
+var DOCUMENTER_NEWEST = "latest";
+var DOCUMENTER_STABLE = "latest";
