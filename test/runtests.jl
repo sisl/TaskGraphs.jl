@@ -43,7 +43,7 @@ end
 end
 
 # Add test for jupyternotebook
-@nbinclude(joinpath(dirname(@__FILE__), "..", "doc", "TaskGraphTutorial.ipynb"))
+@nbinclude(joinpath(dirname(@__DIR__), "docs", "TaskGraphTutorial.ipynb"))
 
 # Set logging level
 global_logger(SimpleLogger(stderr, Logging.Debug))
