@@ -49,7 +49,7 @@ julia> solution, cost = solve!(solver,prob); # solve it
 julia> optimal_status(solver) # check the solution status
 ```
 
-A short tutorial can be found at the jupyter notebook:
+A short tutorial can be found:
 https://github.com/sisl/TaskGraphs.jl/blob/master/docs/TaskGraphTutorial.ipynb
 
 
