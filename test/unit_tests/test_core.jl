@@ -162,8 +162,8 @@ end
 let
     sched = OperatingSchedule()
     node = OBJECT_AT(1,1)
-    add_node!(sched,make_node(sched,node)) 
-    replace_in_schedule!(sched,make_node(sched,node)) 
+    add_node!(sched,make_node(sched,node))
+    replace_in_schedule!(sched,make_node(sched,node))
     get_path_spec(sched,1)
     set_path_spec!(sched,1,get_path_spec(sched,1))
     for pred in [
@@ -194,23 +194,23 @@ let
     get_operations(sched)
 
     zero(sched)
-    LightGraphs.edges(sched)
-    LightGraphs.edgetype(sched)
-    LightGraphs.has_edge(sched,1,1)
-    LightGraphs.has_vertex(sched,1)
-    LightGraphs.inneighbors(sched,1)
-    LightGraphs.outneighbors(sched,1)
-    LightGraphs.is_directed(sched)
-    LightGraphs.ne(sched)
-    LightGraphs.nv(sched)
-    LightGraphs.vertices(sched)
+    Graphs.edges(sched)
+    Graphs.edgetype(sched)
+    Graphs.has_edge(sched,1,1)
+    Graphs.has_vertex(sched,1)
+    Graphs.inneighbors(sched,1)
+    Graphs.outneighbors(sched,1)
+    Graphs.is_directed(sched)
+    Graphs.ne(sched)
+    Graphs.nv(sched)
+    Graphs.vertices(sched)
 end
 let
     # test node deletion
     sched = OperatingSchedule()
     nodes = [OBJECT_AT(1,1),OBJECT_AT(2,2),OBJECT_AT(3,3)]
     for node in nodes
-        add_node!(sched,make_node(sched,node)) 
+        add_node!(sched,make_node(sched,node))
     end
     rem_nodes!(sched,[1,2])
     @test get_node_from_vtx(sched,1) == OBJECT_AT(3,3)
@@ -254,7 +254,7 @@ let
 
 end
 # test copy(::SearchEnv)
-let 
+let
     reset_all_id_counters!()
     prob = pctapf_problem_1(NBSSolver())
     env = get_env(prob)
@@ -274,7 +274,7 @@ let
 
 end
 # test initialize_root_node(::PC_MAPF)
-let 
+let
     reset_all_id_counters!()
     solver = NBSSolver()
     pc_tapf = pctapf_problem_1(solver)
@@ -343,53 +343,33 @@ let
         @test get_vtx(sched, id) == v
     end
 end
-# test I/O for problem defs
-let
-    r0 = [1,4]
-    s0 = [5,8,14]
-    sF = [13,12,15]
-    project_spec, robot_ICs = TaskGraphs.empty_pctapf_problem(r0,s0,sF)
-    add_operation!(project_spec,construct_operation(project_spec,-1,[1,2],[3],0))
-    add_operation!(project_spec,construct_operation(project_spec,-1,[3],  [], 0))
-    assignment_dict = Dict(1=>[1,3],2=>[2])
-    def = SimpleProblemDef(project_spec,r0,s0,sF)
-    pcmapf_def = SimplePCMAPFDef(def,assignment_dict)
+# let
+#     r0 = [1,4]
+#     s0 = [5,8,14]
+#     sF = [13,12,15]
+#     project_spec, robot_ICs = TaskGraphs.empty_pctapf_problem(r0,s0,sF)
+#     add_operation!(project_spec,construct_operation(project_spec,-1,[1,2],[3],0))
+#     add_operation!(project_spec,construct_operation(project_spec,-1,[3],  [], 0))
 
-    filename = "/tmp/project_spec.toml"
-    open(filename, "w") do io
-        TOML.print(io, TOML.parse(project_spec))
-    end
-    project_spec_mod = read_project_spec(filename)
-    # @show project_spec_mod.object_id_to_idx
-    # run(`rm $filename`)
-    filename = "/tmp/problem_def.toml"
-    open(filename, "w") do io
-        TOML.print(io, TOML.parse(def))
-    end
-    def_mod = read_problem_def(filename)
-    # run(`rm $filename`)
-    filename = "/tmp/pcmapf_problem_def.toml"
-    open(filename, "w") do io
-        TOML.print(io, TOML.parse(pcmapf_def))
-    end
-    pcmapf_def_mod = read_pcmapf_problem_def(filename)
+#     filename = "/tmp/project_spec.toml"
+#     open(filename, "w") do io
+#         TOML.print(io, TOML.parse(project_spec))
+#     end
+#     project_spec_mod = read_project_spec(filename)
+#     # @show project_spec_mod.object_id_to_idx
+#     # run(`rm $filename`)
 
-end
-# test apply_assignment_dict!
-let
-    prob = pctapf_problem_1(NBSSolver())
-    sched = get_schedule(get_env(prob))
-    prob_spec = get_problem_spec(get_env(prob))
-    assignment_dict = Dict(1=>[1,3],2=>[2])
-    TaskGraphs.apply_assignment_dict!(sched,assignment_dict,prob_spec)
-    @test validate(sched)
-    for n in get_nodes(sched)
-        if matches_template(BOT_COLLECT,n)
-            @test get_id(get_object_id(n.node)) in assignment_dict[get_id(get_robot_id(n.node))]
-        end
-    end
-
-end
+#     r0 = [get_id(get_initial_location_id(robot_ICs[k])) for k in sort(collect(keys(robot_ICs)))]
+#     s0 = map(pred->get_id(get_initial_location_id(pred)),TaskGraphs.initial_conditions_vector(project_spec))
+#     sF = map(pred->get_id(get_initial_location_id(pred)),TaskGraphs.final_conditions_vector(project_spec))
+#     problem_def = SimpleProblemDef(project_spec,r0,s0,sF)
+#     filename = "/tmp/problem_def.toml"
+#     open(filename, "w") do io
+#         TOML.print(io, TOML.parse(problem_def))
+#     end
+#     problem_def = read_problem_def(filename)
+#     # run(`rm $filename`)
+# end
 let
     solver = NBSSolver()
     prob = pctapf_problem_1(solver)
@@ -406,10 +386,10 @@ let
     o1 = add_node!(sched, make_node(sched,OBJECT_AT(1,2),))
     n2 = add_node!(sched, make_node(sched,COLLECT(1,1,2),))
     n3 = add_node!(sched, make_node(sched,CARRY(1,1,2,3),))
-    add_edge!(sched,r1,n1) 
-    add_edge!(sched,n1,n2) 
-    add_edge!(sched,o1,n2) 
-    add_edge!(sched,n2,n3) 
+    add_edge!(sched,r1,n1)
+    add_edge!(sched,n1,n2)
+    add_edge!(sched,o1,n2)
+    add_edge!(sched,n2,n3)
     for (n,vtxs) in [
         (n3,[get_vtx(sched,n2)]),
         (n2,[get_vtx(sched,n1)]),

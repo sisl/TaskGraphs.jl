@@ -18,7 +18,7 @@ using PGFPlots
 using Printf
 using Parameters
 using Measures
-using LightGraphs
+using Graphs
 using MetaGraphs
 
 ROBOT_COLOR = RGB(0.1,0.5,0.9)

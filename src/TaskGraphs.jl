@@ -1,8 +1,8 @@
 module TaskGraphs
 
 using Parameters
-using LightGraphs 
-using GraphUtils
+#using LightGraphs 
+using Graphs
 using Random
 using LinearAlgebra
 using DataStructures

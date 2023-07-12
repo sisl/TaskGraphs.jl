@@ -1,8 +1,10 @@
 # TaskGraphs
 
-<!-- [![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://kylejbrown17.github.io/TaskGraphs.jl/stable) -->
-[![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://kylejbrown17.github.io/TaskGraphs.jl/dev)
-[![Build Status](https://github.com/kylejbrown17/TaskGraphs.jl/workflows/CI/badge.svg)](https://github.com/kylejbrown17/TaskGraphs.jl/actions)
+<!-- [![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://sisl.github.io/TaskGraphs.jl/stable) -->
+[![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://sisl.github.io/TaskGraphs.jl/dev)
+[![Build Status](https://github.com/sisl/TaskGraphs.jl/workflows/CI/badge.svg)](https://github.com/sisl/TaskGraphs.jl/actions)
+[![codecov](https://codecov.io/github/sisl/TaskGraphs.jl/branch/master/graph/badge.svg?token=KS4IA9UJD2)](https://codecov.io/github/sisl/TaskGraphs.jl)
+
 
 A Julia package for modeling and solving precedence constrained multi-agent task assignment and path finding (PC-TAPF) problems.
 
@@ -16,13 +18,21 @@ Type "]" to enter Pkg mode
 ```Julia
 julia> ]
 ```
-Add the repository with the command `add https://github.com/kylejbrown17/TaskGraphs.jl.git`
+Add the dependent repository GraphUtil with the command `add https://github.com/sisl/GraphUtils.jl.git`
 ```Julia
-pkg> add https://github.com/kylejbrown17/TaskGraphs.jl.git
+pkg> add https://github.com/sisl/GraphUtils.jl.git
+```
+Add the dependent repository CRCBS with the command `add add https://github.com/sisl/CRCBS.jl.git`
+```Julia
+pkg> add add https://github.com/sisl/CRCBS.jl.git
+```
+Add the repository with the command `add https://github.com/sisl/TaskGraphs.jl.git`
+```Julia
+pkg> add https://github.com/sisl/TaskGraphs.jl.git
 ```
 If you wish to contribute to the package, use `dev`:
 ```Julia
-pkg> dev https://github.com/kylejbrown17/TaskGraphs.jl.git
+pkg> dev https://github.com/sisl/TaskGraphs.jl.git
 ```
 
 ## Quick Start
@@ -38,6 +48,10 @@ julia> solution, cost = solve!(solver,prob); # solve it
 
 julia> optimal_status(solver) # check the solution status
 ```
+
+A short tutorial can be found:
+https://github.com/sisl/TaskGraphs.jl/blob/master/docs/TaskGraphTutorial.ipynb
+
 
 ## This package contains the source code for the following papers
 

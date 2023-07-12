@@ -2,4 +2,4 @@ debug/*
 experiments/video/*
 docs/build/
 Manifest.toml
-.vscode/
+.DS_Store

@@ -1,13 +1,14 @@
 using TaskGraphs
 using CRCBS
-using LightGraphs, GraphUtils
+using Graphs,GraphUtils
 using JuMP, MathOptInterface
 # using Gurobi
 using Random
 using TOML
-
+using NBInclude
 using Test
 using Logging
+using Plots
 
 # Check equality of two arrays
 @inline function array_isapprox(x::AbstractArray{F},
@@ -41,6 +42,9 @@ end
     end
     return true
 end
+
+# Add test for jupyternotebook
+@nbinclude(joinpath(dirname(@__DIR__), "docs", "TaskGraphTutorial.ipynb"))
 
 # Set logging level
 global_logger(SimpleLogger(stderr, Logging.Debug))
