@@ -49,7 +49,7 @@ export
 """
     ProjectSpec <: AbstractCustomNDiGraph{Union{OBJECT_AT,Operation},AbstractID}
 
-Encodes a set of operations and the prescribed initial and final locations 
+Encodes a set of operations and the prescribed initial and final locations
 of the objects that form the inputs and outputs of those operations.
 
 Elements:
@@ -108,7 +108,7 @@ end
 function get_pickup_wait_time(spec::ProjectSpec,o::ObjectID)
     if !is_root_node(spec,o)
         parent = get_node(spec,inneighbors(spec,o)[1])
-        @assert isa(parent,Operation) 
+        @assert isa(parent,Operation)
         return duration(parent)
     end
     return 0.0
@@ -130,7 +130,7 @@ end
 """
     get_duration_vector(spec::ProjectSpec)
 
-Return a vector `Δt` such that `Δt[i]` is the amount of time that must elapse 
+Return a vector `Δt` such that `Δt[i]` is the amount of time that must elapse
 before object `i` can be picked up after its parent operation is performed.
 """
 function get_duration_vector(spec::ProjectSpec)
@@ -148,25 +148,25 @@ end
     construct_operation(spec::ProjectSpec, station_id, input_ids, output_ids, Δt, id=get_unique_operation_id())
 """
 function construct_operation(
-        spec::ProjectSpec, 
-        station_id::LocationID, 
-        input_ids::Vector{ObjectID}, 
+        spec::ProjectSpec,
+        station_id::LocationID,
+        input_ids::Vector{ObjectID},
         output_ids::Vector{ObjectID},
-        Δt, 
+        Δt,
         id=get_unique_id(OperationID)
         )
     op = Operation(
-        pre = Dict{ObjectID,OBJECT_AT}(map(id->id=>get_final_condition(spec,id), input_ids)), 
-        post = Dict{ObjectID,OBJECT_AT}(map(id->id=>get_initial_condition(spec,id), output_ids)), 
+        pre = Dict{ObjectID,OBJECT_AT}(map(id->id=>get_final_condition(spec,id), input_ids)),
+        post = Dict{ObjectID,OBJECT_AT}(map(id->id=>get_initial_condition(spec,id), output_ids)),
         Δt = Δt,
         station_id = LocationID(station_id),
         id = id
     )
 end
 function construct_operation(
-        spec::ProjectSpec, 
-        station_id::Int, 
-        input_ids::Vector, 
+        spec::ProjectSpec,
+        station_id::Int,
+        input_ids::Vector,
         output_ids::Vector,args...)
     construct_operation(spec,
         LocationID(station_id),
@@ -234,7 +234,7 @@ function read_operation(toml_dict::Dict,keep_id=false)
     end
     op = Operation(
         pre     = read_op_dict_from_array(toml_dict["pre"]),
-        post    = read_op_dict_from_array(toml_dict["post"]), 
+        post    = read_op_dict_from_array(toml_dict["post"]),
         Δt      = get(toml_dict,"dt",get(toml_dict,"Δt",0.0)),
         station_id = LocationID(get(toml_dict,"station_id",-1)),
         id = op_id
@@ -632,7 +632,7 @@ replace_in_schedule!(sched::OperatingSchedule,node::ScheduleNode,id::AbstractID=
 function replace_in_schedule!(sched::P,path_spec::T,pred,id::ID) where {P<:OperatingSchedule,T<:PathSpec,ID<:AbstractID}
     replace_in_schedule!(sched,ScheduleNode(id,pred,path_spec))
 end
-function replace_in_schedule!(sched::P,spec,pred,id::ID) where {P<:OperatingSchedule,T<:ProblemSpec,ID<:AbstractID}
+function replace_in_schedule!(sched::P,spec,pred,id::ID) where {P<:OperatingSchedule,ID<:AbstractID}
     replace_in_schedule!(sched,generate_path_spec(sched,spec,pred),pred,id)
 end
 function replace_in_schedule!(sched::P,pred,id::ID) where {P<:OperatingSchedule,ID<:AbstractID}
@@ -1024,7 +1024,7 @@ function construct_partial_project_schedule(spec::ProjectSpec,problem_spec::Prob
         add_node!(sched, make_node(sched,problem_spec,op))
     end
     for pred in object_ICs
-        add_node!(sched, make_node(sched,problem_spec,pred)) 
+        add_node!(sched, make_node(sched,problem_spec,pred))
     end
     for pred in robot_ICs
         add_new_robot_to_schedule!(sched,pred,problem_spec)
@@ -1043,7 +1043,7 @@ function construct_partial_project_schedule(spec::ProjectSpec,problem_spec::Prob
             object_ic           = get_node_from_id(sched, object_id)
             if length(get_location_ids(object_ic)) > 1 # COLLABORATIVE TRANSPORT
                 add_headless_team_delivery_task!(sched,problem_spec,
-                    ObjectID(object_id),op_id) 
+                    ObjectID(object_id),op_id)
             else # SINGLE AGENT TRANSPORT
                 add_headless_delivery_task!(sched,problem_spec,
                     ObjectID(object_id),op_id)
@@ -1123,7 +1123,7 @@ end
 """
     update_schedule_times!(sched::OperatingSchedule)
 
-Compute start and end times for all nodes based on the end times of their 
+Compute start and end times for all nodes based on the end times of their
 inneighbors and their own durations.
 """
 function update_schedule_times!(sched::OperatingSchedule)
@@ -1142,7 +1142,7 @@ end
     update_schedule_times!(sched::OperatingSchedule,frontier::Set{Int},local_only=true)
 
 Compute start and end times for all nodes in `frontier` and their descendants.
-If `local_only == true`, descendants of nodes with unchanged final time will not 
+If `local_only == true`, descendants of nodes with unchanged final time will not
 be updated.
 """
 function update_schedule_times!(sched::OperatingSchedule,frontier::Set{Int};
