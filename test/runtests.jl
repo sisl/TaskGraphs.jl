@@ -1,8 +1,9 @@
 using TaskGraphs
 using CRCBS
-using Graphs,GraphUtils
-using JuMP, MathOptInterface
-# using Gurobi
+using Graphs
+using GraphUtils
+using JuMP
+using MathOptInterface
 using Random
 using TOML
 using NBInclude
@@ -75,11 +76,4 @@ global_logger(SimpleLogger(stderr, Logging.Debug))
     @time @testset "TaskGraphs.Replanning" begin
         include(joinpath(testdir, "test_replanning.jl"))
     end
-
-    # @time @testset "TaskGraphs.Profiling" begin
-    #     include(joinpath(testdir, "test_profiling.jl"))
-    # end
-    # @time @testset "TaskGraphs.Overhaul" begin
-    #     include(joinpath(testdir, "test_overhaul.jl"))
-    # end
 end
