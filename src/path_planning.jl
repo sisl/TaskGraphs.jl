@@ -134,7 +134,7 @@ end
 """
     SearchEnv{C,H,S} <: GraphEnv{State,Action,C}
 
-Contains all of the information needed to fully define `PC_TAPF` and related 
+Contains all of the information needed to fully define `PC_TAPF` and related
 problems.
 """
 @with_kw_noshow struct SearchEnv{C,H,S} <: GraphEnv{State,Action,C}
@@ -267,70 +267,78 @@ function get_env_state(env,t)
     robot_positions = get_env_snapshot(env,t)
     object_positions = Dict{ObjectID,OBJECT_AT}()
     objects_active = Dict{ObjectID,Bool}()
-    for n in get_nodes(sched)
-        if matches_template(BOT_CARRY,n)
-            o = get_object_id(n)
-            o_node = get_node(sched,o)
-            v_deposit = first(outneighbors(sched,n))
-            v_collect = first(inneighbors(sched,n))
-            if t <= get_t0(n)
-                object_positions[o] = o_node.node
-                objects_active[o] = t >= get_t0(o_node)
-            else
-                object_positions[o] = o_node.node
-                node = get_node_from_vtx(sched,v_deposit)
-                if t >= get_t0(env,v_deposit)
-                    object_positions[o] = OBJECT_AT(o,
-                        map(n->get_location_id(n),sub_nodes(node))
-                        )
-                elseif t >= get_t0(env,v_collect)
-                    r_ids = get_valid_robot_ids(node)
-                    object_positions[o] = OBJECT_AT(o,
-                        map(r->get_location_id(robot_positions[r]),r_ids)
-                        )
-                end
-                objects_active[o] = (t <= get_tF(env,v_deposit))
-            end
-        end
-    end
-    # for (o,o_node) in get_object_ICs(sched)
-    #     v = get_vtx(sched,o)
-    #     if t <= get_t0(env,v)
-    #         object_positions[o] = o_node
-    #         objects_active[o] = t >= get_t0(env,v)
-    #     else
-    #         object_positions[o] = o_node
-    #         vtxs = capture_connected_nodes(
-    #             sched,v,v->check_object_id(get_node_from_vtx(sched,v),o)
-    #             )
-    #         node_ids = map(v->get_vtx_id(sched,v),collect(vtxs))
-    #         @show node_ids
-    #         v_deposit = filter(v->isa(get_node_from_vtx(sched,v),
-    #         Union{BOT_DEPOSIT,TEAM_DEPOSIT}),
-    #             collect(vtxs))[1]
-    #         v_collect = filter(v->isa(get_node_from_vtx(sched,v),
-    #         Union{BOT_COLLECT,TEAM_COLLECT}),
-    #             collect(vtxs))[1]
 
-    #         node = get_node_from_vtx(sched,v_deposit)
-    #         if t >= get_t0(env,v_deposit)
-    #             object_positions[o] = OBJECT_AT(o,
-    #                 map(n->get_location_id(n),sub_nodes(node))
-    #                 )
-    #         elseif t >= get_t0(env,v_collect)
-    #             r_ids = get_valid_robot_ids(node)
-    #             object_positions[o] = OBJECT_AT(o,
-    #                 map(r->get_location_id(robot_positions[r]),r_ids)
-    #                 )
-    #         # else
-    #         #     r_ids = get_valid_robot_ids(node)
-    #         #     @show object_positions[o] = OBJECT_AT(o,
-    #         #         map(r->get_location_id(robot_positions[r]),r_ids)
-    #         #         )
+    #########
+    # This block was added by Kyle in commits on the develop branch with commit 6b4ebf2.
+    # The commit message was "Final changes for thesis." However, it does not appear to work
+    # in finding the correct objects as it only considers an object if it matches the BOT_CARRY
+    # template. This resulted in failing 6 tests in test_path_planning.jl. Resorting back to
+    # the original code for now.
+    #########
+    # for n in get_nodes(sched)
+    #     if matches_template(BOT_CARRY,n)
+    #         o = get_object_id(n)
+    #         o_node = get_node(sched,o)
+    #         v_deposit = first(outneighbors(sched,n))
+    #         v_collect = first(inneighbors(sched,n))
+    #         if t <= get_t0(n)
+    #             object_positions[o] = o_node.node
+    #             objects_active[o] = t >= get_t0(o_node)
+    #         else
+    #             object_positions[o] = o_node.node
+    #             node = get_node_from_vtx(sched,v_deposit)
+    #             if t >= get_t0(env,v_deposit)
+    #                 object_positions[o] = OBJECT_AT(o,
+    #                     map(n->get_location_id(n),sub_nodes(node))
+    #                     )
+    #             elseif t >= get_t0(env,v_collect)
+    #                 r_ids = get_valid_robot_ids(node)
+    #                 object_positions[o] = OBJECT_AT(o,
+    #                     map(r->get_location_id(robot_positions[r]),r_ids)
+    #                     )
+    #             end
+    #             objects_active[o] = (t <= get_tF(env,v_deposit))
     #         end
-    #         objects_active[o] = (t <= get_tF(env,v_deposit))
     #     end
     # end
+    for (o,o_node) in get_object_ICs(sched)
+        v = get_vtx(sched,o)
+        if t <= get_t0(env,v)
+            object_positions[o] = o_node
+            objects_active[o] = t >= get_t0(env,v)
+        else
+            object_positions[o] = o_node
+            vtxs = capture_connected_nodes(
+                sched,v,v->check_object_id(get_node_from_vtx(sched,v),o)
+                )
+            node_ids = map(v->get_vtx_id(sched,v),collect(vtxs))
+            # @show node_ids
+            v_deposit = filter(v->isa(get_node_from_vtx(sched,v),
+            Union{BOT_DEPOSIT,TEAM_DEPOSIT}),
+                collect(vtxs))[1]
+            v_collect = filter(v->isa(get_node_from_vtx(sched,v),
+            Union{BOT_COLLECT,TEAM_COLLECT}),
+                collect(vtxs))[1]
+
+            node = get_node_from_vtx(sched,v_deposit)
+            if t >= get_t0(env,v_deposit)
+                object_positions[o] = OBJECT_AT(o,
+                    map(n->get_location_id(n),sub_nodes(node))
+                    )
+            elseif t >= get_t0(env,v_collect)
+                r_ids = get_valid_robot_ids(node)
+                object_positions[o] = OBJECT_AT(o,
+                    map(r->get_location_id(robot_positions[r]),r_ids)
+                    )
+            # else
+            #     r_ids = get_valid_robot_ids(node)
+            #     @show object_positions[o] = OBJECT_AT(o,
+            #         map(r->get_location_id(robot_positions[r]),r_ids)
+            #         )
+            end
+            objects_active[o] = (t <= get_tF(env,v_deposit))
+        end
+    end
     EnvState(
         robot_positions = robot_positions,
         object_positions = object_positions,
@@ -502,7 +510,7 @@ function update_planning_cache!(solver,sched::OperatingSchedule,cache::PlanningC
                 break
             end
         end
-        if active 
+        if active
             push!(activated_vtxs,v2)
             push!(active_set, v2)               # add to active set
         end
@@ -681,7 +689,7 @@ end
 """
     function construct_search_env(solver, env::SearchEnv, ... )
 
-Construct a new SearchEnv, with cost_model and heuristic_model defined by the 
+Construct a new SearchEnv, with cost_model and heuristic_model defined by the
 solver type.
 """
 function construct_search_env(solver,
