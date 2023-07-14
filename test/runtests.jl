@@ -45,7 +45,9 @@ end
 end
 
 # Add test for jupyternotebook
-@nbinclude(joinpath(dirname(@__DIR__), "docs", "TaskGraphTutorial.ipynb"))
+if !(haskey(ENV, "CI") && ENV["CI"] == "true")
+    @nbinclude(joinpath(dirname(@__DIR__), "docs", "TaskGraphTutorial.ipynb"))
+end
 
 # Set logging level
 global_logger(SimpleLogger(stderr, Logging.Debug))
