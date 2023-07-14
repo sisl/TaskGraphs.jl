@@ -83,8 +83,7 @@ end
 
 function initialize_route_plan end
 
-const State = CRCBS.GraphState
-const Action = CRCBS.GraphAction
+include("pccbs.jl")
 
 export
     construct_cost_model,
@@ -112,7 +111,6 @@ function construct_environment_layer(env::GridFactoryEnvironment,problem_spec::P
     env_graph = GridFactoryEnvironment(env, graph=deepcopy(env.graph),
         dist_function=deepcopy(get_dist_matrix(env))
         )
-    # prob_spec = ProblemSpec(problem_spec, D=get_dist_matrix(env_graph))
     prob_spec = ProblemSpec(problem_spec, D=env_graph)
     EnvironmentLayer(env_graph,prob_spec)
 end
@@ -136,7 +134,7 @@ end
 """
     SearchEnv{C,H,S} <: GraphEnv{State,Action,C}
 
-Contains all of the information needed to fully define `PC_TAPF` and related 
+Contains all of the information needed to fully define `PC_TAPF` and related
 problems.
 """
 @with_kw_noshow struct SearchEnv{C,H,S} <: GraphEnv{State,Action,C}
@@ -269,6 +267,40 @@ function get_env_state(env,t)
     robot_positions = get_env_snapshot(env,t)
     object_positions = Dict{ObjectID,OBJECT_AT}()
     objects_active = Dict{ObjectID,Bool}()
+
+    #########
+    # This block was added by Kyle in commits on the develop branch with commit 6b4ebf2.
+    # The commit message was "Final changes for thesis." However, it does not appear to work
+    # in finding the correct objects as it only considers an object if it matches the BOT_CARRY
+    # template. This resulted in failing 6 tests in test_path_planning.jl. Resorting back to
+    # the original code for now.
+    #########
+    # for n in get_nodes(sched)
+    #     if matches_template(BOT_CARRY,n)
+    #         o = get_object_id(n)
+    #         o_node = get_node(sched,o)
+    #         v_deposit = first(outneighbors(sched,n))
+    #         v_collect = first(inneighbors(sched,n))
+    #         if t <= get_t0(n)
+    #             object_positions[o] = o_node.node
+    #             objects_active[o] = t >= get_t0(o_node)
+    #         else
+    #             object_positions[o] = o_node.node
+    #             node = get_node_from_vtx(sched,v_deposit)
+    #             if t >= get_t0(env,v_deposit)
+    #                 object_positions[o] = OBJECT_AT(o,
+    #                     map(n->get_location_id(n),sub_nodes(node))
+    #                     )
+    #             elseif t >= get_t0(env,v_collect)
+    #                 r_ids = get_valid_robot_ids(node)
+    #                 object_positions[o] = OBJECT_AT(o,
+    #                     map(r->get_location_id(robot_positions[r]),r_ids)
+    #                     )
+    #             end
+    #             objects_active[o] = (t <= get_tF(env,v_deposit))
+    #         end
+    #     end
+    # end
     for (o,o_node) in get_object_ICs(sched)
         v = get_vtx(sched,o)
         if t <= get_t0(env,v)
@@ -426,8 +458,6 @@ function get_next_vtx_matching_agent_id(env::SearchEnv,agent_id)
         n = get_node(get_schedule(env),v)
         has_robot_id(n) ? nothing : continue
         if agent_id == get_robot_id(n)
-        # if agent_id == get_path_spec(get_schedule(env), v).agent_id
-        # if agent_id == get_robot_id(get_node_from_vtx(get_schedule(env), v))
             return v
         end
     end
@@ -455,13 +485,14 @@ export
     update_planning_cache!(solver,env,v,path)
 """
 update_planning_cache!(solver,env::SearchEnv,v::Int,path::Path) = update_planning_cache!(solver,env,v,get_t(get_final_state(path)))
-function update_planning_cache!(solver,env::SearchEnv,v::Int,t::Int=-1)
-    cache = get_cache(env)
-    sched = get_schedule(env)
+function update_planning_cache!(solver,env::SearchEnv,v::Int,t::Real=-1)
+    update_planning_cache!(solver,get_schedule(env),get_cache(env),v,t)
+end
+function update_planning_cache!(solver,sched::OperatingSchedule,cache::PlanningCache,v::Int,t=-1)
     active_set = cache.active_set
     closed_set = cache.closed_set
     node_queue = cache.node_queue
-    Δt = t - get_tF(env,v)
+    Δt = t - get_tF(sched,v)
     if Δt > 0
         set_tF!(sched,v,t)
         process_schedule!(sched)
@@ -506,7 +537,6 @@ complete.
 function update_planning_cache!(solver,env)
     cache = get_cache(env)
     sched = get_schedule(env)
-    node = initialize_root_node(env)
     # Skip over nodes that are already planned or just don't need planning
     while true
         done = true
@@ -591,7 +621,7 @@ function construct_search_env(
         cache::PlanningCache=initialize_planning_cache(sched),
         primary_objective=problem_spec.cost_function,
         ;
-        extra_T=400,
+        extra_T=2000,
         kwargs...
     )
     cost_model, heuristic_model = construct_cost_model(
@@ -631,7 +661,7 @@ function construct_search_env(
         primary_objective = problem_spec.cost_function,
         args...
         ;
-        extra_T=400,
+        extra_T=2000,
         kwargs...
     )
     cost_model, heuristic_model = construct_cost_model(
@@ -659,7 +689,7 @@ end
 """
     function construct_search_env(solver, env::SearchEnv, ... )
 
-Construct a new SearchEnv, with cost_model and heuristic_model defined by the 
+Construct a new SearchEnv, with cost_model and heuristic_model defined by the
 solver type.
 """
 function construct_search_env(solver,
@@ -724,7 +754,6 @@ end
 ############################### Low Level Search ###############################
 ################################################################################
 
-include("pccbs.jl")
 
 export evaluate_path_gap
 
@@ -743,8 +772,8 @@ end
 function replan_path!(solver, pc_mapf::AbstractPC_MAPF, env::SearchEnv, constraint_node::ConstraintTreeNode, vtx::VtxID,t0)
     v = get_id(vtx)
     sched = get_schedule(env)
-    node_id = get_vtx_id(sched,v)
-    schedule_node = get_node_from_id(sched,node_id)
+    n_id = get_vtx_id(sched,v)
+    schedule_node = get_node_from_id(sched,n_id)
     ### trim path
     cbs_env = build_env(solver,pc_mapf,env,constraint_node,VtxID(v))
     path = get_base_path(solver,env,cbs_env)
@@ -766,9 +795,9 @@ function tighten_gaps!(solver, pc_mapf::AbstractPC_MAPF, env::SearchEnv, constra
     solver.tighten_paths ? nothing : return env
     sched = get_schedule(env)
     active_nodes = robot_tip_map(sched,get_cache(env).active_set)
-    for (robot_id, node_id) in active_nodes
+    for (robot_id, n_id) in active_nodes
         path = get_paths(env)[get_id(robot_id)]
-        v = get_vtx(sched,node_id)
+        v = get_vtx(sched,n_id)
         gap = evaluate_path_gap(env,path,v)
         if gap > 0
             t0 = get_t0(env,v)
@@ -848,6 +877,8 @@ function CRCBS.build_env(
         agent_idx   = agent_id, # this is only used for the HardConflictTable, which can be updated via the combined search node
         constraints = get_constraints(constraint_node, agent_id), # agent_id represents the whole path
         goal        = state_type(env)(goal_vtx,goal_time),
+        cost_model  = cost_model,
+        heuristic   = heuristic,
         )
     # update deadline in DeadlineCost
     set_deadline!(get_cost_model(cbs_env),deadline)
@@ -876,8 +907,8 @@ function CRCBS.build_env(
         constraint_node::ConstraintTreeNode,
         agent_id::AgentID
         )
-    node_id = get_next_node_matching_agent_id(env,RobotID(get_id(agent_id)))
-    build_env(solver,pc_mapf,env,constraint_node,VtxID(get_vtx(get_schedule(env),node_id)))
+    n_id = get_next_node_matching_agent_id(env,RobotID(get_id(agent_id)))
+    build_env(solver,pc_mapf,env,constraint_node,VtxID(get_vtx(get_schedule(env),n_id)))
 end
 CRCBS.build_env(env::SearchEnv) = PCCBSEnv(search_env=env)
 
@@ -957,7 +988,8 @@ end
 function CRCBS.discrete_constraint_table(env::SearchEnv,agent_id=-1,tf=2*makespan(get_schedule(env))+100*num_agents(env))
     discrete_constraint_table(num_states(env),num_actions(env),agent_id,tf)
 end
-CRCBS.initialize_root_node(solver,pc_mapf::AbstractPC_MAPF) = initialize_root_node(get_env(pc_mapf))
+# CRCBS.initialize_root_node(solver,pc_mapf::AbstractPC_MAPF) = initialize_root_node(get_env(pc_mapf))
+CRCBS.initialize_root_node(solver,pc_mapf::AbstractPC_MAPF) = initialize_root_node(copy(get_env(pc_mapf)))
 function Base.copy(env::SearchEnv)
     SearchEnv(
         env,
@@ -977,7 +1009,7 @@ function CRCBS.cbs_update_conflict_table!(solver,mapf::AbstractPC_MAPF,node,cons
     idxs = collect(1:num_agents(search_env))
     # t0 = max(minimum(get_cache(search_env).t0), 1) # This is particularly relevant for replanning, where we don't care to look for conflicts way back in the past.
     t0 = max(minimum(get_t0(get_schedule(search_env))),1) # This is particularly relevant for replanning, where we don't care to look for conflicts way back in the past.
-    detect_conflicts!(node.conflict_table,get_route_plan(search_env),idxs,t0)
+    detect_conflicts!(node.conflict_table,get_route_plan(search_env),idxs,Int(floor(t0)))
 end
 CRCBS.detect_conflicts!(table,env::SearchEnv,args...) = detect_conflicts!(table,get_route_plan(env),args...)
 
@@ -993,3 +1025,7 @@ for op in [
 end
 CRCBS.base_env_type(pc_mapf::AbstractPC_MAPF)               = PCCBSEnv
 CRCBS.base_env_type(pc_mapf::Union{C_PC_MAPF,C_PC_TAPF})    = MetaAgentCBS.TeamMetaEnv
+
+function validate(env::SearchEnv;kwargs...)
+    validate(get_schedule(env),convert_to_vertex_lists(get_route_plan(env));kwargs...)
+end

@@ -49,7 +49,7 @@ export
 """
     ProjectSpec <: AbstractCustomNDiGraph{Union{OBJECT_AT,Operation},AbstractID}
 
-Encodes a set of operations and the prescribed initial and final locations 
+Encodes a set of operations and the prescribed initial and final locations
 of the objects that form the inputs and outputs of those operations.
 
 Elements:
@@ -108,15 +108,29 @@ end
 function get_pickup_wait_time(spec::ProjectSpec,o::ObjectID)
     if !is_root_node(spec,o)
         parent = get_node(spec,inneighbors(spec,o)[1])
-        @assert isa(parent,Operation) 
+        @assert isa(parent,Operation)
         return duration(parent)
     end
     return 0.0
 end
+function Base.merge!(spec1::ProjectSpec,spec2::ProjectSpec)
+    remap_object_ids!(spec2,spec1)
+    for v in vertices(spec2)
+        id = get_vtx_id(spec2,v)
+        node = get_node(spec2,v)
+        add_node!(spec1,node,id)
+    end
+    for e in edges(spec2)
+        add_edge!(spec1,get_vtx_id(spec2,e.src),get_vtx_id(spec2,e.dst))
+    end
+    merge!(get_initial_conditions(spec1),get_initial_conditions(spec2))
+    merge!(get_final_conditions(spec1),get_final_conditions(spec2))
+    spec1
+end
 """
     get_duration_vector(spec::ProjectSpec)
 
-Return a vector `Δt` such that `Δt[i]` is the amount of time that must elapse 
+Return a vector `Δt` such that `Δt[i]` is the amount of time that must elapse
 before object `i` can be picked up after its parent operation is performed.
 """
 function get_duration_vector(spec::ProjectSpec)
@@ -134,25 +148,25 @@ end
     construct_operation(spec::ProjectSpec, station_id, input_ids, output_ids, Δt, id=get_unique_operation_id())
 """
 function construct_operation(
-        spec::ProjectSpec, 
-        station_id::LocationID, 
-        input_ids::Vector{ObjectID}, 
+        spec::ProjectSpec,
+        station_id::LocationID,
+        input_ids::Vector{ObjectID},
         output_ids::Vector{ObjectID},
-        Δt, 
-        id=get_unique_operation_id()
+        Δt,
+        id=get_unique_id(OperationID)
         )
     op = Operation(
-        pre = Dict{ObjectID,OBJECT_AT}(map(id->id=>get_final_condition(spec,id), input_ids)), 
-        post = Dict{ObjectID,OBJECT_AT}(map(id->id=>get_initial_condition(spec,id), output_ids)), 
+        pre = Dict{ObjectID,OBJECT_AT}(map(id->id=>get_final_condition(spec,id), input_ids)),
+        post = Dict{ObjectID,OBJECT_AT}(map(id->id=>get_initial_condition(spec,id), output_ids)),
         Δt = Δt,
         station_id = LocationID(station_id),
         id = id
     )
 end
 function construct_operation(
-        spec::ProjectSpec, 
-        station_id::Int, 
-        input_ids::Vector, 
+        spec::ProjectSpec,
+        station_id::Int,
+        input_ids::Vector,
         output_ids::Vector,args...)
     construct_operation(spec,
         LocationID(station_id),
@@ -220,7 +234,7 @@ function read_operation(toml_dict::Dict,keep_id=false)
     end
     op = Operation(
         pre     = read_op_dict_from_array(toml_dict["pre"]),
-        post    = read_op_dict_from_array(toml_dict["post"]), 
+        post    = read_op_dict_from_array(toml_dict["post"]),
         Δt      = get(toml_dict,"dt",get(toml_dict,"Δt",0.0)),
         station_id = LocationID(get(toml_dict,"station_id",-1)),
         id = op_id
@@ -259,7 +273,9 @@ end
 
 export
     SimpleProblemDef,
-    read_problem_def
+    SimplePCMAPFDef,
+    read_problem_def,
+    read_pcmapf_problem_def
 
 @with_kw struct SimpleProblemDef
     project_spec::ProjectSpec       = ProjectSpec()
@@ -270,6 +286,16 @@ export
 end
 SimpleProblemDef(project_spec,r0,s0,sF) = SimpleProblemDef(project_spec=project_spec,r0=r0,s0=s0,sF=sF)
 
+"""
+    SimplePCMAPFDef
+
+Simple definition of a PC_MAPF problem (PC_TAPF) with assignments already made.
+"""
+@with_kw struct SimplePCMAPFDef
+    pctapf_def::SimpleProblemDef
+    assignments::Dict{Int,Vector{Int}}
+end
+
 function TOML.parse(def::SimpleProblemDef)
     toml_dict = TOML.parse(def.project_spec)
     toml_dict["r0"] = def.r0
@@ -278,19 +304,27 @@ function TOML.parse(def::SimpleProblemDef)
     toml_dict["shapes"] = map(s->[s...], def.shapes)
     toml_dict
 end
+function TOML.parse(def::SimplePCMAPFDef)
+    dict = TOML.parse(def.pctapf_def)
+    dict["assignments"] = Dict(string(k)=>v for (k,v) in def.assignments)
+    dict
+end
 function read_problem_def(toml_dict::Dict)
     SimpleProblemDef(
         read_project_spec(toml_dict),
         toml_dict["r0"],
         toml_dict["s0"],
         toml_dict["sF"],
-        # map(s->tuple(s...), toml_dict["shapes"])
         map(s->tuple(s...), get(toml_dict,"shapes",[[1,1] for o in toml_dict["s0"]]) )
     )
 end
-function read_problem_def(io)
-    read_problem_def(TOML.parsefile(io))
+read_problem_def(io) = read_problem_def(TOML.parsefile(io))
+function read_pcmapf_problem_def(toml_dict::Dict)
+    pctapf_def = read_problem_def(toml_dict)
+    assignments = Dict(parse(Int,k)=>v for (k,v) in toml_dict["assignments"])
+    SimplePCMAPFDef(pctapf_def,assignments)
 end
+read_pcmapf_problem_def(io) = read_pcmapf_problem_def(TOML.parsefile(io))
 
 # export
 #     DeliveryTask,
@@ -384,9 +418,9 @@ Fields:
 """
 @with_kw mutable struct PathSpec
     # temporal
-    t0              ::Int               = 0
-    min_duration    ::Int               = 0
-    tF              ::Int               = t0 + min_duration
+    t0              ::Float64           = 0
+    min_duration    ::Float64           = 0
+    tF              ::Float64           = t0 + min_duration
     slack           ::Vector{Float64}   = Float64[]
     local_slack     ::Vector{Float64}   = Float64[]
     # instructions
@@ -402,10 +436,12 @@ get_tF(spec::PathSpec) = spec.tF
 set_tF!(spec::PathSpec,val) = begin spec.tF = val end
 get_min_duration(spec::PathSpec) = spec.min_duration
 set_min_duration!(spec::PathSpec,val) = begin spec.min_duration = val end
+get_duration(spec::PathSpec) = get_tF(spec) - get_t0(spec)
 get_slack(spec::PathSpec) = spec.slack
 set_slack!(spec::PathSpec,val) = begin spec.slack = val end
 get_local_slack(spec::PathSpec) = spec.local_slack
 set_local_slack!(spec::PathSpec,val) = begin spec.local_slack = val end
+Base.summary(s::PathSpec) = string("t0=",s.t0,", tF=",s.tF,", fixed=",s.fixed)
 
 const path_spec_accessor_interface = [
     :get_t0,
@@ -413,6 +449,7 @@ const path_spec_accessor_interface = [
     :get_slack,
     :get_local_slack,
     :get_min_duration,
+    :get_duration,
     ]
 const path_spec_mutator_interface = [
     :set_min_duration!,
@@ -432,13 +469,14 @@ export
 
 The node type of the `OperatingSchedule` graph.
 """
-mutable struct ScheduleNode{I<:AbstractID,V<:AbstractPlanningPredicate}
+mutable struct ScheduleNode{I<:AbstractID,V}
     id::I
     node::V
     spec::PathSpec
 end
 ScheduleNode(id,node) = ScheduleNode(id,node,PathSpec())
 get_path_spec(node::ScheduleNode) = node.spec
+Base.copy(n::ScheduleNode) = ScheduleNode(n.id,copy(n.node),deepcopy(n.spec))
 function set_path_spec!(node::ScheduleNode,spec)
     node.spec = spec
 end
@@ -454,6 +492,7 @@ end
 for op in [:(GraphUtils.matches_template)]
     @eval $op(template::Type{T},node::ScheduleNode) where {T} = $op(template,node.node)
 end
+Base.summary(n::ScheduleNode) = string(string(n.node)," [",summary(n.spec),"]")
 
 const schedule_node_accessor_interface = [
     path_spec_accessor_interface...,
@@ -500,6 +539,16 @@ constraint between them.
 end
 get_terminal_vtxs(sched::P) where {P<:OperatingSchedule}     = sched.terminal_vtxs
 get_root_node_weights(sched::P) where {P<:OperatingSchedule} = sched.weights
+function Base.copy(sched::OperatingSchedule)
+    OperatingSchedule(
+        graph = deepcopy(get_graph(sched)),
+        nodes = map(copy, get_nodes(sched)),
+        vtx_map = deepcopy(sched.vtx_map),
+        vtx_ids = deepcopy(sched.vtx_ids),
+        terminal_vtxs = deepcopy(sched.terminal_vtxs),
+        weights = deepcopy(sched.weights),
+    )
+end
 
 GraphUtils.get_vtx(sched::OperatingSchedule,node::ScheduleNode) = get_vtx(sched,node.id)
 get_node_from_id(sched::OperatingSchedule,id)                   = get_node(sched,id).node
@@ -583,7 +632,7 @@ replace_in_schedule!(sched::OperatingSchedule,node::ScheduleNode,id::AbstractID=
 function replace_in_schedule!(sched::P,path_spec::T,pred,id::ID) where {P<:OperatingSchedule,T<:PathSpec,ID<:AbstractID}
     replace_in_schedule!(sched,ScheduleNode(id,pred,path_spec))
 end
-function replace_in_schedule!(sched::P,spec::T,pred,id::ID) where {P<:OperatingSchedule,T<:ProblemSpec,ID<:AbstractID}
+function replace_in_schedule!(sched::P,spec,pred,id::ID) where {P<:OperatingSchedule,ID<:AbstractID}
     replace_in_schedule!(sched,generate_path_spec(sched,spec,pred),pred,id)
 end
 function replace_in_schedule!(sched::P,pred,id::ID) where {P<:OperatingSchedule,ID<:AbstractID}
@@ -604,9 +653,16 @@ end
 function GraphUtils.make_node(g::OperatingSchedule,spec::PathSpec,pred::OBJECT_AT,id=get_object_id(pred))
     ScheduleNode(id,pred,spec)
 end
+# function GraphUtils.make_node(g::OperatingSchedule,spec::PathSpec,pred::Union{OBJECT_AT,BOT_AT,Operation},id=node_id(pred))
+#     ScheduleNode(id,pred,spec)
+# end
+# function GraphUtils.make_node(g::OperatingSchedule,spec::PathSpec,pred::A,id=node_id(pred)) where {A<:AbstractRobotAction}
 function GraphUtils.make_node(g::OperatingSchedule,spec::PathSpec,pred::AbstractRobotAction,id=get_unique_action_id())
     ScheduleNode(id,pred,spec)
 end
+# function GraphUtils.make_node(g::OperatingSchedule,spec::PathSpec,pred::A,id=get_unique_id(TemplatedID{A})) where {A<:BOT_GO}
+#     ScheduleNode(id,pred,spec)
+# end
 function GraphUtils.make_node(g::OperatingSchedule,spec::PathSpec,pred::Operation,id=get_operation_id(pred))
     ScheduleNode(id,pred,spec)
 end
@@ -729,14 +785,14 @@ function validate(sched::OperatingSchedule)
             if matches_node_type(node,COLLECT)
                 @assert(get_location_id(node) != -1, string("get_location_id(node) != -1 for node id ", id))
             end
-            @assert( outdegree(sched,v) >= sum([0, values(required_successors(node))...]) , string("node = ", string(node), " outdegree = ",outdegree(G,v), " "))
-            @assert( indegree(sched,v) >= sum([0, values(required_predecessors(node))...]), string("node = ", string(node), " indegree = ",indegree(G,v), " ") )
+            @assert( outdegree(sched,v) >= sum([0, values(required_successors(node))...]) , string("outdegree = ",outdegree(sched,v), " for node = ", string(node)))
+            @assert( indegree(sched,v) >= sum([0, values(required_predecessors(node))...]), string("indegree = ",indegree(sched,v), " for node = ", string(node)))
             if matches_node_type(node, AbstractSingleRobotAction)
                 for v2 in outneighbors(sched,v)
                     node2 = get_node_from_vtx(sched, v2)
                     if matches_node_type(node2, AbstractSingleRobotAction)
                         if length(intersect(resources_reserved(node),resources_reserved(node2))) == 0 # job shop constraint
-                            @assert( get_robot_id(node) == get_robot_id(node2), string("robot IDs do not match: ",string(node), " --> ", string(node2)))
+                            @assert( get_robot_id(node) == get_robot_id(node2), string("robot IDs do not match: ",string(node), " => ", string(node2)))
                         end
                     end
                 end
@@ -745,6 +801,8 @@ function validate(sched::OperatingSchedule)
     catch e
         if typeof(e) <: AssertionError
             bt = catch_backtrace()
+            @info "Schedule is invalid"
+            log_schedule_edges(sched)
             showerror(stdout,e,bt)
             print(e.msg)
         else
@@ -754,7 +812,34 @@ function validate(sched::OperatingSchedule)
     end
     return true
 end
-function validate(node::ScheduleNode,paths::Vector{Vector{Int}})
+function log_schedule_edges(sched,v=-1;
+        show_upstream = true,
+        show_downstream = true,
+        show_all = true,
+    )
+    if has_vertex(sched,v)
+        if show_upstream
+            @info "upstream from $(summary(get_node(sched,v))):"
+            for e in edges(bfs_tree(sched,v;dir=:in))
+                @info "$(summary(get_node(sched,e.dst))) => $(summary(get_node(sched,e.src)))"
+            end
+        end
+        if show_downstream
+            @info "downstream from $(summary(get_node(sched,v))):"
+            for e in edges(bfs_tree(sched,v;dir=:out))
+                @info "$(summary(get_node(sched,e.src))) => $(summary(get_node(sched,e.dst)))"
+            end
+        end
+    end
+    if show_all
+        for e in edges(sched)
+            @info "$(summary(get_node(sched,e.src))) => $(summary(get_node(sched,e.dst))),"
+        end
+    end
+end
+function validate(node::ScheduleNode,paths::Vector{Vector{Int}};
+        quiet::Bool=false,
+    )
     if matches_template(TEAM_ACTION,node)
         for n in sub_nodes(node)
             sub_node = ScheduleNode(node.id,n,node.spec)
@@ -769,23 +854,29 @@ function validate(node::ScheduleNode,paths::Vector{Vector{Int}})
             start_vtx = get_id(get_initial_location_id(node))
             final_vtx = get_id(get_destination_location_id(node))
             try
-                @assert(length(path) > get_t0(node), string("length(path) == $(length(path)), should be greater than get_t0(node) == $(get_t0(node)) in node ",string(node)))
-                @assert(length(path) > get_tF(node), string("length(path) == $(length(path)), should be greater than get_t0(node) == $(get_t0(node)) in node ",string(node)))
+                t0 = Int(round(get_t0(node)))
+                tF = Int(round(get_tF(node)))
+                @assert abs(t0-get_t0(node)) <= 0.01
+                @assert abs(tF-get_tF(node)) <= 0.01
+                @assert(length(path) > t0, string("length(path) == $(length(path)), should be greater than get_t0(node) == $(get_t0(node)) in node ",string(node)))
+                @assert(length(path) > tF, string("length(path) == $(length(path)), should be greater than get_tF(node) == $(get_tF(node)) in node ",string(node)))
                 if start_vtx != -1
-                    if length(path) > get_t0(node)
-                        @assert(path[get_t0(node) + 1] == start_vtx, string("node: ",string(node), ", start_vtx: ",start_vtx, ", t0+1: ",get_t0(node)+1,", path[get_t0(node) + 1] = ",path[get_t0(node) + 1],", path: ", path))
+                    if length(path) > t0
+                        @assert(path[t0 + 1] == start_vtx, string("node: ",string(node.node), ", start_vtx: ",start_vtx, ", t0+1: ",t0+1,", path[get_t0(node) + 1] = ",path[t0 + 1],", path: ", path))
                     end
                 end
                 if final_vtx != -1
-                    if length(path) > get_tF(node)
-                        @assert(path[get_tF(node) + 1] == final_vtx, string("node: ",string(node), ", final vtx: ",final_vtx, ", tF+1: ",get_tF(node)+1,", path[get_tF(node) + 1] = ",path[get_tF(node) + 1],", path: ", path))
+                    if length(path) > tF
+                        @assert(path[tF + 1] == final_vtx, string("node: ",string(node.node), ", final vtx: ",final_vtx, ", tF+1: ",tF+1,", path[get_tF(node) + 1] = ",path[tF + 1],", path: ", path))
                     end
                 end
             catch e
                 if typeof(e) <: AssertionError
-                    print(e.msg)
+                    if !quiet
+                        println(e.msg)
+                    end
                 else
-                    throw(e)
+                    rethrow(e)
                 end
                 return false
             end
@@ -793,10 +884,12 @@ function validate(node::ScheduleNode,paths::Vector{Vector{Int}})
     end
     return true
 end
-function validate(sched::OperatingSchedule,paths::Vector{Vector{Int}})
+function validate(sched::OperatingSchedule,paths::Vector{Vector{Int}};
+        kwargs...
+    )
     for v in vertices(sched)
         node = get_node(sched,v)
-        if !validate(node,paths)
+        if !validate(node,paths;kwargs...)
             return false
         end
     end
@@ -848,7 +941,7 @@ function add_headless_team_delivery_task!(
         ) where {R<:AbstractRobotType}
 
     robot_id = BotID{R}(-1)
-    @assert length(pickup_station_ids) == length(dropoff_station_ids)
+    @assert length(pickup_station_ids) == length(dropoff_station_ids) "$(summary(object_id)): pickup_station_ids = $(pickup_station_ids), but dropoff_station_ids = $(dropoff_station_ids)"
     n = length(pickup_station_ids)
 
     object_node = get_node_from_id(sched,object_id)
@@ -931,7 +1024,7 @@ function construct_partial_project_schedule(spec::ProjectSpec,problem_spec::Prob
         add_node!(sched, make_node(sched,problem_spec,op))
     end
     for pred in object_ICs
-        add_node!(sched, make_node(sched,problem_spec,pred)) 
+        add_node!(sched, make_node(sched,problem_spec,pred))
     end
     for pred in robot_ICs
         add_new_robot_to_schedule!(sched,pred,problem_spec)
@@ -950,7 +1043,7 @@ function construct_partial_project_schedule(spec::ProjectSpec,problem_spec::Prob
             object_ic           = get_node_from_id(sched, object_id)
             if length(get_location_ids(object_ic)) > 1 # COLLABORATIVE TRANSPORT
                 add_headless_team_delivery_task!(sched,problem_spec,
-                    ObjectID(object_id),op_id) 
+                    ObjectID(object_id),op_id)
             else # SINGLE AGENT TRANSPORT
                 add_headless_delivery_task!(sched,problem_spec,
                     ObjectID(object_id),op_id)
@@ -961,16 +1054,16 @@ function construct_partial_project_schedule(spec::ProjectSpec,problem_spec::Prob
         end
     end
     # NOTE: A hack to get speed up on SparseAdjacencyMILP. Not sure if it will work
-    for (id, pred) in get_object_ICs(sched)
-        v = get_vtx(sched, ObjectID(id))
-        if indegree(get_graph(sched),v) == 0
-            op_id = get_unique_operation_id()
-            op = Operation(id=op_id)
-            set_postcondition!(op,pred)
-            add_node!(sched,make_node(sched,problem_spec,op))
-            add_edge!(sched,op_id,ObjectID(id))
-        end
-    end
+    # for (id, pred) in get_object_ICs(sched)
+    #     v = get_vtx(sched, ObjectID(id))
+    #     if indegree(get_graph(sched),v) == 0
+    #         op_id = get_unique_operation_id()
+    #         op = Operation(id=op_id)
+    #         set_postcondition!(op,pred)
+    #         add_node!(sched,make_node(sched,problem_spec,op))
+    #         add_edge!(sched,op_id,ObjectID(id))
+    #     end
+    # end
     set_leaf_operation_vtxs!(sched)
     process_schedule!(sched)
     sched
@@ -994,8 +1087,8 @@ Args:
 * [OPTIONAL] t0::Vector{Int}: default = zeros(Int,nv(schedule))
 * [OPTIONAL] tF::Vector{Int}: default = zeros(Int,nv(schedule))
 """
-function process_schedule(sched::P,t0=zeros(Int,nv(sched)),
-        tF=zeros(Int,nv(sched))
+function process_schedule(sched::P,t0=zeros(nv(sched)),
+        tF=zeros(nv(sched))
     ) where {P<:OperatingSchedule}
 
     G = get_graph(sched)
@@ -1027,6 +1120,12 @@ function process_schedule(sched::P,t0=zeros(Int,nv(sched)),
     end
     t0,tF,slack,local_slack
 end
+"""
+    update_schedule_times!(sched::OperatingSchedule)
+
+Compute start and end times for all nodes based on the end times of their
+inneighbors and their own durations.
+"""
 function update_schedule_times!(sched::OperatingSchedule)
     G = get_graph(sched)
     for v in topological_sort_by_dfs(G)
@@ -1036,6 +1135,32 @@ function update_schedule_times!(sched::OperatingSchedule)
         end
         set_t0!(sched,v,t0)
         set_tF!(sched,v,max(get_tF(sched,v),t0+get_min_duration(sched,v)))
+    end
+    return sched
+end
+"""
+    update_schedule_times!(sched::OperatingSchedule,frontier::Set{Int},local_only=true)
+
+Compute start and end times for all nodes in `frontier` and their descendants.
+If `local_only == true`, descendants of nodes with unchanged final time will not
+be updated.
+"""
+function update_schedule_times!(sched::OperatingSchedule,frontier::Set{Int};
+        local_only::Bool=true,
+        )
+    iter = GraphUtils.SortedBFSIterator(graph=sched,frontier=collect(frontier),replace=true)
+    while !isempty(iter)
+        v = pop!(iter)
+        t0 = get_t0(sched,v)
+        for v2 in inneighbors(sched,v)
+            t0 = max(t0,get_tF(sched,v2))
+        end
+        set_t0!(sched,v,t0)
+        tF = t0+get_min_duration(sched,v)
+        if tF >= get_tF(sched,v) || !local_only
+            set_tF!(sched,v,tF)
+            GraphUtils.update_iterator!(iter,v)
+        end
     end
     return sched
 end
@@ -1111,4 +1236,46 @@ function get_assignment_dict(assignment_matrix,N,M)
         end
     end
     assignment_dict
+end
+
+"""
+    get_assignment_dict(sched::OperatingSchedule)
+
+Return a dictionary mapping robot id to a sequence of object_ids.
+"""
+function get_assignment_dict(sched::OperatingSchedule)
+    dict = Dict{Int,Vector{Int}}()
+    for n in node_iterator(sched,topological_sort_by_dfs(sched))
+        if matches_template(BOT_COLLECT,n)
+            node = n.node
+            r = get_id(get_robot_id(node))
+            o = get_id(get_object_id(node))
+            push!(get!(dict,r,Int[]),o)
+        end
+    end
+    return dict
+end
+
+"""
+    apply_assignment_dict!(sched::OperatingSchedule,assignment_dict)
+
+Make the assignments encoded in assignment_dict.
+"""
+function apply_assignment_dict!(sched::OperatingSchedule,assignment_dict,prob_spec)
+    tips = robot_tip_map(sched)
+    collect_nodes = Dict(get_object_id(n.node)=>n for n in get_nodes(sched) if matches_template(BOT_COLLECT,n))
+    for (robot_idx,itinerary) in assignment_dict
+        r = RobotID(robot_idx)
+        for object_idx in itinerary
+            tip = get_node(sched,tips[r])
+            o = ObjectID(object_idx)
+            c = collect_nodes[o]
+            add_edge!(sched,tip,c)
+            propagate_valid_ids!(sched,prob_spec)
+            # update tips
+            tips = robot_tip_map(sched)
+        end
+    end
+    process_schedule!(sched)
+    sched
 end

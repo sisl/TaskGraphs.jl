@@ -38,6 +38,8 @@ abstract type AbstractRobotAction{R<:AbstractRobotType} <: AbstractPlanningPredi
 abstract type AbstractSingleRobotAction{R<:AbstractRobotType} <: AbstractRobotAction{R} end
 abstract type AbstractTeamRobotAction{R<:AbstractRobotType} <: AbstractRobotAction{R} end
 
+Base.copy(p::AbstractPlanningPredicate) = deepcopy(p)
+
 function get_object_id end
 function get_robot_id end
 function get_initial_location_id end
@@ -176,6 +178,23 @@ struct HasRobot <: PredicateTrait end
 # initial condition preds: OBJECT_AT, ROBOT_AT
 # event preds: Operation
 
+@with_kw struct LargeObjectDef
+	footprint::Matrix{Bool} = ones(Int,1,1)
+	origin::Tuple{Int,Int} 	= (0,0)
+	carrying_positions::Vector{Tuple{Int,Int}} = [(0,0)]
+end
+struct LARGE_OBJECT_AT <: AbstractPlanningPredicate
+	o::ObjectID
+	x::LocationID
+	def::LargeObjectDef
+end
+get_object_id(pred::LARGE_OBJECT_AT) = pred.o
+GraphUtils.node_id(n::LARGE_OBJECT_AT) = get_object_id(n)
+get_location_id(pred::LARGE_OBJECT_AT) = pred.x
+get_initial_location_id(pred::LARGE_OBJECT_AT) = pred.x
+get_destination_location_id(pred::LARGE_OBJECT_AT) = pred.x
+LARGE_OBJECT_AT(o::ObjectID,x::LocationID) = LARGE_OBJECT_AT(o,x,LargeObjectDef())
+
 export
 	OBJECT_AT,
 	BOT_AT,
@@ -208,6 +227,7 @@ struct BOT_AT{R<:AbstractRobotType} <: AbstractPlanningPredicate
     r::BotID{R}
     x::LocationID
 end
+robot_type(id::BotID{R}) where {R} = R
 robot_type(a::BOT_AT{R}) where {R} = R
 get_location_id(pred::BOT_AT) 	= pred.x
 get_robot_id(pred::BOT_AT) 		= pred.r
@@ -277,7 +297,7 @@ GraphUtils.get_id(op::Operation) = get_id(op.id)
 get_dropoff(op::Operation,o::ObjectID) = get_location_id(get_precondition(op,o))
 get_dropoffs(op::Operation,o::ObjectID) = get_location_ids(get_precondition(op,o))
 
-id_type(::BOT_AT{R}) where {R} = BotID{R} 
+id_type(::BOT_AT{R}) where {R} = BotID{R}
 id_type(::AbstractRobotAction{R}) where {R} = ActionID
 id_type(::OBJECT_AT) = ObjectID
 id_type(::Operation) = OperationID
@@ -335,6 +355,31 @@ Encodes the event "robot `r` collects object `o` from `x`
 end
 const DEPOSIT = BOT_DEPOSIT{DeliveryBot}
 
+@with_kw struct COLLABORATIVE_TRANSPORT_ACTION{R,A<:AbstractRobotAction{R}} <: AbstractTeamRobotAction{R}
+	action::A 				   = A()
+	object_def::LargeObjectDef = LargeObjectDef() # defines object shape, carrying config
+	start_positions::Vector{Pair{BotID{R},LocationID}} = Vector{Pair{BotID{R},LocationID}}()
+	goal_positions::Vector{Pair{BotID{R},LocationID}}	= Vector{Pair{BotID{R},LocationID}}()
+end
+function init_collaborative_action(env::GridFactoryEnvironment, action::A, def::LargeObjectDef) where {R<:AbstractRobotType,A<:AbstractRobotAction{R}}
+	x0 = get_initial_location_id(action)
+	xF = get_destination_location_id(action)
+	starts = Vector{Pair{BotID{R},LocationID}}()
+	goals = Vector{Pair{BotID{R},LocationID}}()
+	for p in def.carrying_positions
+		id = get_unique_invalid_id(RobotID)
+		offset = p .- def.origin
+		push!(starts,id=>GraphUtils.idx_from_offset(env, get_id(x0), offset))
+		push!(goals,id=>GraphUtils.idx_from_offset(env, get_id(xF), offset))
+	end
+	COLLABORATIVE_TRANSPORT_ACTION{R,A}(action,def,starts,goals)
+end
+# sub_nodes(n) = [n]
+# sub_nodes(n::COLLABORATIVE_TRANSPORT_ACTION) = n.instructions
+# team_configuration(n) = (1,1)
+# team_configuration(n::COLLABORATIVE_TRANSPORT_ACTION) = n.shape
+# team_action_type(n::COLLABORATIVE_TRANSPORT_ACTION{R,A}) where {R,A} = A
+
 export
 	CleanUpBot,
 	CleanUpBotID,
@@ -345,7 +390,7 @@ export
 """
 	CleanUpBot <: AbstractRobotType
 
-A robot type for picking up dropped objects, cleaning up spills, and taking 
+A robot type for picking up dropped objects, cleaning up spills, and taking
 care of dead robots
 """
 struct CleanUpBot <: AbstractRobotType end
@@ -491,6 +536,9 @@ resources_reserved(node::BOT_COLLECT)	= AbstractID[get_location_id(node)]
 resources_reserved(node::BOT_DEPOSIT)	= AbstractID[get_location_id(node)]
 resources_reserved(node::TEAM_ACTION)	= union(map(pred->resources_reserved(pred), node.instructions)...)
 
+align_with_predecessor(graph,node,pred) = align_with_predecessor(node,pred)
+align_with_successor(graph,node,pred) 	= align_with_successor(node,pred)
+
 align_with_predecessor(node::BOT_GO,pred::BOT_AT)			= BOT_GO(first_valid(node.r,pred.r), first_valid(node.x1,pred.x), node.x2)
 align_with_predecessor(node::BOT_GO,pred::BOT_GO)			= BOT_GO(first_valid(node.r,pred.r), first_valid(node.x1,pred.x2), node.x2)
 align_with_predecessor(node::BOT_GO,pred::BOT_DEPOSIT)		= BOT_GO(first_valid(node.r,pred.r), first_valid(node.x1,pred.x), node.x2)
@@ -550,12 +598,14 @@ GraphUtils.validate_edge(n1::BOT_CARRY,		n2::BOT_DEPOSIT		) = (n1.x2 	== n2.x) &
 GraphUtils.validate_edge(n1::BOT_DEPOSIT,		n2::BOT_CARRY		) = false
 GraphUtils.validate_edge(n1::BOT_DEPOSIT,		n2::BOT_GO			) = (n1.x 	== n2.x1)
 GraphUtils.validate_edge(n1::N,n2::N) where {N<:Union{BOT_COLLECT,BOT_DEPOSIT}} = (n1.x == n2.x) # job shop edges are valid
+GraphUtils.validate_edge(n1::Operation,n2::OBJECT_AT) = haskey(postconditions(n1),get_object_id(n2))
+GraphUtils.validate_edge(n1::OBJECT_AT,n2::Operation) = haskey(preconditions(n2),get_object_id(n1))
 
 Base.string(pred::OBJECT_AT)	=  string("O(",get_id(get_object_id(pred)),",",map(x->get_id(x), get_location_ids(pred)),")")
 Base.string(pred::BOT_AT)  		=  string("R(",get_id(get_robot_id(pred)),",",get_id(get_location_id(pred)),")")
-Base.string(a::BOT_GO)        	=  string("GO(",get_id(get_robot_id(a)),",",get_id(get_initial_location_id(a)),"->",get_id(get_destination_location_id(a)),")")
+Base.string(a::BOT_GO)        	=  string("GO(",get_id(get_robot_id(a)),",",get_id(get_initial_location_id(a)),"=>",get_id(get_destination_location_id(a)),")")
 Base.string(a::BOT_COLLECT)   	=  string("COLLECT(",get_id(get_robot_id(a)),",",get_id(get_object_id(a)),",",get_id(get_location_id(a)),")")
-Base.string(a::BOT_CARRY)     	=  string("CARRY(",get_id(get_robot_id(a)),",",get_id(get_object_id(a)),",",get_id(get_initial_location_id(a)),"->",get_id(get_destination_location_id(a)),")")
+Base.string(a::BOT_CARRY)     	=  string("CARRY(",get_id(get_robot_id(a)),",",get_id(get_object_id(a)),",",get_id(get_initial_location_id(a)),"=>",get_id(get_destination_location_id(a)),")")
 Base.string(a::BOT_DEPOSIT)   	=  string("DEPOSIT(",get_id(get_robot_id(a)),",",get_id(get_object_id(a)),",",get_id(get_location_id(a)),")")
 Base.string(op::Operation)    	=  string("OP(",get_id(get_operation_id(op)),")")
 Base.string(a::TEAM_ACTION)   	=  string("TEAM_ACTION( ",map(i->string(string(i), ","), a.instructions)...," )")
@@ -567,4 +617,4 @@ title_string(a::BOT_COLLECT,verbose=true)   = verbose ? string("collect\n",get_i
 title_string(a::BOT_CARRY,verbose=true)     = verbose ? string("carry\n",get_id(get_robot_id(a)),",",get_id(get_object_id(a)),",",get_id(get_destination_location_id(a))) : "carry";
 title_string(a::BOT_DEPOSIT,verbose=true)   = verbose ? string("deposit\n",get_id(get_robot_id(a)),",",get_id(get_object_id(a)),",",get_id(get_location_id(a))) : "deposit";
 title_string(op::Operation,verbose=true)= verbose ? string("op",get_id(get_operation_id(op))) : "op";
-title_string(a::TEAM_ACTION,verbose=true) where {R,A} = verbose ? string("T-", team_action_type(a), "\n","r: (",map(i->string(get_id(get_robot_id(i)), ","), a.instructions)...,")") : string("TEAM","\n",title_string(team_action_type(a)(),verbose)) #string("TEAM\n", string(team_action_type(a)))
+title_string(a::TEAM_ACTION,verbose=true) = verbose ? string("T-", team_action_type(a), "\n","r: (",map(i->string(get_id(get_robot_id(i)), ","), a.instructions)...,")") : string("TEAM","\n",title_string(team_action_type(a)(),verbose)) #string("TEAM\n", string(team_action_type(a)))

@@ -54,3 +54,14 @@ let
         end
     end
 end
+# test that conflicts are only detected between active states
+let 
+    for (active1,active2) in Base.Iterators.product([true,false],[true,false])
+        s1 = TaskGraphs.State(1,0,active1)
+        s2 = TaskGraphs.State(1,0,active2)
+        a = CRCBS.wait(s1)
+        n1 = PathNode(s1,a,get_next_state(s1,a))
+        n2 = PathNode(s2,a,get_next_state(s2,a))
+        @test detect_state_conflict(n1,n2) == (active1 && active2)
+    end
+end

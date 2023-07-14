@@ -1,7 +1,8 @@
 export
     init_env_1,
     init_env_2,
-    init_env_3
+    init_env_3,
+    init_env_small
 
 init_env_1() = construct_regular_factory_world(;
     n_obstacles_x=2,
@@ -30,6 +31,16 @@ init_env_3() = construct_regular_factory_world(;
     obs_offset = [1;1],
     env_pad = [1;1],
     # env_offset = [1,1],
+    env_scale = 1,
+    exclude_from_free = true,
+)
+
+init_env_small() = construct_regular_factory_world(;
+    n_obstacles_x=2,
+    n_obstacles_y=2,
+    obs_width = [2;2],
+    obs_offset = [2;2],
+    env_pad = [1;1],
     env_scale = 1,
     exclude_from_free = true,
 )
@@ -85,8 +96,16 @@ function pctapf_problem(
         problem_spec,
         env_graph
         )
-    PC_TAPF(env)
+    prob = PC_TAPF(env)
+    return post_process_problem_type(solver,prob)
 end
+"""
+    post_process_problem_type(solver,prob)
+
+An overridable helper function for potentially modifying prob based on solver.
+Default behavior is to return `prob` with no changes.
+"""
+post_process_problem_type(solver,prob) = prob
 function pctapf_problem(solver,spec::ProjectSpec,env,robot_ics,prob_spec=ProblemSpec(D=env))
     sched = construct_partial_project_schedule(spec,prob_spec,robot_ics)
     return pctapf_problem(solver,sched,prob_spec,env)
@@ -95,6 +114,14 @@ function PC_TAPF(solver,def::SimpleProblemDef,env::GridFactoryEnvironment)
     sched, prob_spec = construct_task_graphs_problem(def,env)
     pctapf = pctapf_problem(solver,sched,prob_spec,env)
     return pctapf
+end
+function PC_MAPF(solver,def::SimplePCMAPFDef,env::GridFactoryEnvironment)
+    prob = PC_TAPF(solver,def.pctapf_def,env)
+    sched = get_schedule(get_env(prob))
+    prob_spec = get_problem_spec(get_env(prob))
+    apply_assignment_dict!(sched,def.assignments,prob_spec)
+    process_schedule!(sched)
+    return PC_MAPF(get_env(prob))
 end
 
 function pcta_problem(
@@ -120,7 +147,7 @@ function pcta_problem(
 end
 
 function PC_TA(def::SimpleProblemDef,env::GridFactoryEnvironment,objective=MakeSpan())
-    sched, prob_spec, env, _ = construct_task_graphs_problem(def,env)
+    sched, prob_spec = construct_task_graphs_problem(def,env)
     pcta = pcta_problem(sched,prob_spec,env,objective)
 end
 
@@ -468,56 +495,106 @@ export pctapf_problem_10
     pctapf_problem_10(;cost_function=MakeSpan(),verbose=false,Δt_op=0,Δt_collect=[0,0,0,0,0,0],Δt_deposit=[0,0,0,0,0,0])
 
 Motivation for backtracking in ISPS
-The makespan optimal solution is T = 8. However, the optimistic schedule
-will always prioritize task route planning for tasks 1,2, and 3 before 4.
-This leads to a double delay that will not be caught without backtracking
-in ISPS. Hence, the solver will return a solution with T = 9.
+The makespan optimal solution is T = 6. However, the optimistic schedule will 
+always prioritize robot 2 over robot 1, causing robot 1 to get stuck waiting for 
+3, 4, and 5 to pass all in a row. This creates an unavoidable delay in the 
+schedule, leading to a +1 delay that will not be caught without backtracking in
+ISPS. Hence, the solver will return a solution with T = 7.
 """
 function pctapf_problem_10(;cost_function=MakeSpan(),verbose=false,Δt_op=0,Δt_collect=[0,0,0,0,0,0],Δt_deposit=[0,0,0,0,0,0])
-    N = 4                  # num robots
-    M = 4                  # num delivery tasks
-    vtx_grid = initialize_dense_vtx_grid(13,11)
+    vtx_grid = initialize_dense_vtx_grid(10,4)
+    #   1   2   3   4
+    #   5   6   7   8
+    #   9  10  11  12
+    #  13  14  15  16
+    #  17  18  19  20
+    #  21  22  23  24
+    #  25  26  27  28
+    #  29  30  31  32
+    #  33  34  35  36
+    #  37  38  39  40
 
-    #   1    2    3    4    5    6    7    8    9   10   11
-    #  12   13   14   15   16   17   18   19   20   21   22
-    #  23   24   25   26   27   28   29   30   31   32   33
-    #  34   35   36   37   38   39   40   41   42   43   44
-    #  45   46   47   48   49   50   51   52   53   54   55
-    #  56   57   58   59   60   61   62   63   64   65   66
-    #  67   68   69   70   71   72   73   74   75   76   77
-    #  78   79   80   81   82   83   84   85   86   87   88
-    #  89   90   91   92   93   94   95   96   97   98   99
-    # 100  101  102  103  104  105  106  107  108  109  110
-    # 111  112  113  114  115  116  117  118  119  120  121
-    # 122  123  124  125  126  127  128  129  130  131  132
-    # 133  134  135  136  137  138  139  140  141  142  143
+    #   .   .  (5)  .  
+    #   .   .  (4)  .  
+    #   .   .  (3)  .  
+    #   .   .   .   .  
+    #   .  (2)  .   .  
+    #  (1) [1]  .  [6]
+    #   .   .  [5]  .  
+    #   .   .  [4]  .  
+    #   .   .  [3]  .  
+    #   .  [2]  .   .  
 
-    #            (2)
-    #
-    #
-    #     (1)
-    # (4)    [4]     [4] [3] [4]                         [3]
-    #
-    #
-    #
-    #            [2]
-    #
-    #     [1]
-
-    r0 = [15,34,137, 5       ]
-    s0 = [15,34,137, 5, 27,49 ]
-    sF = [22,42,60,  27,49,71]
+    r0 = [21,18,11, 7, 3]
+    s0 = [21,18,11, 7, 3,22]
+    sF = [22,38,35,31,27,24]
     env_graph = construct_factory_env_from_vtx_grid(
         vtx_grid;
     )
 
     project_spec, robot_ICs = empty_pctapf_problem(r0,s0,sF)
-    add_operation!(project_spec,construct_operation(project_spec,-1,[1,2,3,6],[],Δt_op))
-    # add_operation!(project_spec,construct_operation(project_spec,-1,[2],[],Δt_op))
-    add_operation!(project_spec,construct_operation(project_spec,-1,[4],[5],Δt_op))
-    add_operation!(project_spec,construct_operation(project_spec,-1,[5],[6],Δt_op))
-    # add_operation!(project_spec,construct_operation(project_spec,-1,[4],[],Δt_op))
-    assignment_dict = Dict(1=>[1],2=>[2],3=>[3],4=>[4,5,6])
+    add_operation!(project_spec,construct_operation(project_spec,-1,[1,2,3,4,5,6],[],Δt_op))
+    assignment_dict = Dict(1=>[1,6],2=>[2],3=>[3],4=>[4],5=>[5])
+
+    def = SimpleProblemDef(project_spec,r0,s0,sF)
+    sched, problem_spec = construct_task_graphs_problem(
+        def,env_graph;cost_function=cost_function,Δt_collect=Δt_collect,Δt_deposit=Δt_deposit)
+
+    return sched, problem_spec, env_graph, assignment_dict
+end
+
+"""
+    pctapf_problem_multi_backtrack(;cost_function=MakeSpan(),verbose=false,Δt_op=0,Δt_collect=[0,0,0,0,0,0],Δt_deposit=[0,0,0,0,0,0])
+
+Motivation for backtracking in ISPS
+The makespan optimal solution is T = 8, and requires that robots 2,3, and 4 
+allow robot 1 to pass before them. However, the slack-based priority schedme of 
+ISPS will always prioritize robot 2, 3, and 4 over robot 1, causing robot 1 to 
+get stuck waiting for 5, 6, and 7 to pass all in a row. 
+Without backtracking, CBS+ISPS will eventually return a plan with makespan T = 9.
+With recursive backtracking (not just a single pass)
+"""
+function pctapf_problem_multi_backtrack(;cost_function=MakeSpan(),verbose=false,Δt_op=0,Δt_collect=[0,0,0,0,0,0],Δt_deposit=[0,0,0,0,0,0])
+    vtx_grid = initialize_dense_vtx_grid(13,7)
+
+    #   1   2   3   4   5   6   7
+    #   8   9  10  11  12  13  14
+    #  15  16  17  18  19  20  21
+    #  22  23  24  25  26  27  28
+    #  29  30  31  32  33  34  35
+    #  36  37  38  39  40  41  42
+    #  43  44  45  46  47  48  49
+    #  50  51  52  53  54  55  56
+    #  57  58  59  60  61  62  63
+    #  64  65  66  67  68  69  70
+    #  71  72  73  74  75  76  77
+    #  78  79  80  81  82  83  84
+    #  85  86  87  88  89  90  91
+
+    #   .   .   .   .  (5)  .   . 
+    #   .   .   .   .  (6)  .   . 
+    #   .   .   .   .  (7)  .   . 
+    #   .   .   .   .   .   .   . 
+    #   .   .   .  (4)  .   .   . 
+    #   .   .  (3)  .   .   .   . 
+    #   .  (2)  .   .   .   .   . 
+    #  (1) [1] [8] [9]  .  [10] .
+    #   .   .   .   .  [5]  .   . 
+    #   .   .   .   .  [6]  .   . 
+    #   .   .   .  [4] [7]  .   . 
+    #   .   .  [3]  .   .   .   . 
+    #   .  [2]  .   .   .   .   . 
+    assignment_dict = Dict(1=>[1,8,9,10],2=>[2],3=>[3],4=>[4],5=>[5],6=>[6],7=>[7])
+
+    r0 = [50,44,38,32,5,12,19]
+    s0 = [50,44,38,32,5,12,19,51,52,53]
+    sF = [51,86,80,74,61,68,75,52,53,55]
+    env_graph = construct_factory_env_from_vtx_grid(
+        vtx_grid;
+    )
+
+    project_spec, robot_ICs = empty_pctapf_problem(r0,s0,sF)
+    add_operation!(project_spec,construct_operation(project_spec,-1,[1,2,3,4,5,6,7,8,9,10],[],Δt_op))
 
     def = SimpleProblemDef(project_spec,r0,s0,sF)
     sched, problem_spec = construct_task_graphs_problem(
@@ -622,7 +699,6 @@ object 1 with robot 1.
 """
 function pctapf_problem_13(;
         cost_function = MakeSpan(),
-        verbose = false,
     )
     vtx_grid = initialize_dense_vtx_grid(4, 8)
     #  1   2   3   4   5   6   7   8
@@ -647,6 +723,57 @@ function pctapf_problem_13(;
     return sched, problem_spec, env_graph, assignment_dict
 end
 
+function pctapf_problem_14(;
+        cost_function = MakeSpan(),
+    )
+    vtx_grid = initialize_dense_vtx_grid(1,4) 
+    # 1  2  3  4
+    r0 = [1,4]
+    s0 = [1,4]
+    sF = [3,2]
+    env_graph = construct_factory_env_from_vtx_grid(vtx_grid)
+    project_spec, robot_ICs = TaskGraphs.empty_pctapf_problem(r0,s0,sF)
+    add_operation!(project_spec,construct_operation(project_spec,-1,[1,2],[],0))
+    assignment_dict = Dict(1=>[1],2=>[2])
+    def = SimpleProblemDef(project_spec,r0,s0,sF)
+    sched, problem_spec = construct_task_graphs_problem(
+        def,env_graph;cost_function=MakeSpan())
+
+    return sched, problem_spec, env_graph, assignment_dict
+end
+
+"""
+    pctapf_problem_15(;cost_function=SumOfMakeSpans(),verbose=false)
+
+Trying to stress the multi goal algorithm
+"""
+function pctapf_problem_15(;cost_function=SumOfMakeSpans(),verbose=false)
+    N = 2                  # num robots
+    M = 4                  # num delivery tasks
+    vtx_grid = initialize_dense_vtx_grid(4,8)
+    #  1   2   3   4   5   6   7   8
+    #  9  10  11  12  13  14  15  16
+    # 17  18  19  20  21  22  23  24
+    # 25  26  27  28  29  30  31  32
+    r0 = [1,25]
+    s0 = [1,25,5,29]
+    sF = [3,28,7,31]
+    env_graph = construct_factory_env_from_vtx_grid(
+        vtx_grid;
+    )
+
+    project_spec, robot_ICs = empty_pctapf_problem(r0,s0,sF)
+    add_operation!(project_spec,construct_operation(project_spec,-1,[1],[3],0))
+    add_operation!(project_spec,construct_operation(project_spec,-1,[2],[4],0))
+    add_operation!(project_spec,construct_operation(project_spec,-1,[3,4],[],0))
+    assignment_dict = Dict(1=>[1,3],2=>[2,4])
+
+    def = SimpleProblemDef(project_spec,r0,s0,sF)
+    sched, problem_spec = construct_task_graphs_problem(
+        def,env_graph;cost_function=cost_function)
+
+    return sched, problem_spec, env_graph, assignment_dict
+end
 
 export
     pctapf_test_problems,
@@ -668,6 +795,16 @@ collaborative_pctapf_test_problems() = [
     pctapf_problem_11,
 ]
 
+function generate_prob(recipe,solver,args...;kwargs...)
+    pctapf_problem(solver,recipe(args...;kwargs...)...)
+end
+function generate_prob(::Type{PC_MAPF},recipe,solver,args...;kwargs...)
+    prob = pctapf_problem(solver,recipe(args...;kwargs...)...)
+    _,_,_, assignment_dict = recipe()
+    apply_assignment_dict!(get_schedule(get_env(prob)),assignment_dict,get_problem_spec(get_env(prob)))
+    PC_MAPF(get_env(prob))
+end
+
 for op in [
         :pctapf_problem_1,
         :pctapf_problem_2,
@@ -679,11 +816,22 @@ for op in [
         :pctapf_problem_8,
         :pctapf_problem_9,
         :pctapf_problem_10,
+        :pctapf_problem_multi_backtrack,
         :pctapf_problem_11,
         :pctapf_problem_12,
         :pctapf_problem_13,
+        :pctapf_problem_14,
+        :pctapf_problem_15,
     ]
-    @eval $op(solver,args...;kwargs...) = pctapf_problem(solver,$op(args...;kwargs...)...)
+    @eval begin
+        $op(solver,args...;kwargs...) = pctapf_problem(solver,$op(args...;kwargs...)...)
+        function $op(::Type{PC_MAPF},solver,args...;kwargs...) 
+            prob = pctapf_problem(solver,$op(args...;kwargs...)...)
+            _,_,_, assignment_dict = $op()
+            apply_assignment_dict!(get_schedule(get_env(prob)),assignment_dict,get_problem_spec(get_env(prob)))
+            PC_MAPF(get_env(prob))
+        end
+    end
 end
 
 ################################################################################
@@ -874,6 +1022,7 @@ function random_pctapf_def(env::GridFactoryEnvironment,
         config;
         N                   = get(config,:N,30),
         M                   = get(config,:M,10),
+        num_unique_projects = get(config,:num_unique_projects,1),
         max_parents         = get(config,:max_parents,3),
         depth_bias          = get(config,:depth_bias,0.4),
         dt_min              = get(config,:dt_min,0),
@@ -885,13 +1034,68 @@ function random_pctapf_def(env::GridFactoryEnvironment,
 
     r0,s0,sF = get_random_problem_instantiation(N,M,get_pickup_zones(env),
         get_dropoff_zones(env),get_free_zones(env))
+    shapes = choose_random_object_sizes(M,Dict(task_sizes...))
     project_spec = construct_random_project_spec(M,s0,sF;
         max_parents=max_parents,
         depth_bias=depth_bias,
         Δt_min=dt_min,
         Δt_max=dt_max)
+    problem_def = SimpleProblemDef(project_spec,r0,s0,sF,shapes)
+end
+function random_multihead_pctapf_def(env::GridFactoryEnvironment,
+        config;
+        N                   = get(config,:N,30),
+        M                   = get(config,:M,10),
+        num_unique_projects = get(config,:num_unique_projects,1),
+        m                   = get(config,:m,Int(M/num_unique_projects)),
+        max_parents         = get(config,:max_parents,3),
+        depth_bias          = get(config,:depth_bias,0.4),
+        dt_min              = get(config,:dt_min,0),
+        dt_max              = get(config,:dt_max,0),
+        dt_collect          = get(config,:dt_collect,0),
+        dt_deliver          = get(config,:dt_deliver,0),
+        task_sizes          = get(config,:task_sizes,(1=>1.0,2=>0.0,4=>0.0)),
+    )
+
+    if !(m == M/num_unique_projects)
+        @warn "!(m == M/num_unique_projects)"
+        M = m*num_unique_projects
+    end
+    r0, s0, sF = get_random_problem_instantiation(N,M,
+        get_pickup_zones(env),get_dropoff_zones(env),get_free_zones(env))
+    project_spec = ProjectSpec()
+    # iterate over s0 and sF in chunks of m at a time
+    for (s0_,sF_) in zip(
+        Base.Iterators.partition(s0, m),
+        Base.Iterators.partition(sF, m),
+    )
+        new_project_spec = construct_random_project_spec(m,collect(s0_),collect(sF_);
+            max_parents=max_parents,
+            depth_bias=depth_bias,
+            Δt_min=dt_min,
+            Δt_max=dt_max)
+        merge!(project_spec,new_project_spec)
+    end
     shapes = choose_random_object_sizes(M,Dict(task_sizes...))
     problem_def = SimpleProblemDef(project_spec,r0,s0,sF,shapes)
+end
+
+"""
+    random_pcmapf_def(env,config;objective=MakeSpan(),solver,kwargs...)
+
+Return a random `SimplePCMAPFDef`. Same arguments for `config` as in 
+`random_multihead_pctapf_def`.
+"""
+function random_pcmapf_def(env,config;
+        objective=MakeSpan(),
+        solver=TaskGraphsMILPSolver(GreedyAssignment(greedy_cost=GreedyFinalTimeCost())),
+        kwargs...
+        )
+    pctapf_def = random_multihead_pctapf_def(env,config;kwargs...)
+    pcta = PC_TA(pctapf_def,env,objective)
+    sched, cost = solve!(solver,pcta)
+    @assert validate(sched)
+    return SimplePCMAPFDef(pctapf_def,get_assignment_dict(sched))
 end
 
 ## Stochastic PCTAPF problems

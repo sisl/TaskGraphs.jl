@@ -162,8 +162,8 @@ end
 let
     sched = OperatingSchedule()
     node = OBJECT_AT(1,1)
-    add_node!(sched,make_node(sched,node)) 
-    replace_in_schedule!(sched,make_node(sched,node)) 
+    add_node!(sched,make_node(sched,node))
+    replace_in_schedule!(sched,make_node(sched,node))
     get_path_spec(sched,1)
     set_path_spec!(sched,1,get_path_spec(sched,1))
     for pred in [
@@ -210,12 +210,114 @@ let
     sched = OperatingSchedule()
     nodes = [OBJECT_AT(1,1),OBJECT_AT(2,2),OBJECT_AT(3,3)]
     for node in nodes
-        add_node!(sched,make_node(sched,node)) 
+        add_node!(sched,make_node(sched,node))
     end
     rem_nodes!(sched,[1,2])
     @test get_node_from_vtx(sched,1) == OBJECT_AT(3,3)
 end
 # Test process_schedule
+let
+    for (i, f) in enumerate(pctapf_test_problems())
+        sched1, = f()
+        sched2, = f()
+        for n in get_nodes(sched1)
+            set_t0!(n,0)
+            set_tF!(n,0)
+        end
+        for n in get_nodes(sched2)
+            set_t0!(n,0)
+            set_tF!(n,0)
+        end
+        TaskGraphs.update_schedule_times!(sched1)
+        TaskGraphs.update_schedule_times!(sched2,get_all_root_nodes(sched2))
+        @test all(isapprox.(get_t0(sched1), get_t0(sched2)))
+        @test all(isapprox.(get_tF(sched1), get_tF(sched2)))
+    end
+
+end
+# test copy(::OperatingSchedule)
+let
+    sched = OperatingSchedule()
+    add_node!(sched,GO(1,1,1),ActionID(1))
+    sched2 = copy(sched)
+    set_tF!(sched,1,100)
+    set_tF!(sched2,1,0)
+    @test get_tF(sched,1) == 100
+    @test get_tF(sched2,1) == 0
+    TaskGraphs.reset_schedule_times!(sched,sched2)
+    @test get_tF(sched,1) == 0
+    add_node!(sched,GO(2,2,2),ActionID(2))
+    @test !has_vertex(sched2,ActionID(2))
+    replace_in_schedule!(sched,GO(3,3,3),ActionID(1))
+    @test get_robot_id(get_node(sched,ActionID(1)).node) == RobotID(3)
+    @test get_robot_id(get_node(sched2,ActionID(1)).node) == RobotID(1)
+
+end
+# test copy(::SearchEnv)
+let
+    reset_all_id_counters!()
+    prob = pctapf_problem_1(NBSSolver())
+    env = get_env(prob)
+    sched = get_schedule(env)
+    n1 = add_node!(sched,GO(1,1,1),get_unique_action_id())
+    env2 = copy(env)
+    sched2 = get_schedule(env2)
+    set_tF!(sched,1,100)
+    set_tF!(sched2,1,0)
+    @test get_tF(sched,1) == 100
+    @test get_tF(sched2,1) == 0
+    n2 = add_node!(sched,GO(2,2,2),get_unique_action_id())
+    @test !has_vertex(sched2,node_id(n2))
+    replace_in_schedule!(sched,GO(3,3,3),node_id(n1))
+    @test get_robot_id(get_node(sched,node_id(n1)).node) == RobotID(3)
+    @test get_robot_id(get_node(sched2,node_id(n1)).node) == RobotID(1)
+
+end
+# test initialize_root_node(::PC_MAPF)
+let
+    reset_all_id_counters!()
+    solver = NBSSolver()
+    pc_tapf = pctapf_problem_1(solver)
+    base_env = pc_tapf.env
+    prob = formulate_assignment_problem(assignment_solver(solver),pc_tapf)
+    sched, cost = solve_assignment_problem!(assignment_solver(solver),prob,pc_tapf)
+    env = construct_search_env(solver,sched,base_env)
+    pc_mapf = PC_MAPF(env)
+    # solving the problem should not affect pc_mapf
+    solution, cost = solve!(route_planner(solver),pc_mapf)
+    @test maximum(map(length, get_paths(get_route_plan(get_env(pc_mapf))))) == 0
+    @test maximum(map(length, get_paths(get_route_plan(solution)))) > 0
+    # The solution stored in node should not be shared with pc_mapf
+    node = initialize_root_node(solver,pc_mapf)
+    env = get_env(pc_mapf)
+    sched = get_schedule(env)
+    # this node should only be added to sched--not sched2
+    n1 = add_node!(sched,GO(1,1,1),get_unique_action_id())
+    env2 = node.solution
+    sched2 = get_schedule(env2)
+    @test !has_vertex(sched2,node_id(n1))
+    # should only affect sched--not sched2
+    set_tF!(sched,1,100)
+    set_tF!(sched2,1,0)
+    @test get_tF(sched,1) == 100
+    @test get_tF(sched2,1) == 0
+
+end
+let
+    sched, = pctapf_problem_1()
+    for n in get_nodes(sched)
+        set_t0!(n,0)
+        set_tF!(n,1)
+    end
+    # Test that descendants will not be updated because
+    TaskGraphs.update_schedule_times!(sched,get_all_root_nodes(sched),local_only=true)
+    @test all(isapprox.(get_t0(sched), 0.0))
+    @test all(isapprox.(get_tF(sched), 1.0))
+    TaskGraphs.update_schedule_times!(sched,get_all_root_nodes(sched),local_only=false)
+    @test !all(isapprox.(get_t0(sched), 0.0))
+    @test !all(isapprox.(get_tF(sched), 1.0))
+
+end
 let
     solver = TaskGraphsMILPSolver(AssignmentMILP())
     # project_spec, problem_spec, robot_ICs, env_graph, _ = pctapf_problem_1()
@@ -284,10 +386,10 @@ let
     o1 = add_node!(sched, make_node(sched,OBJECT_AT(1,2),))
     n2 = add_node!(sched, make_node(sched,COLLECT(1,1,2),))
     n3 = add_node!(sched, make_node(sched,CARRY(1,1,2,3),))
-    add_edge!(sched,r1,n1) 
-    add_edge!(sched,n1,n2) 
-    add_edge!(sched,o1,n2) 
-    add_edge!(sched,n2,n3) 
+    add_edge!(sched,r1,n1)
+    add_edge!(sched,n1,n2)
+    add_edge!(sched,o1,n2)
+    add_edge!(sched,n2,n3)
     for (n,vtxs) in [
         (n3,[get_vtx(sched,n2)]),
         (n2,[get_vtx(sched,n1)]),

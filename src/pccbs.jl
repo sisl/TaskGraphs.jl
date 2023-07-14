@@ -10,32 +10,54 @@
 ################################################################################
 ############################### ENVIRONMENT DEF ################################
 ################################################################################
-const State = CRCBS.GraphState
-# struct State{N} <: CRCBS.GraphState
-#     vtx::Int
-#     t::Int
-#     node::N
-# end
+# const State = CRCBS.GraphState
+@with_kw struct State <: CRCBS.AbstractGraphState
+    vtx::Int        = -1
+    t::Int          = -1
+    active::Bool    = true
+end
+State(s::GraphState) = State(s.vtx,s.t)
+Base.convert(::Type{State},s::GraphState) = State(s)
+State(vtx,t) = State(vtx=vtx,t=t)
+_state_active(s) = true
+_state_active(s::State) = s.active
 const Action = CRCBS.GraphAction
+
+function CRCBS.detect_state_conflict(n1::N,n2::N) where {S<:State,A<:AbstractGraphAction,N<:PathNode{S,A}}
+    if _state_active(n1.sp) && _state_active(n2.sp)
+        if get_vtx(n1.sp) == get_vtx(n2.sp) && get_t(n1.sp) == get_t(n2.sp)
+            return true
+        end
+    end
+    return false
+end
+function CRCBS.detect_action_conflict(n1::N,n2::N) where {S<:State,A<:AbstractGraphAction,N<:PathNode{S,A}}
+    if _state_active(n1.sp) && _state_active(n2.sp)
+        if (get_e(n1.a).src == get_e(n2.a).dst) && (get_e(n1.a).dst == get_e(n2.a).src) && (get_t(n1.sp) == get_t(n2.sp))
+            return true
+        end
+    end
+    return false
+end
 
 export PCCBSEnv
 
-# @with_kw_noshow struct PCCBSEnv{E,N,I,T,C<:AbstractCostModel,H<:AbstractCostModel} <: GraphEnv{State{N},Action,C}
 @with_kw_noshow struct PCCBSEnv{E,N,I,T,C<:AbstractCostModel,H<:AbstractCostModel} <: GraphEnv{State,Action,C}
     search_env::E                   = nothing
     schedule_node::N                = nothing
     node_id::I                      = nothing
     agent_idx::Int                  = -1
-    # graph::G                        = get_graph(search_env)
     constraints::T                  = discrete_constraint_table(search_env,agent_idx)
     goal::State                     = State()
     cost_model::C                   = get_cost_model(search_env)
     heuristic::H                    = get_heuristic_model(search_env)
 end
-CRCBS.get_cost_model(env::PCCBSEnv)       = get_cost_model(env.search_env)
-CRCBS.get_heuristic_model(env::PCCBSEnv)  = get_heuristic_model(env.search_env)
+CRCBS.get_cost_model(env::PCCBSEnv)       = env.cost_model
+CRCBS.get_heuristic_model(env::PCCBSEnv)  = env.heuristic
 GraphUtils.get_node(env::PCCBSEnv)        = env.schedule_node
-GraphUtils.get_graph(env::PCCBSEnv)       = get_graph(env.search_env,graph_key(get_node(env))) #graph
+GraphUtils.get_graph(env::PCCBSEnv)       = get_graph(env.search_env,
+    graph_key(get_node(env))
+    )
 
 function Base.show(io::IO, env::PCCBSEnv)
     print(io,"PCCBSEnv: \n",
@@ -44,10 +66,8 @@ function Base.show(io::IO, env::PCCBSEnv)
         "\t","goal:          ",string(get_goal(env)),"\n")
 end
 
-CRCBS.get_next_state(s::State,a::Action)    = State(get_e(a).dst,get_t(s)+get_dt(a))
+CRCBS.get_next_state(s::State,a::Action) = State(get_e(a).dst,get_t(s)+get_dt(a),_state_active(s))
 CRCBS.get_next_state(env::PCCBSEnv,s,a)  = get_next_state(s,a)
-# CRCBS.get_next_state(s::State,a::Action)    = State(get_e(a).dst,get_t(s)+get_dt(a),s.node)
-# CRCBS.get_next_state(env::PCCBSEnv,s,a)  = State(get_e(a).dst,get_t(s)+get_dt(a),env.schedule_node)
 CRCBS.wait(env::PCCBSEnv,s)              = Action(e=Edge(get_vtx(s),get_vtx(s)))
 
 CRCBS.get_possible_actions(env::PCCBSEnv,s::State) = get_possible_actions(get_node(env),env,s)

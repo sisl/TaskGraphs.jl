@@ -28,10 +28,6 @@ struct Prioritized <: SearchTrait end
 struct NonPrioritized <: SearchTrait end
 function search_trait end
 
-# get_primary_cost(::NonPrioritized,model,cost) = cost[1]
-# get_primary_cost(::Prioritized,model,cost) = cost[2]
-# get_primary_cost(solver,cost) = get_primary_cost(search_trait(solver),solver,cost)
-
 primary_cost(solver,cost) = cost[1]
 primary_cost_type(solver) = Float64
 
@@ -48,7 +44,9 @@ Fields:
 """
 @with_kw struct AStarSC{C} <: AbstractAStarPlanner
     logger::SolverLogger{C} = SolverLogger{C}(iteration_limit=1000)
-    replan::Bool            = false
+    replan::Bool            = true # false
+    use_slack_cost          = true
+    use_conflict_cost       = true
 end
 search_trait(solver::AStarSC) = NonPrioritized()
 function CRCBS.logger_step_a_star!(solver::AStarSC, env, base_path, s, q_cost)
@@ -79,22 +77,22 @@ function CRCBS.logger_step_a_star!(solver::AStarSC, env, base_path, s, q_cost)
 end
 
 export DefaultAStarSC
-DefaultAStarSC() = AStarSC{NTuple{5,Float64}}()
+const DefaultAStarSC = AStarSC{NTuple{5,Float64}}
 
-export
-    PrioritizedAStarSC
+# export
+#     PrioritizedAStarSC
 
-"""
-    PrioritizedAStarSC
+# """
+#     PrioritizedAStarSC
 
-Low-level proritized path planner that employs Slack-and-Collision-Aware A*.
-"""
-@with_kw struct PrioritizedAStarSC{C}
-    logger::SolverLogger{C} = SolverLogger{C}()
-    replan::Bool            = false
-end
-search_trait(solver::PrioritizedAStarSC) = Prioritized()
-primary_cost(::PrioritizedAStarSC,cost::NTuple{5,Float64}) = cost[2]
+# Low-level proritized path planner that employs Slack-and-Collision-Aware A*.
+# """
+# @with_kw struct PrioritizedAStarSC{C}
+#     logger::SolverLogger{C} = SolverLogger{C}()
+#     replan::Bool            = false
+# end
+# search_trait(solver::PrioritizedAStarSC) = Prioritized()
+# primary_cost(::PrioritizedAStarSC,cost::NTuple{5,Float64}) = cost[2]
 
 """
     construct_heuristic_model(solver,env_graph;kwargs...)
@@ -102,18 +100,9 @@ primary_cost(::PrioritizedAStarSC,cost::NTuple{5,Float64}) = cost[2]
 Construct the heuristic model to be used by solver.
 """
 function construct_heuristic_model(trait::NonPrioritized,solver,env_graph,
-        # ph = PerfectHeuristic(get_dist_matrix(env_graph))
-        ph = EnvDistanceHeuristic(),
+        ph = EnvDistanceHeuristic(), # coupled with slack cost
         )
     construct_composite_heuristic(ph,NullHeuristic(),ph,ph,NullHeuristic())
-end
-function construct_heuristic_model(trait::Prioritized,args...)
-    h = construct_heuristic_model(NonPrioritized(),args...)
-    construct_composite_heuristic(
-        h.cost_models[2],
-        h.cost_models[1],
-        h.cost_models[3:end]...
-    )
 end
 function construct_heuristic_model(solver, args...)
     construct_heuristic_model(search_trait(solver),solver,args...)
@@ -130,17 +119,36 @@ search!
 """
 function construct_cost_model(trait::NonPrioritized,
         solver, sched, cache, problem_spec, env_graph, primary_objective=SumOfMakeSpans();
-        extra_T::Int=400)
+        use_conflict_cost::Bool=solver.use_conflict_cost,
+        use_slack_cost::Bool=solver.use_slack_cost,
+        extra_T::Int=2000)
     N = length(get_robot_ICs(sched))
     @assert N > 0 "num_robots should be > 0. We need at least one robot!"
+    if use_conflict_cost
+        conflict_cost = HardConflictCost(env_graph,makespan(sched)+extra_T, N)
+    else
+        # @log_info(1,verbosity(solver),"Forgoing conflict cost for node")
+        # conflict_cost = NullCost()
+        conflict_cost = FullCostModel(sum,NullCost())
+    end
     cost_model = construct_composite_cost_model(
         typeof(primary_objective)(sched,cache),
-        HardConflictCost(env_graph,makespan(sched)+extra_T, N),
+        conflict_cost,
         SumOfTravelDistance(),
         FullCostModel(sum,NullCost()), # SumOfTravelTime(),
         FullCostModel(sum,TransformCostModel(c->-1*c,TravelTime()))
     )
     heuristic_model = construct_heuristic_model(trait,solver,env_graph)
+    if !use_slack_cost
+        # reorder so that travel distance is prioritized ahead of conflicts
+        ordering = [1,3,2,4,5]
+        cost_model = construct_composite_cost_model(
+            cost_model.cost_models[ordering]...
+            )
+        heuristic_model = construct_composite_heuristic(
+            heuristic_model.cost_models[ordering]...
+            )
+    end
     cost_model, heuristic_model
 end
 function construct_cost_model(trait::SearchTrait,
@@ -151,21 +159,6 @@ function construct_cost_model(trait::SearchTrait,
     construct_cost_model(trait,solver,
         get_schedule(env), get_cache(env), get_problem_spec(env), get_graph(env),
         primary_objective;kwargs...)
-end
-function construct_cost_model(trait::Prioritized,args...;kwargs...)
-    c, h = construct_cost_model(NonPrioritized(),args...;kwargs...)
-    # switch the first two elements of the cost and heuristic models
-    cost_model = construct_composite_cost_model(
-        c.cost_models[2],
-        c.cost_models[1],
-        c.cost_models[3:end]...
-    )
-    heuristic = construct_composite_heuristic(
-        h.cost_models[2],
-        h.cost_models[1],
-        h.cost_models[3:end]...
-    )
-    cost_model, heuristic
 end
 function construct_cost_model(solver, args...;kwargs...)
     construct_cost_model(search_trait(solver),solver,args...;kwargs...)
@@ -216,13 +209,18 @@ path_finder(solver::AStarSC,args...) = CRCBS.a_star!(solver,args...)
 """
 function plan_path!(solver::AStarSC, pc_mapf::AbstractPC_MAPF, env::SearchEnv, node::N,
         schedule_node::T, v::Int;
+        backtrack::Bool=false,
         kwargs...) where {N<:ConstraintTreeNode,T}
 
     cache = get_cache(env)
-    node_id = get_vtx_id(get_schedule(env),v)
-
     reset_solver!(solver)
-    cbs_env = build_env(solver, pc_mapf, env, node, VtxID(v)) #schedule_node, v)
+    if backtrack
+        # Construct cost model without collision cost (Currently, this does not work)
+        cost_model, _ = construct_cost_model(solver, env, use_conflict_cost=false)
+        cbs_env = build_env(solver, pc_mapf, env, node, VtxID(v);cost_model=cost_model)
+    else
+        cbs_env = build_env(solver, pc_mapf, env, node, VtxID(v)) 
+    end
     base_path = get_base_path(solver,env,cbs_env)
     ### PATH PLANNING ###
     # solver.DEBUG ? validate(base_path,v) : nothing
@@ -233,7 +231,7 @@ function plan_path!(solver::AStarSC, pc_mapf::AbstractPC_MAPF, env::SearchEnv, n
             @log_info(-1,verbosity(solver),"A*: replanning without conflict cost", string(schedule_node))
             reset_solver!(solver)
             cost_model, _ = construct_cost_model(solver, env;
-                primary_objective=get_problem_spec(env).cost_function)
+                use_conflict_cost=false,)
             cbs_env = build_env(solver, pc_mapf, env, node, VtxID(v);cost_model=cost_model)
             base_path = get_base_path(solver,env,cbs_env)
             path, cost = path_finder(solver, cbs_env, base_path)
@@ -279,11 +277,17 @@ export
 Path planner that employs Incremental Slack-Prioritized Search.
 """
 @with_kw struct ISPS{L,C} <: BiLevelPlanner
-    low_level_planner::L = DefaultAStarSC()
+    low_level_planner::L    = DefaultAStarSC()
     logger::SolverLogger{C} = SolverLogger{cost_type(low_level_planner)}(
         iteration_limit = 2
     )
-    tighten_paths::Bool = true
+    tighten_paths::Bool     = true
+    # backtracking for completeness
+    backtrack::Bool         = false
+    backtracking_activated  = Toggle(false)
+    backtrack_list::Dict{AbstractID,Bool} = Dict{AbstractID,Bool}()
+    # slack priority toggle (for ablation studies)
+    random_prioritization::Bool = false
 end
 ISPS(planner) = ISPS(low_level_planner=planner)
 construct_cost_model(solver::ISPS,args...;kwargs...) = construct_cost_model(low_level(solver),args...;kwargs...)
@@ -306,6 +310,69 @@ for op in [:set_deadline!,:set_runtime_limit!,:set_verbosity!]
         end
     end)
 end
+function do_backtrack(solver::ISPS,sched,id) 
+    flag = get_toggle_status(solver.backtracking_activated) && get(solver.backtrack_list,id,false)
+    if flag
+        @log_info(1,verbosity(solver),"do_backtrack = true for $(summary(get_node(sched,id)))")
+    end
+    return flag
+end
+function needs_backtrack(solver::ISPS,sched,id) 
+    flag = solver.backtrack && get(solver.backtrack_list,id,false)
+    if flag
+        @log_info(1,verbosity(solver),"needs_backtrack = true for $(summary(get_node(sched,id)))")
+    end
+    return flag
+end
+"""
+    update_backtrack_list!(solver::ISPS,sched,id,val=false)
+
+Add to backtrack_list.
+"""
+function update_backtrack_list!(solver::ISPS,sched,id,val=true)
+    @log_info(1,verbosity(solver),"adding to backtrack list: $(summary(get_node(sched,id)))")
+    solver.backtrack_list[id] = val
+end
+function activate_backtracking!(solver::ISPS)
+    @log_info(1,verbosity(solver),"activating backtracking ...")
+    if isempty(solver.backtrack_list) || solver.backtrack == false
+        @log_info(1,verbosity(solver),"backtracking not activated")
+        return false
+    end
+    set_toggle_status!(solver.backtracking_activated,true)
+    @log_info(1,verbosity(solver),"backtracking activated")
+    return get_toggle_status(solver.backtracking_activated)
+end
+function clear_backtrack_list!(solver::ISPS)
+    set_toggle_status!(solver.backtracking_activated,false)
+    empty!(solver.backtrack_list)
+end
+"""
+    isps_queue_cost(solver::ISPS,sched::OperatingSchedule,v::Int)
+
+Allow prioritization of nodes flagged for backtracking.
+"""
+function isps_queue_cost(solver::ISPS,sched::OperatingSchedule,v::Int)
+    path_spec = get_path_spec(sched,v)
+    if do_backtrack(solver,sched,get_vtx_id(sched,v))
+        override = 0
+    else
+        override = Int(path_spec.plan_path)
+    end
+    if solver.random_prioritization
+        slack_cost = rand()
+    else
+        slack_cost = minimum(get_slack(sched,v))
+    end
+    return (override, slack_cost)
+end
+
+update_isps_queue!(solver::ISPS,env::SearchEnv) = update_isps_queue!(solver,get_cache(env),get_schedule(env))
+function update_isps_queue!(solver::ISPS,cache,sched)
+    for v in cache.active_set
+        cache.node_queue[v] = isps_queue_cost(solver,sched,v)
+    end
+end
 
 export
     plan_next_path!,
@@ -320,8 +387,8 @@ function plan_next_path!(solver::ISPS, pc_mapf::AbstractPC_MAPF, env::SearchEnv,
     valid_flag = true
     if ~isempty(get_cache(env).node_queue)
         v,priority = dequeue_pair!(get_cache(env).node_queue)
-        node_id = get_vtx_id(get_schedule(env),v)
-        schedule_node = get_node_from_id(get_schedule(env),node_id)
+        n_id = get_vtx_id(get_schedule(env),v)
+        schedule_node = get_node_from_id(get_schedule(env),n_id)
         if get_path_spec(get_schedule(env), v).plan_path == true
             try
                 @log_info(2,verbosity(solver),sprint(show,env))
@@ -332,7 +399,15 @@ function plan_next_path!(solver::ISPS, pc_mapf::AbstractPC_MAPF, env::SearchEnv,
                     get_tF(sched,v): $(get_tF(env,v))
                     maximum(get_cache(env).tF): $(makespan(get_schedule(env)))
                 """)
-                valid_flag = plan_path!(low_level(solver),pc_mapf,env,node,schedule_node,v)
+                dt = get_duration(get_schedule(env),n_id)
+                valid_flag = plan_path!(low_level(solver),pc_mapf,env,node,schedule_node,v;
+                    backtrack=do_backtrack(solver,get_schedule(env),n_id),
+                )
+                if solver.backtrack && get_duration(get_schedule(env),n_id) > dt
+                    update_backtrack_list!(solver,get_schedule(env),n_id)
+                end
+                # update priority queue using isps_queue_cost(solver,...)
+                update_isps_queue!(solver,env)
                 @log_info(2,verbosity(solver),"""
                 ISPS:
                     routes:
@@ -373,11 +448,6 @@ function compute_route_plan!(solver::ISPS, pc_mapf::AbstractPC_MAPF, node::N, en
 
     while length(get_cache(env).node_queue) > 0
         status = plan_next_path!(solver,pc_mapf,env,node)
-        # @log_info(-1,verbosity(solver),"ISPS status = ",status)
-        # if status == false
-        #     @log_info(-1,verbosity(solver),"Exiting ISPS with failed status")
-        #     return false
-        # end
         status ? nothing : return false
         status = tighten_gaps!(solver,pc_mapf,env,node)
         status ? nothing : return false
@@ -391,26 +461,53 @@ function CRCBS.low_level_search!(solver::ISPS, pc_mapf::AbstractPC_MAPF,
         idxs::Vector{Int}=Vector{Int}()
     ) where {N<:ConstraintTreeNode}
 
-    reset_solver!(solver)
-    valid_flag = true
+    reset_solver!(solver) # problematic because the lower_bound from assignment is not stored?
     search_env = node.solution
+    conflict_table = deepcopy(node.conflict_table)
+    update_isps_queue!(solver,search_env)
+    if solver.backtrack
+        clear_backtrack_list!(solver)
+    end
+    valid_flag = true
     for i in 1:iteration_limit(solver)
         increment_iteration_count!(solver)
         # reset solution
         reset_schedule_times!(get_schedule(search_env),get_schedule(get_env(pc_mapf)))
-        reset_cache!(
-            get_cache(search_env),
-            get_schedule(search_env),
-            # get_cache(get_env(pc_mapf)).t0,
-            # get_cache(get_env(pc_mapf)).tF,
-            # map(v->get_t0(search_env,v),vertices(get_schedule(get_env(pc_mapf)))),
-            # map(v->get_tF(search_env,v),vertices(get_schedule(get_env(pc_mapf)))),
-            )
+        reset_cache!(get_cache(search_env),get_schedule(search_env),)
         reset_route_plan!(node,get_route_plan(get_env(pc_mapf)))
         valid_flag = compute_route_plan!(solver, pc_mapf, node)
         if valid_flag == false
-            @log_info(0,verbosity(solver),"ISPS: failed on ",i,"th repair iteration.")
+            @log_info(0,verbosity(solver),"ISPS: failed on iteration $i.")
             break
+        else
+            conflict_table = detect_conflicts(node.solution)
+            if count_conflicts(conflict_table) == 0 # if route plan is valid, break
+                @log_info(2,verbosity(solver),"ISPS: returning valid solution on iteration $i.")
+                break
+            end
+        end
+    end
+    # Needs to happen in while loop
+    if solver.backtrack && valid_flag && count_conflicts(conflict_table) > 0
+        # How to identify need for backtracking (i.e., with optimality_gap)?
+        need_backtrack = false
+        sched = get_schedule(search_env)
+        base_sched = get_schedule(get_env(pc_mapf))
+        for c in get_all_conflicts(conflict_table)
+            for id in [RobotID(c.agent1_id),RobotID(c.agent2_id)]
+                for e in edges(bfs_tree(sched,id))
+                    if needs_backtrack(solver,sched,get_vtx_id(sched,e.dst))
+                        need_backtrack = true
+                        break
+                    end
+                end
+            end
+        end
+        if need_backtrack && activate_backtracking!(solver)
+            reset_schedule_times!(get_schedule(search_env),get_schedule(get_env(pc_mapf)))
+            reset_cache!(get_cache(search_env),get_schedule(search_env),)
+            reset_route_plan!(node,get_route_plan(get_env(pc_mapf)))
+            valid_flag = compute_route_plan!(solver, pc_mapf, node)
         end
     end
     return valid_flag
@@ -427,7 +524,7 @@ Solve a PC-MAPF problem with the ISPS algorithm.
 
 function CRCBS.solve!(solver::ISPS,pc_mapf::PC_MAPF)
     node = initialize_root_node(solver,pc_mapf)
-    valid_flag = compute_route_plan!(solver,pc_mapf,node)#,node)
+    valid_flag = compute_route_plan!(solver,pc_mapf,node)
     return node.solution, get_cost(node.solution)
 end
 
@@ -436,6 +533,8 @@ search_trait(solver::CBSSolver) = search_trait(low_level(solver))
 primary_cost(solver::CBSSolver,cost) = primary_cost(low_level(solver),cost)
 primary_cost_type(solver::CBSSolver) = primary_cost_type(low_level(solver))
 CRCBS.solve!(solver::CBSSolver,pc_mapf::PC_MAPF) = CRCBS.cbs!(solver,pc_mapf)
+
+
 
 export
     TaskGraphsMILPSolver
@@ -456,7 +555,7 @@ function formulate_milp(solver::TaskGraphsMILPSolver,args...;kwargs...)
     milp = formulate_milp(solver.milp,args...;
         kwargs...)
     set_optimizer_attributes(milp,default_optimizer_attributes()...)
-    set_time_limit_sec(milp, max(0,time_to_deadline(solver)))
+    set_time_limit_sec(milp, max(0,min(1000,time_to_deadline(solver))))
     milp
 end
 
@@ -484,6 +583,7 @@ The input to the route planner is the PC-TAPF problem spec along with the
     assignment_model::A     = TaskGraphsMILPSolver()
     path_planner    ::P     = CBSSolver(ISPS())
     logger          ::SolverLogger{C} = SolverLogger{primary_cost_type(path_planner)}()
+    return_first_feasible::Bool        = false # if true, return the first feasible solution
 end
 NBSSolver(a,b) = NBSSolver(assignment_model=a,path_planner=b)
 assignment_solver(solver::NBSSolver) = solver.assignment_model
@@ -513,6 +613,8 @@ for op in [:set_deadline!,:set_runtime_limit!,:set_verbosity!]
         end
     end)
 end
+isps_queue_cost(solver::CBSSolver,args...) = isps_queue_cost(low_level(solver),args...)
+isps_queue_cost(solver::NBSSolver,args...) = isps_queue_cost(route_planner(solver),args...)
 
 """
     solve!(solver, base_env::SearchEnv;kwargs...) where {A,P}
@@ -543,6 +645,11 @@ function CRCBS.solve!(solver::NBSSolver, prob::E;kwargs...) where {E<:AbstractPC
         prob;kwargs...)
     try
         while optimality_gap(solver) > 0
+            if solver.return_first_feasible && feasible_status(solver)
+                @log_info(1,verbosity(solver),
+                    "NBS: Returning feasible solution: optimality gap = $(optimality_gap(solver))")
+                break
+            end
             enforce_time_limit!(solver)
             update_assignment_problem!(assignment_solver(solver),
                 assignment_problem, prob)
@@ -552,6 +659,7 @@ function CRCBS.solve!(solver::NBSSolver, prob::E;kwargs...) where {E<:AbstractPC
                 prob)
             set_lower_bound!(solver,l_bound)
             if optimality_gap(solver) > 0
+                soft_reset_solver!(route_planner(solver)) # Will this break anything?
                 env, cost = plan_route!(route_planner(solver),
                     schedule, prob;kwargs...)
                 if cost < best_cost(solver)
@@ -602,6 +710,7 @@ function formulate_assignment_problem(solver,prob;
 end
 
 function formulate_milp(milp_model::TaskGraphsMILP,env::SearchEnv;kwargs...)
+    process_schedule!(get_schedule(env))
     t0,tF = get_node_start_and_end_times(env)
     formulate_milp(milp_model,get_schedule(env),get_problem_spec(env);
         t0_=t0,
@@ -609,7 +718,8 @@ function formulate_milp(milp_model::TaskGraphsMILP,env::SearchEnv;kwargs...)
         kwargs...
         )
 end
-function formulate_milp(model::AssignmentMILP,env::SearchEnv;kwargs...)
+function formulate_milp(model::AbstractAssignmentMILP,env::SearchEnv;kwargs...)
+    process_schedule!(get_schedule(env))
     formulate_milp(model,get_schedule(env),get_problem_spec(env);kwargs...)
 end
 
@@ -626,7 +736,7 @@ A helper method for updating an instance of an assignment problem. In the case
 function update_assignment_problem!(solver, model::T, base_prob) where {T<:TaskGraphsMILP}
     exclude_solutions!(model) # exclude most recent solution in order to get next best solution
     # Trying this
-    set_time_limit_sec(model, max(0,time_to_deadline(solver)))
+    set_time_limit_sec(model, max(0,min(1000,time_to_deadline(solver))))
     model
 end
 
@@ -641,20 +751,28 @@ wherein we ignore collisions--using the algorithm encoded by solver.
 """
 function solve_assignment_problem!(solver::TaskGraphsMILPSolver, model, prob)
     l_bound = lower_bound(solver)
-    set_time_limit_sec(model, max(0,time_to_deadline(solver)))
+    set_time_limit_sec(model, max(0,min(1000,time_to_deadline(solver))))
     optimize!(model)
     if primal_status(model) != MOI.FEASIBLE_POINT
-        throw(SolverException("Assignment problem is infeasible -- in `solve_assignment_problem!()`"))
+        throw(SolverException("Assignment problem is infeasible -- in `solve_assignment_problem!(solver::$(typeof(solver)))`. iterations = $(iterations(solver))"))
+        # @warn "Assignment problem is infeasible -- in `solve_assignment_problem!(solver::$(typeof(solver)))`. iterations = $(iterations(solver))"
+        # set_lower_bound!(solver, typemax(Int))
+        # set_best_cost!(solver, typemax(Int))
+        # return OperatingSchedule(), lower_bound(solver)
     end
+    # @show value(objective_bound(model)), value(objective_function(model))
     set_lower_bound!(solver, Int(round(value(objective_bound(model)))) )
     set_best_cost!(solver, Int(round(value(objective_function(model)))) )
     if termination_status(model) == MOI.OPTIMAL
         @assert lower_bound(solver) <= best_cost(solver) "lower_bound($(solver_type(solver))) = $(value(objective_bound(model))) -> $(lower_bound(solver)) but should be equal to best_cost($(solver_type(solver))) = $(value(objective_function(model))) -> $(best_cost(solver))"
+    else
+        @warn "Assignment problem not solved to optimality"
     end
     sched = deepcopy(get_schedule(get_env(prob)))
     update_project_schedule!(solver, model, sched, get_problem_spec(get_env(prob)))
-    sched, lower_bound(solver)
+    return sched, lower_bound(solver)
 end
+
 
 function CRCBS.solve!(solver,pcta::PC_TA)
     prob = formulate_assignment_problem(solver,pcta)
@@ -682,6 +800,7 @@ function plan_route!(
         prob;
         kwargs...)
 
+    # soft_reset_solver!(solver) # Will this break anything?
     env = construct_search_env(solver, schedule, get_env(prob);kwargs...)
     pc_mapf = construct_routing_problem(prob,env)
     solution, cost = solve!(solver, pc_mapf)
@@ -693,8 +812,14 @@ CRCBS.solver_type(::CBSSolver)          = "CBSSolver"
 CRCBS.solver_type(::PIBTPlanner)        = "PIBTPlanner"
 CRCBS.solver_type(::ISPS)               = "ISPS"
 CRCBS.solver_type(::AStarSC)            = "AStarSC"
-CRCBS.solver_type(::PrioritizedAStarSC) = "PrioritizedAStarSC"
+# CRCBS.solver_type(::PrioritizedAStarSC) = "PrioritizedAStarSC"
 CRCBS.solver_type(::AStar)              = "AStar"
 CRCBS.solver_type(::TaskGraphsMILPSolver{M,C}) where {M,C} = "TaskGraphsMILPSolver{$M}"
 
 # end
+
+################################################################################
+##############################  Multi Goal Solver  #############################
+################################################################################
+
+include("path_planners/multi_goal_astar_sc.jl")

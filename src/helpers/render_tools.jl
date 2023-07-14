@@ -2,12 +2,18 @@ import Cairo #, Fontconfig
 using GraphPlottingBFS
 using Compose
 using Colors
-using Gadfly
+# using Gadfly
 using DataFrames
 using GraphUtils
+using FactoryRendering
+
+const FR = FactoryRendering
 
 using PGFPlotsX
 latexengine!(PGFPlotsX.PDFLATEX)
+push!(PGFPlotsX.CUSTOM_PREAMBLE,"\\usetikzlibrary{backgrounds}")
+push!(PGFPlotsX.CUSTOM_PREAMBLE,"\\tikzset{background rectangle/.style={fill=white,}}")
+push!(PGFPlotsX.CUSTOM_PREAMBLE,"\\tikzset{use background/.style={show background rectangle,}}")
 using PGFPlots
 using Printf
 using Parameters
@@ -61,8 +67,9 @@ function record_video(outfile_name,render_function,
         t_history=t0:dt:tf,
         fps = 10,
         ext = "png",
-        s = (4inch, 4inch),
-        res = "1080x1080",
+        s = (Compose.default_graphic_width,Compose.default_graphic_height),
+        res1=1080,
+        res = "$(res1)x$(Int(round(res1*s[2]/s[1])))",
     )
     tmpdir = mktempdir()
     for (i,t) in enumerate(t_history)
@@ -96,9 +103,13 @@ end
 function SolutionSummary(env::SearchEnv)
     t0 = 0
     tf = maximum(map(length,get_paths(get_route_plan(env))))
+    sched = get_schedule(env)
     history = map(t->get_env_state(env,t),t0:tf)
-    robot_ids = sort(collect(keys(get_robot_ICs(get_schedule(env)))))
-    object_ids = sort(collect(keys(get_object_ICs(get_schedule(env)))))
+    robot_ids = sort(collect(keys(get_robot_ICs(sched))))
+    # object_ids = sort(collect(keys(get_object_ICs(get_schedule(env)))))
+    object_ids = sort(
+        [get_object_id(n) for n in get_nodes(sched) if matches_template(BOT_CARRY,n)]
+        )
     robot_paths = map(
         id->map(s->get_id(get_location_id(s.robot_positions[id])),history),
         robot_ids)
@@ -645,7 +656,519 @@ render_paths(t,factory_env,robot_paths,object_paths=[];kwargs...) = visualize_en
 render_both(t,paths1,paths2) = hstack(render_paths(t,paths1),render_paths(t,paths2))
 render_search(t_start,factory_env;kwargs...) = visualize_env(factory_env,t_start;show_search_paths=true,kwargs...)
 
-# Plotting results
+
+"""
+    ResultsTable
+
+A simple Table data structure for compiling tabular results.
+"""
+struct ResultsTable
+    xkeys::Vector{Dict{Any,Any}}
+    ykeys::Vector{Dict{Any,Any}}
+    data::Matrix{Any}
+end
+get_data(tab::ResultsTable) = tab.data
+get_data(tab) = tab
+get_xkeys(tab::ResultsTable) = tab.xkeys
+get_ykeys(tab::ResultsTable) = tab.ykeys
+Base.size(tab::ResultsTable) = size(get_data(tab))
+Base.size(tab::ResultsTable,dim) = size(get_data(tab),dim)
+Base.transpose(tab::ResultsTable) = ResultsTable(get_ykeys(tab),get_xkeys(tab),
+    [tab.data[i,j] for j in 1:size(tab,2), i in 1:size(tab,1)],
+    # transpose(get_data(tab)),
+    )
+
+_dict_vec(d::Dict) = Vector{Dict{Any,Any}}([d])
+_dict_vec(d::Vector) = d
+Base.getindex(tab::ResultsTable,idxs1,idxs2) = ResultsTable(
+    _dict_vec(tab.xkeys[idxs1]),
+    _dict_vec(tab.ykeys[idxs2]),
+    Matrix{Any}(reshape([tab.data[idxs1,idxs2]...],(length(idxs1),length(idxs2)))),
+    )
+function index_by_keys(tab::ResultsTable,include_keys::Dict=Dict(),exclude_keys::Dict=Dict())
+    x_idxs = Int[]
+    y_idxs = Int[]
+    for (idxs,keylist) in [(x_idxs,get_xkeys(tab)),(y_idxs,get_ykeys(tab))]
+        for (i,dict) in enumerate(keylist)
+            keep = true
+            for (k,v) in dict
+                if haskey(include_keys,k) && !(v in include_keys[k])
+                    keep = false
+                    break
+                end
+                if haskey(exclude_keys,k) && (v in exclude_keys[k])
+                    keep = false
+                    break
+                end
+            end
+            if keep
+                push!(idxs,i)
+            end
+        end
+    end
+    tab[x_idxs,y_idxs]
+end
+function init_table(xkeys,ykeys)
+    tab = ResultsTable(xkeys, ykeys, zeros(length(xkeys),length(ykeys)))
+end
+function Base.vcat(tab1::ResultsTable,tabs...)
+    ResultsTable(
+        vcat(get_xkeys(tab1),map(get_xkeys, tabs)...),
+        get_ykeys(tab1),
+        vcat(get_data(tab1),map(get_data,tabs)...)
+    )
+end
+function Base.hcat(tab1::ResultsTable,tab2)
+    ResultsTable(
+        get_xkeys(tab2),
+        vcat(get_ykeys(tab1),get_ykeys(tab2)),
+        hcat(tab1.data,tab1.data)
+    )
+end
+
+"""
+    build_table
+
+Takes in a dataframe, builds a table of `obj` values along axes `xkey` and
+`ykey`, where the `obj` values are aggregated via the function `f`.
+"""
+function build_table(df;
+    obj=:tasks_per_second,
+    xkey=:M,
+    ykey = :arrival_interval,
+    include_keys=[],
+    exclude_keys=[],
+    xsort_reverse=false,
+    ysort_reverse=false,
+    xvals = sort(unique(df[!,xkey]);rev=xsort_reverse),
+    yvals = sort(unique(df[!,ykey]);rev=ysort_reverse),
+    aggregator = vals -> sum(vals)/length(vals),
+    )
+
+    base_idxs = trues(nrow(df))
+    if !isempty(include_keys)
+        base_idxs = .&(base_idxs, [(df[!,k] .== v) for (k,v) in include_keys]...)
+    end
+    if !isempty(exclude_keys)
+        base_idxs = .&(base_idxs, [(df[!,k] .!= v) for (k,v) in exclude_keys]...)
+    end
+    if !isempty(include_keys) || !isempty(exclude_keys)
+        xvals = sort(unique(df[base_idxs,xkey]);rev=xsort_reverse)
+        yvals = sort(unique(df[base_idxs,ykey]);rev=ysort_reverse)
+    end
+
+    xkeys = map(x->Dict(xkey=>x), xvals)
+    ykeys = map(y->Dict(ykey=>y), yvals)
+    tab = zeros(length(xvals),length(yvals))
+    tab = ResultsTable(xkeys, ykeys, tab)
+    for (i,x) in enumerate(xvals)
+        for (j,y) in enumerate(yvals)
+            idxs = .&(base_idxs,(df[!,xkey] .== x),(df[!,ykey] .== y))
+            # if any(idxs)
+                vals = df[idxs,obj]
+                tab.data[i,j] = aggregator(vals)
+            # else
+            #     tab.data[i,j] = nothing
+            # end
+        end
+    end
+    # xkeys = map(x->Dict(xkey=>x), xvals)
+    # ykeys = map(y->Dict(ykey=>y), yvals)
+    # return ResultsTable(xkeys, ykeys, tab)
+    return tab
+end
+function table_product(tables;
+        mode=:horizontal,
+        # _xheader_keys=[Dict() for i in 1:length(tables)],
+        # _yheader_keys=[Dict() for j in 1:length(tables)],
+    )
+    @assert length(unique(size.(tables))) == 1 "All tables must have same dimensions"
+    if mode == :horizontal
+        data = collect(zip(map(get_data, tables)...))
+        xkeys = map(tup->merge(tup...), collect(zip(map(get_xkeys, tables)...)))
+        # xkeys = [merge(a,b) for (a,b) in zip(_xkeys,_xheader_keys)]
+        ykeys = map(tup->merge(tup...), collect(zip(map(get_ykeys, tables)...)))
+        # ykeys = [merge(a,b) for (a,b) in zip(_ykeys,_yheader_keys)]
+        return ResultsTable(xkeys,ykeys,data)
+    else
+        return transpose(table_product(map(transpose,tables),:horizontal))
+    end
+end
+function table_reduce(table,op)
+    return ResultsTable(get_xkeys(table),get_ykeys(table),map(op,get_data(table)))
+end
+function flatten_table(tab;
+        axis = :y,
+        _header_keys = Dict(),
+    )
+    if axis == :y
+        data = reshape(vcat([tab.data[:,j] for j in 1:size(tab,2)]...),prod(size(tab)),1)
+        xkeys = [[merge(xk,yk) for (i,xk) in enumerate(get_xkeys(tab)), (j,yk) in enumerate(get_ykeys(tab))]...]
+        ykeys = [_header_keys]
+        return ResultsTable(xkeys,ykeys,data)
+    else
+        return transpose(flatten_table(transpose(tab);axis=:y,_header_keys=_header_keys))
+    end
+end
+
+
+"""
+    fill_tab_from_columns!(tab,df;
+
+tab has row indices for values of df.xkey and column indices for column names
+    df.
+"""
+function fill_tab_from_columns!(tab,df;
+        xkey = :model,
+        ykey = :metric,
+        include_keys = [],
+        exclude_keys = [],
+        f = vals -> get(filter(v->isa(v,Real),vals),1,nothing),
+    )
+    idxs = get_idxs(df;include_keys=include_keys,exclude_keys=exclude_keys)
+    for (i,xdict) in enumerate(get_xkeys(tab))
+        xval = xdict[xkey]
+        for (j,ydict) in enumerate(get_ykeys(tab))
+            yval = ydict[ykey]
+            vals = df[!,yval][idxs .& (df[!,xkey] .== xval)]
+            if !isempty(vals)
+                tab.data[i,j] = f(vals)
+            end
+        end
+    end
+    tab
+end
+
+"""
+    table_inner_product(tables,xkeys,ykeys)
+
+Given an `m × n` matrix of tables, construct a new `m × n` table `new_tab` such
+that `new_tab[i,j]` is a `m × n` matrix whose `a,b`th element is the `i,j`th
+element of table `tables[a,b]`.
+"""
+function table_inner_product(tables,xkeys,ykeys)
+    # @show @assert length(unique(size.(tables))) == 1 "All tables must have same dimensions"
+    tab1 = tables[1]
+    dims = size(tab1)
+    tab = init_table(deepcopy(get_xkeys(tab1)),deepcopy(get_ykeys(tab1)))
+    for (i,x) in enumerate(get_xkeys(tab))
+        for (j,y) in enumerate(get_ykeys(tab))
+            tab.data[i,j] = ResultsTable(deepcopy(xkeys),deepcopy(ykeys),map(t->t.data[i,j],tables))
+        end
+    end
+    tab
+end
+
+""" utility for printing real-valued elements of a table """
+function print_real(io,v;
+        precision=3,
+        kwargs...,
+        )
+    if isa(v,Int)
+        print(io,v)
+    elseif !isa(v,Real)
+        print(io,v)
+    elseif isnan(v)
+        print(io,"")
+    else
+        if precision == 0
+            print(io,Int(round(v;digits=precision)))
+        else
+            print(io,round(v;digits=precision))
+        end
+    end
+end
+""" """
+function print_multi_value_real(io,vals;
+        delim=" & ",
+        surround=["",""],
+        stopchar="",
+        comp_func=vals->-1,
+        print_func=print_real,
+        kwargs...)
+    best_idx = comp_func(vals)
+    if 1 <= best_idx <= length(vals)
+        best_idxs = findall(vals .== vals[best_idx])
+    else
+        best_idxs = []
+    end
+    for (i,v) in enumerate(vals)
+        print(io,surround[1])
+        i in best_idxs ? print(io,"\\textbf{") : nothing
+        print_func(io,v;kwargs...)
+        i in best_idxs ? print(io,"}") : nothing
+        print(io,surround[2])
+        if i < length(vals)
+            print(io,delim)
+        else
+            print(io,stopchar)
+        end
+    end
+end
+print_multi_value_real(io,v::Real;kwargs...) = print_real(io,v;kwargs...)
+span_length(::Real) = 1
+span_length(v::Union{Vector,Tuple}) = length(v)
+span_length(::ResultsTable) = 1
+span_length(::String) = 1
+function print_latex_header(io,tab;
+        span=span_length(get_data(tab)[1,1]),
+        delim=" & ",
+        newline=" \\\\\n",
+        start_char="& ",
+        group_delim=" | ",
+        colspec="l ",
+        alignspec="c",
+        # initial_colspec=colspec,
+        # terminal_spec="",
+        terminal_spec="@{}",
+        initial_colspec="@{}l",
+        print_row_start=true,
+        kwargs...
+        )
+
+    print(io,"\\begin{tabular}[$(alignspec)]{")
+    if print_row_start
+        print(io,initial_colspec,)
+    end
+    for i in 1:size(tab,2)
+        if (i > 1) || print_row_start
+            print(io, group_delim)
+        end
+        for j in 1:span
+            print(io,colspec)
+        end
+    end
+    print(io,terminal_spec,"}","\n")
+end
+function print_latex_column_labels(io,tab;
+        span=span_length(get_data(tab)[1,1]),
+        delim=" & ",
+        newline=" \\\\\n",
+        start_char="& ",
+        group_delim=" | ",
+        print_row_start=true,
+        col_label_func=(k,v)->"\$$(k)=$(v)\$",
+        col_label_wrap=("\\multicolumn{$span}{c}{","}"),
+        kwargs...
+    )
+    # labels
+    if print_row_start
+        print(io,start_char)
+    end
+    for (j,ykeys) in enumerate(get_ykeys(tab))
+        print(io,col_label_wrap[1],
+            [col_label_func(k,v) for (k,v) in ykeys]...,
+            col_label_wrap[2])
+        if j < size(tab,2)
+            print(io,delim)
+        else
+            print(io,newline)
+        end
+    end
+end
+function print_latex_row_start(io,tab,i;
+        delim=" & ",
+        row_label_func=(k,v)->"\$$(k)=$(v)\$",
+        row_label_delim=",",
+        kwargs...
+        )
+    xkeys = get_xkeys(tab)[i]
+    for (idx,(k,v)) in enumerate(xkeys)
+        print(io,row_label_func(k,v))
+        if !(idx == length(xkeys))
+            print(io,row_label_delim)
+        end
+    end
+    print(io,delim)
+end
+function write_tex_table(io,tab;
+        delim=" & ",
+        newline=" \\\\\n",
+        final_newline=newline,
+        # print_func = (io,v) -> print_real(io,v),
+        print_func = print_multi_value_real,
+        header_printer = print_latex_header,
+        row_start_printer = print_latex_row_start,
+        print_content=true,
+        print_header=print_content,
+        print_column_labels=print_content,
+        print_row_start=print_content,
+        print_footer=print_content,
+        pre_footer="",
+        post_header="",
+        row_dividers=Dict(),
+        kwargs...,
+    )
+    if print_header
+        header_printer(io,tab;
+            print_row_start=print_row_start,
+            kwargs...)
+        print(io,post_header)
+    end
+    if print_column_labels
+        print_latex_column_labels(io,tab;
+            print_row_start=print_row_start,
+            kwargs...)
+    end
+    if haskey(row_dividers,0)
+        print(io, row_dividers[0],"\n")
+    end
+    for (i,xkeys) in enumerate(get_xkeys(tab))
+        if print_row_start
+            row_start_printer(io,tab,i;delim=delim,kwargs...)
+        end
+        if print_content
+            for (j,ykeys) in enumerate(get_ykeys(tab))
+                print_func(io,get_data(tab)[i,j];kwargs...)
+                if j < size(tab,2)
+                    print(io,delim)
+                else
+                    if i < size(tab,1)
+                        print(io,newline)
+                    else
+                        print(io, final_newline)
+                    end
+                end
+            end
+        end
+        if haskey(row_dividers,i)
+            print(io, row_dividers[i],"\n")
+        end
+    end
+    if print_footer
+        print(io,pre_footer)
+        print(io,"\\end{tabular}")
+    end
+end
+function write_tex_table(fname::String,args...;kwargs...)
+    open(fname,"w") do io
+        write_tex_table(io,args...;kwargs...)
+    end
+end
+function write_row_labels(io,tab;
+        kwargs...,
+    )
+    write_tex_table(io,tab;
+        print_content=false,
+        print_row_start=true,
+        delim = " \\\\\n",
+        kwargs...,
+    )
+end
+
+"""
+    nested_label_func(nested_xkeys::Vector)
+
+Return a function that outputs a nested table row or column (depends on `mode`)
+label.
+"""
+function nested_label_func(nested_xkeys::Vector;
+        mode=:row,
+        kwargs...,
+        )
+    label_func = (k,v) -> begin
+        io = IOBuffer()
+        xlabels = ResultsTable(
+            [Dict(:x=>x) for x in nested_xkeys],
+            [Dict()],
+            reshape([x for x in nested_xkeys],(:,1)),
+            )
+        if mode != :row
+            xlabels = ResultsTable(
+                xlabels.ykeys,
+                xlabels.xkeys,
+                reshape(xlabels.data,(1,:))
+            )
+        end
+        write_tex_table(io,xlabels;
+            print_column_labels=false,
+            print_row_start=false,
+            print_func=print_real,
+            kwargs...
+        )
+        row_prefix = String(take!(io))
+        @show row_prefix
+        tab = ResultsTable([Dict(k=>v)],[Dict(k=>v)],reshape([row_prefix],(1,1)))
+        @show tab
+        write_tex_table(io,tab;
+            print_column_labels=(mode == :col),
+            print_row_start=(mode == :row),
+            print_func=print_real,
+            kwargs...
+        )
+        return String(take!(io))
+    end
+    return label_func
+end
+
+
+print_nested_tex_table(io,tab::ResultsTable;kwargs...,) = write_nested_tex_table(io,tab;kwargs...)
+print_nested_tex_table(io,data;print_func = print_multi_value_real,kwargs...,) = print_func(io,data;kwargs...)
+print_nested_tex_table(io,data::String;kwargs...,) = print(io,data)
+function write_nested_tex_table(f::String,tab;kwargs...)
+    open(f,"w") do io
+        write_nested_tex_table(io,tab;kwargs...)
+    end
+end
+function write_nested_tex_table(io,tab;
+        delim=" & ",
+        newline=" \\\\\n",
+        print_func = print_nested_tex_table,
+        header_printer = print_latex_header,
+        row_start_printer = print_latex_row_start,
+        print_header=true,
+        print_column_labels=true,
+        print_row_start=true,
+        print_footer=true,
+        row_dividers=Dict(),
+        kwargs...,
+    )
+    if print_header
+        # header_printer(io,tab)
+        header_printer(io,tab;
+            print_row_start=print_row_start,
+            kwargs...)
+    end
+    if print_column_labels
+        print_latex_column_labels(io,tab;
+            print_row_start=true,
+            kwargs...)
+    end
+    if haskey(row_dividers,0)
+        print(io, row_dividers[0],"\n")
+    end
+    for (i,xkeys) in enumerate(get_xkeys(tab))
+        if print_row_start
+            row_start_printer(io,tab,i;kwargs...)
+        else
+            print(io,delim)
+        end
+        for (j,ykeys) in enumerate(get_ykeys(tab))
+            print_func(io,get_data(tab)[i,j];
+                print_column_labels = (i == 1),
+                print_row_start = (j == 1),
+                kwargs...)
+            if j < size(tab,2)
+                print(io,delim)
+            else
+                if i < size(tab,1)
+                    print(io,newline)
+                else
+                    print(io, "\n")
+                end
+            end
+        end
+        if haskey(row_dividers,i)
+            print(io, row_dividers[i],"\n")
+        end
+    end
+    if print_footer
+        print(io,"\\end{tabular}")
+    end
+end
+
+
+# Plotting
 function preprocess_results!(df)
     if nrow(df) > 0
         if :depth_bias in names(df)
@@ -706,105 +1229,6 @@ function robots_vs_task_vs_time_box_plot(df;
     )
 end
 
-# function get_box_plot_group_plot_normal(df;
-#         obj=:time,
-#         outer_key=:M,
-#         inner_key=:N,
-#         outer_range=10:10:60,
-#         inner_range=10:10:40,
-#         xmin=0,
-#         xmax=length(inner_range)+1,
-#         ymin=0.007,
-#         ymax=120,
-#         xtick=[10,20,30,40],
-#         xticklabels=[10,20,30,40],
-#         tickpos="left",
-#         ytick=[0.1,1,10,100],
-#         ylabel_shift="0pt",
-#         title="",
-#         title_shift=[3.3,2.55],
-#         inner_sym="n",
-#         outer_sym="m",
-#         xlabels=map(m->string(outer_sym," = ",m), outer_range),
-#         ylabels=map(n->string(inner_sym," = ",n), inner_range),
-#         ylabel="time (s)",
-#         draw_labels=true,
-#         ymode="log",
-#         width="3.25cm",
-#         height="6cm",
-#         legend_draw="black",
-#         legend_fill="white",
-#         legend_x_shift="2pt",
-#         vertical_sep = "0pt",
-#         horizontal_sep = "0pt",
-#         mark="*",
-#     )
-#     group_style = [
-#         "group name"=>"myPlots",
-#         "group size"=>"$(length(outer_range)) by 1",
-#         "xlabels at"=>"edge bottom",
-#         "xticklabels at"=>"edge bottom",
-#         "vertical sep"=>"0pt",
-#         "horizontal sep"=>"2pt"
-#     ]
-#     gstyle=prod(map(p->string(p.first,"=",p.second,","),group_style))
-#     gp = PGFPlots.GroupPlot(groupStyle=gstyle,
-#             # "boxplot"
-#             # "boxplot/draw direction = y",
-#             # ymode=ymode,
-#             # "\footnotesize",
-#             # width=width,
-#             # height=height,
-#             # xmin=xmin,
-#             # xmax=xmax,
-#             # ymin=ymin,
-#             # ymax=ymax,
-#             # xtick=xtick,
-#             # xticklabels=xtick,
-#             # tickpos=tickpos,
-#             # ytick=ytick,
-#             # yticklabels=[],
-#             # "ylabel shift=$(ylabel_shift)",
-#             # "ytick align=outside",
-#             # "xtick align=outside",
-#     )
-#     # pushPGFPlotsOptions("boxplot")
-#
-#     # for (i,m) in enumerate(outer_range)
-#     #     if i == 1 && draw_labels
-#     #         push!(gp,
-#     #             xlabel="\$$(xlabels[i])\$",
-#     #             ylabel=ylabel,
-#     #             yticklabels=ytick,
-#     #             "legend style=[draw=$legend_draw,
-#     #                 fill=$legend_fill,
-#     #                 xshift=$legend_x_shift,
-#     #                 yshift=0pt],
-#     #                 legend pos=north west
-#     #             ],"
-#     #             map(j->LegendEntry({},@sprintf("\$%s\$",ylabels[j]),false),1:length(inner_range))...,
-#     #             """
-#     #             \\addlegendimage{no markers,blue}
-#     #             \\addlegendimage{no markers,red}
-#     #             \\addlegendimage{no markers,brown}
-#     #             \\addlegendimage{no markers,black}
-#     #             """,
-#     #             map(n->PGFPlotsX.PlotInc({boxplot,mark=mark},Table(
-#     #                         {"y index"=0},
-#     #                         [:data=>df[(df[:,outer_key] .== m) .& (df[:,inner_key] .== n),obj]])),inner_range)...)
-#     #     else
-#     #         push!(gp, {
-#     #                 xlabel=@sprintf("\$%s\$",xlabels[i]),
-#     #                 ymajorticks="false",
-#     #                 yminorticks="false"
-#     #             },
-#     #             map(n->PGFPlotsX.PlotInc({boxplot,mark=mark},Table(
-#     #                         {"y index"=0},
-#     #                         [:data=>df[(df[:,outer_key] .== m) .& (df[:,inner_key] .== n),obj]])),inner_range)...)
-#     #     end
-#     # end;
-#     gp
-# end
 function get_box_plot_group_plot(df;
         obj=:time,
         outer_key=:M,
@@ -813,10 +1237,10 @@ function get_box_plot_group_plot(df;
         inner_range=sort(unique(df[!,inner_key])),
         xmin=0,
         xmax=length(inner_range)+1,
-        ymin=0.007,
+        ymin=minimum(df[!,obj]),
         ymax=maximum(df[!,obj]),
-        xtick=[10,20,30,40],
-        xticklabels=[10,20,30,40],
+        xtick=[],
+        xticklabels=xtick,
         tickpos="left",
         ytick=[0.1,1,10,100],
         ylabel_shift="0pt",
@@ -826,7 +1250,7 @@ function get_box_plot_group_plot(df;
         outer_sym="m",
         xlabels=map(m->string(outer_sym," = ",m), outer_range),
         ylabels=map(n->string(inner_sym," = ",n), inner_range),
-        ylabel="time (s)",
+        ylabel="$(string(obj)) (s)",
         draw_labels=true,
         ymode="log",
         width="3.25cm",
@@ -835,19 +1259,21 @@ function get_box_plot_group_plot(df;
         legend_fill="white",
         legend_x_shift="2pt",
         mark="*",
+        axis_bg_color="white",
+        plot_type="boxplot",
+        legend_pos="north west",
+        legend_idx=1,
     )
     @pgf gp = PGFPlotsX.GroupPlot({group_style = {
                 "group name"="myPlots",
-                "group size"=string(length(outer_range)," by 1"),
+                "group size"="$(length(outer_range)) by 1",
                 "xlabels at"="edge bottom",
                 "xticklabels at"="edge bottom",
                 "vertical sep"="0pt",
                 "horizontal sep"="2pt"
             },
-            boxplot,
-            "boxplot/draw direction"="y",
             ymode=ymode,
-            footnotesize,
+            # footnotesize,
             width=width,
             height=height,
             xmin=xmin,
@@ -859,63 +1285,65 @@ function get_box_plot_group_plot(df;
             tickpos=tickpos,
             ytick=ytick,
             yticklabels=[],
-            # "set layers"="standard",
+            "axis background/.style"="{fill=$axis_bg_color}",
             "ylabel shift"=ylabel_shift,
             "ytick align"="outside",
             "xtick align"="outside",
-            # "legend entries"={map(j->@sprintf("\$%s\$",ylabels[j]),1:length(inner_range))...},
-            # "legend cell align"="left",
-            # "legend to name"="grouplegend",
-            # "legend style"={
-            #     draw=legend_draw,
-            #     fill=legend_fill,
-            #     xshift=legend_x_shift,
-            #     "inner sep"="1pt",
-            #     yshift="0pt",
-            #     font="\\scriptsize"
-            # },
-            # "legend pos"="north west"
         }
 
         );
 
+        if plot_type == "boxplot"
+            gp.options[plot_type] = nothing
+            gp.options["boxplot/draw_direction"] = "y"
+        end
+
     @pgf for (i,m) in enumerate(outer_range)
+        legend_options = {"legend style"={
+            draw=legend_draw,
+            fill=legend_fill,
+            xshift=legend_x_shift,
+            yshift="0pt"},
+            "legend pos"=legend_pos,
+            }
         if i == 1 && draw_labels
-            # push!(gp,
-            #     """
-            #     \\coordinate (leg) at (rel axis cs:0,1);
-            #     """
-            # )
-            push!(gp,
-                {xlabel=@sprintf("\$%s\$",xlabels[i]),
+            label_options = {xlabel=@sprintf("\$%s\$",xlabels[i]),
                 ylabel=ylabel,
-                yticklabels=ytick,
-                "legend style"={
-                    draw=legend_draw,
-                    fill=legend_fill,
-                    xshift=legend_x_shift,
-                    yshift="0pt"},
-                "legend pos"="north west"
-                },
+                yticklabels=ytick,}
+        else
+            label_options = {
+                xlabel=@sprintf("\$%s\$",xlabels[i]),
+                ymajorticks="false",
+                yminorticks="false"}
+        end
+        if i == legend_idx
+            push!(gp,merge(label_options,legend_options),
                 map(j->PGFPlotsX.LegendEntry({},@sprintf("\$%s\$",ylabels[j]),false),1:length(inner_range))...,
                 """
-                \\addlegendimage{no markers,blue}
-                \\addlegendimage{no markers,red}
-                \\addlegendimage{no markers,brown}
-                \\addlegendimage{no markers,black}
+                \\addlegendimage{only marks, blue}
+                \\addlegendimage{only marks, red}
+                \\addlegendimage{only marks, brown}
+                \\addlegendimage{only marks, black}
                 """,
-                map(n->PGFPlotsX.PlotInc({boxplot,mark=mark},PGFPlotsX.Table(
-                            {"y index"=0},
-                            [:data=>df[(df[:,outer_key] .== m) .& (df[:,inner_key] .== n),obj]])),inner_range)...)
+            )
         else
-            push!(gp, {
-                    xlabel=@sprintf("\$%s\$",xlabels[i]),
-                    ymajorticks="false",
-                    yminorticks="false"
-                },
-                map(n->PGFPlotsX.PlotInc({boxplot,mark=mark},PGFPlotsX.Table(
-                            {"y index"=0},
-                            [:data=>df[(df[:,outer_key] .== m) .& (df[:,inner_key] .== n),obj]])),inner_range)...)
+            push!(gp,label_options)
+        end
+        for (i,n) in enumerate(inner_range)
+            y = df[(df[:,outer_key] .== m) .& (df[:,inner_key] .== n),obj]
+            if plot_type == "boxplot"
+                p = PGFPlotsX.PlotInc({boxplot,mark=mark},PGFPlotsX.Table(
+                    {"y index"=0},
+                    [:data=>y]
+                    )
+                )
+            else
+                p = PGFPlotsX.PlotInc({"only marks",mark=mark},PGFPlotsX.Table(
+                    [:x=>[i for _ in y],:y=>y]
+                    )
+                )
+            end
+            push!(gp,p)
         end
     end;
     gp
@@ -923,11 +1351,15 @@ end
 function get_titled_group_box_plot(df;
         title="",
         title_shift=[3.3,2.55],
-        scale=0.7,
+        scale=1.0,
+        axis_bg_color="white",
         kwargs...)
     gp = get_box_plot_group_plot(df;kwargs...)
     if title != ""
-        tikzpic = @pgf TikzPicture({scale=scale},
+        tikzpic = @pgf TikzPicture({scale=scale,
+                "background rectangle/.style"="{fill=$(axis_bg_color)}",
+                # "use background rectangle/.style"="{show background rectangle}",
+                },
             """
             \\centering
             \\pgfplotsset{set layers=standard,cell picture=true}
@@ -954,8 +1386,6 @@ function get_titled_group_box_plot(df;
     end
     return tikzpic
 end
-
-# print_tex(gp)
 
 function preprocess_collab_results!(df_dict)
     num_tasks = [12,18,24]
@@ -1161,7 +1591,7 @@ function plot_histories_pgf(df_list::Vector,ax=PGFPlots.Axis();
                 style=string(color,",solid, mark options={solid,fill=",color,"}")
                 for k in 1:nrow(df_cut)
                     y_arr = df_cut[!,y_key][k]
-                    x_arr = x_key == :none ? collect(1:length(y_arr)) : df_cut[x_key][k]
+                    x_arr = x_key == :none ? collect(1:length(y_arr)) : df_cut[!,x_key][k]
                     opt_vals = df_cut[!,opt_key][k] # tracks whether the fall back was employed
 
                     idx = minimum([length(x_arr),length(y_arr),length(opt_vals)])
@@ -1215,6 +1645,62 @@ function plot_histories_pgf(df_list::Vector,ax=PGFPlots.Axis();
     end
     return ax
 end
+function plot_table(tab;
+        xkey=:M,
+        ykey=:alg,
+        # xticks = join(string.(1:size(tab,1)),","),
+        # xticklabels = join(string.([d[xkey] for d in get_xkeys(tab)]),","),
+        # style="xtick={$(xticks)},xticklabels={$(xticklabels)},xlabel=\$m\$",
+        title="",
+        plot_3d=true,
+        x_val=0,
+        legend_func=i->get_ykeys(tab)[i][ykey],
+        z_func=i->Float64.(get_data(tab)[:,i]),
+        x_func=i->collect(1:size(tab,1)),
+        y_func=i->[x_val for i in 1:size(tab,1)],
+        kwargs...,
+    )
+    plts = Vector{PGFPlots.Plots.Plot}()
+    for i in 1:size(tab,2)
+        z = z_func(i)
+        y = y_func(i)
+        x = x_func(i)
+        if plot_3d
+            push!(plts,PGFPlots.Plots.Linear3(x,y,z,legendentry=legend_func(i)))
+        else
+            push!(plts,PGFPlots.Plots.Linear(z,legendentry=legend_func(i)))
+        end
+    end
+    ax = PGFPlots.Axis(
+        plts,
+        # style=style,
+        title=title,
+        kwargs...
+    )
+end
+
+# function mesh_table_points(tab,mask)
+#     pts = []
+#     explored = Set()
+#     frontier = Set([findfirst(mask).I])
+#     while !isempty(frontier)
+#         (i0,j0) = pop!(frontier)
+#         for d in [(-1,0),(1,0),(0,-1),(0,1)]
+#             (i,j) = (i0,j0) .+ d
+#             if get(mask,(i,j),false)
+#                 push!(pts,(i,j))
+#                 push!(pts,(i0,j0))
+#             end
+#         end
+#     end
+#     for i in 1:size(table,1)
+#         for j in 1:size(table,2)
+#             if mask
+
+#             end
+#         end
+#     end
+# end
 
 function plot_history_layers(df,keylist,ax=PGFPlots.Axis();
         legend_entries = map(string,keylist),
@@ -1275,157 +1761,60 @@ function group_history_plot(df_list::Vector;
     return g
 end
 
-"""
-    ResultsTable
-
-A simple Table data structure for compiling tabular results.
-"""
-struct ResultsTable
-    xkeys::Vector{Dict{Any,Any}}
-    ykeys::Vector{Dict{Any,Any}}
-    data::Matrix{Any}
+function get_idxs(df;
+        include_keys=[],
+        exclude_keys=[],
+    )
+    idxs = trues(nrow(df))
+    if !isempty(include_keys)
+        idxs .&= .&([df[!,key] .== val for (key,val) in include_keys]...)
+    end
+    if !isempty(exclude_keys)
+        idxs .&= .&([df[!,key] .!= val for (key,val) in exclude_keys]...)
+    end
+    idxs
 end
-get_data(tab::ResultsTable) = tab.data
-get_data(tab) = tab
-get_xkeys(tab::ResultsTable) = tab.xkeys
-get_ykeys(tab::ResultsTable) = tab.ykeys
-Base.size(tab::ResultsTable) = size(get_data(tab))
-Base.size(tab::ResultsTable,dim) = size(get_data(tab),dim)
-Base.transpose(tab::ResultsTable) = ResultsTable(get_ykeys(tab),get_xkeys(tab),transpose(get_data(tab)))
 
 """
-    build_table
-
-Takes in a dataframe, builds a table of `obj` values along axes `xkey` and
-`ykey`, where the `obj` values are aggregated via the function `f`.
-"""
-function build_table(df;
-    obj=:tasks_per_second,
-    xkey=:M,
-    ykey = :arrival_interval,
-    xvals = sort(unique(df[!,xkey])),
-    yvals = sort(unique(df[!,ykey])),
-    aggregator = vals -> sum(vals)/length(vals),
+    quantile_traces(df;
+        obj=:primary_runtimes,
+        include_keys=Dict(),
+        color="red",
+        quants=[0.25],
+        opacity=0.6,
+        fade=0.6,
     )
 
-    xkeys = map(x->Dict(xkey=>x), xvals)
-    ykeys = map(y->Dict(ykey=>y), yvals)
-    tab = zeros(length(xvals),length(yvals))
-    tab = ResultsTable(xkeys, ykeys, tab)
-    for (i,x) in enumerate(xvals)
-        for (j,y) in enumerate(yvals)
-            idxs = .&((df[!,xkey] .== x),(df[!,ykey] .== y))
-            # if any(idxs)
-                vals = df[idxs,obj]
-                tab.data[i,j] = aggregator(vals)
-            # else
-            #     tab.data[i,j] = nothing
-            # end
-        end
-    end
-    # xkeys = map(x->Dict(xkey=>x), xvals)
-    # ykeys = map(y->Dict(ykey=>y), yvals)
-    # return ResultsTable(xkeys, ykeys, tab)
-    return tab
-end
-function table_product(tables,mode=:horizontal)
-    @assert length(unique(size.(tables))) == 1 "All tables must have same dimensions"
-    if mode == :horizontal
-        data = collect(zip(map(get_data, tables)...))
-        xkeys = map(tup->merge(tup...), collect(zip(map(get_xkeys, tables)...)))
-        ykeys = map(tup->merge(tup...), collect(zip(map(get_ykeys, tables)...)))
-        return ResultsTable(xkeys,ykeys,data)
-    else
-        return transpose(table_product(map(transpose,tables),:horizontal))
-    end
-end
-function table_reduce(table,op)
-    return ResultsTable(get_xkeys(table),get_ykeys(table),map(op,get_data(table)))
-end
-""" utility for printing real-valued elements of a table """
-function print_real(io,v;
-        precision=3,
-        )
-    if isa(v,Int)
-        print(io,v)
-    elseif isnan(v)
-        print(io,"")
-    else
-        print(io,round(v;digits=precision))
-    end
-end
-""" """
-function print_multi_value_real(io,vals;
-        delim=" & ",
-        surround=["",""],
-        stopchar="",
-        comp_func=vals->-1,
-        kwargs...)
-    best_idx = comp_func(vals)
-    best_idxs = findall(vals .== vals[best_idx])
-    for (i,v) in enumerate(vals)
-        print(io,surround[1])
-        i in best_idxs ? print(io,"\\textbf{") : nothing
-        print_real(io,v;kwargs...)
-        i in best_idxs ? print(io,"}") : nothing
-        print(io,surround[2])
-        if i < length(vals)
-            print(io,delim)
-        else
-            print(io,stopchar)
-        end
-    end
-end
-function print_latex_header(io,tab;span=length(get_data(tab)[1,1]),delim=" & ",newline=" \\\\\n",start_char="& ")
-    print(io,"\\begin{tabular}{",map(i->"l ",1:size(tab,2)*span+1)...,"}","\n")
-    print(io,start_char)
-    for (j,ykeys) in enumerate(get_ykeys(tab))
-        print(io,"\\multicolumn{$span}{c}{",
-            ["\$$(k)=$(v)\$" for (k,v) in ykeys]...,"}")
-        if j < size(tab,2)
-            print(io,delim)
-        else
-            print(io,newline)
-        end
-    end
-end
-function print_latex_row_start(io,tab,i;span=length(get_data(tab)[1,1]),delim=" & ")
-    xkeys = get_xkeys(tab)[i]
-    for (k,v) in xkeys
-        print(io,"\$$(k)=$(v)\$")
-        if length(xkeys > 1)
-            print(io,",")
-        end
-    end
-    # print(io,["\$$(k)=$(v)\$" for (k,v) in xkeys]...)
-    print(io,delim)
-end
-function write_tex_table(io,tab;
-        delim = " & ",
-        newline = " \\\\\n",
-        print_func = (io,v) -> print_real(io,v),
-        header_printer = print_latex_header,
-        row_start_printer = print_latex_row_start,
-        kwargs...,
+Fill in the space between the alpha quantiles of some histories in `df`.
+"""
+function quantile_traces(df;
+        obj=:primary_runtimes,
+        include_keys=Dict(),
+        color="red",
+        quants=[0.25],
+        opacity=0.6,
+        fade=0.6,
+        buffer=0.0,
     )
-    header_printer(io,tab)
-    for (i,xkeys) in enumerate(get_xkeys(tab))
-        row_start_printer(io,tab,i)
-        for (j,ykeys) in enumerate(get_ykeys(tab))
-            print_func(io,get_data(tab)[i,j];kwargs...)
-            if j < size(tab,2)
-                print(io,delim)
-            else
-                print(io,newline)
-            end
-        end
+    idxs = .&([df[!,key] .== val for (key,val) in include_keys]...)
+    if !any(idxs)
+        return PGFPlots.Axis()
     end
-    print(io,"\\end{tabular}")
-end
-function write_tex_table(fname::String,args...;kwargs...)
-    open(fname,"w") do io
-        write_tex_table(io,args...;kwargs...)
+    # quantiles
+    mat = vcat(map(v->reshape(v,1,:),df[idxs,obj])...)
+    plts = Vector{PGFPlots.Plot}()
+    for alpha in quants
+        lo = map(j->Statistics.quantile(mat[:,j],alpha),1:size(mat,2)) .- buffer
+        hi = map(j->Statistics.quantile(mat[:,j],1.0-alpha),1:size(mat,2)) .+ buffer
+        c = "$(color)!$(fade)"
+        # prepend because of overlaps
+        append!(plts,[
+            PGFPlots.Plots.Linear(hi,style="draw=$(c),draw opacity=0,mark=none,name path=A,forget plot"),
+            PGFPlots.Plots.Linear(lo,style="draw=$(c),draw opacity=0,mark=none,name path=B,forget plot"),
+            PGFPlots.Plots.Command("\\addplot[fill=$(c),fill opacity=$(opacity)] fill between[of=A and B];"),
+            ])
     end
+    PGFPlots.Axis(plts)
 end
 
 # For rendering the factory floor as a custom ImageAppearance in Webots
@@ -1466,30 +1855,30 @@ end
 function get_node_shape(search_env::SearchEnv,graph,v,x,y,r)
     sched = get_schedule(search_env)
     cache = get_cache(search_env)
-    node_id = get_vtx_id(sched,get_prop(graph,v,:vtx_id))
-    if typeof(node_id) <: ActionID
+    n_id = get_vtx_id(sched,get_prop(graph,v,:vtx_id))
+    if typeof(n_id) <: ActionID
         return Compose.circle(x,y,r)
-    elseif typeof(node_id) <: RobotID
+    elseif typeof(n_id) <: RobotID
         return Compose.ngon(x,y,r,4)
-    elseif typeof(node_id) <: ObjectID
+    elseif typeof(n_id) <: ObjectID
         return Compose.ngon(x,y,r,3)
-    elseif typeof(node_id) <: OperationID
+    elseif typeof(n_id) <: OperationID
         return Compose.circle(x,y,r)
     end
 end
 function get_node_color(search_env::SearchEnv,graph,v,x,y,r)
     sched = get_schedule(search_env)
     cache = get_cache(search_env)
-    node_id = get_vtx_id(sched,get_prop(graph,v,:vtx_id))
-    if typeof(node_id) <: ActionID
+    n_id = get_vtx_id(sched,get_prop(graph,v,:vtx_id))
+    if typeof(n_id) <: ActionID
         return "cyan"
-    elseif typeof(node_id) <: CleanUpBotID
+    elseif typeof(n_id) <: CleanUpBotID
         return "purple"
-    elseif typeof(node_id) <: BotID
+    elseif typeof(n_id) <: BotID
         return "lime"
-    elseif typeof(node_id) <: ObjectID
+    elseif typeof(n_id) <: ObjectID
         return "orange"
-    elseif typeof(node_id) <: OperationID
+    elseif typeof(n_id) <: OperationID
         return "red"
     end
 end
@@ -1509,6 +1898,156 @@ function show_times(sched::OperatingSchedule,v,scalar_slack=true)
     end
     return string(get_t0(sched,v),", ",get_tF(sched,v),", ",slack_string)
 end
+
+global TITLE_MODE = Dict()
+_title_mode(n) = get(TITLE_MODE,typeof(n),get(TITLE_MODE,Any,:TYPE))
+function _set_title_mode!(n,val)
+    global TITLE_MODE
+    TITLE_MODE[n] = val
+end
+
+global SUBTITLE_MODE = Dict()
+_subtitle_mode(n) = get(SUBTITLE_MODE,typeof(n),get(SUBTITLE_MODE,Any,:TYPE))
+function _set_subtitle_mode!(n,val)
+    global SUBTITLE_MODE
+    SUBTITLE_MODE[n] = val
+end
+
+GraphPlottingBFS._title_string(n::BOT_GO)       = _title_mode(n) == :TYPE ? "G" : "G"
+GraphPlottingBFS._title_string(n::BOT_COLLECT)  = _title_mode(n) == :TYPE ? "C" : "C"
+GraphPlottingBFS._title_string(n::BOT_CARRY)    = _title_mode(n) == :TYPE ? "T" : "T"
+GraphPlottingBFS._title_string(n::BOT_DEPOSIT)  = _title_mode(n) == :TYPE ? "D" : "D"
+GraphPlottingBFS._title_string(n::Operation)    = _title_mode(n) == :TYPE ? "OP" : get_id(get_operation_id(n))
+GraphPlottingBFS._title_string(n::OBJECT_AT)    = _title_mode(n) == :TYPE ? "O" : get_id(get_object_id(n))
+GraphPlottingBFS._title_string(n::BOT_AT)       = _title_mode(n) == :TYPE ? "R" : get_id(get_robot_id(n))
+
+for op in (
+    :(GraphPlottingBFS._node_shape),
+    :(GraphPlottingBFS._node_color),
+    # :(GraphPlottingBFS._node_bg_color),
+    :(GraphPlottingBFS._title_string),
+    :(GraphPlottingBFS._text_color),
+    :(GraphPlottingBFS._subtitle_text_scale),
+    # :(GraphPlottingBFS._subtitle_string),
+    # :(GraphPlottingBFS.draw_node)
+    )
+    @eval $op(n::ScheduleNode,args...) = $op(n.node,args...)
+end
+
+
+_info_string(n::AbstractPlanningPredicate)     = ""
+_info_string(n::BOT_AT)        = "r$(get_id(get_robot_id(n))),x$(get_id(get_initial_location_id(n)))"
+_info_string(n::OBJECT_AT)     = "o$(get_id(get_object_id(n))),x$(get_id(get_initial_location_id(n)))"
+_info_string(n::BOT_GO)        = "r$(get_id(get_robot_id(n))),x$(get_id(get_initial_location_id(n)))=>x$(get_id(get_destination_location_id(n)))"
+_info_string(n::BOT_COLLECT)   = "r$(get_id(get_robot_id(n))),o$(get_id(get_object_id(n))),x$(get_id(get_initial_location_id(n)))"
+_info_string(n::BOT_DEPOSIT)   = "r$(get_id(get_robot_id(n))),o$(get_id(get_object_id(n))),x$(get_id(get_initial_location_id(n)))"
+_info_string(n::BOT_CARRY)     = "r$(get_id(get_robot_id(n))),o$(get_id(get_object_id(n))),x$(get_id(get_initial_location_id(n)))=>x$(get_id(get_destination_location_id(n)))"
+_time_summary(n::ScheduleNode) = "t: $(get_t0(n)), $(get_tF(n))"
+_info_string(n::ScheduleNode) = string(_info_string(n.node),",",_time_summary(n))
+GraphPlottingBFS._subtitle_string(n::ScheduleNode) = _subtitle_mode(n) == :INFO ? _info_string(n) : ""
+GraphPlottingBFS._subtitle_string(n::AbstractPlanningPredicate) = _subtitle_mode(n) == :INFO ? _info_string(n) : ""
+
+# global SPACE_GRAY = RGB(0.2,0.2,0.2)
+# global BRIGHT_RED = RGB(0.6,0.0,0.2)
+# global LIGHT_BROWN = RGB(0.6,0.3,0.2)
+# global LIME_GREEN = RGB(0.2,0.6,0.2)
+# global BRIGHT_BLUE = RGB(0.0,0.4,1.0)
+
+GraphPlottingBFS._node_color(::BOT_AT)                      = FactoryRendering.get_render_param(:Color,:Robot)
+GraphPlottingBFS._node_color(::OBJECT_AT)                   = FactoryRendering.get_render_param(:Color,:Object)
+GraphPlottingBFS._node_color(::Operation)                   = RGB(0.8,0.0,0.2)
+GraphPlottingBFS._node_bg_color(n::AbstractPlanningPredicate)= GraphPlottingBFS._node_color(n)
+GraphPlottingBFS._node_shape(::Operation,args...)           = Compose.rectangle(0.0,0.0,1.0,1.0)
+GraphPlottingBFS._node_color(::AbstractSingleRobotAction)   = RGB(0.0,0.4,1.0)
+GraphPlottingBFS._node_color(::BOT_AT{R}) where {R<:CleanUpBot} = RGB(1.0,0.0,1.0)
+GraphPlottingBFS._node_color(::A) where {R<:CleanUpBot,A<:AbstractSingleRobotAction{R}} = RGB(1.0,0.0,1.0)
+
+GraphPlottingBFS._subtitle_text_scale(n::AbstractPlanningPredicate) = 0.3
+GraphPlottingBFS._text_color(n::AbstractPlanningPredicate) = "black"
+
+# function GraphPlottingBFS.display_graph(g::OperatingSchedule;
+#         kwargs...)
+#     draw_node_func=(_,v)->GraphPlottingBFS.draw_node(g,v)
+# end
+function GraphPlottingBFS.draw_node(g::OperatingSchedule,v,args...;kwargs...)
+    draw_node(get_node(g,v))
+end
+function GraphPlottingBFS.draw_node(g::ProjectSpec,v,args...;kwargs...)
+    draw_node(get_node(g,v))
+end
+
+function build_frame(ctx;
+        h1 = Compose.default_graphic_height,
+        w1 = Compose.default_graphic_width,
+    )
+    frame = (dims = (w1,h1),ctx=ctx)
+end
+function hstack_canvases(frame1,frame2;
+        stackmode=:horizontal,
+        align_mode=:centered_align,
+        bgcolor="white",
+    )
+    dims1 = frame1.dims
+    dims2 = frame2.dims
+
+    max_dims = max.(dims1,dims2)
+    sum_dims = dims1 .+ dims2
+
+    # horizontal stack
+    if stackmode == :horizontal
+        dx = sum_dims[1]
+        dy = max_dims[2]
+    else
+        dx = max_dims[1]
+        dy = sum_dims[2]
+    end
+    _dims = (dx,dy) # of new canvas
+    set_default_graphic_size(_dims...)
+    _dims1 = dims1 ./ _dims
+    _dims2 = dims2 ./ _dims
+
+
+    if stackmode == :horizontal
+        if align_mode == :centered_align
+            _y1 = (1.0 - _dims1[2])/2
+            _y2 = (1.0 - _dims2[2])/2
+        elseif align_mode == :top_align
+            _y1 = 0.0
+            _y2 = 0.0
+        elseif align_mode == :bottom_align
+            _y1 = (1.0 - _dims1[2])
+            _y2 = (1.0 - _dims2[2])
+        end
+        ctx1 = Compose.context(0.0,         _y1, _dims1...)
+        ctx2 = Compose.context(_dims1[1],   _y2, _dims2...)
+    else
+        if align_mode == :centered_align
+            _x1 = (1.0 - _dims1[1])/2
+            _x2 = (1.0 - _dims2[1])/2
+        elseif align_mode == :top_align
+            _x1 = 0.0
+            _x2 = 0.0
+        elseif align_mode == :bottom_align
+            _x1 = (1.0 - _dims1[1])
+            _x2 = (1.0 - _dims2[1])
+        end
+        ctx1 = Compose.context(_x1, 0.0,        _dims1...)
+        ctx2 = Compose.context(_x2, _dims1[2],  _dims2...)
+    end
+
+    if !(bgcolor === nothing)
+        bg = (context(),Compose.rectangle(0,0,1,1),fill(bgcolor))
+    else
+        bg = (contect(),)
+    end
+    # composed context
+    Compose.compose(context(),
+        (ctx1,frame1.ctx),
+        (ctx2,frame2.ctx),
+        bg
+    )
+end
+
 # function show_times(cache::PlanningCache,v)
 #     slack = minimum(get_slack(sched,v))
 #     slack_string = slack == Inf ? string(slack) : string(Int(slack))

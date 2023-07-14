@@ -30,15 +30,16 @@ end
 read_simple_request(path::String) = read_simple_request(TOML.parsefile(path))
 
 function ProjectRequest(def::SimpleReplanningRequest,prob_spec)
-    ProjectRequest(
+    request = ProjectRequest(
         construct_partial_project_schedule(
             def.def.project_spec,prob_spec),
         def.t_request,
         def.t_arrival
         )
-    set_t0!(request.schedule,t_request)
+    set_t0!(request.schedule,def.t_request)
     process_schedule!(request.schedule)
-    return request.schedule
+    return request
+    # return request.schedule
 end
 
 export SimpleRepeatedProblemDef
@@ -116,7 +117,8 @@ Instantiate a random `RepeatedPC_TAPF` problem based on the parameters of config
 function random_pctapf_sequence(env::GridFactoryEnvironment,config;
         num_projects        = get(config,:num_projects,10),
         kwargs...)
-    projects = map(i->random_pctapf_def(env,config;kwargs...), 1:num_projects)
+    # projects = map(i->random_pctapf_def(env,config;kwargs...), 1:num_projects)
+    projects = map(i->random_multihead_pctapf_def(env,config;kwargs...), 1:num_projects)
 end
 
 function random_repeated_pctapf_def(env,config;
@@ -277,7 +279,7 @@ function profile_replanner!(solver,replan_model,prob::RepeatedAbstractPC_TAPF,
         base_env = replan!(solver,replan_model,env,request)
         reset_solver!(solver)
         # env, cost = solve!(solver,base_env)
-        env, timer_results = profile_solver!(solver,construct_routing_problem(prob,base_env))
+        env, timer_results = profile_solver!(solver,construct_pctapf_problem(prob,base_env))
         compile_replanning_results!(cache,solver,env,timer_results,prob,stage,request)
         @log_info(1,verbosity(solver),"Stage ",stage," - ","route planner iterations: ",
             iterations(route_planner(solver)))
@@ -295,37 +297,47 @@ function profile_replanner!(planner::ReplannerWithBackup,prob::RepeatedAbstractP
     for (stage,request) in enumerate(prob.requests)
         remap_object_ids!(request.schedule,get_schedule(env))
 
-        base_envB = replan!(plannerB,env,request)
-        envB, resultsB = profile_solver!(plannerB.solver,construct_routing_problem(prob,base_envB))
-        compile_replanning_results!(plannerB.cache,plannerB.solver,envB,
-            resultsB,prob,stage,request)
+        # base_envB = replan!(plannerB,env,request)
+        # envB, resultsB = profile_solver!(plannerB.solver,construct_pctapf_problem(prob,base_envB))
+        # compile_replanning_results!(plannerB.cache,plannerB.solver,envB,
+        #     resultsB,prob,stage,request)
 
         base_envA = replan!(plannerA,env,request)
-        envA, resultsA = profile_solver!(plannerA.solver,construct_routing_problem(prob,base_envA))
+        envA, resultsA = profile_solver!(plannerA.solver,construct_pctapf_problem(prob,base_envA))
         compile_replanning_results!(plannerA.cache,plannerA.solver,envA,
             resultsA,prob,stage,request)
 
-        # if failed_status(plannerA) == false
         if feasible_status(plannerA)
-            @log_info(-1,0,"REPLANNING: ",
-            "Primary planner succeeded at stage $stage.")
+            @log_info(-1,0,"REPLANNING: ", "Primary planner succeeded at stage $stage.")
+            # @info "OptimalityGap: $(plannerA.cache.stage_results[end]["OptimalityGap"])"
+            results = plannerA.cache.stage_results
+            # @info "Stage results" results
             env = envA
-        elseif feasible_status(plannerB)
-            @log_info(-1,0,"REPLANNING: ",
-            "Primary planner failed at stage $stage. Proceeding with backup plan.")
-            env = envB
-            validate(get_schedule(envB))
+            validate(get_schedule(envA))
         else
-            @log_info(-1,0,"REPLANNING:",
-                "Both primary and backup planners failed at stage $stage.",
-                " Returning early.")
-            break
+            # backup
+            base_envB = replan!(plannerB,env,request)
+            envB, resultsB = profile_solver!(plannerB.solver,construct_pctapf_problem(prob,base_envB))
+            compile_replanning_results!(plannerB.cache,plannerB.solver,envB,
+                resultsB,prob,stage,request)
+            if feasible_status(plannerB)
+                @log_info(-1,0,"REPLANNING: ",
+                "Primary planner failed at stage $stage. Proceeding with backup plan.")
+                env = envB
+                validate(get_schedule(envB))
+                validate(get_schedule(env),convert_to_vertex_lists(get_route_plan(env)))
+            else
+                @log_info(-1,0,"REPLANNING:",
+                    "Both primary and backup planners failed at stage $stage.",
+                    " Returning early.")
+                break
+            end
         end
     end
     return env, planner
 end
 
-function warmup(planner::ReplannerWithBackup,loader::ReplanningProblemLoader,
+function warmup(planner::Union{ReplannerWithBackup,FullReplanner},loader::ReplanningProblemLoader;
         base_dir            = joinpath("/tmp","warmup"),
         base_problem_dir    = joinpath(base_dir,"problem_instances"),
         base_results_dir    = joinpath(base_dir,"results"),
@@ -341,6 +353,8 @@ function warmup(planner::ReplannerWithBackup,loader::ReplanningProblemLoader,
     env = get_env!(loader,config[:env_id])
     # turn off time constraints for warm up
     set_real_time_flag!(planner,false)
+    set_deadline!(planner,Inf)
+    set_runtime_limit!(planner,Inf)
     profile_replanner!(loader,planner,base_problem_dir,base_results_dir)
     # turn real time constraints back on
     set_real_time_flag!(planner,true)
@@ -360,7 +374,9 @@ export
     replanning_config_2,
     replanning_config_3,
     replanning_config_4,
-    replanning_config_5
+    replanning_config_5,
+    replanning_config_6,
+    replanning_config_7
 
 """
     replanning_config_1
@@ -573,6 +589,120 @@ function replanning_config_5()
     ]
     product_config_dicts(base_configs,robot_configs,project_configs,stream_configs)
 end
+function replanning_config_6()
+    base_configs = [
+        Dict(
+            :warning_time=>0,
+            :commit_threshold=>10,
+            :fallback_commit_threshold=>10,
+            :num_trials => 8,
+            :max_parents => 3,
+            :depth_bias => 0.4,
+            :dt_min => 0,
+            :dt_max => 0,
+            :dt_collect => 0,
+            :dt_deliver => 0,
+            :env_id=>"env_2",
+            )
+    ]
+    robot_configs = [
+        Dict(:N=>30)
+    ]
+    project_configs = [
+        Dict(:num_projects=>30),
+    ]
+    stream_configs = [
+        Dict(:M=>10, :num_unique_projects=>1, :arrival_interval=>20, ),
+        Dict(:M=>10, :num_unique_projects=>1, :arrival_interval=>30, ),
+        Dict(:M=>10, :num_unique_projects=>1, :arrival_interval=>40, ),
+
+        Dict(:M=>15, :num_unique_projects=>1, :arrival_interval=>20, ),
+        Dict(:M=>15, :num_unique_projects=>1, :arrival_interval=>30, ),
+        Dict(:M=>15, :num_unique_projects=>1, :arrival_interval=>40, ),
+        Dict(:M=>15, :num_unique_projects=>1, :arrival_interval=>50, ),
+
+        Dict(:M=>20, :num_unique_projects=>1, :arrival_interval=>20, ),
+        Dict(:M=>20, :num_unique_projects=>1, :arrival_interval=>30, ),
+        Dict(:M=>20, :num_unique_projects=>1, :arrival_interval=>40, ),
+        Dict(:M=>20, :num_unique_projects=>1, :arrival_interval=>50, ),
+        Dict(:M=>20, :num_unique_projects=>1, :arrival_interval=>60, ),
+
+        Dict(:M=>25, :num_unique_projects=>1, :arrival_interval=>20, ),
+        Dict(:M=>25, :num_unique_projects=>1, :arrival_interval=>30, ),
+        Dict(:M=>25, :num_unique_projects=>1, :arrival_interval=>40, ),
+        Dict(:M=>25, :num_unique_projects=>1, :arrival_interval=>50, ),
+        Dict(:M=>25, :num_unique_projects=>1, :arrival_interval=>60, ),
+        Dict(:M=>25, :num_unique_projects=>1, :arrival_interval=>70, ),
+
+        Dict(:M=>30, :num_unique_projects=>1, :arrival_interval=>20, ),
+        Dict(:M=>30, :num_unique_projects=>1, :arrival_interval=>30, ),
+        Dict(:M=>30, :num_unique_projects=>1, :arrival_interval=>40, ),
+        Dict(:M=>30, :num_unique_projects=>1, :arrival_interval=>50, ),
+        Dict(:M=>30, :num_unique_projects=>1, :arrival_interval=>60, ),
+        Dict(:M=>30, :num_unique_projects=>1, :arrival_interval=>70, ),
+        Dict(:M=>30, :num_unique_projects=>1, :arrival_interval=>80, ),
+        # medium-sized projects
+        Dict(:M=>30, :num_unique_projects=>6, :arrival_interval=>20, ),
+        Dict(:M=>30, :num_unique_projects=>6, :arrival_interval=>30, ),
+        Dict(:M=>30, :num_unique_projects=>6, :arrival_interval=>40, ),
+        Dict(:M=>30, :num_unique_projects=>6, :arrival_interval=>50, ),
+        Dict(:M=>30, :num_unique_projects=>6, :arrival_interval=>60, ),
+        Dict(:M=>30, :num_unique_projects=>6, :arrival_interval=>70, ),
+        Dict(:M=>30, :num_unique_projects=>6, :arrival_interval=>80, ),
+        # small-sized projects
+        Dict(:M=>30, :num_unique_projects=>10, :arrival_interval=>20, ),
+        Dict(:M=>30, :num_unique_projects=>10, :arrival_interval=>30, ),
+        Dict(:M=>30, :num_unique_projects=>10, :arrival_interval=>40, ),
+        Dict(:M=>30, :num_unique_projects=>10, :arrival_interval=>50, ),
+        Dict(:M=>30, :num_unique_projects=>10, :arrival_interval=>60, ),
+        Dict(:M=>30, :num_unique_projects=>10, :arrival_interval=>70, ),
+        Dict(:M=>30, :num_unique_projects=>10, :arrival_interval=>80, ),
+        # single-task projects
+        Dict(:M=>30, :num_unique_projects=>30, :arrival_interval=>20, ),
+        Dict(:M=>30, :num_unique_projects=>30, :arrival_interval=>30, ),
+        Dict(:M=>30, :num_unique_projects=>30, :arrival_interval=>40, ),
+        Dict(:M=>30, :num_unique_projects=>30, :arrival_interval=>50, ),
+        Dict(:M=>30, :num_unique_projects=>30, :arrival_interval=>60, ),
+        Dict(:M=>30, :num_unique_projects=>30, :arrival_interval=>70, ),
+        Dict(:M=>30, :num_unique_projects=>30, :arrival_interval=>80, ),
+    ]
+    product_config_dicts(base_configs,robot_configs,project_configs,stream_configs)
+end
+
+function replanning_config_7()
+    base_configs = [
+        Dict(
+            :warning_time=>0,
+            :commit_threshold=>10,
+            :fallback_commit_threshold=>10,
+            :num_trials => 8,
+            :max_parents => 3,
+            :depth_bias => 0.4,
+            :dt_min => 0,
+            :dt_max => 0,
+            :dt_collect => 0,
+            :dt_deliver => 0,
+            :env_id=>"env_2",
+            )
+    ]
+    robot_configs = [
+        Dict(:N=>30)
+    ]
+    project_configs = [
+        Dict(:num_projects=>30),
+    ]
+    stream_configs = [
+        Dict(:M=>20, :num_unique_projects=>1, :arrival_interval=>20, ),
+
+        Dict(:M=>25, :num_unique_projects=>1, :arrival_interval=>20, ),
+        Dict(:M=>25, :num_unique_projects=>1, :arrival_interval=>30, ),
+
+        Dict(:M=>30, :num_unique_projects=>1, :arrival_interval=>20, ),
+        Dict(:M=>30, :num_unique_projects=>1, :arrival_interval=>30, ),
+        Dict(:M=>30, :num_unique_projects=>1, :arrival_interval=>40, ),
+    ]
+    product_config_dicts(base_configs,robot_configs,project_configs,stream_configs)
+end
 
 export setup_replanning_experiments
 
@@ -630,14 +760,32 @@ function setup_replanning_experiments(base_problem_dir,base_results_dir)
     return loader, planners
 end
 
+
+function construct_replanning_results_dataframe(loader,solver_config,feats)
+    results_df = init_dataframe(feats)
+    for results_file in readdir(solver_config.results_path;join=true)
+        results = load_results(loader,results_file)
+        prob_name = results[:problem_name]
+        prob_file = joinpath(solver_config.problem_path,prob_name)
+        config = CRCBS.load_config(loader,prob_file)
+        TaskGraphs.post_process_replanning_results!(results,config,feats)
+        push!(results_df,results;cols=:intersect)
+    end
+    results_df
+end
+
 """
     add start_time, completion_time, and makespan for each stage
 """
-function post_process_replanning_results!(results,config)
+function post_process_replanning_results!(results,config,feats)
     M = config[:M]
+    results[:backup_planner] = align_stage_results!(results[:primary_planner],results[:backup_planner])
     for k in [:primary_planner,:backup_planner]
         for (i,stage_dict) in enumerate(results[k])
+            stage_dict === nothing ? continue : nothing
             id_range = (1+(i-1)*M,i*M)
+            # todo this doesn't work for the new results where the backup planner
+            # doesn't run every time
             stage_dict[:start_time] = i*config[:arrival_interval]
             completion_time = 0
             if stage_dict[:FeasibleFlag]
@@ -653,7 +801,9 @@ function post_process_replanning_results!(results,config)
                     )
                 if i == length(results[k])
                     kp = Symbol(string(k,"_final"))
-                    results[:RobotPaths] = results[kp][:RobotPaths]
+                    if haskey(results[kp],:RobotPaths)
+                        results[:RobotPaths] = results[kp][:RobotPaths]
+                    end
                 end
             else
                 completion_time = typemax(Int)
@@ -667,43 +817,87 @@ function post_process_replanning_results!(results,config)
     backup_flags = Bool[]
     primary_runtimes = Float64[]
     backup_runtimes = Float64[]
-    runtime_gaps = Float64[]
-    for (resultsA,resultsB) in zip(results[:primary_planner],results[:backup_planner])
-        push!(primary_runtimes,resultsA[:RunTime])
-        push!(backup_runtimes,resultsB[:RunTime])
-        push!(runtime_gaps,(resultsA[:RunTime])/(resultsA[:RunTime]+resultsB[:RunTime]))
-        if resultsA[:FeasibleFlag] == true
-            push!(makespans,resultsA[:makespan])
-            push!(arrival_times,resultsA[:start_time])
-            push!(backup_flags,false)
-        elseif resultsB[:FeasibleFlag] == true
-            push!(makespans,resultsB[:makespan])
-            push!(arrival_times,resultsB[:start_time])
-            push!(backup_flags,true)
-        else
-            break
+    # runtime_gaps = Float64[]
+    primary_results = results[:primary_planner]
+    backup_results = results[:backup_planner]
+    @assert length(primary_results) == length(backup_results)
+    # if length(results[:primary_planner]) == length(results[:backup_planner])
+        # for (resultsA,resultsB) in zip(results[:primary_planner],results[:backup_planner])
+        for (resultsA,resultsB) in zip(primary_results,backup_results)
+            push!(primary_runtimes,resultsA[:RunTime])
+            # push!(runtime_gaps,(resultsA[:RunTime])/(resultsA[:RunTime]+resultsB[:RunTime]))
+            if resultsA[:FeasibleFlag] == true
+                push!(backup_runtimes,0.0)
+                push!(makespans,resultsA[:makespan])
+                push!(arrival_times,resultsA[:start_time])
+                push!(backup_flags,false)
+            elseif resultsB[:FeasibleFlag] == true
+                push!(backup_runtimes,resultsB[:RunTime])
+                push!(makespans,resultsB[:makespan])
+                push!(arrival_times,resultsB[:start_time])
+                push!(backup_flags,true)
+            else
+                break
+            end
         end
-    end
+    # else
+    #     j = 1
+    #     resultsB = get(results[:backup_planner],j,nothing)
+    #     for (stage,resultsA) in enumerate(results[:primary_planner])
+    #         push!(primary_runtimes,resultsA[:RunTime])
+    #         if resultsA[:FeasibleFlag] == true
+    #             push!(makespans,resultsA[:makespan])
+    #             push!(arrival_times,resultsA[:start_time])
+    #             push!(backup_flags,false)
+    #         elseif !(resultsB === nothing) && resultsB[:FeasibleFlag] == true
+    #             push!(makespans,resultsB[:makespan])
+    #             push!(arrival_times,resultsB[:start_time])
+    #             push!(backup_flags,true)
+    #             j += 1
+    #             resultsB = get(results[:backup_planner],j,nothing)
+    #         else
+    #             @warn "Cannot load a full set of results. Both the primary and backup planners fails at stage $(stage)."
+    #             break
+    #         end
+    #     end
+    # end
     results[:makespans] = makespans
     results[:arrival_times] = arrival_times
     results[:backup_flags] = backup_flags
-    results[:runtime_gaps] = runtime_gaps
+    # results[:runtime_gaps] = runtime_gaps
     results[:primary_runtimes] = primary_runtimes
     results[:backup_runtimes] = backup_runtimes
     results[:completion_times] = arrival_times .+ makespans
+    # to incorporate per-stage features like OptimalityGap, etc.
+    for (k,_feat_type) in feats
+        if !haskey(results,k)
+            results[k] = [dict[k] for dict in primary_results]
+        end
+    end
     return results
 end
 
+"""
+    align_stage_results!(primary_results,backup_results)
 
-function construct_replanning_results_dataframe(loader,solver_config,feats)
-    results_df = init_dataframe(feats)
-    for results_file in readdir(solver_config.results_path;join=true)
-        results = load_results(loader,results_file)
-        prob_name = results[:problem_name]
-        prob_file = joinpath(solver_config.problem_path,prob_name)
-        config = CRCBS.load_config(loader,prob_file)
-        TaskGraphs.post_process_replanning_results!(results,config)
-        push!(results_df,results)
+Align results dicts when they stages aren't aligned (i.e., if the backup planner
+only runs some of the time.)
+"""
+function align_stage_results!(primary_results,backup_results)
+    if length(primary_results) == length(backup_results)
+        return primary_results, backup_results
     end
-    results_df
+    j = 1
+    new_backup_results = []
+    for (stage,resultsA) in enumerate(primary_results)
+        if resultsA[:FeasibleFlag] == true
+            push!(new_backup_results,nothing)
+        else
+            resultsB = get(backup_results,j,nothing)
+            push!(new_backup_results,resultsB)
+            j += 1
+        end
+    end
+    return new_backup_results
 end
+

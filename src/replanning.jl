@@ -63,8 +63,8 @@ for T in [:RepeatedPC_TAPF,:RepeatedC_PC_TAPF]
     @eval $T(prob::$T,env::SearchEnv) = $T(env,prob.requests)
 end
 
-construct_routing_problem(prob::RepeatedPC_TAPF,env) = PC_TAPF(env)
-construct_routing_problem(prob::RepeatedC_PC_TAPF,env) = C_PC_TAPF(env)
+construct_pctapf_problem(prob::RepeatedPC_TAPF,env) = PC_TAPF(env)
+construct_pctapf_problem(prob::RepeatedC_PC_TAPF,env) = C_PC_TAPF(env)
 
 
 """
@@ -84,7 +84,7 @@ export
     fix_precutoff_nodes!,
     break_assignments!,
     prune_schedule,
-    prune_project_schedule,
+    # prune_project_schedule,
     splice_schedules!
 
 """
@@ -97,9 +97,13 @@ function get_active_and_fixed_vtxs(sched::OperatingSchedule,t)
     active_vtxs = Set{Int}()
     fixed_vtxs = Set{Int}()
     for v in vertices(get_graph(sched))
-        if get_tF(sched,v) + minimum(get_local_slack(sched,v)) <= t
+        t0 = get_t0(sched,v)
+        tF = get_tF(sched,v)
+        # t0 = Int(round(get_t0(sched,v)))
+        # tF = Int(round(get_tF(sched,v)))
+        if tF + minimum(get_local_slack(sched,v)) <= t
             push!(fixed_vtxs, v)
-    elseif get_t0(sched,v) <= t < get_tF(sched,v) + minimum(get_local_slack(sched,v))
+        elseif t0 <= t < tF + minimum(get_local_slack(sched,v))
             push!(active_vtxs, v)
         end
     end
@@ -115,8 +119,11 @@ function split_action_node!(sched::OperatingSchedule,problem_spec::ProblemSpec,n
     node1 = replace_in_schedule!(sched,pred1,node.id)
     set_t0!(node1,get_t0(node))
     set_tF!(node1,t)
-    node2 = add_node!(sched,make_node(sched,problem_spec,pred1))
+    node2 = add_node!(sched,make_node(sched,problem_spec,pred2))
     set_t0!(node2,t)
+    set_tF!(node2,t+get_min_duration(node2.spec))
+    # @show node_id(node1), string(node1.node), node1
+    # @show node_id(node2), string(node2.node), node2
     # set_tF!(sched,id2,get_tF(node))
     for v in outneighbors(sched,get_vtx(sched,node1.id))
         rem_edge!(sched,node1,v)
@@ -141,11 +148,11 @@ function split_active_vtxs!(sched::OperatingSchedule,problem_spec::ProblemSpec,t
     # split active nodes
     for v in active_vtxs
         node = get_node(sched,v)
-        if isa(node,BOT_GO) # split TODO why aren't we splitting CARRY, COLLECT, and DEPOSIT as well?
-            x = robot_positions[node.r].x
+        if matches_template(BOT_GO,node) # split TODO why aren't we splitting CARRY, COLLECT, and DEPOSIT as well?
+            x = robot_positions[get_robot_id(node)].x
             node1,node2 = split_action_node!(sched,problem_spec,node,x,t)
             set_path_spec!(node1,PathSpec(get_path_spec(node1),fixed=true,plan_path=false))
-            set_path_spec!(node2,PathSpec(get_path_spec(node1),tight=true))
+            set_path_spec!(node2,PathSpec(get_path_spec(node2),tight=true))
         end
     end
     set_leaf_operation_vtxs!(sched)
@@ -161,15 +168,27 @@ Identify all nodes that end before the cutoff time, and change their path spec
     so that the route planner will not actually plan a path for them.
 """
 function fix_precutoff_nodes!(sched::OperatingSchedule,problem_spec::ProblemSpec,t)
-    # active_vtxs = Set{Int}()
     active_vtxs, fixed_vtxs = get_active_and_fixed_vtxs(sched,t)
+    # Make sure no nodes are already fixed (e.g, from a previous replanning 
+    # attempt that would have gone farther into the future.)
+    for v in vertices(sched)
+        set_path_spec!(sched,v,
+            PathSpec(   
+                get_path_spec(sched,v), 
+                plan_path=needs_path(get_node(sched,v).node), 
+                fixed=false)
+                )
+    end
     # set all fixed_vtxs to plan_path=false
     for v in fixed_vtxs
         set_path_spec!(sched,v,PathSpec(get_path_spec(sched,v), plan_path=false, fixed=true))
     end
-    # verify that all vertices following active_vtxs have a start time > 0
-    @assert all(map(v->get_t0(sched,v), collect(fixed_vtxs)) .<= t)
-    @assert all(map(v->get_tF(sched,v) + minimum(get_local_slack(sched,v)), collect(active_vtxs)) .>= t)
+    # verify that all vertices following active_vtxs have a start time > t
+    @assert all(get_node(sched,v).spec.fixed==false for v in active_vtxs)
+    @assert all(get_t0(sched,v) <= t for v in fixed_vtxs)
+    @assert all(
+        get_tF(sched,v) + minimum(get_local_slack(sched,v)) >= t for v in collect(active_vtxs)
+            )
     sched
 end
 function fix_precutoff_nodes!(env::SearchEnv,t=minimum(map(length, get_paths(get_route_plan(env)))))
@@ -178,20 +197,19 @@ function fix_precutoff_nodes!(env::SearchEnv,t=minimum(map(length, get_paths(get
 end
 
 function break_assignments!(sched::OperatingSchedule,problem_spec,v)
-    G = get_graph(sched)
-    node_id = get_vtx_id(sched,v)
-    node = get_node_from_id(sched,node_id)
+    n_id = get_vtx_id(sched,v)
+    node = get_node_from_id(sched,n_id)
     if isa(node, AbstractRobotAction)
-        new_node = replace_robot_id(node,RobotID(-1)) # TODO Why is this line here? I don't think the robot id should be replaced in this node--just it's successors
+        new_node = replace_robot_id(node,RobotID(-1)) # All replaced ids will be filled back when propagate_valid_ids!(sched) is called again
         if isa(node,BOT_GO)
-            for v2 in outneighbors(G,v)
+            for v2 in outneighbors(sched,v)
                 if isa(get_node_from_vtx(sched,v2),Union{BOT_COLLECT,TEAM_COLLECT})
-                    rem_edge!(G,v,v2)
+                    rem_edge!(sched,v,v2)
                     new_node = replace_destination(new_node,LocationID(-1))
                 end
             end
         end
-        replace_in_schedule!(sched,problem_spec,new_node,node_id)
+        replace_in_schedule!(sched,problem_spec,new_node,n_id)
     elseif isa(node,TEAM_ACTION)
         for i in 1:length(node.instructions)
             n = node.instructions[i]
@@ -223,7 +241,7 @@ end
     prune_schedule(sched::OperatingSchedule,
         problem_spec::ProblemSpec,t)
 
-    remove nodes that don't need to be kept around any longer
+remove nodes that don't need to be kept around any longer
 """
 function prune_schedule(sched::OperatingSchedule,
         problem_spec::ProblemSpec,
@@ -257,7 +275,8 @@ function prune_schedule(sched::OperatingSchedule,
     keep_vtxs = setdiff(Set{Int}(collect(vertices(G))), remove_set)
     # add all non-deleted nodes to new project schedule
     for v in keep_vtxs
-        add_node!(new_sched,get_node(sched,v))
+        # add_node!(new_sched,get_node(sched,v))
+        add_node!(new_sched,deepcopy(get_node(sched,v)))
     end
     # add all edges between nodes that still exist
     for e in edges(get_graph(sched))
@@ -265,11 +284,14 @@ function prune_schedule(sched::OperatingSchedule,
     end
     # Initialize new cache
     # draw new ROBOT_AT -> GO edges where necessary
+    _robot_ids_replaced = Set{RobotID}()
     for v in vertices(new_sched)
         node = get_node(new_sched, v)
         pred = node.node
         if isa(pred,BOT_GO) && indegree(new_sched,v) == 0
             robot_id = get_robot_id(pred)
+            @assert !(robot_id in _robot_ids_replaced) "Already replaced ROBOT_AT node for $(summary(robot_id))"
+            push!(_robot_ids_replaced,robot_id)
             robot_node = replace_in_schedule!(new_sched, BOT_AT(robot_id, pred.x1), robot_id)
             set_t0!(robot_node,get_t0(node))
             add_edge!(new_sched, robot_node, node)
@@ -278,7 +300,6 @@ function prune_schedule(sched::OperatingSchedule,
             # add deleted objects back in
             input_ids = Set(map(v2->get_object_id(get_node_from_vtx(new_sched,v2)), inneighbors(new_sched,v)))
             for (object_id,o) in preconditions(pred)
-                # if !(get_object_id(o) in input_ids)
                 if !(object_id in input_ids)
                     o_node = add_node!(new_sched,make_node(sched,problem_spec,o)) 
                     add_edge!(new_sched, o_node.id, node)
@@ -298,26 +319,26 @@ end
 prune_schedule(env::SearchEnv,args...) = prune_schedule(get_schedule(env),get_problem_spec(env),args...)
 prune_schedule(solver,env::SearchEnv,args...) = prune_schedule(env,args...)
 
-"""
-    `prune_project_schedule`
+# """
+#     `prune_project_schedule`
 
-Remove all vertices that have already been completed. The idea is to identify
-all `Operation`s that are completed before `t`, remove all nodes upstream of
-them (except for ROBOT_AT nodes), and create new edges between the ROBOT_AT
-nodes and their first GO assignments.
-"""
-function prune_project_schedule(sched::OperatingSchedule,problem_spec::ProblemSpec,t;
-        robot_positions::Dict{RobotID,ROBOT_AT}=Dict{RobotID,ROBOT_AT}()
-    )
-    new_sched = prune_schedule(sched,problem_spec,t)
-    # split active nodes
-    new_sched = split_active_vtxs!(new_sched,problem_spec,t;robot_positions=robot_positions)
-    # freeze nodes that terminate before cutoff time
-    fix_precutoff_nodes!(new_sched,problem_spec,t)
-    # Remove all "assignments" from schedule
-    break_assignments!(new_sched,problem_spec)
-    new_sched
-end
+# Remove all vertices that have already been completed. The idea is to identify
+# all `Operation`s that are completed before `t`, remove all nodes upstream of
+# them (except for ROBOT_AT nodes), and create new edges between the ROBOT_AT
+# nodes and their first GO assignments.
+# """
+# function prune_project_schedule(sched::OperatingSchedule,problem_spec::ProblemSpec,t;
+#         robot_positions::Dict{RobotID,ROBOT_AT}=Dict{RobotID,ROBOT_AT}()
+#     )
+#     new_sched = prune_schedule(sched,problem_spec,t)
+#     # split active nodes
+#     new_sched = split_active_vtxs!(new_sched,problem_spec,t;robot_positions=robot_positions)
+#     # freeze nodes that terminate before cutoff time
+#     fix_precutoff_nodes!(new_sched,problem_spec,t)
+#     # Remove all "assignments" from schedule
+#     break_assignments!(new_sched,problem_spec)
+#     new_sched
+# end
 
 """
     splice_schedules!(sched::P,next_sched::P) where {P<:OperatingSchedule}
@@ -395,6 +416,7 @@ Fields:
     route_planning_buffer::Float64  = 2
     commit_threshold::Int           = 10
     max_time_limit::Int             = 100
+    prune::Bool                     = true
 end
 get_replanner_config(config::ReplannerConfig) = config
 get_replanner_config(model) = model.config
@@ -457,7 +479,10 @@ stage.
 """
 @with_kw struct ConstrainedMergeAndBalance      <: ReplannerModel
     config::ReplannerConfig = ReplannerConfig()
-    max_problem_size::Int   = 400 # max permissible number of variables in sub problem
+    max_problem_size::Int   = 400 # max permissible number of unfrozen nodes in sub problem
+    max_tasks::Int          = 80 # max permissible number of tasks
+    constrain_tasks::Bool   = false 
+    constrain_nodes::Bool   = true
 end
 @with_kw struct Oracle               <: ReplannerModel
     config::ReplannerConfig = ReplannerConfig(
@@ -537,6 +562,19 @@ struct ReplannerWithBackup{A,B}
     primary_planner::A
     backup_planner::B
 end
+for op in [:(CRCBS.set_runtime_limit!),:(CRCBS.set_deadline!)]
+    @eval begin
+        $op(model::FullReplanner,val) = $op(model.solver,val)
+        function $op(model::ReplannerWithBackup,val)
+            $op(model.backup_planner,val)
+            $op(model.primary_planner,val)
+        end
+    end
+end
+# function set_runtime_limit!(model::ReplannerModel,val)
+#     set_runtime_limit!(model.primary_planner,val)
+#     set_runtime_limit!(model.backup_planner,val)
+# end
 function set_real_time_flag!(model::ReplannerWithBackup,val)
     set_real_time_flag!(model.backup_planner,val)
     set_real_time_flag!(model.primary_planner,val)
@@ -552,26 +590,73 @@ end
 get_commit_time(replan_model::Oracle, search_env, request, args...) = request.t_request
 get_commit_time(replan_model::DeferUntilCompletion, search_env, request, commit_threshold) = max(request.t_request + commit_threshold, maximum(get_tF(get_schedule(search_env))))
 get_commit_time(replan_model::NullReplanner,args...) = get_commit_time(DeferUntilCompletion(),args...)
-function get_commit_time(replan_model::ReassignFreeRobots, search_env, request, commit_threshold)
+function get_earliest_free_time(search_env)
     free_time = makespan(get_schedule(search_env))
-    for v in vertices(get_schedule(search_env))
-        # node = get_node_from_vtx(get_schedule(search_env),v)
-        node = get_node(get_schedule(search_env),v)
+    for node in get_nodes(get_schedule(search_env))
         if isa(node.node,GO)
             if get_id(get_destination_location_id(node.node)) == -1
                 free_time = min(free_time, get_t0(node))
             end
         end
     end
+    return free_time
+end
+function get_commit_time(replan_model::ReassignFreeRobots, search_env, request, commit_threshold)
+    # free_time = makespan(get_schedule(search_env))
+    # for v in vertices(get_schedule(search_env))
+    #     # node = get_node_from_vtx(get_schedule(search_env),v)
+    #     node = get_node(get_schedule(search_env),v)
+    #     if isa(node.node,GO)
+    #         if get_id(get_destination_location_id(node.node)) == -1
+    #             free_time = min(free_time, get_t0(node))
+    #         end
+    #     end
+    # end
+    free_time = get_earliest_free_time(search_env)
     max(request.t_request + commit_threshold,free_time)
 end
 function get_commit_time(replan_model::ConstrainedMergeAndBalance, search_env, request, commit_threshold)
-    nv_max = replan_model.max_problem_size - nv(request.schedule)
+    nv_max = max(1,replan_model.max_problem_size - nv(request.schedule))
     t_commit = request.t_request + commit_threshold
-    if 0 < nv_max < nv(get_schedule(search_env))
-        t_commit = max(t_commit, sort(get_tF(get_schedule(search_env)); rev=true)[nv_max])
+    sched = get_schedule(search_env)
+    # constrain the total number of unfrozen nodes
+    if replan_model.constrain_nodes
+        old_t_commit = t_commit
+        if 0 < nv_max < nv(sched)
+            t_commit = max(t_commit, sort(get_tF(sched); rev=true)[nv_max])
+        end
+        if old_t_commit != t_commit
+            @info "Bumping t_commit from $(old_t_commit) to $(t_commit) to respect ConstrainedMergeAndBalance.max_problem_size = $(replan_model.max_tasks)"
+        end
+    end
+    # constrain the total number of delivery tasks
+    if replan_model.constrain_tasks
+        n_tasks = 0
+        for n in get_nodes(request.schedule) 
+            if matches_template(OBJECT_AT,n)
+                n_tasks += 1
+            end
+        end
+        for n in node_iterator(sched,reverse(sortperm(get_tF(sched))))
+            if matches_template(BOT_COLLECT,n)
+                n_tasks += 1
+                if n_tasks > replan_model.max_tasks || get_tF(n) <= t_commit
+                    old_t_commit = t_commit
+                    t_commit = max(t_commit, get_tF(n))
+                    if old_t_commit != t_commit
+                        @info "Bumping t_commit from $(old_t_commit) to $(t_commit) to respect ConstrainedMergeAndBalance.max_tasks = $(replan_model.max_tasks)"
+                    end
+                    break
+                end
+            end
+        end
     end
     return t_commit
+end
+
+function prune_schedule(::ReassignFreeRobots,env::SearchEnv,t)
+    t_free = get_earliest_free_time(env)
+    prune_schedule(env,min(t_free,t))
 end
 
 break_assignments!(replan_model::ReplannerModel,args...) = break_assignments!(args...)
@@ -587,25 +672,13 @@ function set_time_limits!(replan_model,solver,t_request,t_commit)
 end
 
 function set_time_limits!(flag::Bool,replan_model,solver,t_request,t_commit)
-    # set_runtime_limit!(solver, (t_commit - t_request) - get_timeout_buffer(replan_model))
-    # # set_runtime_limit!(assignment_solver(solver), solver.time_limit - get_route_planning_buffer(replan_model))
-    # set_runtime_limit!(solver.assignment_model, runtime_limit(solver) - get_route_planning_buffer(replan_model))
-    # @assert runtime_limit(solver) > 0.0
-    # solver
     set_runtime_limit!(solver, (t_commit - t_request) - get_timeout_buffer(replan_model))
-    set_runtime_limit!(solver, min(runtime_limit(solver),get_max_time_limit(replan_model)))
+    set_runtime_limit!(solver, min(runtime_limit(solver), get_max_time_limit(replan_model)))
     set_runtime_limit!(assignment_solver(solver), runtime_limit(solver) - get_route_planning_buffer(replan_model))
     @assert runtime_limit(solver) > 0.0
     set_deadline!(solver, time() + (t_commit - t_request))
     solver
 end
-# function set_time_limits!(flag::Bool,replan_model::DeferUntilCompletion,solver,t_request,t_commit)
-#     set_runtime_limit!(solver, (t_commit - t_request) - get_timeout_buffer(replan_model))
-#     set_runtime_limit!(solver, min(runtime_limit(solver),get_max_time_limit(replan_model)))
-#     set_runtime_limit!(assignment_solver(solver), runtime_limit(solver) - get_route_planning_buffer(replan_model))
-#     @assert runtime_limit(solver) > 0.0
-#     solver
-# end
 function set_time_limits!(flag::Bool,replan_model::NullReplanner,solver,t_request,t_commit)
     set_runtime_limit!(solver,-1.0)
     return solver
@@ -630,35 +703,48 @@ function replan!(solver, replan_model, search_env, request;
         commit_threshold=get_commit_threshold(replan_model),
         kwargs...
         )
-    sched               = get_schedule(search_env)
+    # sched               = get_schedule(search_env)
     cache               = get_cache(search_env)
     route_plan          = get_route_plan(search_env)
     problem_spec        = get_problem_spec(search_env)
     env_graph           = get_graph(search_env)
     t_request           = request.t_request
-    next_sched          = request.schedule
+    next_sched          = deepcopy(request.schedule)
 
-    @assert sanity_check(sched," in replan!()")
+    @assert sanity_check(get_schedule(search_env)," in replan!()")
     # Freeze route_plan and schedule at t_commit
     t_commit = get_commit_time(replan_model, search_env, request, commit_threshold)
     t_final = minimum(map(length, get_paths(get_route_plan(search_env))))
+    @assert(all(length(p) == t_final for p in get_paths(get_route_plan(search_env))))
     t_split = min(t_commit,t_final)
+    # @info "t_commit" t_commit t_split
+
     robot_positions=get_env_snapshot(search_env,t_split)
     reset_solver!(solver)
     set_time_limits!(replan_model,solver,t_request,t_commit)
     # Update operating schedule
-    new_sched = prune_schedule(replan_model,search_env,t_split)
+    if get_replanner_config(replan_model).prune
+        new_sched = prune_schedule(replan_model,search_env,t_split) # Maybe this should be at t_request instead?
+    else
+        new_sched = deepcopy(get_schedule(search_env))
+    end
+    # NOTE If we prune at t_commit or t_split, we may actually cut out unfinished
+    # nodes when using ReassignFreeRobots. Ideally, ReassignFreeRobots would prune at the earliest free time
+    # NOTE again -- actually, the above is not true. ReassignFreeRobots only increases t_commit to the earliest free node.
+    # new_sched = prune_schedule(replan_model,search_env,min(t_split,t_request)) # Maybe this should be at t_request instead?
     @assert sanity_check(new_sched," after prune_schedule()")
     # split active nodes
-    new_sched = split_active_vtxs!(replan_model,new_sched,problem_spec,t_split;robot_positions=robot_positions)
+    # new_sched = split_active_vtxs!(replan_model,new_sched,problem_spec,t_split;robot_positions=robot_positions)
+    new_sched = split_active_vtxs!(replan_model,new_sched,problem_spec,t_commit;robot_positions=robot_positions)
     @assert sanity_check(new_sched," after split_active_vtxs!()")
     # freeze nodes that terminate before cutoff time
-    new_sched = fix_precutoff_nodes!(replan_model,new_sched,problem_spec,t_split)
+    # new_sched = fix_precutoff_nodes!(replan_model,new_sched,problem_spec,t_split)
+    new_sched = fix_precutoff_nodes!(replan_model,new_sched,problem_spec,t_commit)
     # Remove all "assignments" from schedule
     break_assignments!(replan_model,new_sched,problem_spec)
     @assert sanity_check(new_sched," after break_assignments!()")
     # splice projects together!
-    set_t0!(next_sched,t_commit)
+    set_t0!(next_sched,t_commit) 
     splice_schedules!(new_sched,next_sched)
     process_schedule!(new_sched)
     @assert sanity_check(new_sched," after splice_schedules!()")

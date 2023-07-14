@@ -93,27 +93,40 @@ function remap_object_ids!(sched::OperatingSchedule,args...)
     @assert sanity_check(sched," after remap_object_ids!()")
     sched
 end
-function remap_object_ids!(new_schedule::OperatingSchedule,old_schedule::OperatingSchedule)
-    max_obj_id = 0
-    for id in get_vtx_ids(old_schedule)
-        if typeof(id) <: ObjectID
-            max_obj_id = max(get_id(id),max_obj_id)
+function remap_object_ids!(spec::ProjectSpec,args...)
+    remap_object_ids!(get_vtx_ids(spec),args...)
+    remap_object_ids!(get_nodes(spec),args...)
+    remap_object_ids!(get_vtx_map(spec),args...)
+    remap_object_ids!(get_initial_conditions(spec),args...)
+    remap_object_ids!(get_final_conditions(spec),args...)
+    # @assert sanity_check(sched," after remap_object_ids!()")
+    spec
+end
+for T in [:OperatingSchedule,:ProjectSpec]
+    @eval begin
+        function remap_object_ids!(new_schedule::$T,old_schedule::$T)
+            max_obj_id = 0
+            for id in get_vtx_ids(old_schedule)
+                if typeof(id) <: ObjectID
+                    max_obj_id = max(get_id(id),max_obj_id)
+                end
+            end
+            remap_object_ids!(new_schedule,max_obj_id)
         end
     end
-    remap_object_ids!(new_schedule,max_obj_id)
 end
 
 export get_valid_robot_ids
 
 """
-    get_valid_robot_ids(sched::OperatingSchedule,node_id::AbstractID)
+    get_valid_robot_ids(sched::OperatingSchedule,n_id::AbstractID)
 
 Returns vector of all robot ids associated with the schedule node referenced by
-node_id.
+n_id.
 """
-function get_valid_robot_ids(sched::OperatingSchedule,node_id::A,v=get_vtx(sched,node_id)) where {A<:Union{ActionID,BotID}}
+function get_valid_robot_ids(sched::OperatingSchedule,n_id::A,v=get_vtx(sched,n_id)) where {A<:Union{ActionID,BotID}}
     ids = Vector{BotID}()
-    node = get_node(sched,node_id).node
+    node = get_node(sched,n_id).node
     if matches_template(TEAM_ACTION,node)
         for n in sub_nodes(node)
             r = get_robot_id(n)
@@ -126,7 +139,7 @@ function get_valid_robot_ids(sched::OperatingSchedule,node_id::A,v=get_vtx(sched
     end
     return filter(CRCBS.is_valid,ids)
 end
-function get_valid_robot_ids(sched::OperatingSchedule,node_id::A,v=get_vtx(sched,node_id)) where {A<:Union{ObjectID,OperationID}}
+function get_valid_robot_ids(sched::OperatingSchedule,n_id::A,v=get_vtx(sched,n_id)) where {A<:Union{ObjectID,OperationID}}
     return Vector{BotID}()
 end
 get_valid_robot_ids(s::OperatingSchedule,v::Int) = get_valid_robot_ids(s,get_vtx_id(s,v),v)
@@ -145,16 +158,53 @@ the `sched` corresponding to the robot's last assigned task.
 function robot_tip_map(sched::OperatingSchedule,vtxs=get_all_terminal_nodes(sched))
     robot_tips = Dict{BotID,AbstractID}()
     for v in vtxs
-        node_id = get_vtx_id(sched,v)
-        for robot_id in get_valid_robot_ids(sched,node_id,v)
+        n_id = get_vtx_id(sched,v)
+        for robot_id in get_valid_robot_ids(sched,n_id,v)
             if get_id(robot_id) != -1
-                @assert !haskey(robot_tips,robot_id)
-                robot_tips[robot_id] = node_id
+                if haskey(robot_tips,robot_id)
+                    current_tip = get_node(sched,robot_tips[robot_id])
+                    new_tip = get_node(sched,n_id)
+                    @error "Just found tip $(string(new_tip.node)), but robot tip map already has $(robot_id) => $(string(current_tip.node))"
+                    GraphUtils.log_graph_edges(sched,current_tip,show_all=false)
+                    GraphUtils.log_graph_edges(sched,new_tip,show_all=false)
+                    # @assert validate(sched)
+                    @assert !haskey(robot_tips,robot_id)
+                end
+                robot_tips[robot_id] = n_id
             end
         end
     end
     # @assert length(robot_tips) == length(get_robot_ICs(sched)) "length(robot_tips) == $(length(robot_tips)), but should be $(length(get_robot_ICs(sched)))"
     robot_tips
+end
+
+"""
+    extract_robot_itinerary(sched::OperatingSchedule,id::BotID)
+
+Return the sequence of tasks assigned to `id`
+"""
+function extract_robot_itinerary(sched::OperatingSchedule,id::BotID)
+    itinerary = Vector{ScheduleNode}()
+    if !has_vertex(sched,id)
+        return itinerary 
+    end
+    n = get_node(sched,id) # Robot start node
+    push!(itinerary,n)
+    while outdegree(sched,n) > 0
+        done = true
+        for np in node_iterator(sched,outneighbors(sched,n))
+            if has_robot_id(np) && get_robot_id(np) == id
+                push!(itinerary,np)
+                n = np
+                done = false
+                break
+            end
+        end
+        if done
+            break
+        end
+    end
+    return itinerary
 end
 
 export construct_task_graphs_problem
@@ -171,11 +221,15 @@ function construct_task_graphs_problem(
         Δt_deposit=zeros(length(sF)),
         cost_function=SumOfMakeSpans(),
         task_shapes=map(o->(1,1),s0),
-        shape_dict=Dict{Int,Dict{Tuple{Int,Int},Vector{Int}}}(s=>Dict{Tuple{Int,Int},Vector{Int}}() for s in vcat(s0,sF))
+        shape_dict=Dict{Int,Dict{Tuple{Int,Int},Vector{Int}}}(
+            s=>Dict{Tuple{Int,Int},Vector{Int}}() for s in vcat(s0,sF)
+            )
         ) 
     N = length(r0)
     M = length(s0)
     for j in 1:M
+        get!(shape_dict,s0[j],Dict{Tuple{Int,Int},Vector{Int}}())
+        get!(shape_dict,sF[j],Dict{Tuple{Int,Int},Vector{Int}}())
         @assert haskey(shape_dict, s0[j]) "shape_dict has no key for s0[$j] = $(s0[j])"
         @assert haskey(shape_dict, sF[j]) "shape_dict has no key for sF[$j] = $(sF[j])"
         @assert length(task_shapes) >= j "task_shapes has no key for j = $j"
@@ -192,7 +246,8 @@ function construct_task_graphs_problem(
                 op.station_id,
                 collect(keys(preconditions(op))),
                 collect(keys(postconditions(op))),
-                duration(op)
+                duration(op),
+                op.id
             )
         )
     end
@@ -368,8 +423,18 @@ end
 function get_random_problem_instantiation(N::Int,M::Int,pickup_zones,dropoff_zones,robot_zones)
     ##### Random Problem Initialization #####
     r0 = robot_zones[sortperm(rand(length(robot_zones)))][1:N]
-    s0 = pickup_zones[sortperm(rand(length(pickup_zones)))][1:M]
-    sF = dropoff_zones[sortperm(rand(length(dropoff_zones)))][1:M]
+    pickup_idxs = sortperm(rand(length(pickup_zones)))
+    while length(pickup_idxs) < M
+        pickup_idxs = vcat(pickup_idxs,sortperm(rand(length(pickup_zones))))
+    end
+    s0 = map(i->pickup_zones[i], pickup_idxs[1:M])
+    # s0 = pickup_zones[sortperm(rand(length(pickup_zones)))][1:M]
+    dropoff_idxs = sortperm(rand(length(dropoff_zones)))
+    while length(dropoff_idxs) < M
+        dropoff_idxs = vcat(dropoff_idxs,sortperm(rand(length(dropoff_zones))))
+    end
+    sF = map(i->dropoff_zones[i], dropoff_idxs[1:M])
+    # sF = dropoff_zones[sortperm(rand(length(dropoff_zones)))][1:M]
     return r0,s0,sF
 end
 
@@ -504,8 +569,11 @@ end
 export
     get_object_paths
 
-function get_object_paths(solution,sched)
-    robot_paths = convert_to_vertex_lists(solution)
+function get_object_paths(
+        solution,
+        sched, 
+        robot_paths = convert_to_vertex_lists(solution),
+        )
     tF = maximum(map(length, robot_paths))
     object_paths = Vector{Vector{Int}}()
     object_intervals = Vector{Vector{Int}}()
@@ -529,11 +597,18 @@ function get_object_paths(solution,sched)
             for (idx,(agent_id,s0,sF)) in enumerate(zip(agent_id_list,s0_list,sF_list))
                 if get_id(agent_id) != -1
                     push!(object_paths,[
-                        map(t->s0,0:get_t0(sched,v)-1)...,
-                        map(t->robot_paths[agent_id][t],min(get_t0(sched,v)+1,tF):min(get_tF(sched,v)+1,tF,length(robot_paths[agent_id])))...,
-                        map(t->sF,min(get_tF(sched,v)+1,tF):tF)...
+                        map(t->s0,
+                            0:Int(round(get_t0(sched,v)))-1)...,
+                        map(t->robot_paths[agent_id][t],
+                            min(Int(round(get_t0(sched,v)))+1,tF):min(Int(round(get_tF(sched,v)))+1,
+                            tF,
+                            length(robot_paths[agent_id])))...,
+                        map(t->sF,
+                            min(Int(round(get_tF(sched,v)))+1,tF):tF)...
                     ])
-                    push!(object_intervals,[get_t0(sched,object_vtx),get_tF(sched,v)+1])
+                    push!(object_intervals,[
+                        get_t0(sched,object_vtx),
+                        get_tF(sched,v)+1])
                     push!(object_ids, get_id(object_id))
                     push!(path_idxs, idx)
                 end
@@ -542,9 +617,6 @@ function get_object_paths(solution,sched)
     end
     object_paths, object_intervals, object_ids, path_idxs
 end
-# function get_object_paths(solution,env::SearchEnv)
-#     get_object_paths(solution,get_schedule(env))
-# end
 
 export
     fill_object_path_dicts!,
@@ -580,4 +652,14 @@ function convert_to_path_vectors(object_path_dict, object_interval_dict)
         end
     end
     object_paths, object_intervals
+end
+
+function print_schedule_node_details(io::IO,sched,n)
+    print(io,sprint_padded(string(n.node);pad=20)," - ")
+    s = "t0: $(get_t0(n)), tF: $(get_tF(n)), "
+    print(io,s)
+    print(io,"fixed: $(n.spec.fixed), ")
+    print(io,"inneighbors: ",[string(get_node(sched,vp).node) for vp in inneighbors(sched,n)]...)
+    print(io,", outneighbors: ",[string(get_node(sched,vp).node) for vp in outneighbors(sched,n)]...)
+    print(io,"\n")
 end

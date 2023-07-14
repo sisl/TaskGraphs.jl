@@ -42,13 +42,13 @@ let
         path_planner = DefaultAStarSC()
         node = initialize_root_node(search_env)
         # plan for Robot Start
-        node_id = RobotID(1)
-        schedule_node = get_node_from_id(search_env.schedule, node_id)
-        v = get_vtx(search_env.schedule, node_id)
+        n_id = RobotID(1)
+        schedule_node = get_node(search_env.schedule, n_id)
+        v = get_vtx(search_env.schedule, schedule_node)
         @test plan_path!(path_planner, pc_mapf,search_env, node, schedule_node, v)
         # plan for GO
         v2 = outneighbors(search_env.schedule,v)[1]
-        schedule_node = get_node_from_vtx(search_env.schedule, v2)
+        schedule_node = get_node(search_env.schedule, v2)
         @test plan_path!(path_planner, pc_mapf,search_env, node, schedule_node, v2)
         # @show convert_to_vertex_lists(node.solution)
     end
@@ -120,6 +120,7 @@ let
                 costs = Float64[]
                 for solver in [
                         NBSSolver(assignment_model = TaskGraphsMILPSolver(AssignmentMILP())),
+                        NBSSolver(assignment_model = TaskGraphsMILPSolver(ExtendedAssignmentMILP())),
                         NBSSolver(assignment_model = TaskGraphsMILPSolver(SparseAdjacencyMILP())),
                         NBSSolver(assignment_model = TaskGraphsMILPSolver(GreedyAssignment())),
                         ]
@@ -127,8 +128,10 @@ let
                     # @show i, f, solver
                     pc_tapf = f(solver;cost_function=cost_model,verbose=false);
                     search_env = pc_tapf.env
+
                     prob = formulate_assignment_problem(solver.assignment_model,pc_tapf)
                     sched, cost = solve_assignment_problem!(solver.assignment_model,prob,pc_tapf)
+                    # @show cost, maximum(get_tF(sched))
                     if !isa(solver.assignment_model.milp,GreedyAssignment)
                         push!(costs, cost)
                     end
@@ -160,6 +163,7 @@ let
                 costs = Float64[]
                 for solver in [
                         NBSSolver(assignment_model = TaskGraphsMILPSolver(AssignmentMILP())),
+                        NBSSolver(assignment_model = TaskGraphsMILPSolver(ExtendedAssignmentMILP())),
                         NBSSolver(assignment_model = TaskGraphsMILPSolver(SparseAdjacencyMILP())),
                         NBSSolver(assignment_model = TaskGraphsMILPSolver(GreedyAssignment())),
                         NBSSolver(
@@ -199,6 +203,7 @@ let
         ])
         for solver in [
                 NBSSolver(assignment_model = TaskGraphsMILPSolver(AssignmentMILP())),
+                NBSSolver(assignment_model = TaskGraphsMILPSolver(ExtendedAssignmentMILP())),
                 NBSSolver(assignment_model = TaskGraphsMILPSolver(SparseAdjacencyMILP())),
                 ]
             let
@@ -349,3 +354,121 @@ let
     cost
     # @show get_route_plan(env)
 end
+# test ISPS backtracking
+let
+    solver = ISPS()
+    @test TaskGraphs.activate_backtracking!(solver) == false
+    @test solver.backtrack == false
+
+    solver = ISPS(backtrack=true)
+    @test solver.backtrack == true
+    # activate returns false b/c no nodes to backtrack on
+    @test TaskGraphs.activate_backtracking!(solver) == false
+    sched = OperatingSchedule()
+    add_node!(sched,GO(1,1,2),ActionID(1))
+    TaskGraphs.update_backtrack_list!(solver,sched,ActionID(1))
+    @test TaskGraphs.activate_backtracking!(solver) == true
+    @test TaskGraphs.do_backtrack(solver,sched,ActionID(1))
+
+end
+# Test completeness of ISPS with/without backtracking
+let 
+    solver1 = CBSSolver(ISPS())
+    prob = pctapf_problem_10(PC_MAPF,solver1)
+    env,cost = solve!(solver1,prob)
+    @test cost[1] == 7
+
+    solver2 = CBSSolver(ISPS(backtrack=true))
+    env,cost = solve!(solver2,prob)
+    @test cost[1] == 6 
+
+end
+let 
+    solver1 = CBSSolver(ISPS())
+    prob = TaskGraphs.pctapf_problem_multi_backtrack(PC_MAPF,solver1)
+    env,cost = solve!(solver1,prob)
+    @test cost[1] == 9
+
+    solver2 = CBSSolver(ISPS(backtrack=true))
+    env,cost = solve!(solver2,prob)
+    @test cost[1] == 8 
+
+end
+# Test ISPS and A* with different options 
+let
+    # ISPS - normal vs. no slack prioritization in queue
+    # A*sc - normal vs. no collision-avoidance vs. no slack allowance
+    for (i, f) in enumerate([
+        pctapf_problem_1,
+        pctapf_problem_2,
+        pctapf_problem_3,
+        pctapf_problem_4,
+        pctapf_problem_5,
+        pctapf_problem_6,
+        pctapf_problem_7,
+        pctapf_problem_8,
+        ])
+        for (use_slack_cost, use_conflict_cost, random_prioritization
+            ) in Base.Iterators.product(
+                [true,false],[true,false],[true,false]
+            )
+            solver = ISPS(
+                low_level_planner=DefaultAStarSC(
+                        use_slack_cost=use_slack_cost,
+                        use_conflict_cost=use_conflict_cost
+                    ),
+                    random_prioritization=random_prioritization
+                    )
+
+            prob = f(PC_MAPF,solver)
+            env, cost = solve!(solver,prob)
+        end
+    end
+
+end
+# Investigate why A*sc is failing
+let 
+        
+end
+# let
+#     reset_all_id_counters!()
+#     solver = NBSSolver(path_planner=CBSSolver(ISPS(backtrack=true)))
+#     pc_tapf = pctapf_problem_10(solver;cost_function=MakeSpan(),verbose=false);
+#     base_env = pc_tapf.env
+
+#     prob = formulate_assignment_problem(assignment_solver(solver),pc_tapf)
+#     sched, cost = solve_assignment_problem!(assignment_solver(solver),prob,pc_tapf)
+#     @test cost == 6
+
+#     env = construct_search_env(solver,sched,base_env)
+#     pc_mapf = PC_MAPF(env)
+
+#     # reset_solver!(route_planner(solver))
+#     # set_verbosity!(low_level(route_planner(solver)),0)
+#     # solve!(route_planner(solver),pc_mapf)
+
+#     isps_planner = low_level(route_planner(solver))
+#     reset_solver!(isps_planner)
+#     TaskGraphs.clear_backtrack_list!(isps_planner)
+#     set_verbosity!(isps_planner,2)
+#     set_verbosity!(low_level(isps_planner),0)
+#     node = initialize_root_node(solver,pc_mapf)
+#     compute_route_plan!(isps_planner,pc_mapf,node)
+#     search_env = node.solution
+
+#     TaskGraphs.activate_backtracking!(isps_planner)
+#     TaskGraphs.reset_schedule_times!(get_schedule(search_env),get_schedule(get_env(pc_mapf)))
+#     TaskGraphs.reset_cache!(get_cache(search_env),get_schedule(search_env),)
+#     TaskGraphs.reset_route_plan!(node,get_route_plan(get_env(pc_mapf)))
+#     # compute_route_plan!(isps_planner,pc_mapf,node)
+#     # node.solution
+
+#     set_verbosity!(isps_planner,4)
+#     while !TaskGraphs.do_backtrack(isps_planner, get_schedule(search_env), get_vtx_id(get_schedule(search_env), peek(search_env.cache.node_queue).first))
+#         plan_next_path!(isps_planner,pc_mapf,search_env,node)
+#     end
+#     set_verbosity!(low_level(isps_planner),5)
+#     plan_next_path!(isps_planner,pc_mapf,search_env,node)
+
+
+# end
