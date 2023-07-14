@@ -691,7 +691,7 @@ function index_by_keys(tab::ResultsTable,include_keys::Dict=Dict(),exclude_keys:
     for (idxs,keylist) in [(x_idxs,get_xkeys(tab)),(y_idxs,get_ykeys(tab))]
         for (i,dict) in enumerate(keylist)
             keep = true
-            for (k,v) in dict 
+            for (k,v) in dict
                 if haskey(include_keys,k) && !(v in include_keys[k])
                     keep = false
                     break
@@ -799,7 +799,7 @@ function table_reduce(table,op)
 end
 function flatten_table(tab;
         axis = :y,
-        _header_keys = Dict(), 
+        _header_keys = Dict(),
     )
     if axis == :y
         data = reshape(vcat([tab.data[:,j] for j in 1:size(tab,2)]...),prod(size(tab)),1)
@@ -815,7 +815,7 @@ end
 """
     fill_tab_from_columns!(tab,df;
 
-tab has row indices for values of df.xkey and column indices for column names 
+tab has row indices for values of df.xkey and column indices for column names
     df.
 """
 function fill_tab_from_columns!(tab,df;
@@ -842,8 +842,8 @@ end
 """
     table_inner_product(tables,xkeys,ykeys)
 
-Given an `m × n` matrix of tables, construct a new `m × n` table `new_tab` such 
-that `new_tab[i,j]` is a `m × n` matrix whose `a,b`th element is the `i,j`th 
+Given an `m × n` matrix of tables, construct a new `m × n` table `new_tab` such
+that `new_tab[i,j]` is a `m × n` matrix whose `a,b`th element is the `i,j`th
 element of table `tables[a,b]`.
 """
 function table_inner_product(tables,xkeys,ykeys)
@@ -887,7 +887,7 @@ function print_multi_value_real(io,vals;
         print_func=print_real,
         kwargs...)
     best_idx = comp_func(vals)
-    if 1 <= best_idx <= length(vals) 
+    if 1 <= best_idx <= length(vals)
         best_idxs = findall(vals .== vals[best_idx])
     else
         best_idxs = []
@@ -1059,14 +1059,14 @@ end
 """
     nested_label_func(nested_xkeys::Vector)
 
-Return a function that outputs a nested table row or column (depends on `mode`) 
+Return a function that outputs a nested table row or column (depends on `mode`)
 label.
 """
 function nested_label_func(nested_xkeys::Vector;
         mode=:row,
         kwargs...,
         )
-    label_func = (k,v) -> begin 
+    label_func = (k,v) -> begin
         io = IOBuffer()
         xlabels = ResultsTable(
             [Dict(:x=>x) for x in nested_xkeys],
@@ -1292,7 +1292,7 @@ function get_box_plot_group_plot(df;
         }
 
         );
-        
+
         if plot_type == "boxplot"
             gp.options[plot_type] = nothing
             gp.options["boxplot/draw_direction"] = "y"
@@ -1902,14 +1902,14 @@ end
 global TITLE_MODE = Dict()
 _title_mode(n) = get(TITLE_MODE,typeof(n),get(TITLE_MODE,Any,:TYPE))
 function _set_title_mode!(n,val)
-    global TITLE_MODE 
+    global TITLE_MODE
     TITLE_MODE[n] = val
 end
 
 global SUBTITLE_MODE = Dict()
 _subtitle_mode(n) = get(SUBTITLE_MODE,typeof(n),get(SUBTITLE_MODE,Any,:TYPE))
 function _set_subtitle_mode!(n,val)
-    global SUBTITLE_MODE 
+    global SUBTITLE_MODE
     SUBTITLE_MODE[n] = val
 end
 
@@ -1936,9 +1936,9 @@ end
 
 
 _info_string(n::AbstractPlanningPredicate)     = ""
-_info_string(n::BOT_AT)        = "r$(get_id(get_robot_id(n))),x$(get_id(get_initial_location_id(n)))" 
+_info_string(n::BOT_AT)        = "r$(get_id(get_robot_id(n))),x$(get_id(get_initial_location_id(n)))"
 _info_string(n::OBJECT_AT)     = "o$(get_id(get_object_id(n))),x$(get_id(get_initial_location_id(n)))"
-_info_string(n::BOT_GO)        = "r$(get_id(get_robot_id(n))),x$(get_id(get_initial_location_id(n)))=>x$(get_id(get_destination_location_id(n)))" 
+_info_string(n::BOT_GO)        = "r$(get_id(get_robot_id(n))),x$(get_id(get_initial_location_id(n)))=>x$(get_id(get_destination_location_id(n)))"
 _info_string(n::BOT_COLLECT)   = "r$(get_id(get_robot_id(n))),o$(get_id(get_object_id(n))),x$(get_id(get_initial_location_id(n)))"
 _info_string(n::BOT_DEPOSIT)   = "r$(get_id(get_robot_id(n))),o$(get_id(get_object_id(n))),x$(get_id(get_initial_location_id(n)))"
 _info_string(n::BOT_CARRY)     = "r$(get_id(get_robot_id(n))),o$(get_id(get_object_id(n))),x$(get_id(get_initial_location_id(n)))=>x$(get_id(get_destination_location_id(n)))"
@@ -1966,13 +1966,13 @@ GraphPlottingBFS._subtitle_text_scale(n::AbstractPlanningPredicate) = 0.3
 GraphPlottingBFS._text_color(n::AbstractPlanningPredicate) = "black"
 
 # function GraphPlottingBFS.display_graph(g::OperatingSchedule;
-#         kwargs...) 
+#         kwargs...)
 #     draw_node_func=(_,v)->GraphPlottingBFS.draw_node(g,v)
 # end
-function GraphPlottingBFS.draw_node(g::OperatingSchedule,v,args...;kwargs...) 
+function GraphPlottingBFS.draw_node(g::OperatingSchedule,v,args...;kwargs...)
     draw_node(get_node(g,v))
 end
-function GraphPlottingBFS.draw_node(g::ProjectSpec,v,args...;kwargs...) 
+function GraphPlottingBFS.draw_node(g::ProjectSpec,v,args...;kwargs...)
     draw_node(get_node(g,v))
 end
 
@@ -2034,7 +2034,7 @@ function hstack_canvases(frame1,frame2;
         ctx1 = Compose.context(_x1, 0.0,        _dims1...)
         ctx2 = Compose.context(_x2, _dims1[2],  _dims2...)
     end
-    
+
     if !(bgcolor === nothing)
         bg = (context(),Compose.rectangle(0,0,1,1),fill(bgcolor))
     else
