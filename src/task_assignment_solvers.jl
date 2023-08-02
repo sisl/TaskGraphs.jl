@@ -41,7 +41,7 @@ AssignmentMILP(model::JuMP.Model) = AssignmentMILP(model=model)
     ExtendedAssignmentMILP <: TaskGraphsMILP
 
 Extended to the replanning setting. Replaces robot_ics with the "tips" of each
-robot's existing itinerary, and replaces object_ics with each COLLECT node that 
+robot's existing itinerary, and replaces object_ics with each COLLECT node that
 with an invalid robot id.
 """
 @with_kw struct ExtendedAssignmentMILP <: TaskGraphsMILP
@@ -116,7 +116,7 @@ function formulate_milp(milp_model::AssignmentMILP,
     end
     # from ProblemSpec
     D = (x,y) -> get_distance(problem_spec,x,y)
-    
+
     @variable(model, to0[1:M] >= 0.0) # object availability time
     @variable(model, tor[1:M] >= 0.0) # object robot arrival time
     @variable(model, toc[1:M] >= 0.0) # object collection complete time
@@ -261,7 +261,7 @@ function formulate_milp(milp_model::ExtendedAssignmentMILP,
     @assert all(sF .> 0) "sF should be a list of valid vtx ids, but some of these are invalid: $sF"
     # from ProblemSpec
     D = (x,y) -> get_distance(problem_spec,x,y)
-    
+
     @variable(model, to0[1:M] >= 0.0) # object availability time
     @variable(model, tor[1:M] >= 0.0) # object robot arrival time
     @variable(model, toc[1:M] >= 0.0) # object collection complete time
@@ -309,7 +309,7 @@ function formulate_milp(milp_model::ExtendedAssignmentMILP,
         end
         add_edge!(precedence_graph,v,v)
     end
-    for (id,node) in object_ics 
+    for (id,node) in object_ics
         if indegree(precedence_graph,id) == 1 # only applies to tasks with no prereqs
             @constraint(model, to0[object_map[id]] == get_t0(node))
         end
@@ -748,10 +748,10 @@ function formulate_schedule_milp(sched::OperatingSchedule,problem_spec::ProblemS
     G = get_graph(sched);
     assignments = [];
     Δt = get_min_duration(sched)
-    
+
     model=Model(optimizer_with_attributes(optimizer))
     set_optimizer_attributes(model,default_optimizer_attributes()...)
-    
+
     @variable(model, t0[1:nv(G)] >= 0.0); # initial times for all nodes
     @variable(model, tF[1:nv(G)] >= 0.0); # final times for all nodes
 
@@ -926,146 +926,165 @@ function formulate_milp(milp_model::AdjacencyMILP,sched::OperatingSchedule,probl
     kwargs...)
     formulate_schedule_milp(sched,problem_spec;optimizer=optimizer,kwargs...)
 end
-function formulate_milp(milp_model::SparseAdjacencyMILP,sched,problem_spec;
-        optimizer=default_milp_optimizer(),
-        t0_ = Dict{AbstractID,Float64}(), # dictionary of initial times. Default is empty
-        tF_ = Dict{AbstractID,Float64}(), # dictionary of initial times. Default is empty
-        Mm = 10000, # for big M constraints
-        cost_model = SumOfMakeSpans(),
-        job_shop=milp_model.job_shop,
-        kwargs...
-    )
+function formulate_milp(
+    milp_model::SparseAdjacencyMILP,
+    sched,
+    problem_spec;
+    warm_start_soln::Union{SparseMatrixCSC,Nothing}=nothing,
+    optimizer=default_milp_optimizer(),
+    t0_=Dict{AbstractID,Float64}(), # dictionary of initial times. Default is empty
+    tF_=Dict{AbstractID,Float64}(), # dictionary of initial times. Default is empty
+    Mm=10000, # for big M constraints
+    cost_model=SumOfMakeSpans(),
+    job_shop=milp_model.job_shop,
+    kwargs...
+)
 
-    model=Model(optimizer_with_attributes(optimizer))
-    set_optimizer_attributes(model,default_optimizer_attributes()...)
+warm_start = false
+if !isnothing(warm_start_soln)
+    warm_start = true
+end
 
-    G = get_graph(sched);
-    (missing_successors, missing_predecessors, n_eligible_successors,
-        n_eligible_predecessors, n_required_successors, n_required_predecessors,
-        upstream_vertices, non_upstream_vertices
-        ) = preprocess_project_schedule(sched)
+model=Model(optimizer_with_attributes(optimizer))
+set_optimizer_attributes(model,default_optimizer_attributes()...)
 
-    Δt = get_min_duration(sched)
+G = get_graph(sched);
+(missing_successors, missing_predecessors, n_eligible_successors,
+    n_eligible_predecessors, n_required_successors, n_required_predecessors,
+    upstream_vertices, non_upstream_vertices
+    ) = preprocess_project_schedule(sched)
 
-    @variable(model, t0[1:nv(sched)] >= 0.0); # initial times for all nodes
-    @variable(model, tF[1:nv(sched)] >= 0.0); # final times for all nodes
+Δt = get_min_duration(sched)
 
-    # Precedence relationships
-    Xa = SparseMatrixCSC{VariableRef,Int}(nv(sched),nv(sched),ones(Int,nv(sched)+1),Int[],VariableRef[])
-    # set all initial times that are provided
-    for (id,t) in t0_
-        v = get_vtx(sched, id)
-        @constraint(model, t0[v] >= t)
-    end
-    for (id,t) in tF_
-        v = get_vtx(sched, id)
-        @constraint(model, tF[v] >= t)
-    end
-    # Precedence constraints and duration constraints for existing nodes and edges
-    for v in vertices(sched)
-        @constraint(model, tF[v] >= t0[v] + Δt[v]) # NOTE Δt may change for some nodes
-        for v2 in outneighbors(sched,v)
-            Xa[v,v2] = @variable(model, binary=true) # TODO remove this (MUST UPDATE n_eligible_successors, etc. accordingly)
-            @constraint(model, Xa[v,v2] == 1) #TODO this edge already exists--no reason to encode it as a decision variable
-            @constraint(model, t0[v2] >= tF[v]) # NOTE DO NOT CHANGE TO EQUALITY CONSTRAINT. Making this an equality constraint causes the solver to return a higher final value in some cases (e.g., toy problems 2,3,7). Why? Maybe the Big-M constraint forces it to bump up. I though the equality constraint might speed up the solver.
+@variable(model, t0[1:nv(sched)] >= 0.0); # initial times for all nodes
+@variable(model, tF[1:nv(sched)] >= 0.0); # final times for all nodes
+
+# Precedence relationships
+Xa = SparseMatrixCSC{VariableRef,Int}(nv(sched),nv(sched),ones(Int,nv(sched)+1),Int[],VariableRef[])
+# set all initial times that are provided
+for (id,t) in t0_
+    v = get_vtx(sched, id)
+    @constraint(model, t0[v] >= t)
+end
+for (id,t) in tF_
+    v = get_vtx(sched, id)
+    @constraint(model, tF[v] >= t)
+end
+# Precedence constraints and duration constraints for existing nodes and edges
+for v in vertices(sched)
+    @constraint(model, tF[v] >= t0[v] + Δt[v]) # NOTE Δt may change for some nodes
+    for v2 in outneighbors(sched,v)
+        if warm_start
+            Xa[v,v2] = @variable(model, binary=true, start=warm_start_soln[v,v2])
+        else
+            Xa[v,v2] = @variable(model, binary=true)
         end
+        @constraint(model, Xa[v,v2] == 1) #TODO this edge already exists--no reason to encode it as a decision variable
+        @constraint(model, t0[v2] >= tF[v]) # NOTE DO NOT CHANGE TO EQUALITY CONSTRAINT. Making this an equality constraint causes the solver to return a higher final value in some cases (e.g., toy problems 2,3,7). Why? Maybe the Big-M constraint forces it to bump up. I though the equality constraint might speed up the solver.
     end
+end
 
-    # Big M constraints
-    for v in vertices(sched)
-        node = get_node_from_id(sched, get_vtx_id(sched, v))
-        potential_match = false
-        if outdegree(sched,v) < n_eligible_successors[v] # NOTE: Trying this out to save time on formulation
-            for v2 in non_upstream_vertices[v] # for v2 in vertices(sched)
-                if indegree(sched,v2) < n_eligible_predecessors[v2]
-                    node2 = get_node_from_id(sched, get_vtx_id(sched, v2))
-                    for (template, val) in missing_successors[v]
-                        if !matches_template(template, typeof(node2)) # possible to add an edge
+# Big M constraints
+for v in vertices(sched)
+    node = get_node_from_id(sched, get_vtx_id(sched, v))
+    potential_match = false
+    if outdegree(sched,v) < n_eligible_successors[v] # NOTE: Trying this out to save time on formulation
+        for v2 in non_upstream_vertices[v] # for v2 in vertices(sched)
+            if indegree(sched,v2) < n_eligible_predecessors[v2]
+                node2 = get_node_from_id(sched, get_vtx_id(sched, v2))
+                for (template, val) in missing_successors[v]
+                    if !matches_template(template, typeof(node2)) # possible to add an edge
+                        continue
+                    end
+                    for (template2, val2) in missing_predecessors[v2]
+                        if !matches_template(template2, typeof(node)) # possible to add an edge
                             continue
                         end
-                        for (template2, val2) in missing_predecessors[v2]
-                            if !matches_template(template2, typeof(node)) # possible to add an edge
-                                continue
+                        if (val > 0 && val2 > 0)
+                            potential_match = true
+                            new_node = align_with_successor(node,node2)
+                            if !robot_ids_match(node,node2)
+                                @log_info(-1,0,"Edge $(string(node)) --> $(string(node2)) should be illegal, but is being allowed by SparseAdjacencyMILP")
+                                @log_info(-1,0,"inneighbors(sched,$(string(node))):   ",  map(vp->string(string(get_node_from_vtx(sched,vp)),", "), inneighbors(sched,v))...)
+                                @log_info(-1,0,"outneighbors(sched,$(string(node))):  ", map(vp->string(string(get_node_from_vtx(sched,vp)),", "), outneighbors(sched,v))...)
+                                @log_info(-1,0,"inneighbors(sched,$(string(node2))):  ", map(vp->string(string(get_node_from_vtx(sched,vp)),", "), inneighbors(sched,v2))...)
+                                @log_info(-1,0,"outneighbors(sched,$(string(node2))): ",map(vp->string(string(get_node_from_vtx(sched,vp)),", "), outneighbors(sched,v2))...)
                             end
-                            if (val > 0 && val2 > 0)
-                                potential_match = true
-                                new_node = align_with_successor(node,node2)
-                                if !robot_ids_match(node,node2)
-                                    @log_info(-1,0,"Edge $(string(node)) --> $(string(node2)) should be illegal, but is being allowed by SparseAdjacencyMILP")
-                                    @log_info(-1,0,"inneighbors(sched,$(string(node))):   ",  map(vp->string(string(get_node_from_vtx(sched,vp)),", "), inneighbors(sched,v))...)
-                                    @log_info(-1,0,"outneighbors(sched,$(string(node))):  ", map(vp->string(string(get_node_from_vtx(sched,vp)),", "), outneighbors(sched,v))...)
-                                    @log_info(-1,0,"inneighbors(sched,$(string(node2))):  ", map(vp->string(string(get_node_from_vtx(sched,vp)),", "), inneighbors(sched,v2))...)
-                                    @log_info(-1,0,"outneighbors(sched,$(string(node2))): ",map(vp->string(string(get_node_from_vtx(sched,vp)),", "), outneighbors(sched,v2))...)
-                                end
 
-                                dt_min = generate_path_spec(sched,problem_spec,new_node).min_duration
-                                Xa[v,v2] = @variable(model, binary=true) # initialize a new binary variable in the sparse adjacency matrix
-                                @constraint(model, tF[v] - (t0[v] + dt_min) >= -Mm*(1 - Xa[v,v2]))
-                                @constraint(model, t0[v2] - tF[v] >= -Mm*(1 - Xa[v,v2]))
-                                break
+                            dt_min = generate_path_spec(sched,problem_spec,new_node).min_duration
+                            if warm_start
+                                Xa[v,v2] = @variable(model, binary=true, start=warm_start_soln[v,v2])
+                            else
+                                Xa[v,v2] = @variable(model, binary=true)
                             end
+                            @constraint(model, tF[v] - (t0[v] + dt_min) >= -Mm*(1 - Xa[v,v2]))
+                            @constraint(model, t0[v2] - tF[v] >= -Mm*(1 - Xa[v,v2]))
+                            break
                         end
                     end
                 end
             end
         end
-        if potential_match == false && job_shop == false
-            @constraint(model, tF[v] == t0[v] + Δt[v]) # adding this constraint may provide some speedup
-        end
     end
-
-    # In the sparse implementation, these constraints must come after all possible edges are defined by a VariableRef
-    @constraint(model, Xa * ones(nv(sched)) .<= n_eligible_successors);
-    @constraint(model, Xa * ones(nv(sched)) .>= n_required_successors);
-    @constraint(model, Xa' * ones(nv(sched)) .<= n_eligible_predecessors);
-    @constraint(model, Xa' * ones(nv(sched)) .>= n_required_predecessors);
-    for i in 1:nv(sched)
-        for j in i:nv(sched)
-            # prevent self-edges and cycles
-            @constraint(model, Xa[i,j] + Xa[j,i] <= 1)
-        end
+    if potential_match == false && job_shop == false
+        @constraint(model, tF[v] == t0[v] + Δt[v]) # adding this constraint may provide some speedup
     end
+end
 
-    # "Job-shop" constraints specifying that no station may be double-booked. A station
-    # can only support a single COLLECT or DEPOSIT operation at a time, meaning that all
-    # the windows for these operations cannot overlap. In the constraints below, t1 and t2
-    # represent the intervals for the COLLECT or DEPOSIT operations of tasks j and j2,
-    # respectively. If eny of the operations for these two tasks require use of the same
-    # station, we introduce a 2D binary variable y. if y = [1,0], the operation for task
-    # j must occur before the operation for task j2. The opposite is true for y == [0,1].
-    # We use the big M method here as well to tightly enforce the binary constraints.
-    # job_shop_variables = Dict{Tuple{Int,Int},JuMP.VariableRef}();
-    Xj = SparseMatrixCSC{VariableRef,Int}(nv(sched),nv(sched),ones(Int,nv(sched)+1),Int[],VariableRef[])
-    if job_shop
-        for v in 1:nv(sched)
-            node = get_node_from_id(sched, get_vtx_id(sched, v))
-            for v2 in non_upstream_vertices[v] #v+1:nv(sched)
-                if v2 > v && ~(v in upstream_vertices[v2]) && ~(has_edge(sched,v,v2) || has_edge(sched,v2,v))
-                    node2 = get_node_from_id(sched, get_vtx_id(sched, v2))
-                    common_resources = intersect(resources_reserved(node),resources_reserved(node2))
-                    if length(common_resources) > 0
-                        println("MILP FORMULATION: adding a job shop constraint between ",v, " (",string(node),") and ", v2, " (",string(node2),")")
-                        # @show common_resources
-                        # Big M constraints
-                        Xj[v,v2] = @variable(model, binary=true) #
-                        Xj[v2,v] = @variable(model, binary=true) # need both directions to have a valid adjacency matrix
-                        @constraint(model, Xj[v,v2] + Xj[v2,v] == 1)
-                        @constraint(model, t0[v2] - tF[v] >= -Mm*(1 - Xj[v,v2]))
-                        @constraint(model, t0[v] - tF[v2] >= -Mm*(1 - Xj[v2,v]))
-                    end
+# In the sparse implementation, these constraints must come after all possible edges are defined by a VariableRef
+@constraint(model, Xa * ones(nv(sched)) .<= n_eligible_successors);
+@constraint(model, Xa * ones(nv(sched)) .>= n_required_successors);
+@constraint(model, Xa' * ones(nv(sched)) .<= n_eligible_predecessors);
+@constraint(model, Xa' * ones(nv(sched)) .>= n_required_predecessors);
+for i in 1:nv(sched)
+    for j in i:nv(sched)
+        # prevent self-edges and cycles
+        @constraint(model, Xa[i,j] + Xa[j,i] <= 1)
+    end
+end
+
+# "Job-shop" constraints specifying that no station may be double-booked. A station
+# can only support a single COLLECT or DEPOSIT operation at a time, meaning that all
+# the windows for these operations cannot overlap. In the constraints below, t1 and t2
+# represent the intervals for the COLLECT or DEPOSIT operations of tasks j and j2,
+# respectively. If eny of the operations for these two tasks require use of the same
+# station, we introduce a 2D binary variable y. if y = [1,0], the operation for task
+# j must occur before the operation for task j2. The opposite is true for y == [0,1].
+# We use the big M method here as well to tightly enforce the binary constraints.
+# job_shop_variables = Dict{Tuple{Int,Int},JuMP.VariableRef}();
+Xj = SparseMatrixCSC{VariableRef,Int}(nv(sched),nv(sched),ones(Int,nv(sched)+1),Int[],VariableRef[])
+if job_shop
+    for v in 1:nv(sched)
+        node = get_node_from_id(sched, get_vtx_id(sched, v))
+        for v2 in non_upstream_vertices[v] #v+1:nv(sched)
+            if v2 > v && ~(v in upstream_vertices[v2]) && ~(has_edge(sched,v,v2) || has_edge(sched,v2,v))
+                node2 = get_node_from_id(sched, get_vtx_id(sched, v2))
+                common_resources = intersect(resources_reserved(node),resources_reserved(node2))
+                if length(common_resources) > 0
+                    println("MILP FORMULATION: adding a job shop constraint between ",v, " (",string(node),") and ", v2, " (",string(node2),")")
+                    # @show common_resources
+                    # Big M constraints
+                    Xj[v,v2] = @variable(model, binary=true) #
+                    Xj[v2,v] = @variable(model, binary=true) # need both directions to have a valid adjacency matrix
+                    @constraint(model, Xj[v,v2] + Xj[v2,v] == 1)
+                    @constraint(model, t0[v2] - tF[v] >= -Mm*(1 - Xj[v,v2]))
+                    @constraint(model, t0[v] - tF[v2] >= -Mm*(1 - Xj[v2,v]))
                 end
             end
         end
     end
-
-    # Full adjacency matrix
-    @expression(model, X, Xa .+ Xj) # Make X an expression rather than a variable
-
-    milp = SparseAdjacencyMILP(model,Xa,Xj, milp_model.job_shop) #, job_shop_variables
-    cost1 = get_objective_expr(milp,cost_model,milp.model,sched,tF)
-    @objective(milp.model, Min, cost1)
-    milp
 end
+
+# Full adjacency matrix
+@expression(model, X, Xa .+ Xj) # Make X an expression rather than a variable
+
+milp = SparseAdjacencyMILP(model,Xa,Xj, milp_model.job_shop) #, job_shop_variables
+cost1 = get_objective_expr(milp,cost_model,milp.model,sched,tF)
+@objective(milp.model, Min, cost1)
+milp
+end
+
+
 function formulate_milp(milp_model::FastSparseAdjacencyMILP,sched::OperatingSchedule,problem_spec::ProblemSpec;
         optimizer=default_milp_optimizer(),
         t0_ = Dict{AbstractID,Float64}(), # dictionary of initial times. Default is empty
@@ -1075,7 +1094,7 @@ function formulate_milp(milp_model::FastSparseAdjacencyMILP,sched::OperatingSche
         job_shop=milp_model.job_shop,
         kwargs...
     )
-    
+
     model=Model(optimizer_with_attributes(optimizer))
     set_optimizer_attributes(model,default_optimizer_attributes()...)
 
@@ -1223,7 +1242,7 @@ end
 function get_objective_expr(milp,f::SumOfMakeSpans,model,sched,tF)
     terminal_vtxs = sched.terminal_vtxs
     if isempty(terminal_vtxs)
-        @warn "sched.terminal_vtxs is empty. Using get_all_terminal_nodes(sched) instead" 
+        @warn "sched.terminal_vtxs is empty. Using get_all_terminal_nodes(sched) instead"
         terminal_vtxs = get_all_terminal_nodes(sched)
     end
     @variable(model, T[1:length(terminal_vtxs)])
@@ -1283,7 +1302,7 @@ JuMP.termination_status(::AbstractGreedyAssignment)    = MOI.OPTIMAL
 JuMP.primal_status(::AbstractGreedyAssignment)         = MOI.FEASIBLE_POINT
 get_assignment_matrix(model::AbstractGreedyAssignment)      = adjacency_matrix(get_graph(model.schedule))
 JuMP.objective_function(model::AbstractGreedyAssignment) = JuMP.objective_function(model.cost_model,model)
-function JuMP.objective_function(::SumOfMakeSpans,model::AbstractGreedyAssignment) 
+function JuMP.objective_function(::SumOfMakeSpans,model::AbstractGreedyAssignment)
     # t0,tF,slack,local_slack = process_schedule(model.schedule,model.t0)
     process_schedule!(model.schedule)
     sum((get_tF(model.schedule,v) * model.schedule.weights[v] for v in model.schedule.terminal_vtxs))
@@ -1320,7 +1339,7 @@ function formulate_milp(milp_model::GreedyAssignment,sched,problem_spec;
     )
 
     model = GreedyAssignment(
-        # schedule = sched, 
+        # schedule = sched,
         schedule = copy(sched), # Trying to see if this will fix problems in replanning
         problem_spec = problem_spec,
         cost_model = cost_model,
@@ -1423,8 +1442,8 @@ get_edge_cost(model::AbstractGreedyAssignment,D,v,v2) = get_edge_cost(model.gree
 get_edge_cost(::GreedyPathLengthCost,model,D,v,v2) = D[v,v2]
 get_edge_cost(::GreedyFinalTimeCost,model,D,v,v2) = get_tF(model.schedule,v) + D[v,v2]
 update_greedy_cost_model!(::GreedyCost,model,new_edges) = nothing
-update_greedy_cost_model!(model::AbstractGreedyAssignment,args...) = update_greedy_cost_model!(model.greedy_cost,model,args...) 
-function update_greedy_cost_model!(::GreedyFinalTimeCost,model,new_edges) 
+update_greedy_cost_model!(model::AbstractGreedyAssignment,args...) = update_greedy_cost_model!(model.greedy_cost,model,args...)
+function update_greedy_cost_model!(::GreedyFinalTimeCost,model,new_edges)
     # @info "Updating GreedyFinalTimeCost"
     t = time()
     update_schedule_times!(model.schedule)
